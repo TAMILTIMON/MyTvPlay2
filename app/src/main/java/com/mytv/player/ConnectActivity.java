@@ -60,7 +60,7 @@ public class ConnectActivity extends AppCompatActivity {
         TextView h = Ui.text(this, 24, Ui.TEXT, true);
         h.setText("TamilCastPlay");
         TextView s = Ui.text(this, 13, Ui.DIM, false);
-        s.setText("Remote · cast phone videos & songs");
+        s.setText(T.t("Remote · cast phone videos & songs"));
         t.addView(h);
         t.addView(s);
         top.addView(t, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
@@ -79,7 +79,7 @@ public class ConnectActivity extends AppCompatActivity {
         sr.setGravity(Gravity.CENTER_VERTICAL);
         sr.setPadding(0, Ui.dp(this, 24), 0, Ui.dp(this, 10));
         TextView label = Ui.text(this, 13, Ui.DIM, true);
-        label.setText("TVS ON YOUR WI-FI");
+        label.setText(T.t("TVS ON YOUR WI-FI"));
         label.setLetterSpacing(0.15f);
         sr.addView(label, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
         spinner = new ProgressBar(this);
@@ -93,21 +93,28 @@ public class ConnectActivity extends AppCompatActivity {
         status.setPadding(Ui.dp(this, 4), Ui.dp(this, 8), 0, Ui.dp(this, 16));
         root.addView(status);
 
-        Button rescan = Ui.button(this, "🔄  Scan again", true);
+        Button rescan = Ui.button(this, T.t("🔄  Scan again"), true);
         rescan.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 startScan();
             }
         });
         root.addView(rescan, full());
-        Button manual = Ui.button(this, "⌨  Enter TV address", false);
+        Button manual = Ui.button(this, T.t("⌨  Enter TV address"), false);
         manual.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 manual();
             }
         });
         root.addView(manual, full());
-        Button self = Ui.button(this, "📺  Use this phone as a player", false);
+        Button browse = Ui.button(this, "🌐  " + T.t("Browser · search & send videos to TV"), false);
+        browse.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                startActivity(new Intent(ConnectActivity.this, BrowserActivity.class));
+            }
+        });
+        root.addView(browse, full());
+        Button self = Ui.button(this, T.t("📺  Use this phone as a player"), false);
         self.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 startActivity(new Intent(ConnectActivity.this, MainActivity.class)
@@ -117,7 +124,7 @@ public class ConnectActivity extends AppCompatActivity {
         root.addView(self, full());
         TextView tip = Ui.text(this, 13, Ui.DIM, false);
         tip.setText("\nPhone and TV must be on the same Wi-Fi, and TamilCastPlay must be installed on the TV "
-                + "(it runs in the background after the first start).");
+                + T.t("(it runs in the background after the first start)."));
         root.addView(tip);
         setContentView(sv);
         RemoteService.start(this);
@@ -149,7 +156,7 @@ public class ConnectActivity extends AppCompatActivity {
         found.clear();
         renderList();
         spinner.setVisibility(View.VISIBLE);
-        status.setText("Looking for TVs…");
+        status.setText(T.t("Looking for TVs…"));
         final String last = Store.getStr("last_tv", "");
         Discovery.Listener l = new Discovery.Listener() {
             public void onFound(final Discovery.Device d) {
@@ -172,8 +179,8 @@ public class ConnectActivity extends AppCompatActivity {
                         if (id != scanId) return;
                         spinner.setVisibility(View.GONE);
                         status.setText(found.isEmpty()
-                                ? "No TV found. Open TamilCastPlay once on the TV, check both are on the same Wi-Fi, then scan again."
-                                : found.size() + (found.size() == 1 ? " device found. Tap to connect." : " devices found. Tap one to connect."));
+                                ? T.t("No TV found. Open TamilCastPlay once on the TV, check both are on the same Wi-Fi, then scan again.")
+                                : found.size() + (found.size() == 1 ? T.t(" device found. Tap to connect.") : T.t(" devices found. Tap one to connect.")));
                     }
                 });
             }
@@ -212,7 +219,7 @@ public class ConnectActivity extends AppCompatActivity {
             TextView n = Ui.text(this, 17, Ui.TEXT, true);
             n.setText(d.name);
             TextView ip = Ui.text(this, 13, Ui.DIM, false);
-            ip.setText(d.ip + (d.ip.equals(Store.getStr("last_tv", "")) ? "  ·  last used" : ""));
+            ip.setText(d.ip + (d.ip.equals(Store.getStr("last_tv", "")) ? T.t("  ·  last used") : ""));
             tx.addView(n);
             tx.addView(ip);
             row.addView(tx, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
@@ -243,8 +250,8 @@ public class ConnectActivity extends AppCompatActivity {
         e.setHint("192.168.1.33");
         e.setInputType(InputType.TYPE_CLASS_PHONE);
         e.setText(Store.getStr("last_tv", ""));
-        new AlertDialog.Builder(this).setTitle("TV address").setView(e)
-                .setPositiveButton("Connect", (d, w) -> {
+        new AlertDialog.Builder(this).setTitle(T.t("TV address")).setView(e)
+                .setPositiveButton(T.t("Connect"), (d, w) -> {
                     final String ip = e.getText().toString().trim().replace("http://", "").replaceAll(":.*", "");
                     if (ip.isEmpty()) return;
                     new Thread(() -> {
@@ -254,6 +261,6 @@ public class ConnectActivity extends AppCompatActivity {
                             else open(dev.ip, dev.name);
                         });
                     }).start();
-                }).setNegativeButton("Cancel", null).show();
+                }).setNegativeButton(T.t("Cancel"), null).show();
     }
 }

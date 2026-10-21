@@ -38,7 +38,7 @@ public final class LocalShare {
 
     /** Returns the link the TV can play. */
     public static synchronized String share(Context c, Uri u, String name) {
-        String id = String.valueOf(next++);
+        String id = Long.toHexString(new java.security.SecureRandom().nextLong() & Long.MAX_VALUE) + (next++);
         files.put(id, u);
         keepAwake(c);
         return "http://" + Net.ip() + ":" + RemoteService.PORT + "/local/" + id + "/" + Uri.encode(name);

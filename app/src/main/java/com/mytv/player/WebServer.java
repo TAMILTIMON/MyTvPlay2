@@ -1,6 +1,7 @@
 package com.mytv.player;
 
 import android.content.Context;
+import android.content.Intent;
 
 import org.json.JSONObject;
 
@@ -30,11 +31,33 @@ public class WebServer extends NanoHTTPD {
         try {
             String uri = s.getUri();
             if (uri.startsWith("/torrent/")) return torrent(s, uri);
-            if (uri.startsWith("/local/")) return local(s, uri);
+            if (uri.startsWith("/local/")) return local(s, uri);   // random ids, needed by the TV player
 
             Map<String, String> files = new HashMap<>();
             if (Method.POST.equals(s.getMethod())) s.parseBody(files);
             @SuppressWarnings("deprecation") Map<String, String> p = s.getParms();
+
+            // ---- remote PIN ----
+            if ("/pair".equals(uri)) {
+                if (!Pair.enabled()) return json("{\"ok\":true,\"token\":\"open\"}");
+                final String pin = Pair.pin();
+                Remote.MAIN.post(new Runnable() {
+                    public void run() {
+                        android.widget.Toast.makeText(ctx, "📱 A phone is connecting — PIN: " + pin,
+                                android.widget.Toast.LENGTH_LONG).show();
+                    }
+                });
+                if (val(p, "pin").isEmpty()) return fail("Enter the PIN shown on the TV");
+                String tok = Pair.pair(val(p, "pin"));
+                if (tok == null) return fail("Wrong PIN. Look at the TV screen.");
+                return json(new JSONObject().put("ok", true).put("token", tok).toString());
+            }
+            if (!allowed(s, uri, p)) {
+                Response r = newFixedLengthResponse(Response.Status.UNAUTHORIZED, "application/json",
+                        "{\"ok\":false,\"auth\":true,\"msg\":\"Enter the PIN shown on the TV\"}");
+                r.addHeader("Cache-Control", "no-store");
+                return r;
+            }
 
             switch (uri) {
                 case "/data":
@@ -180,6 +203,37 @@ public class WebServer extends NanoHTTPD {
                     return msg(r);
                 }
 
+                case "/history": {
+                    org.json.JSONArray a = new org.json.JSONArray();
+                    for (Store.Watch w : Store.history()) {
+                        a.put(new JSONObject().put("t", w.t).put("u", w.u).put("p", w.pos).put("l", w.len)
+                                .put("thumb", Thumbs.file(ctx, w.u).exists() ? Thumbs.key(w.u) : ""));
+                    }
+                    return json(new JSONObject().put("items", a).toString());
+                }
+
+                case "/historydel":
+                    Store.removeHistory(val(p, "url"));
+                    return ok();
+
+                case "/thumb": {
+                    File f = Thumbs.byKey(ctx, val(p, "k"));
+                    if (!f.exists()) return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "");
+                    Response r = newFixedLengthResponse(Response.Status.OK, "image/jpeg", new FileInputStream(f), f.length());
+                    r.addHeader("Cache-Control", "max-age=300");
+                    return r;
+                }
+
+                case "/browse": {
+                    final String u = val(p, "url");
+                    Intent bi = new Intent(ctx, BrowserActivity.class);
+                    if (!u.isEmpty()) bi.putExtra(BrowserActivity.EXTRA_URL, u);
+                    bi.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    ctx.startActivity(bi);
+                    return msg(App.visible == 0 && !Perms.overlayOk(ctx)
+                            ? "Sent — open TamilCastPlay on the TV if the browser doesn't appear" : "Opening the browser on the TV");
+                }
+
                 case "/state":
                     return json(state().toString());
 
@@ -244,6 +298,17 @@ public class WebServer extends NanoHTTPD {
         } catch (Exception e) {
             return fail(e.getMessage() == null ? String.valueOf(e) : e.getMessage());
         }
+    }
+
+    /** Phone page, ping, and streams for the player itself are open; everything else needs the PIN token. */
+    private boolean allowed(IHTTPSession s, String uri, Map<String, String> p) {
+        if (!Pair.enabled()) return true;
+        if (uri.equals("/") || uri.equals("/index.html") || uri.equals("/ping") || uri.equals("/favicon.ico")) return true;
+        String ip = s.getRemoteIpAddress();
+        if ("127.0.0.1".equals(ip) || "::1".equals(ip) || Net.ip().equals(ip)) return true;
+        String t = s.getHeaders().get("x-token");
+        if (t == null || t.isEmpty()) t = p.get("t");
+        return Pair.valid(t);
     }
 
     private File bigDir() {
@@ -331,6 +396,7 @@ public class WebServer extends NanoHTTPD {
         if (o == null) o = new JSONObject().put("player", false);
         o.put("device", Discovery.deviceName(ctx));
         o.put("apptheme", Store.getStr("theme", "dark"));
+        o.put("lang", Store.getStr("lang", "en"));
         PlayerActivity.putSettings(o);
         o.put("torrent", TorrentEngine.get(ctx).status());
         return o;

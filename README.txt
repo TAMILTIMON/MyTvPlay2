@@ -1,4 +1,29 @@
-TAMILCASTPLAY 1.0 (app id: com.tamil.castplay)
+TAMILCASTPLAY 1.1 — what's new
+==============================
+1. FIXED SIGNING KEY (do this once, before pushing):
+   GitHub repo > Settings > Secrets and variables > Actions > New repository secret.
+   Add the 4 secrets listed in GITHUB_SECRETS.txt (KEYSTORE_B64, STORE_PASSWORD,
+   KEY_ALIAS, KEY_PASSWORD). Builds are then signed with YOUR key, so every new
+   APK installs over the previous one. Back up tamilcastplay.jks + GITHUB_SECRETS.txt.
+   Never put them in the repo (.gitignore already blocks them).
+   With the key, the build makes "release" APKs: TamilCastPlay-armeabi-v7a-release.apk …
+   First install of a key-signed build: uninstall the old TamilCastPlay once.
+2. REMOTE PIN: the TV shows a 4-digit PIN (home screen + ⚙ Settings > Remote PIN).
+   Each phone/browser enters it once. New PIN = forget all phones. Can be turned off.
+3. SHARE TO TV: in any phone app (YouTube link, browser, Telegram, WhatsApp, Files,
+   Gallery) tap Share > "Play on TV". Links, magnets, videos, songs, .torrent files.
+4. CONTINUE WATCHING: row with pictures + progress on the TV home and phone Remote tab.
+   Torrent episodes restart their torrent automatically. Long-press to remove.
+5. TAMIL UI: ⚙ Settings > Language / மொழி > தமிழ் (app restarts).
+   Phone page: tap the த button at the top.
+6. BROWSER: TV home > "Browser", phone app > Cast > Browser, or send a page to the
+   TV browser from the phone. Search with Google, bookmarks (☆), and
+   🎬 shows video/stream links found on the page; long-press a link to play it,
+   send it to the TV, queue it or save it. TV remote: arrows move a pointer,
+   OK clicks, hold OK = long-press, Menu = address bar, Back = previous page.
+   (Netflix/Hotstar etc. pages are DRM-protected: use their apps from the Apps row.)
+
+TAMILCASTPLAY 1.0 notes (app id: com.tamil.castplay)
 =============================================
 Installs as a NEW app next to the old "My TV Player" (com.mytv.player).
 Playlists/settings from the old app are not copied. Remove the old one with:

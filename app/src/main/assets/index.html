@@ -86,6 +86,15 @@ nav button.on{background:linear-gradient(135deg,var(--acc),var(--acc2));color:#f
 .app img,.app .ph{width:48px;height:48px;border-radius:12px}
 .app .ph{display:grid;place-items:center;background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff;font-weight:700;font-size:20px}
 .app span{width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cw{display:flex;gap:12px;overflow-x:auto;padding-bottom:4px}
+.cwi{flex:none;width:150px;cursor:pointer}
+.cwi .th{position:relative;width:150px;height:84px;border-radius:14px;overflow:hidden;background:linear-gradient(135deg,var(--acc),var(--acc2));display:grid;place-items:center;color:#fff;font-size:26px}
+.cwi .th img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.cwi .th i{position:absolute;left:0;bottom:0;height:4px;background:linear-gradient(90deg,var(--acc),var(--acc2))}
+.cwi b{display:block;font-size:13px;margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cwi small{color:var(--dim);font-size:11px}
+.pin{display:flex;gap:10px;justify-content:center;margin:16px 0}
+.pin input{width:56px;height:64px;text-align:center;font-size:28px;font-weight:700;padding:0;margin:0}
 .only-app,.only-web{display:none}
 .app .only-app{display:block}.web .only-web{display:block}
 label.sw{display:flex;align-items:center;gap:10px;font-size:14px;margin:6px 0}
@@ -96,11 +105,16 @@ label.sw{display:flex;align-items:center;gap:10px;font-size:14px;margin:6px 0}
   <div class="logo">▶</div>
   <div class="t"><b>TamilCastPlay</b><small id="devname">Connecting…</small></div>
   <button class="g ic" onclick="openDevices()" title="Switch TV">📺</button>
+  <button class="g ic" onclick="toggleLang()" id="langBtn" title="Language">த</button>
   <button class="g ic" onclick="toggleTheme()" id="themeBtn" title="Theme">☀</button>
 </header>
 
 <!-- ================= REMOTE ================= -->
 <div class="tab on" id="t-remote">
+  <div class="card" id="cwcard" style="display:none">
+    <div class="sec">Continue watching</div>
+    <div class="cw" id="cw"></div>
+  </div>
   <div class="card">
     <div class="sec">Now playing <span id="state" class="pill">idle</span></div>
     <div class="np"><div class="art" id="art">♪</div>
@@ -222,6 +236,14 @@ label.sw{display:flex;align-items:center;gap:10px;font-size:14px;margin:6px 0}
     </div>
   </div>
   <div class="card">
+    <div class="sec">Browser</div>
+    <button class="w only-app" onclick="MyTV.openBrowser()">🌐 Search the web on this phone &amp; send videos</button>
+    <div class="only-app" style="height:10px"></div>
+    <input id="burl" placeholder="Search words or a web address">
+    <button class="g w" onclick="tvBrowse()">📺 Open on the TV browser</button>
+  </div>
+
+  <div class="card">
     <div class="sec">Play a link</div>
     <textarea id="purl" rows="3" placeholder="Video link, stream (m3u8, mpd, rtsp…), magnet:?xt=… or .torrent link"></textarea>
     <input id="ptitle" placeholder="Title (optional)">
@@ -277,6 +299,12 @@ label.sw{display:flex;align-items:center;gap:10px;font-size:14px;margin:6px 0}
   <div id="devlist" class="dim">Scanning…</div>
   <button class="g w only-app" onclick="MyTV.switchTv()">More options…</button></div>
 </div>
+<div class="modal" id="pinmodal">
+  <div class="card" style="text-align:center"><div class="sec" style="justify-content:center">🔐 <span>Enter the PIN shown on the TV</span></div>
+  <div class="dim">TV Settings → Remote PIN</div>
+  <div class="pin"><input inputmode="numeric" maxlength="1"><input inputmode="numeric" maxlength="1"><input inputmode="numeric" maxlength="1"><input inputmode="numeric" maxlength="1"></div>
+  <button class="w" onclick="sendPin()">Connect</button><div class="dim" id="pinmsg" style="margin-top:10px"></div></div>
+</div>
 <div id="toast"></div>
 
 <script>
@@ -291,10 +319,36 @@ function toggleTheme(){setTheme(document.documentElement.dataset.theme==='dark'?
 let saved=null;try{saved=localStorage.getItem('theme')}catch(e){}
 setTheme(qp.get('theme')||saved||(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'));
 
+// ---------- PIN pairing ----------
+let TOK='';try{TOK=localStorage.getItem('tok')||''}catch(e){}
+if(!TOK&&APP){try{TOK=MyTV.getToken()||''}catch(e){}}
+let pinWait=null;
+function askPin(){
+  if(pinWait)return pinWait;
+  $('pinmodal').classList.add('on');const ins=[...document.querySelectorAll('.pin input')];ins.forEach(i=>i.value='');ins[0].focus();
+  pinWait=new Promise(res=>{window._pinDone=res;});return pinWait;
+}
+document.querySelectorAll('.pin input').forEach((el,i,all)=>{el.addEventListener('input',()=>{el.value=el.value.replace(/\D/g,'');if(el.value&&i<3)all[i+1].focus();if(i===3&&el.value)sendPin();});
+  el.addEventListener('keydown',e=>{if(e.key==='Backspace'&&!el.value&&i>0)all[i-1].focus();});});
+async function sendPin(){
+  const pin=[...document.querySelectorAll('.pin input')].map(i=>i.value).join('');
+  if(pin.length<4){$('pinmsg').textContent=tr('Enter the 4 digits');return;}
+  const r=await (await fetch('/pair',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'pin='+pin})).json().catch(()=>({ok:false,msg:'Cannot reach the TV'}));
+  if(r.ok&&r.token){TOK=r.token;try{localStorage.setItem('tok',TOK)}catch(e){}if(APP)try{MyTV.setToken(TOK)}catch(e){}
+    $('pinmodal').classList.remove('on');const d=window._pinDone;pinWait=null;if(d)d();toast(tr('Connected ✅'));loadApps();loadHistory();load();}
+  else{$('pinmsg').textContent=r.msg||'Wrong PIN';document.querySelectorAll('.pin input').forEach(i=>i.value='');document.querySelector('.pin input').focus();}
+}
+async function api(path,opt){
+  opt=opt||{};const h=Object.assign({},opt.headers||{});h['X-Token']=TOK;
+  const r=await fetch(path,Object.assign({},opt,{headers:h}));
+  if(r.status===401){await askPin();return api(path,opt);}
+  return r;
+}
+
 function toast(t){if(!t)return;const e=$('toast');e.textContent=t;e.classList.add('on');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('on'),2600);}
 window.toast=toast;
 async function post(path,obj){
-  try{const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams(obj)});return await r.json();}
+  try{const r=await api(path,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams(obj)});return await r.json();}
   catch(e){return {ok:false,msg:'Cannot reach the TV. Same Wi-Fi?'};}
 }
 async function cmd(c,v,b){const r=await post('/cmd',{c:c,v:v==null?'':v,b:b==null?'':b});if(r&&r.msg)toast(r.msg);poll();return r;}
@@ -321,7 +375,7 @@ $('zoom').addEventListener('input',e=>{e.target._t=Date.now();$('zoomv').textCon
 $('zoom').addEventListener('change',e=>{e.target._t=Date.now();cmd('zoom',e.target.value);});
 
 async function loadOptions(){
-  try{O=await (await fetch('/options')).json();}catch(e){return;}
+  try{O=await (await api('/options')).json();}catch(e){return;}
   fill('zoomsel',O.zooms,100);
   fill('subsize',O.subsizes.map(p=>[p[0],'Size: '+p[1]]),16);fill('subenc',O.encs.map(p=>[p[0],'Encoding: '+p[1]]),'');
   fill('rate',O.speeds.map(s=>[String(s),s+'x']),'1');
@@ -392,7 +446,7 @@ function render(){
 let polling=false;
 async function poll(){
   if(polling)return;polling=true;
-  try{S=await (await fetch('/state')).json();if(!O||(S.player&&O.presets&&O.presets.length<2))await loadOptions();render();}
+  try{S=await (await api('/state')).json();if(!O||(S.player&&O.presets&&O.presets.length<2))await loadOptions();render();}
   catch(e){$('np').textContent='Cannot reach the TV';$('devname').textContent='Offline – is the TV on?';}
   polling=false;
 }
@@ -402,10 +456,10 @@ setInterval(()=>{if(!document.hidden)poll();},1000);
 function upload(path,inputId){
   const f=$(inputId).files[0];if(!f){toast('Choose a file first');return;}
   const fd=new FormData();fd.append('file',f,f.name);
-  const x=new XMLHttpRequest();x.open('POST',path);
+  const x=new XMLHttpRequest();x.open('POST',path);x.setRequestHeader('X-Token',TOK);
   const bar=$('upbar');
   x.upload.onprogress=e=>{if(e.lengthComputable&&bar){bar.style.width=(100*e.loaded/e.total)+'%';$('upmsg').textContent='Sending '+Math.round(100*e.loaded/e.total)+'%…';}};
-  x.onload=()=>{try{const r=JSON.parse(x.responseText);toast(r.msg||(r.ok?'Done':'Failed'));}catch(e){toast('Failed');}if(bar){bar.style.width='0';$('upmsg').textContent='Done.';}$(inputId).value='';};
+  x.onload=()=>{if(x.status===401){askPin().then(()=>upload(path,inputId));return;}try{const r=JSON.parse(x.responseText);toast(r.msg||(r.ok?'Done':'Failed'));}catch(e){toast('Failed');}if(bar){bar.style.width='0';$('upmsg').textContent='Done.';}$(inputId).value='';};
   x.onerror=()=>toast('Upload failed');
   toast('Sending to TV…');x.send(fd);
 }
@@ -420,7 +474,7 @@ async function saveLink(){const r=await post('/add',{playlist:$('ppl').value,tit
 // ---------- multi TV ----------
 async function openDevices(){
   $('devmodal').classList.add('on');$('devlist').textContent='Scanning the Wi-Fi… (a few seconds)';
-  try{const d=await (await fetch('/devices')).json();const box=$('devlist');box.innerHTML='';
+  try{const d=await (await api('/devices')).json();const box=$('devlist');box.innerHTML='';
     d.devices.forEach(v=>{const e=document.createElement('div');e.className='dev'+(v.me?' me':'');
       e.innerHTML='<div class="art" style="width:40px;height:40px;font-size:18px;border-radius:12px">📺</div><div style="flex:1;min-width:0"><b></b><div class="dim"></div></div>';
       e.querySelector('b').textContent=v.name;e.querySelector('.dim').textContent=v.ip+(v.me?' · connected':'');
@@ -431,7 +485,7 @@ async function openDevices(){
 }
 
 // ---------- playlists ----------
-async function load(){try{const d=await (await fetch('/data')).json();renderLists(d.playlists);}catch(e){}}
+async function load(){try{const d=await (await api('/data')).json();renderLists(d.playlists);}catch(e){}}
 function renderLists(pls){
   const dl=$('pls');dl.innerHTML='';const box=$('lists');box.innerHTML='';
   pls.forEach(function(p){
@@ -461,7 +515,7 @@ async function imp(){toast('Importing…');const r=await post('/import',{playlis
 
 (function(){const u=qp.get('url');if(u){$('purl').value=u;document.querySelector('[data-t=cast]').click();playNow('now');history.replaceState(null,'','/');}})();
 async function loadApps(){
-  try{const d=await (await fetch('/apps')).json();const box=$('apps');box.innerHTML='';
+  try{const d=await (await api('/apps')).json();const box=$('apps');box.innerHTML='';
     d.apps.forEach(a=>{const e=document.createElement('div');e.className='app';
       if(a.icon){const i=document.createElement('img');i.src=a.icon;e.appendChild(i);}
       else{const ph=document.createElement('div');ph.className='ph';ph.textContent=a.name[0];e.appendChild(ph);}
@@ -471,7 +525,47 @@ async function loadApps(){
     if(!d.apps.length)box.innerHTML='<div class="dim">No apps yet. On the TV home screen choose “＋ Add apps”.</div>';
   }catch(e){$('apps').innerHTML='<div class="dim">Cannot load apps</div>';}
 }
-loadOptions().then(poll);load();loadApps();
+async function loadHistory(){
+  try{const d=await (await api('/history')).json();const box=$('cw');box.innerHTML='';
+    $('cwcard').style.display=d.items.length?'block':'none';
+    d.items.forEach(w=>{const e=document.createElement('div');e.className='cwi';
+      const th=document.createElement('div');th.className='th';th.textContent='▶';
+      if(w.thumb){const im=document.createElement('img');im.src='/thumb?k='+w.thumb+'&t='+TOK;th.appendChild(im);}
+      const bar=document.createElement('i');bar.style.width=(w.l?Math.min(100,100*w.p/w.l):0)+'%';th.appendChild(bar);
+      const b=document.createElement('b');b.textContent=w.t;
+      const sm=document.createElement('small');sm.textContent=Math.max(1,Math.round((w.l-w.p)/60000))+' '+tr('min left');
+      e.appendChild(th);e.appendChild(b);e.appendChild(sm);
+      e.onclick=async()=>{const r=await post('/play',{url:w.u,title:w.t});toast(r.msg);};
+      e.oncontextmenu=async(ev)=>{ev.preventDefault();if(confirm(tr('Remove from Continue watching')+'?')){await post('/historydel',{url:w.u});loadHistory();}};
+      box.appendChild(e);});
+  }catch(e){}
+}
+async function tvBrowse(){const r=await post('/browse',{url:$('burl').value.trim()});toast(r.msg);}
+setInterval(()=>{if(!document.hidden)loadHistory();},20000);
+
+// ---------- Tamil / English ----------
+const TA={"Now playing":"இப்போது இயங்குவது","Nothing playing":"எதுவும் இயங்கவில்லை","Use Cast to play something":"ஏதாவது இயக்க Cast திறக்கவும்","Remote":"ரிமோட்","Volume":"ஒலி அளவு","Queue":"வரிசை","Empty":"காலி",
+"Apps on the TV":"டிவியில் உள்ள செயலிகள்","tap to open":"திறக்க தட்டவும்","Continue watching":"தொடர்ந்து பார்க்க","min left":"நிமிடம் மீதம்","Remove from Continue watching":"தொடர்ந்து பார்க்க பட்டியலிலிருந்து நீக்கு",
+"Audio track":"ஒலித் தடம்","Audio delay (lip-sync)":"ஒலி தாமதம் (உதடு ஒத்திசைவு)","Subtitles":"வசனங்கள்","🚫 Turn subtitles off":"🚫 வசனங்களை அணை","Subtitle delay":"வசன தாமதம்","Add a subtitle":"வசனம் சேர்","⬆ Send file to TV":"⬆ கோப்பை டிவிக்கு அனுப்பு","Load from link":"இணைப்பிலிருந்து ஏற்று","Subtitle style":"வசன பாணி","Dark box behind text":"எழுத்துக்குப் பின் கருப்புப் பெட்டி",
+"Picture fit":"படப் பொருத்தம்","Aspect ratio":"திரை விகிதம்","Zoom / crop":"ஜூம் / வெட்டு","Equalizer":"ஈக்வலைசர்","On":"இயக்கு","Reset (flat)":"மீட்டமை (சமநிலை)","Playback":"இயக்கம்","Speed":"வேகம்","Sleep timer":"உறக்க நேரம்","Decoder":"டிகோடர்","Network buffer":"நெட்வொர்க் பஃபர்",
+"From this phone":"இந்த போனிலிருந்து","📱 Play videos / songs from this phone":"📱 இந்த போனின் வீடியோ / பாடல்களை இயக்கு","+ Add phone files to the TV queue":"+ போன் கோப்புகளை டிவி வரிசையில் சேர்","🧲 Open a .torrent file":"🧲 .torrent கோப்பைத் திற","⬆ Send to TV and play":"⬆ டிவிக்கு அனுப்பி இயக்கு","🧲 Play .torrent file":"🧲 .torrent கோப்பை இயக்கு",
+"Browser":"உலாவி","🌐 Search the web on this phone & send videos":"🌐 இந்த போனில் இணையத்தில் தேடி வீடியோ அனுப்பு","📺 Open on the TV browser":"📺 டிவி உலாவியில் திற","Play a link":"இணைப்பை இயக்கு","▶ Play on TV":"▶ டிவியில் இயக்கு","+ Queue":"+ வரிசையில் சேர்","Torrent":"டொரண்ட்","peers":"பியர்கள்","done":"முடிந்தது","No torrent running":"டொரண்ட் எதுவும் இயங்கவில்லை","Stop & delete data":"நிறுத்தி தரவை அழி",
+"Import M3U playlist":"M3U பிளேலிஸ்ட் இறக்குமதி","Import":"இறக்குமதி","Add to a playlist":"பிளேலிஸ்டில் சேர்","Add":"சேர்","TV settings":"டிவி அமைப்புகள்","TV app theme":"டிவி செயலி தீம்","TV name (shown when scanning)":"டிவி பெயர் (தேடும்போது தெரியும்)","Save":"சேமி",
+"Remote ":"ரிமோட்","Audio/Subs":"ஒலி/வசனம்","Picture/EQ":"படம்/EQ","Cast":"அனுப்பு","Library":"நூலகம்","TVs on this Wi-Fi":"இந்த Wi-Fi இல் உள்ள டிவிகள்","More options…":"மேலும்…",
+"Enter the PIN shown on the TV":"டிவியில் தெரியும் PIN-ஐ உள்ளிடவும்","Connect":"இணை","Enter the 4 digits":"4 இலக்கங்களை உள்ளிடவும்","Connected ✅":"இணைக்கப்பட்டது ✅","⏹ Stop":"⏹ நிறுத்து","↩ Back":"↩ பின்","⌂ Home":"⌂ முகப்பு","⚙ Menu":"⚙ மெனு",
+"Search words or a web address":"தேடல் சொற்கள் அல்லது இணைய முகவரி","Title (optional)":"தலைப்பு (விருப்பம்)","Subtitle link (optional)":"வசன இணைப்பு (விருப்பம்)","Playlist name":"பிளேலிஸ்ட் பெயர்"};
+let LANG='en';try{LANG=localStorage.getItem('lang')||''}catch(e){}
+function tr(t){return LANG==='ta'&&TA[t]?TA[t]:t;}
+function applyLang(){
+  $('langBtn').textContent=LANG==='ta'?'EN':'த';
+  const walk=n=>{if(n.nodeType===3){const k=n._en||n.nodeValue.trim();if(TA[k]){n._en=k;n.nodeValue=n.nodeValue.replace(n.nodeValue.trim(),LANG==='ta'?TA[k]:k);}else if(n._en){n.nodeValue=LANG==='ta'?(TA[n._en]||n._en):n._en;}return;}
+    if(n.nodeType===1&&n.tagName!=='SCRIPT'&&n.tagName!=='STYLE'){if(n.placeholder){const k=n._ph||n.placeholder;if(TA[k]){n._ph=k;n.placeholder=LANG==='ta'?TA[k]:k;}}n.childNodes.forEach(walk);}};
+  walk(document.body);
+}
+function toggleLang(){LANG=LANG==='ta'?'en':'ta';try{localStorage.setItem('lang',LANG)}catch(e){}applyLang();}
+(async()=>{if(!LANG){try{const s=await (await api('/state')).json();LANG=s.lang==='ta'?'ta':'en';}catch(e){LANG='en';}}applyLang();})();
+
+loadOptions().then(poll);load();loadApps();loadHistory();
 </script>
 </body>
 </html>

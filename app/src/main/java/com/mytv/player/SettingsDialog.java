@@ -41,31 +41,46 @@ public final class SettingsDialog {
 
     public static void show(final Activity a) {
         final String[] themes = {"dark", "light", "system"};
-        final String[] themeNames = {"Dark", "Light", "Follow system"};
+        final String[] themeNames = {T.t("Dark"), T.t("Light"), T.t("Follow system")};
         String[] items = {
-                "🎨  Theme: " + themeNames[idx(themes, Store.getStr("theme", "dark"))],
-                "📺  Device name: " + Discovery.deviceName(a),
-                "🖼  Picture fit: " + PlayerActivity.FIT_NAMES[Math.max(0, Math.min(3, Store.getInt("fit", 0)))],
-                "📐  Aspect ratio: " + PlayerActivity.ASPECT_NAMES[idx(PlayerActivity.ASPECT_VALUES, Store.getStr("aspect", ""))],
-                "🎚  Equalizer…",
-                "🔊  Default volume: " + Store.getInt("vol", 100) + "%",
-                "💬  Subtitle size: " + PlayerActivity.SUB_SIZE_NAMES[Math.max(0, idx(PlayerActivity.SUB_SIZES, Store.getInt("subsize", 16)))],
-                "💬  Subtitle background: " + (Store.getBool("subbg", false) ? "On" : "Off"),
-                "🔤  Subtitle encoding: " + PlayerActivity.ENC_NAMES[idx(PlayerActivity.ENC_VALUES, Store.getStr("subenc", ""))],
-                "⚙  Decoder: " + (Store.getInt("hw", 0) == 1 ? "Software" : "Hardware (auto)"),
-                "🌐  Network buffer: " + Store.getInt("cache", 2000) / 1000f + " s",
-                "🔌  Start phone remote when device boots: " + (Store.getBool("boot", Ui.isTv(a)) ? "On" : "Off"),
-                "🧹  Clear “Recently played”",
-                "🔓  Allow phone to start videos (display over apps): " + (Perms.overlayOk(a) ? "Allowed" : "Not allowed"),
-                "🔓  Allow access to all files (USB, subtitles): " + (Perms.filesOk() ? "Allowed" : "Not allowed"),
-                "📱  Use as remote for another TV…",
-                "ℹ  Phone remote address: http://" + Net.ip() + ":" + RemoteService.PORT};
-        new AlertDialog.Builder(a).setTitle("⚙  Settings").setItems(items, new DialogInterface.OnClickListener() {
+                "🌐  Language / மொழி: " + (T.tamil() ? "தமிழ்" : "English"),
+                "🔐  " + (T.tamil() ? "ரிமோட் PIN: " : "Remote PIN: ") + (Pair.enabled() ? Pair.pin() : (T.tamil() ? "அணை" : "Off")),
+                T.t("🎨  Theme: ") + themeNames[idx(themes, Store.getStr("theme", "dark"))],
+                T.t("📺  Device name: ") + Discovery.deviceName(a),
+                T.t("🖼  Picture fit: ") + PlayerActivity.FIT_NAMES[Math.max(0, Math.min(3, Store.getInt("fit", 0)))],
+                T.t("📐  Aspect ratio: ") + PlayerActivity.ASPECT_NAMES[idx(PlayerActivity.ASPECT_VALUES, Store.getStr("aspect", ""))],
+                T.t("🎚  Equalizer…"),
+                T.t("🔊  Default volume: ") + Store.getInt("vol", 100) + "%",
+                T.t("💬  Subtitle size: ") + PlayerActivity.SUB_SIZE_NAMES[Math.max(0, idx(PlayerActivity.SUB_SIZES, Store.getInt("subsize", 16)))],
+                T.t("💬  Subtitle background: ") + (Store.getBool("subbg", false) ? "On" : T.t("Off")),
+                T.t("🔤  Subtitle encoding: ") + PlayerActivity.ENC_NAMES[idx(PlayerActivity.ENC_VALUES, Store.getStr("subenc", ""))],
+                T.t("⚙  Decoder: ") + (Store.getInt("hw", 0) == 1 ? T.t("Software") : T.t("Hardware (auto)")),
+                T.t("🌐  Network buffer: ") + Store.getInt("cache", 2000) / 1000f + " s",
+                T.t("🔌  Start phone remote when device boots: ") + (Store.getBool("boot", Ui.isTv(a)) ? "On" : T.t("Off")),
+                T.t("🧹  Clear “Recently played”"),
+                T.t("🔓  Allow phone to start videos (display over apps): ") + (Perms.overlayOk(a) ? T.t("Allowed") : T.t("Not allowed")),
+                T.t("🔓  Allow access to all files (USB, subtitles): ") + (Perms.filesOk() ? T.t("Allowed") : T.t("Not allowed")),
+                T.t("📱  Use as remote for another TV…"),
+                T.t("ℹ  Phone remote address: http://") + Net.ip() + ":" + RemoteService.PORT};
+        new AlertDialog.Builder(a).setTitle(T.t("⚙  Settings")).setItems(items, new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface d, int w) {
-                switch (w) {
+                if (w == 0) {
+                    choose(a, "Language / மொழி", new String[]{"English", "தமிழ் (Tamil)"}, T.tamil() ? 1 : 0, new IntCb() {
+                        public void on(int i) {
+                            Store.putStr("lang", i == 1 ? "ta" : "en");
+                            restart(a);
+                        }
+                    });
+                    return;
+                }
+                if (w == 1) {
+                    pinMenu(a);
+                    return;
+                }
+                switch (w - 2) {
                     case 0:
-                        choose(a, "Theme", themeNames, idx(themes, Store.getStr("theme", "dark")), new IntCb() {
+                        choose(a, T.t("Theme"), themeNames, idx(themes, Store.getStr("theme", "dark")), new IntCb() {
                             public void on(int i) {
                                 Store.putStr("theme", themes[i]);
                                 a.recreate();
@@ -76,19 +91,19 @@ public final class SettingsDialog {
                         final EditText e = new EditText(a);
                         e.setText(Discovery.deviceName(a));
                         e.setInputType(InputType.TYPE_CLASS_TEXT);
-                        new AlertDialog.Builder(a).setTitle("Device name (shown in the phone app)").setView(e)
-                                .setPositiveButton("Save", new DialogInterface.OnClickListener() {
+                        new AlertDialog.Builder(a).setTitle(T.t("Device name (shown in the phone app)")).setView(e)
+                                .setPositiveButton(T.t("Save"), new DialogInterface.OnClickListener() {
                                     public void onClick(DialogInterface d2, int w2) {
                                         Store.putStr("devname", e.getText().toString().trim());
                                         Discovery.unregister(a);
                                         Discovery.register(a);
                                         show(a);
                                     }
-                                }).setNegativeButton("Cancel", null).show();
+                                }).setNegativeButton(T.t("Cancel"), null).show();
                         break;
                     }
                     case 2:
-                        choose(a, "Picture fit", PlayerActivity.FIT_NAMES, Store.getInt("fit", 0), new IntCb() {
+                        choose(a, T.t("Picture fit"), PlayerActivity.FIT_NAMES, Store.getInt("fit", 0), new IntCb() {
                             public void on(int i) {
                                 PlayerActivity.applySetting("fit", String.valueOf(i), "");
                                 show(a);
@@ -96,7 +111,7 @@ public final class SettingsDialog {
                         });
                         break;
                     case 3:
-                        choose(a, "Aspect ratio", PlayerActivity.ASPECT_NAMES,
+                        choose(a, T.t("Aspect ratio"), PlayerActivity.ASPECT_NAMES,
                                 idx(PlayerActivity.ASPECT_VALUES, Store.getStr("aspect", "")), new IntCb() {
                                     public void on(int i) {
                                         PlayerActivity.applySetting("aspect", PlayerActivity.ASPECT_VALUES[i], "");
@@ -109,8 +124,8 @@ public final class SettingsDialog {
                         break;
                     case 5: {
                         String[] v = new String[PlayerActivity.VOLS.length];
-                        for (int i = 0; i < v.length; i++) v[i] = PlayerActivity.VOLS[i] + "%" + (PlayerActivity.VOLS[i] > 100 ? " (boost)" : "");
-                        choose(a, "Default volume", v, idx(PlayerActivity.VOLS, Store.getInt("vol", 100)), new IntCb() {
+                        for (int i = 0; i < v.length; i++) v[i] = PlayerActivity.VOLS[i] + "%" + (PlayerActivity.VOLS[i] > 100 ? T.t(" (boost)") : "");
+                        choose(a, T.t("Default volume"), v, idx(PlayerActivity.VOLS, Store.getInt("vol", 100)), new IntCb() {
                             public void on(int i) {
                                 PlayerActivity.applySetting("vol", String.valueOf(PlayerActivity.VOLS[i]), "");
                                 show(a);
@@ -119,7 +134,7 @@ public final class SettingsDialog {
                         break;
                     }
                     case 6:
-                        choose(a, "Subtitle size", PlayerActivity.SUB_SIZE_NAMES,
+                        choose(a, T.t("Subtitle size"), PlayerActivity.SUB_SIZE_NAMES,
                                 idx(PlayerActivity.SUB_SIZES, Store.getInt("subsize", 16)), new IntCb() {
                                     public void on(int i) {
                                         PlayerActivity.applySetting("subsize", String.valueOf(PlayerActivity.SUB_SIZES[i]), "");
@@ -132,7 +147,7 @@ public final class SettingsDialog {
                         show(a);
                         break;
                     case 8:
-                        choose(a, "Subtitle encoding", PlayerActivity.ENC_NAMES,
+                        choose(a, T.t("Subtitle encoding"), PlayerActivity.ENC_NAMES,
                                 idx(PlayerActivity.ENC_VALUES, Store.getStr("subenc", "")), new IntCb() {
                                     public void on(int i) {
                                         PlayerActivity.applySetting("subenc", PlayerActivity.ENC_VALUES[i], "");
@@ -146,8 +161,8 @@ public final class SettingsDialog {
                         break;
                     case 10: {
                         String[] v = new String[PlayerActivity.CACHES.length];
-                        for (int i = 0; i < v.length; i++) v[i] = PlayerActivity.CACHES[i] / 1000f + " seconds";
-                        choose(a, "Network buffer", v, idx(PlayerActivity.CACHES, Store.getInt("cache", 2000)), new IntCb() {
+                        for (int i = 0; i < v.length; i++) v[i] = PlayerActivity.CACHES[i] / 1000f + T.t(" seconds");
+                        choose(a, T.t("Network buffer"), v, idx(PlayerActivity.CACHES, Store.getInt("cache", 2000)), new IntCb() {
                             public void on(int i) {
                                 PlayerActivity.applySetting("cache", String.valueOf(PlayerActivity.CACHES[i]), "");
                                 show(a);
@@ -178,6 +193,36 @@ public final class SettingsDialog {
         }).show();
     }
 
+    /** Restarts the app so every screen uses the new language. */
+    static void restart(Activity a) {
+        Intent i = new Intent(a, MainActivity.class);
+        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        if (!Ui.isTv(a)) i.putExtra(MainActivity.EXTRA_PLAYER_HOME, true);
+        a.startActivity(i);
+        a.finishAffinity();
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(new Runnable() {
+            public void run() {
+                System.exit(0);
+            }
+        }, 300);
+    }
+
+    static void pinMenu(final Activity a) {
+        String[] items = {
+                (T.tamil() ? "PIN தேவை: " : "Ask for PIN: ") + (Pair.enabled() ? "ON" : "OFF"),
+                T.tamil() ? "புதிய PIN (இணைந்த போன்கள் அனைத்தும் மறக்கப்படும்)" : "New PIN (forget all paired phones)"};
+        new AlertDialog.Builder(a).setTitle("🔐  PIN: " + Pair.pin())
+                .setMessage(T.tamil() ? "போன் முதல் முறை இணையும்போது இந்த PIN கேட்கப்படும்."
+                        : "Phones must enter this PIN once before they can control this device.")
+                .setItems(items, new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface d, int w) {
+                        if (w == 0) Store.putBool("pin_on", !Pair.enabled());
+                        else Pair.reset();
+                        pinMenu(a);
+                    }
+                }).show();
+    }
+
     /** Equalizer without a video playing: vertical bands, on/off, reset. */
     public static void eq(Activity a) {
         LinearLayout box = new LinearLayout(a);
@@ -185,7 +230,7 @@ public final class SettingsDialog {
         int p = Ui.dp(a, 20);
         box.setPadding(p, p / 2, p, 0);
         final CheckBox on = new CheckBox(a);
-        on.setText("Equalizer on");
+        on.setText(T.t("Equalizer on"));
         on.setChecked(Store.getBool("eq_on", false));
         on.setOnCheckedChangeListener(new android.widget.CompoundButton.OnCheckedChangeListener() {
             public void onCheckedChanged(android.widget.CompoundButton b, boolean c) {
@@ -203,9 +248,9 @@ public final class SettingsDialog {
             }
         });
         box.addView(eq);
-        new AlertDialog.Builder(a).setTitle("🎚  Equalizer  (◀ ▶ band · ▲ ▼ level)").setView(box)
-                .setPositiveButton("Done", null)
-                .setNeutralButton("Reset", new DialogInterface.OnClickListener() {
+        new AlertDialog.Builder(a).setTitle(T.t("🎚  Equalizer  (◀ ▶ band · ▲ ▼ level)")).setView(box)
+                .setPositiveButton(T.t("Done"), null)
+                .setNeutralButton(T.t("Reset"), new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface d, int w) {
                         PlayerActivity.applySetting("eq_reset", "", "");
                     }

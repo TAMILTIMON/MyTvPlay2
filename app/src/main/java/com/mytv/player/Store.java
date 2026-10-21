@@ -156,6 +156,65 @@ public class Store {
         if (data.remove(name) != null) save();
     }
 
+    // ---------- continue watching ----------
+    public static final class Watch {
+        public final String t, u;
+        public final long pos, len, when;
+
+        Watch(String t, String u, long pos, long len, long when) {
+            this.t = t;
+            this.u = u;
+            this.pos = pos;
+            this.len = len;
+            this.when = when;
+        }
+    }
+
+    public static synchronized List<Watch> history() {
+        List<Watch> out = new ArrayList<>();
+        try {
+            JSONArray a = new JSONArray(getStr("history", "[]"));
+            for (int i = 0; i < a.length(); i++) {
+                JSONObject o = a.getJSONObject(i);
+                out.add(new Watch(o.optString("t"), o.optString("u"), o.optLong("p"), o.optLong("l"), o.optLong("w")));
+            }
+        } catch (Exception ignored) {
+        }
+        return out;
+    }
+
+    private static void saveHistory(List<Watch> l) {
+        try {
+            JSONArray a = new JSONArray();
+            for (Watch w : l) {
+                a.put(new JSONObject().put("t", w.t).put("u", w.u).put("p", w.pos).put("l", w.len).put("w", w.when));
+            }
+            putStr("history", a.toString());
+            version++;
+        } catch (Exception ignored) {
+        }
+    }
+
+    public static synchronized void putHistory(String title, String url, long pos, long len) {
+        List<Watch> l = history();
+        Iterator<Watch> i = l.iterator();
+        while (i.hasNext()) if (i.next().u.equals(url)) i.remove();
+        l.add(0, new Watch(title, url, pos, len, System.currentTimeMillis()));
+        while (l.size() > 30) l.remove(l.size() - 1);
+        saveHistory(l);
+    }
+
+    public static synchronized void removeHistory(String url) {
+        List<Watch> l = history();
+        Iterator<Watch> i = l.iterator();
+        boolean changed = false;
+        while (i.hasNext()) if (i.next().u.equals(url)) {
+            i.remove();
+            changed = true;
+        }
+        if (changed) saveHistory(l);
+    }
+
     // ---------- resume positions ----------
     public static long pos(String url) {
         return posPrefs == null ? 0 : posPrefs.getLong(url, 0);

@@ -172,6 +172,23 @@ public final class TorrentEngine {
         th.resume();
 
         String h = ti.infoHash().toHex();
+        if (!uri.trim().startsWith("/") || !uri.contains("/cache/")) Store.putStr("torsrc_" + h, uri.trim());
+        else {
+            // keep a copy of uploaded .torrent files so "Continue watching" can restart them
+            try {
+                File keep = new File(ctx.getFilesDir(), "torrent_files");
+                //noinspection ResultOfMethodCallIgnored
+                keep.mkdirs();
+                File dst = new File(keep, h + ".torrent");
+                java.nio.channels.FileChannel in = new java.io.FileInputStream(uri.trim()).getChannel();
+                java.nio.channels.FileChannel out = new java.io.FileOutputStream(dst).getChannel();
+                out.transferFrom(in, 0, in.size());
+                in.close();
+                out.close();
+                Store.putStr("torsrc_" + h, dst.getAbsolutePath());
+            } catch (Exception ignored) {
+            }
+        }
         synchronized (this) {
             if (token != openToken) {
                 s.remove(th, SessionHandle.DELETE_FILES);
@@ -221,6 +238,10 @@ public final class TorrentEngine {
             } catch (Throwable ignored) {
             }
         }
+    }
+
+    public boolean isActiveHash(String h) {
+        return handle != null && hash.equals(h);
     }
 
     public boolean isActive() {

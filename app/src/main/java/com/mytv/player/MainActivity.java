@@ -25,7 +25,77 @@ public class MainActivity extends AppCompatActivity {
     public static final String EXTRA_PLAYER_HOME = "player_home";
 
     private TextView header, info;
-    private LinearLayout appsRow;
+    private LinearLayout appsRow, watchRow;
+    private TextView watchLabel;
+    private android.widget.HorizontalScrollView watchScroll;
+    private int watchSeen = -1;
+
+    private void buildWatch() {
+        if (watchRow == null) return;
+        watchSeen = Store.version;
+        watchRow.removeAllViews();
+        List<Store.Watch> h = Store.history();
+        int vis = h.isEmpty() ? View.GONE : View.VISIBLE;
+        watchLabel.setVisibility(vis);
+        watchScroll.setVisibility(vis);
+        boolean tv = Ui.isTv(this);
+        int w = Ui.dp(this, tv ? 208 : 156), ht = w * 9 / 16;
+        for (final Store.Watch x : h) {
+            LinearLayout card = new LinearLayout(this);
+            card.setOrientation(LinearLayout.VERTICAL);
+            card.setPadding(Ui.dp(this, 8), Ui.dp(this, 8), Ui.dp(this, 8), Ui.dp(this, 8));
+            card.setBackground(Ui.focusCard(this, 18));
+            card.setFocusable(true);
+            card.setClickable(true);
+            card.setOnFocusChangeListener((v, f) -> v.animate().scaleX(f ? 1.06f : 1f).scaleY(f ? 1.06f : 1f).setDuration(120).start());
+            android.widget.FrameLayout pic = new android.widget.FrameLayout(this);
+            java.io.File tf = Thumbs.file(this, x.u);
+            if (tf.exists()) {
+                android.widget.ImageView iv = new android.widget.ImageView(this);
+                iv.setImageURI(android.net.Uri.fromFile(tf));
+                iv.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
+                pic.addView(iv, new android.widget.FrameLayout.LayoutParams(w, ht));
+            } else {
+                TextView ph = Ui.text(this, 30, 0xFFFFFFFF, true);
+                ph.setText("▶");
+                ph.setGravity(Gravity.CENTER);
+                ph.setBackground(Ui.gradient(this, 12));
+                pic.addView(ph, new android.widget.FrameLayout.LayoutParams(w, ht));
+            }
+            View bar = new View(this);
+            bar.setBackground(Ui.gradient(this, 2));
+            int pw = x.len > 0 ? (int) (w * Math.min(1f, (float) x.pos / x.len)) : 0;
+            pic.addView(bar, new android.widget.FrameLayout.LayoutParams(Math.max(1, pw), Ui.dp(this, 4), Gravity.BOTTOM));
+            card.addView(pic, new LinearLayout.LayoutParams(w, ht));
+            TextView n = Ui.text(this, 14, Ui.TEXT, true);
+            n.setText(x.t);
+            n.setSingleLine(true);
+            n.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            n.setPadding(0, Ui.dp(this, 6), 0, 0);
+            card.addView(n, new LinearLayout.LayoutParams(w, ViewGroup.LayoutParams.WRAP_CONTENT));
+            TextView left = Ui.text(this, 12, Ui.DIM, false);
+            long mins = Math.max(1, (x.len - x.pos) / 60000);
+            left.setText(mins + " " + T.t("min left"));
+            card.addView(left);
+            card.setOnClickListener(v -> {
+                List<Store.Item> one = new ArrayList<>();
+                one.add(new Store.Item(x.t, x.u, ""));
+                Remote.play(this, one, 0);
+            });
+            card.setOnLongClickListener(v -> {
+                new androidx.appcompat.app.AlertDialog.Builder(this).setTitle(x.t)
+                        .setItems(new String[]{T.t("Remove from Continue watching")}, (d, wh) -> {
+                            Store.removeHistory(x.u);
+                            buildWatch();
+                        }).show();
+                return true;
+            });
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT);
+            lp.setMargins(0, 0, Ui.dp(this, 12), 0);
+            watchRow.addView(card, lp);
+        }
+    }
     private final List<String> rows = new ArrayList<>();
     private final List<Runnable> actions = new ArrayList<>();
     private ArrayAdapter<String> adapter;
@@ -36,7 +106,10 @@ public class MainActivity extends AppCompatActivity {
     private final Runnable tick = new Runnable() {
         @Override
         public void run() {
-            if (Store.version != seen) refresh();
+            if (Store.version != seen) {
+                refresh();
+                if (watchSeen != Store.version) buildWatch();
+            }
             updateInfo();
             handler.postDelayed(this, 2000);
         }
@@ -77,7 +150,7 @@ public class MainActivity extends AppCompatActivity {
         titles.addView(sub);
         top.addView(titles, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
 
-        Button theme = Ui.button(this, Ui.dark() ? "☀ Light" : "🌙 Dark", false);
+        Button theme = Ui.button(this, Ui.dark() ? T.t("☀ Light") : T.t("🌙 Dark"), false);
         theme.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 Store.putStr("theme", Ui.dark() ? "light" : "dark");
@@ -85,7 +158,7 @@ public class MainActivity extends AppCompatActivity {
             }
         });
         top.addView(theme);
-        Button gear = Ui.button(this, "⚙ Settings", true);
+        Button gear = Ui.button(this, T.t("⚙ Settings"), true);
         gear.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 SettingsDialog.show(MainActivity.this);
@@ -105,9 +178,26 @@ public class MainActivity extends AppCompatActivity {
         ilp.setMargins(0, Ui.dp(this, 18), 0, Ui.dp(this, 14));
         root.addView(info, ilp);
 
+        // ---- Continue watching
+        watchLabel = Ui.text(this, 12, Ui.DIM, true);
+        watchLabel.setText(T.t("CONTINUE WATCHING"));
+        watchLabel.setLetterSpacing(0.18f);
+        watchLabel.setPadding(Ui.dp(this, 4), 0, 0, Ui.dp(this, 8));
+        root.addView(watchLabel);
+        watchScroll = new android.widget.HorizontalScrollView(this);
+        watchScroll.setHorizontalScrollBarEnabled(false);
+        watchScroll.setPadding(Ui.dp(this, 4), Ui.dp(this, 6), Ui.dp(this, 4), Ui.dp(this, 6));
+        watchScroll.setClipToPadding(false);
+        watchRow = new LinearLayout(this);
+        watchScroll.addView(watchRow);
+        LinearLayout.LayoutParams wlp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT);
+        wlp.setMargins(0, 0, 0, Ui.dp(this, 12));
+        root.addView(watchScroll, wlp);
+
         // ---- Apps hub: Netflix, JioHotstar, Spotify, SonyLIV … in one place
         TextView appsLabel = Ui.text(this, 12, Ui.DIM, true);
-        appsLabel.setText("APPS");
+        appsLabel.setText(T.t("APPS"));
         appsLabel.setLetterSpacing(0.18f);
         appsLabel.setPadding(Ui.dp(this, 4), 0, 0, Ui.dp(this, 8));
         root.addView(appsLabel);
@@ -188,7 +278,7 @@ public class MainActivity extends AppCompatActivity {
             plus.setGravity(Gravity.CENTER);
             plus.setBackground(Ui.gradient(this, 14));
             t.addView(plus, new LinearLayout.LayoutParams(iw, ih));
-            name = "Add apps";
+            name = T.t("Add apps");
         }
         TextView n = Ui.text(this, 13, Ui.TEXT, false);
         n.setText(name);
@@ -210,25 +300,26 @@ public class MainActivity extends AppCompatActivity {
         boolean[] checked = new boolean[all.size()];
         for (int i = 0; i < all.size(); i++) {
             AppsHub.App a = all.get(i);
-            names[i] = a.name + (a.installed ? "" : "   (not installed – tap tile to get it)");
+            names[i] = a.name + (a.installed ? "" : T.t("   (not installed – tap tile to get it)"));
             checked[i] = chosen.contains(a.pkg);
         }
-        new androidx.appcompat.app.AlertDialog.Builder(this).setTitle("Apps on the home screen")
+        new androidx.appcompat.app.AlertDialog.Builder(this).setTitle(T.t("Apps on the home screen"))
                 .setMultiChoiceItems(names, checked, (d, w, on) -> {
                     String p = all.get(w).pkg;
                     if (on && !chosen.contains(p)) chosen.add(p);
                     if (!on) chosen.remove(p);
                 })
-                .setPositiveButton("Save", (d, w) -> {
+                .setPositiveButton(T.t("Save"), (d, w) -> {
                     AppsHub.saveFavorites(chosen);
                     buildApps();
                 })
-                .setNegativeButton("Cancel", null).show();
+                .setNegativeButton(T.t("Cancel"), null).show();
     }
 
     private void updateInfo() {
         if (info == null) return;
         StringBuilder sb = new StringBuilder();
+        if (Pair.enabled()) sb.append("🔐  PIN ").append(Pair.pin()).append("   ·   ");
         if (RemoteService.error != null) sb.append(RemoteService.error);
         else sb.append("📱  Control from your phone: install this same app on the phone (it finds this TV by itself), "
                 + "or open  http://").append(Net.ip()).append(":").append(RemoteService.PORT).append("  in a browser.");
@@ -243,13 +334,15 @@ public class MainActivity extends AppCompatActivity {
         if (current == null) {
             header.setText("TamilCastPlay");
             if (Ui.isTv(this) && !Perms.overlayOk(this)) {
-                rows.add("🔓   Allow the phone to start videos when this app is closed  (recommended)");
+                rows.add(T.t("🔓   Allow the phone to start videos when this app is closed  (recommended)"));
                 actions.add(() -> Perms.openOverlaySettings(this));
             }
-            rows.add("📁   Local files  ·  USB drive / storage");
+            rows.add("🌐   " + T.t("Browser · search the web & play links"));
+            actions.add(() -> startActivity(new Intent(this, BrowserActivity.class)));
+            rows.add(T.t("📁   Local files  ·  USB drive / storage"));
             actions.add(() -> startActivity(new Intent(this, FileBrowserActivity.class)));
             if (!Ui.isTv(this)) {
-                rows.add("📱   Remote control a TV");
+                rows.add(T.t("📱   Remote control a TV"));
                 actions.add(() -> startActivity(new Intent(this, ConnectActivity.class)));
             }
             for (final String n : Store.names()) {
@@ -260,7 +353,7 @@ public class MainActivity extends AppCompatActivity {
                 });
             }
             if (Store.names().isEmpty()) {
-                rows.add("No playlists yet — add videos, links, magnets or .torrent files from your phone.");
+                rows.add(T.t("No playlists yet — add videos, links, magnets or .torrent files from your phone."));
                 actions.add(null);
             }
         } else {
@@ -277,7 +370,7 @@ public class MainActivity extends AppCompatActivity {
                 actions.add(() -> Remote.play(this, Store.items(current), idx));
             }
             if (items.isEmpty()) {
-                rows.add("This playlist is empty.");
+                rows.add(T.t("This playlist is empty."));
                 actions.add(null);
             }
         }
@@ -288,6 +381,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         buildApps();
+        buildWatch();
         refresh();
         handler.post(tick);
     }

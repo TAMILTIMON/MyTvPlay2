@@ -126,13 +126,13 @@ public class FileBrowserActivity extends AppCompatActivity {
         files.clear();
         info.setText(needAllFiles()
                 ? "To see every file (and subtitle files), select the first row and allow “All files access”."
-                : "Subtitle files with the same name as the video are loaded automatically.");
+                : T.t("Subtitle files with the same name as the video are loaded automatically."));
         if (needAllFiles()) {
             rows.add("🔓  Allow access to all files");
             files.add(null);
         }
         if (d == null) {
-            header.setText("Local files");
+            header.setText(T.t("Local files"));
             for (File r : roots()) {
                 rows.add("💾  " + r.getAbsolutePath());
                 files.add(r);
@@ -161,7 +161,7 @@ public class FileBrowserActivity extends AppCompatActivity {
                 }
             }
             if (kids.length == 0) {
-                rows.add("(empty or no permission)");
+                rows.add(T.t("(empty or no permission)"));
                 files.add(null);
             }
         }

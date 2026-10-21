@@ -49,21 +49,21 @@ public class PlayerActivity extends AppCompatActivity {
     // ---------- choices (shared with the phone page) ----------
     static final String[] ASPECT_VALUES = {"", "16:9", "4:3", "21:9", "235:100", "239:100", "185:100", "2:1",
             "16:10", "5:4", "1:1", "3:2", "32:9"};
-    static final String[] ASPECT_NAMES = {"Auto (from video)", "16:9", "4:3", "21:9 (ultrawide)",
+    static final String[] ASPECT_NAMES = {T.t("Auto (from video)"), "16:9", "4:3", "21:9 (ultrawide)",
             "2.35:1 (CinemaScope)", "2.39:1 (anamorphic)", "1.85:1 (widescreen film)", "2:1 (18:9)", "16:10",
             "5:4", "1:1 (square)", "3:2", "32:9"};
-    static final String[] FIT_NAMES = {"Best fit (whole picture)", "Fill screen (zoom, no black bars)",
-            "Stretch to full screen", "Original size"};
+    static final String[] FIT_NAMES = {T.t("Best fit (whole picture)"), T.t("Fill screen (zoom, no black bars)"),
+            T.t("Stretch to full screen"), T.t("Original size")};
 
     static final int[] ZOOM_VALUES = {100, 104, 132, 134, 133, 110, 120, 125, 150, 175, 200};
     static final String[] ZOOM_NAMES = {"100% (no zoom)", "104% – crop bars of 1.85:1 film",
             "132% – crop bars of 21:9 / 2.35:1 film", "134% – crop bars of 2.39:1 film",
             "133% – crop side bars of 4:3 video", "110%", "120%", "125%", "150%", "175%", "200%"};
     static final int[] SUB_SIZES = {24, 20, 16, 12, 9};
-    static final String[] SUB_SIZE_NAMES = {"Tiny", "Small", "Normal", "Large", "Huge"};
+    static final String[] SUB_SIZE_NAMES = {T.t("Tiny"), T.t("Small"), T.t("Normal"), T.t("Large"), T.t("Huge")};
     static final String[] ENC_VALUES = {"", "UTF-8", "Windows-1252", "Windows-1256", "Windows-1251",
             "Windows-1250", "ISO-8859-9", "ISO-8859-7", "Windows-1255", "GB18030", "Big5", "Shift_JIS", "EUC-KR"};
-    static final String[] ENC_NAMES = {"Automatic", "UTF-8", "Western (Windows-1252)", "Arabic (Windows-1256)",
+    static final String[] ENC_NAMES = {T.t("Automatic"), "UTF-8", "Western (Windows-1252)", "Arabic (Windows-1256)",
             "Cyrillic (Windows-1251)", "Central European (Windows-1250)", "Turkish (ISO-8859-9)",
             "Greek (ISO-8859-7)", "Hebrew (Windows-1255)", "Chinese simplified (GB18030)",
             "Chinese traditional (Big5)", "Japanese (Shift_JIS)", "Korean (EUC-KR)"};
@@ -374,7 +374,7 @@ public class PlayerActivity extends AppCompatActivity {
         timeView = text(15, Color.WHITE);
         trow.addView(timeView, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
         TextView hint = text(12, 0xFF9C94B8);
-        hint.setText(Ui.isTv(this) ? "◀ ▶ seek · ▼ buttons · ⚙ settings" : "Tap video to hide");
+        hint.setText(Ui.isTv(this) ? T.t("◀ ▶ seek · ▼ buttons · ⚙ settings") : T.t("Tap video to hide"));
         trow.addView(hint);
         panel.addView(trow);
 
@@ -480,17 +480,17 @@ public class PlayerActivity extends AppCompatActivity {
     private void updateOverlay() {
         if (mp == null) return;
         long t = mp.getTime(), len = mp.getLength();
-        timeView.setText(len > 0 ? Net.fmtTime(t) + " / " + Net.fmtTime(len) + (mp.isPlaying() ? "" : "   ❚❚ Paused")
-                : (mp.isPlaying() ? "● Live  " + Net.fmtTime(t) : "❚❚ Paused"));
+        timeView.setText(len > 0 ? Net.fmtTime(t) + " / " + Net.fmtTime(len) + (mp.isPlaying() ? "" : T.t("   ❚❚ Paused"))
+                : (mp.isPlaying() ? T.t("● Live  ") + Net.fmtTime(t) : T.t("❚❚ Paused")));
         progress.setProgress(len > 0 ? (int) (1000 * Math.max(0, t) / len) : 0);
         playBtn.setText(mp.isPlaying() ? "❚❚" : "▶");
         StringBuilder sb = new StringBuilder();
         if (queue.size() > 1) sb.append(index + 1).append('/').append(queue.size()).append("   ");
         sb.append("🔊 ").append(trackName(mp.getAudioTracks(), mp.getAudioTrack()));
         sb.append("   💬 ").append(trackName(mp.getSpuTracks(), mp.getSpuTrack()));
-        sb.append("   Vol ").append(muted ? "muted" : volume + "%");
+        sb.append(T.t("   Vol ")).append(muted ? "muted" : volume + "%");
         if (rate != 1f) sb.append("   ").append(fmtRate(rate));
-        if (sleepAt > 0 || sleepAfterItem) sb.append("   Sleep ").append(sleepLabel());
+        if (sleepAt > 0 || sleepAfterItem) sb.append(T.t("   Sleep ")).append(sleepLabel());
         String ts = torrentUsed ? TorrentEngine.get(this).shortStatus() : "";
         if (!ts.isEmpty()) sb.append("\n").append(ts);
         infoView.setText(sb.toString());
@@ -506,7 +506,7 @@ public class PlayerActivity extends AppCompatActivity {
         }
         if (sleepAt > 0 && System.currentTimeMillis() >= sleepAt) {
             sleepAt = 0;
-            Toast.makeText(this, "Sleep timer: stopped", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, T.t("Sleep timer: stopped"), Toast.LENGTH_LONG).show();
             finish();
             return;
         }
@@ -624,6 +624,16 @@ public class PlayerActivity extends AppCompatActivity {
             resolveTorrent(i);
             return;
         }
+        String th = torrentHash(it.u);
+        if (th != null && !TorrentEngine.get(this).isActiveHash(th)) {
+            String src = Store.getStr("torsrc_" + th, "");
+            if (src.isEmpty()) {
+                onPlayError(T.t("This torrent has ended. Play its magnet link again."));
+                return;
+            }
+            reopenTorrent(i, src, it.u);
+            return;
+        }
         long start = resume ? Store.pos(it.u) : 0;
         if (start < 5000) start = 0;
         startMedia(it, start, null);
@@ -642,13 +652,25 @@ public class PlayerActivity extends AppCompatActivity {
         try {
             m = buildMedia(it.u);
         } catch (Exception e) {
-            onPlayError("Cannot open: " + e.getMessage());
+            onPlayError(T.t("Cannot open: ") + e.getMessage());
             return;
         }
         if (startMs > 0) m.addOption(String.format(Locale.US, ":start-time=%.2f", startMs / 1000.0));
         if (Store.getInt("hw", 0) == 1) m.setHWDecoderEnabled(false, false);
         if (it.u.startsWith("http")) {
-            m.addOption(":http-user-agent=" + Net.UA);
+            String ua = Net.UA, ref = null;
+            int bar = it.u.indexOf('|');
+            if (bar > 0) {
+                for (String kv : it.u.substring(bar + 1).split("&")) {
+                    int eq = kv.indexOf('=');
+                    if (eq < 0) continue;
+                    String k = kv.substring(0, eq).trim().toLowerCase(Locale.US), v = Uri.decode(kv.substring(eq + 1));
+                    if (k.equals("referer") || k.equals("referrer")) ref = v;
+                    if (k.equals("user-agent")) ua = v;
+                }
+            }
+            m.addOption(":http-user-agent=" + ua);
+            if (ref != null) m.addOption(":http-referrer=" + ref);
         }
         mp.setMedia(m);
         m.release();
@@ -657,11 +679,12 @@ public class PlayerActivity extends AppCompatActivity {
         mp.play();
         applyAudio();
         titleView.setText(it.t);
-        showLoading(startMs > 0 ? "Resuming at " + Net.fmtTime(startMs) + "…" : "Opening…");
+        showLoading(startMs > 0 ? T.t("Resuming at ") + Net.fmtTime(startMs) + "…" : T.t("Opening…"));
         showOverlay();
     }
 
     private Media buildMedia(String url) throws Exception {
+        if (url.startsWith("http") && url.indexOf('|') > 0) url = url.substring(0, url.indexOf('|'));
         if (url.startsWith("/")) return new Media(libVLC, url);
         Uri u = Uri.parse(url);
         if ("content".equals(u.getScheme())) {
@@ -680,6 +703,48 @@ public class PlayerActivity extends AppCompatActivity {
             }
             pfd = null;
         }
+    }
+
+    private static String torrentHash(String u) {
+        String mark = "127.0.0.1:" + RemoteService.PORT + "/torrent/";
+        int k = u.indexOf(mark);
+        if (k < 0) return null;
+        String rest = u.substring(k + mark.length());
+        int s = rest.indexOf('/');
+        return s > 0 ? rest.substring(0, s) : null;
+    }
+
+    /** Restarts a finished torrent and jumps to the same file (used by "Continue watching"). */
+    private void reopenTorrent(final int i, final String src, final String streamUrl) {
+        final int token = ++resolveToken;
+        torrentUsed = true;
+        if (mp != null) mp.stop();
+        titleView.setText(queue.get(i).t);
+        showLoading(T.t("Restarting torrent…"));
+        showOverlay();
+        new Thread(new Runnable() {
+            public void run() {
+                try {
+                    final List<Store.Item> files = TorrentEngine.get(PlayerActivity.this).open(src);
+                    handler.post(new Runnable() {
+                        public void run() {
+                            if (token != resolveToken || isFinishing() || i >= queue.size()) return;
+                            int at = 0;
+                            for (int k = 0; k < files.size(); k++) if (files.get(k).u.equals(streamUrl)) at = k;
+                            queue.remove(i);
+                            queue.addAll(i, files);
+                            playIndex(i + at, true);
+                        }
+                    });
+                } catch (final Exception e) {
+                    handler.post(new Runnable() {
+                        public void run() {
+                            if (token == resolveToken) onPlayError("Torrent: " + e.getMessage());
+                        }
+                    });
+                }
+            }
+        }).start();
     }
 
     private void resolveTorrent(final int i) {
@@ -701,7 +766,7 @@ public class PlayerActivity extends AppCompatActivity {
                             if (token != resolveToken || isFinishing() || i >= queue.size()) return;
                             queue.remove(i);
                             queue.addAll(i, files);
-                            if (files.size() > 1) osd(files.size() + " videos in this torrent");
+                            if (files.size() > 1) osd(files.size() + T.t(" videos in this torrent"));
                             playIndex(i, true);
                         }
                     });
@@ -756,7 +821,7 @@ public class PlayerActivity extends AppCompatActivity {
                     break;
                 case MediaPlayer.Event.Buffering:
                     float b = e.getBuffering();
-                    if (b < 100f) showLoading("Buffering " + (int) b + "%");
+                    if (b < 100f) showLoading(T.t("Buffering ") + (int) b + "%");
                     else hideLoading();
                     break;
                 case MediaPlayer.Event.Vout:
@@ -775,7 +840,7 @@ public class PlayerActivity extends AppCompatActivity {
                         @Override
                         public void run() {
                             Store.Item it = current();
-                            onPlayError("Cannot play: " + (it == null ? "" : it.t));
+                            onPlayError(T.t("Cannot play: ") + (it == null ? "" : it.t));
                         }
                     });
                     break;
@@ -789,9 +854,12 @@ public class PlayerActivity extends AppCompatActivity {
         if (ended) return;
         ended = true;
         Store.Item it = current();
-        if (it != null) Store.setPos(it.u, 0);
+        if (it != null) {
+            Store.setPos(it.u, 0);
+            Store.removeHistory(it.u);
+        }
         if (sleepAfterItem) {
-            Toast.makeText(this, "Sleep timer: stopped", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, T.t("Sleep timer: stopped"), Toast.LENGTH_LONG).show();
             finish();
             return;
         }
@@ -814,8 +882,14 @@ public class PlayerActivity extends AppCompatActivity {
         if (mp == null || it == null || ended) return;
         long pos = mp.getTime(), len = mp.getLength();
         if (len <= 0 || pos <= 0) return;
-        boolean nearEnd = pos > len - 15000;
+        boolean nearEnd = pos > len - Math.max(15000, len / 50);
         Store.setPos(it.u, nearEnd ? 0 : pos);
+        boolean resumable = !it.u.startsWith("content:") && !it.u.contains("/local/") && len > 60000;
+        if (nearEnd) Store.removeHistory(it.u);
+        else if (resumable && pos > 5000) {
+            Store.putHistory(it.t, it.u, pos, len);
+            Thumbs.request(this, it.u, pos);
+        }
     }
 
     // =====================================================================
@@ -965,14 +1039,14 @@ public class PlayerActivity extends AppCompatActivity {
                         @Override
                         public void run() {
                             addSubtitle(f.getAbsolutePath(), true);
-                            osd("Subtitle loaded");
+                            osd(T.t("Subtitle loaded"));
                         }
                     });
                 } catch (final Exception e) {
                     handler.post(new Runnable() {
                         @Override
                         public void run() {
-                            osd("Subtitle failed: " + e.getMessage());
+                            osd(T.t("Subtitle failed: ") + e.getMessage());
                         }
                     });
                 }
@@ -1100,7 +1174,7 @@ public class PlayerActivity extends AppCompatActivity {
                     if (len > 0 && mp.isSeekable()) {
                         int pct = (code - KeyEvent.KEYCODE_0) * 10;
                         seekTo(len * pct / 100);
-                        osd("Jump to " + pct + "%");
+                        osd(T.t("Jump to ") + pct + "%");
                     }
                     return true;
                 }
@@ -1124,7 +1198,7 @@ public class PlayerActivity extends AppCompatActivity {
 
     private void seekTo(long t) {
         if (!mp.isSeekable()) {
-            osd("This stream cannot be seeked");
+            osd(T.t("This stream cannot be seeked"));
             return;
         }
         long len = mp.getLength();
@@ -1138,7 +1212,7 @@ public class PlayerActivity extends AppCompatActivity {
 
     private void next() {
         if (index + 1 < queue.size()) playIndex(index + 1, true);
-        else osd("This is the last item");
+        else osd(T.t("This is the last item"));
     }
 
     private void prev() {
@@ -1153,14 +1227,14 @@ public class PlayerActivity extends AppCompatActivity {
     private void cycleSubs() {
         MediaPlayer.TrackDescription[] t = mp.getSpuTracks();
         if (t == null || t.length == 0) {
-            osd("No subtitles in this video");
+            osd(T.t("No subtitles in this video"));
             return;
         }
         int cur = mp.getSpuTrack(), k = -1;
         for (int i = 0; i < t.length; i++) if (t[i].id == cur) k = i;
         MediaPlayer.TrackDescription n = t[(k + 1) % t.length];
         mp.setSpuTrack(n.id);
-        osd("Subtitles: " + niceName(n));
+        osd(T.t("Subtitles: ") + niceName(n));
     }
 
     private void cycleAudio() {
@@ -1172,7 +1246,7 @@ public class PlayerActivity extends AppCompatActivity {
             MediaPlayer.TrackDescription n = t[(k + step) % t.length];
             if (n.id < 0) continue; // skip "Disable"
             mp.setAudioTrack(n.id);
-            osd("Audio: " + niceName(n));
+            osd(T.t("Audio: ") + niceName(n));
             return;
         }
     }
@@ -1217,11 +1291,11 @@ public class PlayerActivity extends AppCompatActivity {
         box.addView(tv);
         TextView hint = new TextView(this);
         hint.setGravity(Gravity.CENTER);
-        hint.setText("Use ◀ ▶ on the remote to change");
+        hint.setText(T.t("Use ◀ ▶ on the remote to change"));
         box.addView(hint);
         AlertDialog d = new AlertDialog.Builder(this).setTitle(title).setView(box)
-                .setPositiveButton("Done", null)
-                .setNeutralButton("Reset", new DialogInterface.OnClickListener() {
+                .setPositiveButton(T.t("Done"), null)
+                .setNeutralButton(T.t("Reset"), new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface di, int w) {
                         cb.on(reset);
@@ -1248,48 +1322,48 @@ public class PlayerActivity extends AppCompatActivity {
         if (mp == null) return;
         final List<String> labels = new ArrayList<>();
         final List<Runnable> acts = new ArrayList<>();
-        labels.add("Audio track: " + trackName(mp.getAudioTracks(), mp.getAudioTrack()));
+        labels.add(T.t("Audio track: ") + trackName(mp.getAudioTracks(), mp.getAudioTrack()));
         acts.add(new Runnable() { public void run() { menuAudio(); } });
-        labels.add("Subtitles: " + trackName(mp.getSpuTracks(), mp.getSpuTrack()));
+        labels.add(T.t("Subtitles: ") + trackName(mp.getSpuTracks(), mp.getSpuTrack()));
         acts.add(new Runnable() { public void run() { menuSubs(); } });
-        labels.add("Aspect ratio: " + ASPECT_NAMES[aspectIndex()]);
+        labels.add(T.t("Aspect ratio: ") + ASPECT_NAMES[aspectIndex()]);
         acts.add(new Runnable() { public void run() { menuAspect(); } });
-        labels.add("Picture fit: " + FIT_NAMES[Math.max(0, Math.min(3, Store.getInt("fit", 0)))]);
+        labels.add(T.t("Picture fit: ") + FIT_NAMES[Math.max(0, Math.min(3, Store.getInt("fit", 0)))]);
         acts.add(new Runnable() { public void run() { menuFit(); } });
-        labels.add("Zoom / crop: " + Store.getInt("zoom", 100) + "%");
+        labels.add(T.t("Zoom / crop: ") + Store.getInt("zoom", 100) + "%");
         acts.add(new Runnable() { public void run() { menuZoom(); } });
-        labels.add("Equalizer: " + eqLabel());
+        labels.add(T.t("Equalizer: ") + eqLabel());
         acts.add(new Runnable() { public void run() { menuEq(); } });
-        labels.add("Volume / boost: " + (muted ? "muted" : volume + "%"));
+        labels.add(T.t("Volume / boost: ") + (muted ? "muted" : volume + "%"));
         acts.add(new Runnable() { public void run() { menuVolume(); } });
-        labels.add("Playback speed: " + fmtRate(rate));
+        labels.add(T.t("Playback speed: ") + fmtRate(rate));
         acts.add(new Runnable() { public void run() { menuSpeed(); } });
-        labels.add("Audio delay: " + fmtMs(Store.getInt("adelay", 0)));
+        labels.add(T.t("Audio delay: ") + fmtMs(Store.getInt("adelay", 0)));
         acts.add(new Runnable() { public void run() { menuAudioDelay(); } });
-        labels.add("Subtitle delay: " + fmtMs(subDelayMs));
+        labels.add(T.t("Subtitle delay: ") + fmtMs(subDelayMs));
         acts.add(new Runnable() { public void run() { menuSubDelay(); } });
-        labels.add("Subtitle style (size, background, language encoding)");
+        labels.add(T.t("Subtitle style (size, background, language encoding)"));
         acts.add(new Runnable() { public void run() { menuSubStyle(); } });
-        labels.add("Sleep timer: " + sleepLabel());
+        labels.add(T.t("Sleep timer: ") + sleepLabel());
         acts.add(new Runnable() { public void run() { menuSleep(); } });
-        labels.add("Decoder & buffer");
+        labels.add(T.t("Decoder & buffer"));
         acts.add(new Runnable() { public void run() { menuEngine(); } });
         if (queue.size() > 1) {
-            labels.add("Playlist (" + (index + 1) + "/" + queue.size() + ")…");
+            labels.add(T.t("Playlist (") + (index + 1) + "/" + queue.size() + ")…");
             acts.add(new Runnable() { public void run() { menuQueue(); } });
-            labels.add("Next item");
+            labels.add(T.t("Next item"));
             acts.add(new Runnable() { public void run() { next(); } });
-            labels.add("Previous item");
+            labels.add(T.t("Previous item"));
             acts.add(new Runnable() { public void run() { prev(); } });
         }
         if (torrentUsed && TorrentEngine.get(this).isActive()) {
-            labels.add("Stop torrent and delete its data");
+            labels.add(T.t("Stop torrent and delete its data"));
             acts.add(new Runnable() { public void run() { TorrentEngine.get(PlayerActivity.this).stopAsync(); finish(); } });
         }
-        labels.add("Phone remote: http://" + Net.ip() + ":" + RemoteService.PORT);
+        labels.add(T.t("Phone remote: http://") + Net.ip() + ":" + RemoteService.PORT);
         acts.add(new Runnable() { public void run() { osd("Open http://" + Net.ip() + ":" + RemoteService.PORT + " on your phone"); } });
 
-        new AlertDialog.Builder(this).setTitle("Options")
+        new AlertDialog.Builder(this).setTitle(T.t("Options"))
                 .setItems(labels.toArray(new String[0]), new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface d, int w) {
@@ -1301,7 +1375,7 @@ public class PlayerActivity extends AppCompatActivity {
     private void menuAudio() {
         final MediaPlayer.TrackDescription[] t = mp.getAudioTracks();
         if (t == null || t.length == 0) {
-            osd("No audio tracks");
+            osd(T.t("No audio tracks"));
             return;
         }
         String[] names = new String[t.length];
@@ -1310,7 +1384,7 @@ public class PlayerActivity extends AppCompatActivity {
             names[i] = niceName(t[i]);
             if (t[i].id == mp.getAudioTrack()) sel = i;
         }
-        choose("Audio track", names, sel, new IntCb() {
+        choose(T.t("Audio track"), names, sel, new IntCb() {
             public void on(int i) {
                 command("audio", String.valueOf(t[i].id), "");
             }
@@ -1325,7 +1399,7 @@ public class PlayerActivity extends AppCompatActivity {
         if (t != null) for (MediaPlayer.TrackDescription d : t) if (d.id < 0) hasOff = true;
         if (!hasOff) {
             ids.add(-1);
-            names.add("Off");
+            names.add(T.t("Off"));
         }
         int sel = -1;
         if (t != null) {
@@ -1337,16 +1411,16 @@ public class PlayerActivity extends AppCompatActivity {
         }
         if (sel < 0 && mp.getSpuTrack() < 0) sel = 0;
         final int extra = ids.size();
-        names.add("➕ Load a subtitle file from your phone…");
-        names.add("Subtitle delay…");
-        names.add("Subtitle style…");
-        choose("Subtitles", names.toArray(new String[0]), sel, new IntCb() {
+        names.add(T.t("➕ Load a subtitle file from your phone…"));
+        names.add(T.t("Subtitle delay…"));
+        names.add(T.t("Subtitle style…"));
+        choose(T.t("Subtitles"), names.toArray(new String[0]), sel, new IntCb() {
             public void on(int i) {
                 if (i < extra) command("sub", String.valueOf(ids.get(i)), "");
-                else if (i == extra) new AlertDialog.Builder(PlayerActivity.this).setTitle("Load subtitles")
+                else if (i == extra) new AlertDialog.Builder(PlayerActivity.this).setTitle(T.t("Load subtitles"))
                         .setMessage("On your phone open\n\nhttp://" + Net.ip() + ":" + RemoteService.PORT
                                 + "\n\nthen go to “Audio & Subs” and upload a .srt/.ass file or paste a subtitle link.")
-                        .setPositiveButton("OK", null).show();
+                        .setPositiveButton(T.t("OK"), null).show();
                 else if (i == extra + 1) menuSubDelay();
                 else menuSubStyle();
             }
@@ -1354,7 +1428,7 @@ public class PlayerActivity extends AppCompatActivity {
     }
 
     private void menuAspect() {
-        choose("Aspect ratio", ASPECT_NAMES, aspectIndex(), new IntCb() {
+        choose(T.t("Aspect ratio"), ASPECT_NAMES, aspectIndex(), new IntCb() {
             public void on(int i) {
                 command("aspect", ASPECT_VALUES[i], "");
             }
@@ -1362,7 +1436,7 @@ public class PlayerActivity extends AppCompatActivity {
     }
 
     private void menuFit() {
-        choose("Picture fit", FIT_NAMES, Store.getInt("fit", 0), new IntCb() {
+        choose(T.t("Picture fit"), FIT_NAMES, Store.getInt("fit", 0), new IntCb() {
             public void on(int i) {
                 command("fit", String.valueOf(i), "");
             }
@@ -1372,16 +1446,16 @@ public class PlayerActivity extends AppCompatActivity {
     private void menuZoom() {
         String[] names = new String[ZOOM_NAMES.length + 1];
         System.arraycopy(ZOOM_NAMES, 0, names, 0, ZOOM_NAMES.length);
-        names[ZOOM_NAMES.length] = "Custom…";
+        names[ZOOM_NAMES.length] = T.t("Custom…");
         int z = Store.getInt("zoom", 100), sel = -1;
         for (int i = 0; i < ZOOM_VALUES.length; i++) if (ZOOM_VALUES[i] == z) sel = i;
-        choose("Zoom / crop to fill the screen", names, sel, new IntCb() {
+        choose(T.t("Zoom / crop to fill the screen"), names, sel, new IntCb() {
             public void on(int i) {
                 if (i < ZOOM_VALUES.length) {
                     command("zoom", String.valueOf(ZOOM_VALUES[i]), "");
                     return;
                 }
-                stepper("Zoom", Store.getInt("zoom", 100), 5, 50, 300, 100, new Fmt() {
+                stepper(T.t("Zoom"), Store.getInt("zoom", 100), 5, 50, 300, 100, new Fmt() {
                     public String f(float v) {
                         return Math.round(v) + "%";
                     }
@@ -1398,16 +1472,16 @@ public class PlayerActivity extends AppCompatActivity {
         String[] names = new String[VOLS.length + 2];
         int sel = -1;
         for (int i = 0; i < VOLS.length; i++) {
-            names[i] = VOLS[i] + "%" + (VOLS[i] > 100 ? "  (boost)" : "");
+            names[i] = VOLS[i] + "%" + (VOLS[i] > 100 ? T.t("  (boost)") : "");
             if (VOLS[i] == volume) sel = i;
         }
-        names[VOLS.length] = muted ? "Unmute" : "Mute";
-        names[VOLS.length + 1] = "Custom…";
+        names[VOLS.length] = muted ? T.t("Unmute") : T.t("Mute");
+        names[VOLS.length + 1] = T.t("Custom…");
         choose("Volume / boost (up to 200%)", names, sel, new IntCb() {
             public void on(int i) {
                 if (i < VOLS.length) command("vol", String.valueOf(VOLS[i]), "");
                 else if (i == VOLS.length) command("mute", "", "");
-                else stepper("Volume", volume, 5, 0, 200, 100, new Fmt() {
+                else stepper(T.t("Volume"), volume, 5, 0, 200, 100, new Fmt() {
                     public String f(float v) {
                         return Math.round(v) + "%";
                     }
@@ -1427,7 +1501,7 @@ public class PlayerActivity extends AppCompatActivity {
             names[i] = fmtRate(SPEEDS[i]);
             if (Math.abs(SPEEDS[i] - rate) < 0.01f) sel = i;
         }
-        choose("Playback speed", names, sel, new IntCb() {
+        choose(T.t("Playback speed"), names, sel, new IntCb() {
             public void on(int i) {
                 command("rate", String.valueOf(SPEEDS[i]), "");
             }
@@ -1435,7 +1509,7 @@ public class PlayerActivity extends AppCompatActivity {
     }
 
     private void menuAudioDelay() {
-        stepper("Audio delay (fix lip-sync)", Store.getInt("adelay", 0), 50, -10000, 10000, 0, new Fmt() {
+        stepper(T.t("Audio delay (fix lip-sync)"), Store.getInt("adelay", 0), 50, -10000, 10000, 0, new Fmt() {
             public String f(float v) {
                 return fmtMs((long) v);
             }
@@ -1447,7 +1521,7 @@ public class PlayerActivity extends AppCompatActivity {
     }
 
     private void menuSubDelay() {
-        stepper("Subtitle delay", subDelayMs, 100, -60000, 60000, 0, new Fmt() {
+        stepper(T.t("Subtitle delay"), subDelayMs, 100, -60000, 60000, 0, new Fmt() {
             public String f(float v) {
                 return fmtMs((long) v);
             }
@@ -1459,20 +1533,20 @@ public class PlayerActivity extends AppCompatActivity {
     }
 
     private void menuSubStyle() {
-        String[] items = {"Size: " + SUB_SIZE_NAMES[subSizeIndex()],
-                "Background box: " + (Store.getBool("subbg", false) ? "On" : "Off"),
-                "Text encoding: " + ENC_NAMES[encIndex()]};
-        new AlertDialog.Builder(this).setTitle("Subtitle style")
+        String[] items = {T.t("Size: ") + SUB_SIZE_NAMES[subSizeIndex()],
+                T.t("Background box: ") + (Store.getBool("subbg", false) ? "On" : T.t("Off")),
+                T.t("Text encoding: ") + ENC_NAMES[encIndex()]};
+        new AlertDialog.Builder(this).setTitle(T.t("Subtitle style"))
                 .setItems(items, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface d, int w) {
-                        if (w == 0) choose("Subtitle size", SUB_SIZE_NAMES, subSizeIndex(), new IntCb() {
+                        if (w == 0) choose(T.t("Subtitle size"), SUB_SIZE_NAMES, subSizeIndex(), new IntCb() {
                             public void on(int i) {
                                 command("subsize", String.valueOf(SUB_SIZES[i]), "");
                             }
                         });
                         else if (w == 1) command("subbg", Store.getBool("subbg", false) ? "0" : "1", "");
-                        else choose("Subtitle text encoding", ENC_NAMES, encIndex(), new IntCb() {
+                        else choose(T.t("Subtitle text encoding"), ENC_NAMES, encIndex(), new IntCb() {
                             public void on(int i) {
                                 command("subenc", ENC_VALUES[i], "");
                             }
@@ -1484,9 +1558,9 @@ public class PlayerActivity extends AppCompatActivity {
     private void menuSleep() {
         String[] names = new String[SLEEPS.length];
         for (int i = 0; i < SLEEPS.length; i++) {
-            names[i] = SLEEPS[i] == 0 ? "Off" : SLEEPS[i] < 0 ? "At the end of this video" : SLEEPS[i] + " minutes";
+            names[i] = SLEEPS[i] == 0 ? T.t("Off") : SLEEPS[i] < 0 ? T.t("At the end of this video") : SLEEPS[i] + T.t(" minutes");
         }
-        choose("Sleep timer", names, -1, new IntCb() {
+        choose(T.t("Sleep timer"), names, -1, new IntCb() {
             public void on(int i) {
                 command("sleep", String.valueOf(SLEEPS[i]), "");
             }
@@ -1494,9 +1568,9 @@ public class PlayerActivity extends AppCompatActivity {
     }
 
     private void menuEngine() {
-        String[] items = {"Decoder: " + (Store.getInt("hw", 0) == 1 ? "Software (slower, most compatible)" : "Hardware (auto)"),
-                "Network buffer: " + Store.getInt("cache", 2000) / 1000f + " s"};
-        new AlertDialog.Builder(this).setTitle("Decoder & buffer")
+        String[] items = {T.t("Decoder: ") + (Store.getInt("hw", 0) == 1 ? T.t("Software (slower, most compatible)") : T.t("Hardware (auto)")),
+                T.t("Network buffer: ") + Store.getInt("cache", 2000) / 1000f + " s"};
+        new AlertDialog.Builder(this).setTitle(T.t("Decoder & buffer"))
                 .setItems(items, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface d, int w) {
@@ -1506,10 +1580,10 @@ public class PlayerActivity extends AppCompatActivity {
                             String[] n = new String[CACHES.length];
                             int sel = -1;
                             for (int i = 0; i < CACHES.length; i++) {
-                                n[i] = (CACHES[i] / 1000f) + " seconds";
+                                n[i] = (CACHES[i] / 1000f) + T.t(" seconds");
                                 if (CACHES[i] == Store.getInt("cache", 2000)) sel = i;
                             }
-                            choose("Network buffer (bigger = fewer stalls)", n, sel, new IntCb() {
+                            choose(T.t("Network buffer (bigger = fewer stalls)"), n, sel, new IntCb() {
                                 public void on(int i) {
                                     command("cache", String.valueOf(CACHES[i]), "");
                                 }
@@ -1522,7 +1596,7 @@ public class PlayerActivity extends AppCompatActivity {
     private void menuQueue() {
         String[] names = new String[queue.size()];
         for (int i = 0; i < queue.size(); i++) names[i] = (i + 1) + ". " + queue.get(i).t;
-        choose("Playlist", names, index, new IntCb() {
+        choose(T.t("Playlist"), names, index, new IntCb() {
             public void on(int i) {
                 playIndex(i, true);
             }
@@ -1569,9 +1643,9 @@ public class PlayerActivity extends AppCompatActivity {
             }
         });
         top.addView(on, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
-        final Button preset = Ui.button(this, "Preset: " + eqPresetName(), true);
+        final Button preset = Ui.button(this, T.t("Preset: ") + eqPresetName(), true);
         top.addView(preset);
-        final Button reset = Ui.button(this, "Reset", false);
+        final Button reset = Ui.button(this, T.t("Reset"), false);
         LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT);
         rlp.setMargins(dp(8), 0, 0, 0);
@@ -1585,7 +1659,7 @@ public class PlayerActivity extends AppCompatActivity {
                 if (i == 0) command("eq_preamp", String.valueOf(db), "");
                 else command("eq_band", String.valueOf(db), String.valueOf(i - 1));
                 on.setChecked(true);
-                preset.setText("Preset: " + eqPresetName());
+                preset.setText(T.t("Preset: ") + eqPresetName());
             }
         });
         LinearLayout.LayoutParams elp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
@@ -1593,7 +1667,7 @@ public class PlayerActivity extends AppCompatActivity {
         elp.setMargins(0, dp(12), 0, 0);
         box.addView(eq, elp);
         TextView hint = new TextView(this);
-        hint.setText("◀ ▶ choose band   ·   ▲ ▼ change level   ·   touch: drag up / down");
+        hint.setText(T.t("◀ ▶ choose band   ·   ▲ ▼ change level   ·   touch: drag up / down"));
         hint.setTextSize(12);
         hint.setGravity(Gravity.CENTER);
         box.addView(hint);
@@ -1601,11 +1675,11 @@ public class PlayerActivity extends AppCompatActivity {
         preset.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                choose("Equalizer preset", presets, Store.getInt("eq_preset", -1), new IntCb() {
+                choose(T.t("Equalizer preset"), presets, Store.getInt("eq_preset", -1), new IntCb() {
                     public void on(int i) {
                         loadPreset(i);
                         on.setChecked(true);
-                        preset.setText("Preset: " + eqPresetName());
+                        preset.setText(T.t("Preset: ") + eqPresetName());
                         eq.setValues(eqValues());
                     }
                 });
@@ -1615,11 +1689,11 @@ public class PlayerActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
                 command("eq_reset", "", "");
-                preset.setText("Preset: " + eqPresetName());
+                preset.setText(T.t("Preset: ") + eqPresetName());
                 eq.setValues(eqValues());
             }
         });
-        new AlertDialog.Builder(this).setTitle("🎚  Equalizer").setView(box).setPositiveButton("Done", null).show();
+        new AlertDialog.Builder(this).setTitle(T.t("🎚  Equalizer")).setView(box).setPositiveButton(T.t("Done"), null).show();
         eq.post(new Runnable() {
             public void run() {
                 eq.requestFocus();
@@ -1644,7 +1718,7 @@ public class PlayerActivity extends AppCompatActivity {
                     for (int i = 0; i < ASPECT_VALUES.length; i++) {
                         if (ASPECT_VALUES[i].equals(v)) {
                             Store.putStr("aspect", v);
-                            return "Aspect ratio: " + ASPECT_NAMES[i];
+                            return T.t("Aspect ratio: ") + ASPECT_NAMES[i];
                         }
                     }
                     return "Unknown aspect ratio";
@@ -1704,7 +1778,7 @@ public class PlayerActivity extends AppCompatActivity {
                     return "Subtitle encoding: " + (v.isEmpty() ? "automatic" : v);
                 case "hw":
                     Store.putInt("hw", "1".equals(v) ? 1 : 0);
-                    return "Decoder: " + ("1".equals(v) ? "software" : "hardware");
+                    return T.t("Decoder: ") + ("1".equals(v) ? "software" : "hardware");
                 case "cache":
                     Store.putInt("cache", Math.max(300, Math.min(60000, Integer.parseInt(v))));
                     return "Network buffer " + Store.getInt("cache", 2000) / 1000f + " s";
@@ -1746,7 +1820,7 @@ public class PlayerActivity extends AppCompatActivity {
             case "eq_preset":
                 Store.putBool("eq_pending", false);
                 loadPreset(Store.getInt("eq_preset", 0));
-                msg = "Equalizer: " + eqPresetName();
+                msg = T.t("Equalizer: ") + eqPresetName();
                 break;
             case "subsize": case "subbg": case "subenc": case "cache":
                 restartEngine();
@@ -1797,11 +1871,11 @@ public class PlayerActivity extends AppCompatActivity {
                 break;
             case "audio":
                 mp.setAudioTrack(Integer.parseInt(v));
-                msg = "Audio: " + trackName(mp.getAudioTracks(), Integer.parseInt(v));
+                msg = T.t("Audio: ") + trackName(mp.getAudioTracks(), Integer.parseInt(v));
                 break;
             case "sub":
                 mp.setSpuTrack(Integer.parseInt(v));
-                msg = "Subtitles: " + (Integer.parseInt(v) < 0 ? "Off" : trackName(mp.getSpuTracks(), Integer.parseInt(v)));
+                msg = T.t("Subtitles: ") + (Integer.parseInt(v) < 0 ? T.t("Off") : trackName(mp.getSpuTracks(), Integer.parseInt(v)));
                 break;
             case "sdelay":
                 subDelayMs = Math.max(-600000, Math.min(600000, Math.round(Float.parseFloat(v))));
@@ -1817,12 +1891,12 @@ public class PlayerActivity extends AppCompatActivity {
                 int m = Integer.parseInt(v);
                 sleepAfterItem = m < 0;
                 sleepAt = m > 0 ? System.currentTimeMillis() + m * 60000L : 0;
-                msg = "Sleep timer: " + sleepLabel();
+                msg = T.t("Sleep timer: ") + sleepLabel();
                 break;
             }
             case "subfile":
                 addSubtitle(v, true);
-                msg = "Subtitle loaded";
+                msg = T.t("Subtitle loaded");
                 break;
             case "menu":
                 showMenu();
@@ -1943,7 +2017,7 @@ public class PlayerActivity extends AppCompatActivity {
         JSONArray a = new JSONArray();
         boolean hasOff = false;
         if (t != null) for (MediaPlayer.TrackDescription d : t) if (d.id < 0) hasOff = true;
-        if (addOff && !hasOff) a.put(new JSONObject().put("id", -1).put("name", "Off"));
+        if (addOff && !hasOff) a.put(new JSONObject().put("id", -1).put("name", T.t("Off")));
         if (t != null) for (MediaPlayer.TrackDescription d : t) {
             a.put(new JSONObject().put("id", d.id).put("name", niceName(d)));
         }
@@ -1954,12 +2028,12 @@ public class PlayerActivity extends AppCompatActivity {
     // Small helpers
     // =====================================================================
     private static String niceName(MediaPlayer.TrackDescription d) {
-        if (d.id < 0) return "Off";
+        if (d.id < 0) return T.t("Off");
         return d.name == null || d.name.isEmpty() ? "Track " + d.id : d.name;
     }
 
     private static String trackName(MediaPlayer.TrackDescription[] t, int id) {
-        if (id < 0) return "Off";
+        if (id < 0) return T.t("Off");
         if (t != null) for (MediaPlayer.TrackDescription d : t) if (d.id == id) return niceName(d);
         return "—";
     }
@@ -1989,12 +2063,12 @@ public class PlayerActivity extends AppCompatActivity {
     }
 
     private String eqLabel() {
-        return Store.getBool("eq_on", false) ? eqPresetName() : "Off";
+        return Store.getBool("eq_on", false) ? eqPresetName() : T.t("Off");
     }
 
     private String sleepLabel() {
         if (sleepAfterItem) return "end of video";
-        if (sleepAt <= 0) return "Off";
+        if (sleepAt <= 0) return T.t("Off");
         long left = Math.max(0, sleepAt - System.currentTimeMillis());
         return (left / 60000 + 1) + " min";
     }

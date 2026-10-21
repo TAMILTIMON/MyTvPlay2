@@ -151,6 +151,21 @@ public class RemoteWebActivity extends AppCompatActivity {
         }
 
         @JavascriptInterface
+        public void setToken(String t) {
+            TvClient.setToken(ip, t);
+        }
+
+        @JavascriptInterface
+        public String getToken() {
+            return TvClient.token(ip);
+        }
+
+        @JavascriptInterface
+        public void openBrowser() {
+            runOnUiThread(() -> startActivity(new Intent(RemoteWebActivity.this, BrowserActivity.class)));
+        }
+
+        @JavascriptInterface
         public void retry() {
             runOnUiThread(RemoteWebActivity.this::load);
         }
@@ -192,23 +207,15 @@ public class RemoteWebActivity extends AppCompatActivity {
                 titles.append(name).append('\n');
             }
             try {
-                String body = "urls=" + URLEncoder.encode(urls.toString(), "UTF-8")
-                        + "&titles=" + URLEncoder.encode(titles.toString(), "UTF-8")
-                        + "&mode=" + mode;
-                HttpURLConnection c = (HttpURLConnection) new URL("http://" + ip + ":" + RemoteService.PORT
-                        + "/playmany").openConnection();
-                c.setDoOutput(true);
-                c.setConnectTimeout(5000);
-                c.setReadTimeout(10000);
-                c.setRequestMethod("POST");
-                c.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
-                try (OutputStream o = c.getOutputStream()) {
-                    o.write(body.getBytes("UTF-8"));
-                }
-                int code = c.getResponseCode();
-                c.disconnect();
-                notifyPage(code == 200 ? (torrent ? "Torrent sent to the TV 🧲" : uris.size() + " file(s) streaming to the TV — keep this app open")
-                        : "TV refused the request");
+                java.util.HashMap<String, String> prm = new java.util.HashMap<>();
+                prm.put("urls", urls.toString());
+                prm.put("titles", titles.toString());
+                prm.put("mode", mode);
+                JSONObject r = TvClient.post(ip, "/playmany", prm);
+                notifyPage(r.optBoolean("ok") ? (torrent ? "Torrent sent to the TV 🧲"
+                        : uris.size() + " file(s) streaming to the TV — keep this app open") : r.optString("msg", "TV refused"));
+            } catch (TvClient.AuthNeeded e) {
+                notifyPage("Enter the TV PIN first (shown on the TV)");
             } catch (Exception e) {
                 notifyPage("Could not reach the TV: " + e.getMessage());
             }

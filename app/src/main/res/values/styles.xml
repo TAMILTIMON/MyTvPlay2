@@ -23,4 +23,18 @@
         <item name="colorAccent">#8B5CF6</item>
         <item name="colorControlActivated">#8B5CF6</item>
     </style>
+    <style name="ShareTheme" parent="Theme.AppCompat.Dialog">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:backgroundDimEnabled">true</item>
+        <item name="colorAccent">#8B5CF6</item>
+    </style>
+    <style name="ShareTheme.Light" parent="Theme.AppCompat.Light.Dialog">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:backgroundDimEnabled">true</item>
+        <item name="colorAccent">#8B5CF6</item>
+    </style>
 </resources>

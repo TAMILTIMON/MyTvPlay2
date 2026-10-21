@@ -41,16 +41,16 @@ public final class Perms {
 
     public static void askOverlay(final Activity a) {
         new AlertDialog.Builder(a)
-                .setTitle("📱  Allow the phone to start videos")
+                .setTitle(T.t("📱  Allow the phone to start videos"))
                 .setMessage("So your phone can play videos on this TV even when TamilCastPlay is closed, "
                         + "allow “Display over other apps”.\n\nOn the next screen choose TamilCastPlay and switch it ON, "
                         + "then press Back.")
-                .setPositiveButton("Allow", new DialogInterface.OnClickListener() {
+                .setPositiveButton(T.t("Allow"), new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface d, int w) {
                         openOverlaySettings(a);
                     }
                 })
-                .setNegativeButton("Later", null).show();
+                .setNegativeButton(T.t("Later"), null).show();
     }
 
     public static void openOverlaySettings(Activity a) {
@@ -90,10 +90,10 @@ public final class Perms {
 
     /** Some TVs hide these screens: explain the manual path. */
     private static void help(Activity a, String what) {
-        new AlertDialog.Builder(a).setTitle("Open it in TV Settings")
+        new AlertDialog.Builder(a).setTitle(T.t("Open it in TV Settings"))
                 .setMessage("This TV has no direct shortcut. Go to:\n\nSettings → Apps → Special app access → "
                         + what + " → TamilCastPlay → ON\n\nIf your TV doesn't have that option, everything still works "
                         + "while TamilCastPlay is open on the TV.")
-                .setPositiveButton("OK", null).show();
+                .setPositiveButton(T.t("OK"), null).show();
     }
 }
