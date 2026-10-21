@@ -144,6 +144,7 @@ public class PlayerActivity extends AppCompatActivity {
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         hideSystemUi();
         buildUi();
+        applyRotation();
         volume = Store.getInt("vol", 100);
         try {
             createEngine();
@@ -281,6 +282,59 @@ public class PlayerActivity extends AppCompatActivity {
     private Button playBtn;
     private Button gearBtn;
 
+    private Button repeatBtn, shuffleBtn, unlockBtn;
+    private boolean locked;
+    private final java.util.Random rng = new java.util.Random();
+    private final Runnable hideUnlock = new Runnable() {
+        public void run() {
+            if (unlockBtn != null) unlockBtn.setVisibility(View.GONE);
+        }
+    };
+
+    private void flashUnlock() {
+        unlockBtn.setVisibility(View.VISIBLE);
+        handler.removeCallbacks(hideUnlock);
+        handler.postDelayed(hideUnlock, 3000);
+        osd(T.t("Screen locked — tap 🔓 to unlock"));
+    }
+
+    private int repeatMode() {
+        return Store.getInt("repeat", 0);
+    }
+
+    private boolean shuffleOn() {
+        return Store.getBool("shuffle", false);
+    }
+
+    private void updateModeButtons() {
+        if (repeatBtn == null) return;
+        int rm = repeatMode();
+        repeatBtn.setText(rm == 1 ? "🔂" : "🔁");
+        repeatBtn.setAlpha(rm == 0 ? 0.45f : 1f);
+        shuffleBtn.setAlpha(shuffleOn() ? 1f : 0.45f);
+    }
+
+    private String repeatName() {
+        int rm = repeatMode();
+        return T.t(rm == 1 ? "One" : rm == 2 ? "All" : "Off");
+    }
+
+    /** Phones: 0 = auto rotate, 1 = landscape (default), 2 = portrait. */
+    private void applyRotation() {
+        if (Ui.isTv(this)) return;
+        int m = Store.getInt("rotate", 1);
+        setRequestedOrientation(m == 0 ? android.content.pm.ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR
+                : m == 2 ? android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+                : android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+    }
+
+    private int randomOther() {
+        if (queue.size() < 2) return index;
+        int n;
+        do n = rng.nextInt(queue.size()); while (n == index);
+        return n;
+    }
+
     private Button ctl(LinearLayout row, String label, float size, boolean primary, View.OnClickListener l) {
         Button b = Ui.iconButton(this, label, size, primary);
         b.setOnClickListener(l);
@@ -302,6 +356,10 @@ public class PlayerActivity extends AppCompatActivity {
         View touch = new View(this);
         touch.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
+                if (locked) {
+                    flashUnlock();
+                    return;
+                }
                 if (overlayVisible) hideOverlayNow();
                 else showOverlay();
             }
@@ -339,6 +397,10 @@ public class PlayerActivity extends AppCompatActivity {
         infoView.setPadding(0, dp(4), 0, 0);
         tcol.addView(infoView);
         topBar.addView(tcol, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        if (!Ui.isTv(this)) {
+            ctl(topBar, "🔄", 52, false, v -> command("rotate", "", ""));
+            ctl(topBar, "🔒", 52, false, v -> command("lock", "1", ""));
+        }
         ctl(topBar, "⌂", 52, false, new View.OnClickListener() {
             public void onClick(View v) {
                 Ui.goHome(PlayerActivity.this, true);
@@ -363,6 +425,13 @@ public class PlayerActivity extends AppCompatActivity {
                 ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP | Gravity.CENTER_HORIZONTAL);
         olp.setMargins(dp(32), dp(96), dp(32), 0);
         root.addView(osdView, olp);
+
+        unlockBtn = Ui.iconButton(this, "🔓", 64, true);
+        unlockBtn.setOnClickListener(v -> command("lock", "0", ""));
+        unlockBtn.setVisibility(View.GONE);
+        FrameLayout.LayoutParams ulp = new FrameLayout.LayoutParams(dp(64), dp(64), Gravity.START | Gravity.CENTER_VERTICAL);
+        ulp.setMargins(dp(28), 0, 0, 0);
+        root.addView(unlockBtn, ulp);
 
         // ---- bottom glass panel
         panel = new LinearLayout(this);
@@ -405,7 +474,10 @@ public class PlayerActivity extends AppCompatActivity {
         ctl(btns, "💬", 46, false, v -> menuSubs());
         ctl(btns, "⛶", 46, false, v -> menuFit());
         ctl(btns, "🎚", 46, false, v -> menuEq());
+        repeatBtn = ctl(btns, "🔁", 46, false, v -> command("repeat", "", ""));
+        shuffleBtn = ctl(btns, "🔀", 46, false, v -> command("shuffle", "", ""));
         ctl(btns, "☰", 46, false, v -> showMenu());
+        updateModeButtons();
         android.widget.HorizontalScrollView hs = new android.widget.HorizontalScrollView(this);
         hs.setHorizontalScrollBarEnabled(false);
         hs.addView(btns);
@@ -459,6 +531,7 @@ public class PlayerActivity extends AppCompatActivity {
     }
 
     private void showOverlay() {
+        if (locked) return;
         panel.setVisibility(View.VISIBLE);
         topBar.setVisibility(View.VISIBLE);
         overlayVisible = true;
@@ -955,7 +1028,16 @@ public class PlayerActivity extends AppCompatActivity {
             showOverlay();
             return;
         }
+        if (repeatMode() == 1) {
+            playIndex(index, false);
+            return;
+        }
+        if (shuffleOn() && queue.size() > 1) {
+            playIndex(randomOther(), false);
+            return;
+        }
         if (index + 1 < queue.size()) playIndex(index + 1, true);
+        else if (repeatMode() == 2) playIndex(0, false);
         else finish();
     }
 
@@ -1152,6 +1234,11 @@ public class PlayerActivity extends AppCompatActivity {
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
         int code = event.getKeyCode();
+        if (locked && code != KeyEvent.KEYCODE_VOLUME_UP && code != KeyEvent.KEYCODE_VOLUME_DOWN
+                && code != KeyEvent.KEYCODE_VOLUME_MUTE) {
+            if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) flashUnlock();
+            return true;
+        }
         if (controlsFocused()) {
             boolean nav = code == KeyEvent.KEYCODE_DPAD_LEFT || code == KeyEvent.KEYCODE_DPAD_RIGHT
                     || code == KeyEvent.KEYCODE_DPAD_UP || code == KeyEvent.KEYCODE_DPAD_DOWN
@@ -1325,7 +1412,9 @@ public class PlayerActivity extends AppCompatActivity {
     }
 
     private void next() {
-        if (index + 1 < queue.size()) playIndex(index + 1, true);
+        if (shuffleOn() && queue.size() > 1 && !channelMode()) playIndex(randomOther(), true);
+        else if (index + 1 < queue.size()) playIndex(index + 1, true);
+        else if (repeatMode() == 2) playIndex(0, true);
         else osd(T.t("This is the last item"));
     }
 
@@ -1473,6 +1562,17 @@ public class PlayerActivity extends AppCompatActivity {
         if (torrentUsed && TorrentEngine.get(this).isActive()) {
             labels.add(T.t("Stop torrent and delete its data"));
             acts.add(new Runnable() { public void run() { TorrentEngine.get(PlayerActivity.this).stopAsync(); finish(); } });
+        }
+        labels.add((repeatMode() == 1 ? "🔂  " : "🔁  ") + T.t("Repeat: ") + repeatName());
+        acts.add(new Runnable() { public void run() { command("repeat", "", ""); } });
+        labels.add("🔀  " + T.t("Shuffle: ") + T.t(shuffleOn() ? "On" : "Off"));
+        acts.add(new Runnable() { public void run() { command("shuffle", "", ""); } });
+        if (!Ui.isTv(this)) {
+            int rot = Store.getInt("rotate", 1);
+            labels.add("🔄  " + T.t("Rotation: ") + T.t(rot == 0 ? "Auto" : rot == 2 ? "Portrait" : "Landscape"));
+            acts.add(new Runnable() { public void run() { command("rotate", "", ""); } });
+            labels.add("🔒  " + T.t("Lock screen"));
+            acts.add(new Runnable() { public void run() { command("lock", "1", ""); } });
         }
         labels.add("🏠  " + T.t("Go to Home"));
         acts.add(new Runnable() { public void run() { Ui.goHome(PlayerActivity.this, true); } });
@@ -2094,6 +2194,37 @@ public class PlayerActivity extends AppCompatActivity {
                 showMenu();
                 msg = "";
                 break;
+            case "repeat": {
+                int rm = v.isEmpty() ? (repeatMode() + 1) % 3 : Math.max(0, Math.min(2, Integer.parseInt(v)));
+                Store.putInt("repeat", rm);
+                updateModeButtons();
+                msg = T.t("Repeat: ") + repeatName();
+                break;
+            }
+            case "shuffle":
+                Store.putBool("shuffle", v.isEmpty() ? !shuffleOn() : "1".equals(v));
+                updateModeButtons();
+                msg = T.t("Shuffle: ") + T.t(shuffleOn() ? "On" : "Off");
+                break;
+            case "rotate": {
+                int m = v.isEmpty() ? (Store.getInt("rotate", 1) + 1) % 3 : Integer.parseInt(v);
+                Store.putInt("rotate", m);
+                applyRotation();
+                msg = T.t("Rotation: ") + T.t(m == 0 ? "Auto" : m == 2 ? "Portrait" : "Landscape");
+                break;
+            }
+            case "lock":
+                locked = "1".equals(v);
+                if (locked) {
+                    hideOverlayNow();
+                    flashUnlock();
+                    msg = "";
+                } else {
+                    unlockBtn.setVisibility(View.GONE);
+                    showOverlay();
+                    msg = T.t("Unlocked");
+                }
+                break;
             case "osd":
                 showOverlay();
                 msg = "";
@@ -2148,6 +2279,8 @@ public class PlayerActivity extends AppCompatActivity {
         o.put("subs", tracksJson(mp.getSpuTracks(), true));
         o.put("subSel", mp.getSpuTrack());
         o.put("sleep", sleepLabel());
+        o.put("repeat", repeatMode());
+        o.put("shuffle", shuffleOn());
         o.put("loading", loadingView.getVisibility() == View.VISIBLE ? loadingView.getText().toString() : "");
         JSONArray q = new JSONArray();
         int qs = Math.max(0, Math.min(index - 50, queue.size() - 200));

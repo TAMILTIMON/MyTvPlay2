@@ -10,15 +10,16 @@ html[data-theme=dark]{--bg:#0b0913;--bg2:#1c1236;--glass:#17122a;--glass2:#221b3
 html[data-theme=light]{--bg:#f5f3fb;--bg2:#e7dffc;--glass:#ffffff;--glass2:#ffffff;--line:rgba(42,27,92,.12);--text:#1b1530;--dim:#6b6482;--field:rgba(42,27,92,.05);--shadow:0 4px 14px rgba(80,60,160,.10)}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
-html,body{margin:0;min-height:100%}
+html,body{margin:0;min-height:100%;max-width:100%;overflow-x:hidden}
 body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--text);background:var(--bg);
   background-image:radial-gradient(900px 500px at 0% 0%,rgba(139,92,246,0.28),transparent 60%),radial-gradient(700px 500px at 100% 100%,rgba(236,72,153,0.22),transparent 60%),linear-gradient(160deg,var(--bg2),var(--bg) 55%);
-  padding:0 14px calc(92px + env(safe-area-inset-bottom));max-width:760px;margin:0 auto}
-header{display:flex;align-items:center;gap:10px;padding:calc(12px + env(safe-area-inset-top)) 2px 12px;position:sticky;top:0;z-index:4;background:var(--bg)}
+  padding:0 12px calc(130px + env(safe-area-inset-bottom));max-width:760px;margin:0 auto;width:100%;box-sizing:border-box}
+header{display:flex;align-items:center;gap:8px;padding:calc(10px + env(safe-area-inset-top)) 2px 10px;position:sticky;top:0;z-index:4;background:var(--bg);transition:transform .25s}
+body.hidebars header{transform:translateY(-110%)}
 .logo{width:42px;height:42px;border-radius:13px;background:linear-gradient(135deg,var(--acc),var(--acc2));display:grid;place-items:center;color:#fff;font-size:18px;box-shadow:0 6px 20px rgba(139,92,246,0.45)}
-header .t{flex:1;min-width:0}header b{display:block;font-size:18px}
+header .t{flex:1;min-width:0}header b{display:block;font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 header small{color:var(--dim);font-size:12px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.card{background:var(--glass);border:1px solid var(--line);border-radius:var(--r);padding:16px;margin-bottom:14px;box-shadow:var(--shadow)}
+.card{min-width:0;overflow:hidden;background:var(--glass);border:1px solid var(--line);border-radius:var(--r);padding:16px;margin-bottom:14px;box-shadow:var(--shadow)}
 .sec{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);margin:0 0 12px;font-weight:700;display:flex;justify-content:space-between;align-items:center;gap:8px}
 input,textarea,select{width:100%;padding:12px 14px;margin-bottom:10px;border-radius:14px;border:1px solid var(--line);background:var(--field);color:var(--text);font-size:16px;outline:none;font-family:inherit}
 input:focus,textarea:focus,select:focus{border-color:var(--acc)}
@@ -28,7 +29,7 @@ button{font-family:inherit;border:0;border-radius:999px;padding:11px 18px;font-s
 button:active{transform:scale(.95)}
 button.g{background:var(--glass2);color:var(--text);border:1px solid var(--line);font-weight:500}
 button.del{background:rgba(239,68,68,0.22);color:var(--bad);border:1px solid rgba(239,68,68,0.40);padding:7px 12px;font-size:13px}
-button.ic{width:46px;height:46px;padding:0;display:grid;place-items:center;font-size:18px;flex:none}
+button.ic{width:44px;height:44px;padding:0;display:grid;place-items:center;font-size:18px;flex:none}
 button.big{width:66px;height:66px;font-size:24px;box-shadow:0 8px 26px rgba(139,92,246,0.50)}
 .w{width:100%}
 .row{display:flex;align-items:center;gap:10px}
@@ -44,16 +45,11 @@ input[type=range]{-webkit-appearance:none;appearance:none;height:6px;padding:0;b
 input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#fff;border:4px solid var(--acc);box-shadow:0 2px 10px rgba(0,0,0,.3)}
 input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:#fff;border:4px solid var(--acc)}
 .tl{display:flex;justify-content:space-between;font-size:13px;color:var(--dim);font-variant-numeric:tabular-nums}
-.dpad{position:relative;width:240px;height:240px;margin:6px auto 4px;border-radius:50%;background:var(--glass2);border:1px solid var(--line)}
+.dpad{position:relative;margin:6px auto 4px;border-radius:50%;background:var(--glass2);border:1px solid var(--line)}
 .dpad button{position:absolute;background:none;color:var(--text);font-size:22px;width:72px;height:72px;padding:0}
-.dpad .u{top:4px;left:84px}.dpad .d{bottom:4px;left:84px}.dpad .l{left:4px;top:84px}.dpad .r{right:4px;top:84px}
-.dpad .ok{left:72px;top:72px;width:96px;height:96px;border-radius:50%;background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff;font-weight:700;box-shadow:0 8px 26px rgba(139,92,246,0.50)}
-.eq{display:flex;justify-content:space-between;align-items:flex-end;gap:2px;height:230px;padding-top:6px}
+.dpad .ok{border-radius:50%;background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff;font-weight:700;box-shadow:0 8px 26px rgba(139,92,246,0.50)}
 .band{flex:1;display:flex;flex-direction:column;align-items:center;min-width:0}
 .band .v{font-size:11px;color:var(--text);font-variant-numeric:tabular-nums;height:16px}
-.vwrap{position:relative;width:30px;height:170px}
-.vwrap input{position:absolute;width:170px;left:-70px;top:76px;transform:rotate(-90deg);margin:0;
-  background:linear-gradient(90deg,var(--acc),var(--acc2))}
 .band .f{font-size:10px;color:var(--dim);margin-top:6px;white-space:nowrap}
 #queue{max-height:360px;overflow-y:auto}
 .q{padding:10px 4px;border-top:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;font-size:14px}
@@ -63,7 +59,7 @@ input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;bac
 .it button{padding:7px 11px;font-size:13px}
 .chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:6px}
 .chips button{flex:none;padding:8px 14px;font-size:13px}
-.chips button.g.on{background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff;border-color:transparent}
+#rep.on,#shuf.on,.chips button.g.on{background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff;border-color:transparent}
 .stat{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
 .stat div{background:var(--field);border-radius:14px;padding:10px;text-align:center}
 .stat b{display:block;font-size:17px}.stat small{color:var(--dim);font-size:11px}
@@ -99,6 +95,36 @@ nav button.on{background:linear-gradient(135deg,var(--acc),var(--acc2));color:#f
 .it .ck{width:22px;height:22px;flex:none;accent-color:var(--acc)}
 label.chk{padding:8px 0;border-top:1px solid var(--line);margin:0}
 label.chk input{width:22px;height:22px;accent-color:var(--acc)}
+@media (max-width:480px){
+  header .logo{display:none}
+  header button.ic{width:38px;height:38px;font-size:16px}
+  .card{padding:14px 12px}
+  .ctr{gap:6px}.ctr button.ic{width:42px;height:42px}
+  button.big{width:58px;height:58px}
+  .btns>button{padding:10px 8px;font-size:14px}
+}
+.dpad{width:min(240px,72vw);height:min(240px,72vw)}
+.dpad .u{top:2%;left:50%;transform:translateX(-50%)}.dpad .d{bottom:2%;left:50%;transform:translateX(-50%)}
+.dpad .l{left:2%;top:50%;transform:translateY(-50%)}.dpad .r{right:2%;top:50%;transform:translateY(-50%)}
+.dpad .ok{left:50%;top:50%;transform:translate(-50%,-50%);width:40%;height:40%}
+/* vertical EQ (custom, never overflows) */
+.eq{display:grid;grid-template-columns:repeat(11,minmax(0,1fr));gap:2px;height:auto;padding-top:6px;align-items:end}
+.band{min-width:0}
+.vs{position:relative;width:100%;height:170px;touch-action:none;cursor:pointer}
+.vs .tr{position:absolute;left:50%;top:10px;bottom:10px;width:8px;margin-left:-4px;border-radius:8px;background:var(--line)}
+.vs .fill{position:absolute;left:0;right:0;border-radius:8px;background:linear-gradient(180deg,var(--acc2),var(--acc))}
+.vs .knob{position:absolute;left:50%;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;background:#fff;border:4px solid var(--acc);box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.vs .mid{position:absolute;left:15%;right:15%;top:50%;height:1px;background:var(--line)}
+/* bottom bar: single-line labels, auto-hide */
+nav{transition:transform .25s}
+body.hidebars nav{transform:translate(-50%,150%)}
+nav button{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10.5px;min-width:0;padding:8px 2px}
+nav button span{font-size:18px}
+#showbars{position:fixed;right:14px;bottom:calc(18px + env(safe-area-inset-bottom));z-index:6;display:none;width:46px;height:46px;border-radius:50%;padding:0;font-size:20px;box-shadow:0 6px 18px rgba(0,0,0,.35)}
+body.hidebars #showbars{display:grid;place-items:center}
+.dpad .ok:active{transform:translate(-50%,-50%) scale(.94)}
+.dpad .u:active,.dpad .d:active{transform:translateX(-50%) scale(.9)}
+.dpad .l:active,.dpad .r:active{transform:translateY(-50%) scale(.9)}
 .only-app,.only-web{display:none}
 .app .only-app{display:block}.web .only-web{display:block}
 label.sw{display:flex;align-items:center;gap:10px;font-size:14px;margin:6px 0}
@@ -135,6 +161,7 @@ label.sw{display:flex;align-items:center;gap:10px;font-size:14px;margin:6px 0}
       <button class="g ic" onclick="cmd('next')">⏭</button>
     </div>
     <div class="ctr"><button class="g" onclick="cmd('jump',-30000)">−30s</button><button class="g" onclick="cmd('stop')">⏹ Stop</button><button class="g" onclick="cmd('jump',30000)">+30s</button></div>
+    <div class="ctr"><button class="g" id="rep" onclick="cmd('repeat')">🔁 Repeat: Off</button><button class="g" id="shuf" onclick="cmd('shuffle')">🔀 Shuffle: Off</button></div>
     <div id="torbox" style="display:none"><div class="bar"><i id="torbar"></i></div><div class="dim" id="tor" style="margin-top:6px"></div></div>
   </div>
 
@@ -286,6 +313,10 @@ label.sw{display:flex;align-items:center;gap:10px;font-size:14px;margin:6px 0}
   </div>
   <div id="lists"></div>
   <div class="card">
+    <div class="sec">This page</div>
+    <label class="sw"><input type="checkbox" id="autohide" onchange="setAutoHide(this.checked)"> Auto-hide top &amp; bottom bars while scrolling</label>
+  </div>
+  <div class="card">
     <div class="sec">TV settings</div>
     <div class="dim">TV app theme</div>
     <select id="apptheme" onchange="cmd('apptheme',this.value)"><option value="dark">Dark</option><option value="light">Light</option><option value="system">Follow system</option></select>
@@ -313,6 +344,7 @@ label.sw{display:flex;align-items:center;gap:10px;font-size:14px;margin:6px 0}
   <div class="pin"><input inputmode="numeric" maxlength="1"><input inputmode="numeric" maxlength="1"><input inputmode="numeric" maxlength="1"><input inputmode="numeric" maxlength="1"></div>
   <button class="w" onclick="sendPin()">Connect</button><div class="dim" id="pinmsg" style="margin-top:10px"></div></div>
 </div>
+<button id="showbars" onclick="showBars()" title="Menu">☰</button>
 <div id="toast"></div>
 
 <script>
@@ -369,13 +401,20 @@ function fill(sel,pairs,cur){const el=$(sel);const sig=JSON.stringify(pairs);if(
 function chips(id,pairs,cur,c){const box=$(id);const sig=JSON.stringify(pairs);if(box._sig!==sig){box.innerHTML='';pairs.forEach(p=>{const b=document.createElement('button');b.className='g';b.textContent=p[1].replace(/ \(.*\)/,'');b.title=p[1];b.dataset.v=p[0];b.onclick=()=>cmd(c,p[0]);box.appendChild(b);});box._sig=sig;}
   box.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v===String(cur)));}
 
+let AUTOHIDE=true;try{AUTOHIDE=localStorage.getItem('autohide')!=='0'}catch(e){}
+function setAutoHide(on){AUTOHIDE=on;try{localStorage.setItem('autohide',on?'1':'0')}catch(e){}if(!on)showBars();}
+function showBars(){document.body.classList.remove('hidebars');}
+let lastY=0;
+addEventListener('scroll',()=>{const y=window.scrollY;
+  if(AUTOHIDE){if(y>lastY+8&&y>90)document.body.classList.add('hidebars');else if(y<lastY-8||y<40)showBars();}
+  lastY=y;},{passive:true});
 let curTab='remote';
 function showTab(t){
   if(t===curTab)return;curTab=t;
   document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x.dataset.t===t));
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.id==='t-'+t));
   if(t==='lists')load();if(t==='remote')loadHistory();
-  window.scrollTo(0,0);poll();
+  window.scrollTo(0,0);showBars();poll();
 }
 document.querySelectorAll('nav button').forEach(b=>{
   b.addEventListener('pointerdown',e=>{e.preventDefault();showTab(b.dataset.t);});
@@ -404,26 +443,35 @@ async function loadOptions(){
 }
 
 // ---------- vertical equalizer ----------
+function vSlider(val,onFinal){
+  const el=document.createElement('div');el.className='vs';
+  el.innerHTML='<div class="tr"><div class="mid"></div><i class="fill"></i><b class="knob"></b></div>';
+  const tr=el.firstChild,fill=tr.querySelector('.fill'),knob=tr.querySelector('.knob');
+  const MIN=-20,MAX=20;let v=+val||0,cb=null;
+  function draw(){const f=(v-MIN)/(MAX-MIN),y=(1-f)*100,z=50;knob.style.top=y+'%';fill.style.top=Math.min(y,z)+'%';fill.style.bottom=(100-Math.max(y,z))+'%';}
+  function fromY(cy){const r=tr.getBoundingClientRect();let f=1-(cy-r.top)/r.height;f=Math.max(0,Math.min(1,f));return Math.round((MIN+f*(MAX-MIN))*2)/2;}
+  el.addEventListener('pointerdown',e=>{e.preventDefault();el.setPointerCapture(e.pointerId);el._t=Date.now();v=fromY(e.clientY);draw();if(cb)cb(v);});
+  el.addEventListener('pointermove',e=>{if(!el.hasPointerCapture(e.pointerId))return;el._t=Date.now();v=fromY(e.clientY);draw();if(cb)cb(v);});
+  el.addEventListener('pointerup',e=>{el._t=Date.now();onFinal(v);});
+  draw();
+  return {el:el,set:x=>{v=+x||0;draw();},onMove:f=>cb=f};
+}
 function buildEq(bands){
   const box=$('eqbands');box.innerHTML='';
-  const mk=(label,val,cb)=>{
+  const mk=(label,val,send)=>{
     const d=document.createElement('div');d.className='band';
-    const v=document.createElement('div');v.className='v';v.textContent=(+val>0?'+':'')+(+val).toFixed(0);
-    const w=document.createElement('div');w.className='vwrap';
-    const i=document.createElement('input');i.type='range';i.min=-20;i.max=20;i.step=0.5;i.value=val;
-    i.oninput=()=>{i._t=Date.now();v.textContent=(+i.value>0?'+':'')+(+i.value).toFixed(0);};
-    i.onchange=()=>{i._t=Date.now();cb(i.value);};
+    const t=document.createElement('div');t.className='v';
+    const fmtv=x=>(+x>0?'+':'')+(+x).toFixed(0);t.textContent=fmtv(val);
+    const sl=vSlider(val,x=>send(x));sl.onMove(x=>t.textContent=fmtv(x));
     const f=document.createElement('div');f.className='f';f.textContent=label;
-    w.appendChild(i);d.appendChild(v);d.appendChild(w);d.appendChild(f);box.appendChild(d);return [i,v];
+    d.appendChild(t);d.appendChild(sl.el);d.appendChild(f);box.appendChild(d);return [sl,t];
   };
   box._pre=mk('Pre',S.eq.preamp,v=>cmd('eq_preamp',v));
   box._bands=bands.map((b,k)=>mk(b.f.replace(' Hz','').replace(' kHz','k'),b.v,v=>cmd('eq_band',v,k)));
   eqBuilt=bands.length;
 }
-function showEq(x,val){if(!busy(x[0])){x[0].value=val;x[1].textContent=(+val>0?'+':'')+(+val).toFixed(0);}}
+function showEq(x,val){if(!busy(x[0].el)){x[0].set(val);x[1].textContent=(+val>0?'+':'')+(+val).toFixed(0);}}
 
-(function(){const d=Object.getOwnPropertyDescriptor(Node.prototype,'textContent');
-  Object.defineProperty(Node.prototype,'textContent',{get:d.get,set:function(v){if(this.nodeType===1&&this.childNodes.length===1&&this.firstChild.nodeType===3&&this.firstChild.nodeValue===String(v))return;d.set.call(this,v);},configurable:true});})();
 function render(){
   const p=S.player;
   $('devname').textContent=(S.device||'TV')+' · '+location.hostname;
@@ -432,6 +480,10 @@ function render(){
   $('art').textContent=p&&S.playing?'♫':'♪';
   $('sub1').textContent=p?((S.count>1?(S.idx+1)+' of '+S.count:'')+(S.rate&&S.rate!=1?' · '+S.rate+'x':'')+(S.sleep&&S.sleep!=='Off'?' · 💤 '+S.sleep:'')+(S.loading?' · '+S.loading.split('\n')[0]:'')):'Open the Cast tab to play something';
   $('pp').textContent=p&&S.playing?'❚❚':'▶';
+  const RN=['Off','One','All'];
+  $('rep').textContent=(S.repeat===1?'🔂 ':'🔁 ')+tr('Repeat')+': '+tr(RN[S.repeat||0]);
+  $('rep').classList.toggle('on',!!S.repeat);$('shuf').classList.toggle('on',!!S.shuffle);
+  $('shuf').textContent='🔀 '+tr('Shuffle')+': '+tr(S.shuffle?'On':'Off');
   if(p&&S.len>0){setVal($('seek'),Math.round(1000*S.pos/S.len));if(!busy($('seek')))$('time').textContent=fmt(S.pos);$('len').textContent=fmt(S.len);}
   else{$('time').textContent=p?('● Live '+fmt(S.pos)):'0:00';$('len').textContent='';}
   setVal($('vol'),S.vol);if(!busy($('vol')))$('volv').textContent=(S.muted?'🔇 ':'')+S.vol+'%'+(S.vol>100?' boost':'');
@@ -673,7 +725,8 @@ const HI={"Now playing":"अभी चल रहा है","Nothing playing":"�
 "Search words or a web address":"खोज शब्द या वेब पता","Title (optional)":"शीर्षक (वैकल्पिक)","Subtitle link (optional)":"सबटाइटल लिंक (वैकल्पिक)","Playlist name":"प्लेलिस्ट का नाम","channels":"चैनल","Search":"खोजें","Show more":"और दिखाएँ","No channel found":"कोई चैनल नहीं मिला",
 "Playlists":"प्लेलिस्ट","Select all":"सभी चुनें","Select none":"कुछ नहीं चुनें","Delete":"मिटाएँ","playlists":"प्लेलिस्ट","Nothing selected":"कुछ नहीं चुना","Select":"चुनें","Delete playlist":"प्लेलिस्ट मिटाएँ","Search channel / name":"चैनल / नाम खोजें","search results":"खोज के नतीजे","Cancel":"रद्द करें",
 "💾 Save as playlist":"💾 प्लेलिस्ट के रूप में सेव करें","search above, or Save as playlist":"ऊपर खोजें, या प्लेलिस्ट के रूप में सेव करें","Channels":"चैनल","Load all channels of this list":"इस सूची के सभी चैनल लोड करें","Loading channels…":"चैनल लोड हो रहे हैं…","Adding…":"जोड़ा जा रहा है…","Added":"जुड़ गया","Saved":"सेव हुआ"};
-Object.assign(TA,{"💾 Save as playlist":"💾 பிளேலிஸ்டாகச் சேமி","search above, or Save as playlist":"மேலே தேடவும், அல்லது பிளேலிஸ்டாகச் சேமிக்கவும்","Channels":"சேனல்கள்","Load all channels of this list":"இந்தப் பட்டியலின் அனைத்து சேனல்களையும் ஏற்று","Loading channels…":"சேனல்கள் ஏற்றப்படுகின்றன…","Adding…":"சேர்க்கிறது…","Added":"சேர்க்கப்பட்டது","Saved":"சேமிக்கப்பட்டது"});
+Object.assign(HI,{"Repeat":"दोहराएँ","Shuffle":"शफ़ल","Off":"बंद","On":"चालू","One":"एक","All":"सभी","This page":"यह पेज","Auto-hide top & bottom bars while scrolling":"स्क्रॉल करते समय ऊपर-नीचे की पट्टियाँ छिपाएँ"});
+Object.assign(TA,{"Repeat":"மீண்டும்","Shuffle":"கலக்கு","Off":"அணை","On":"இயக்கு","One":"ஒன்று","All":"அனைத்தும்","This page":"இந்தப் பக்கம்","Auto-hide top & bottom bars while scrolling":"உருட்டும்போது மேல்/கீழ் பட்டிகளை மறை","💾 Save as playlist":"💾 பிளேலிஸ்டாகச் சேமி","search above, or Save as playlist":"மேலே தேடவும், அல்லது பிளேலிஸ்டாகச் சேமிக்கவும்","Channels":"சேனல்கள்","Load all channels of this list":"இந்தப் பட்டியலின் அனைத்து சேனல்களையும் ஏற்று","Loading channels…":"சேனல்கள் ஏற்றப்படுகின்றன…","Adding…":"சேர்க்கிறது…","Added":"சேர்க்கப்பட்டது","Saved":"சேமிக்கப்பட்டது"});
 const DICTS={ta:TA,hi:HI};
 let LANG='';try{LANG=localStorage.getItem('lang')||''}catch(e){}
 function D(){return DICTS[LANG]||null;}
@@ -689,6 +742,7 @@ function applyLang(){
 function toggleLang(){LANG=LANG==='en'||!LANG?'ta':LANG==='ta'?'hi':'en';try{localStorage.setItem('lang',LANG)}catch(e){}applyLang();}
 (async()=>{if(!LANG){try{const s=await (await api('/state')).json();LANG=(s.lang==='ta'||s.lang==='hi')?s.lang:'en';}catch(e){LANG='en';}}applyLang();})();
 
+$('autohide').checked=AUTOHIDE;
 loadOptions().then(poll);load();loadApps();loadHistory();
 </script>
 </body>

@@ -35,6 +35,30 @@ public final class T {
     }
 
     static {
+        TA.put("Repeat: ", "மீண்டும் இயக்கு: ");
+        HI.put("Repeat: ", "दोहराएँ: ");
+        TA.put("Shuffle: ", "கலக்கு: ");
+        HI.put("Shuffle: ", "शफ़ल: ");
+        TA.put("One", "ஒன்று");
+        HI.put("One", "एक");
+        TA.put("All", "அனைத்தும்");
+        HI.put("All", "सभी");
+        TA.put("On", "இயக்கு");
+        HI.put("On", "चालू");
+        TA.put("Rotation: ", "சுழற்சி: ");
+        HI.put("Rotation: ", "रोटेशन: ");
+        TA.put("Auto", "தானியங்கி");
+        HI.put("Auto", "ऑटो");
+        TA.put("Portrait", "நேராக");
+        HI.put("Portrait", "पोर्ट्रेट");
+        TA.put("Landscape", "அகலமாக");
+        HI.put("Landscape", "लैंडस्केप");
+        TA.put("Lock screen", "திரையைப் பூட்டு");
+        HI.put("Lock screen", "स्क्रीन लॉक करें");
+        TA.put("Unlocked", "பூட்டு திறக்கப்பட்டது");
+        HI.put("Unlocked", "अनलॉक हुआ");
+        TA.put("Screen locked — tap 🔓 to unlock", "திரை பூட்டப்பட்டது — திறக்க 🔓 தட்டவும்");
+        HI.put("Screen locked — tap 🔓 to unlock", "स्क्रीन लॉक है — खोलने के लिए 🔓 दबाएँ");
         TA.put("min left", "நிமிடம் மீதம்");
         TA.put("Remove from Continue watching", "தொடர்ந்து பார்க்க பட்டியலிலிருந்து நீக்கு");
         TA.put("☀ Light", "☀ வெளிர்");

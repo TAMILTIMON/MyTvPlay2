@@ -1,3 +1,20 @@
+TAMILCASTPLAY 1.6 — phone app fits the screen + player modes
+=============================================================
+Phone app remote:
+* Fits every phone width: nothing spills off the side any more (the old rotated
+  equalizer sliders were pushing the page wider than the screen).
+* New equalizer sliders built for touch: drag up / down, they never overflow.
+* Bottom tabs stay on one line in Tamil/Hindi; extra space at the bottom so the
+  last buttons are never hidden behind the tab bar.
+* Auto-hide: top and bottom bars slide away while you scroll down and come back
+  when you scroll up (or tap the ☰ button). Turn it off in Library > This page.
+* Smaller header on small phones.
+Player:
+* 🔁 Repeat: Off -> All (whole list) -> One (🔂 same video), and 🔀 Shuffle —
+  buttons in the control bar, the ☰ menu, and the phone Remote tab.
+* Phones: 🔄 rotation (Landscape -> Auto -> Portrait) and 🔒 screen lock in the top
+  corner. While locked, touches and keys are ignored; tap the screen and press 🔓.
+
 TAMILCASTPLAY 1.5 — channels & Hindi
 ====================================
 * Adding a channel-list link (.m3u / .m3u8 / .pls) to a playlist now adds ALL its
