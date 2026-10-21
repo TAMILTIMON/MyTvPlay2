@@ -23,6 +23,21 @@ public final class Ui {
     public static final int ACCENT = 0xFF8B5CF6, ACCENT2 = 0xFFEC4899, ACCENT3 = 0xFF3B82F6;
     public static int BG, BG2, CARD, STROKE, TEXT, DIM, FIELD;
     private static boolean dark = true;
+    /** Focus "grow" effects only on TVs (D-pad). On phones they look like random zooming. */
+    public static boolean tvMode = false;
+
+    /** Back to the start screen: TV home on TVs / when used as a player, TV list in the phone remote. */
+    public static void goHome(Activity a, boolean playerHome) {
+        android.content.Intent i;
+        if (isTv(a) || playerHome) {
+            i = new android.content.Intent(a, MainActivity.class).putExtra(MainActivity.EXTRA_PLAYER_HOME, true);
+        } else {
+            i = new android.content.Intent(a, ConnectActivity.class).putExtra("no_auto", true);
+        }
+        i.addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP | android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        a.startActivity(i);
+        if (!(a instanceof MainActivity) && !(a instanceof ConnectActivity)) a.finish();
+    }
 
     public static boolean isTv(Context c) {
         UiModeManager m = (UiModeManager) c.getSystemService(Context.UI_MODE_SERVICE);
@@ -47,6 +62,7 @@ public final class Ui {
     public static void apply(Activity a) {
         Store.init(a);
         dark = isDark(a);
+        tvMode = isTv(a);
         a.setTheme(dark ? R.style.AppTheme : R.style.AppTheme_Light);
         if (dark) {
             BG = 0xFF0B0913; BG2 = 0xFF1C1236; CARD = 0x1FFFFFFF; STROKE = 0x29FFFFFF;
@@ -139,7 +155,7 @@ public final class Ui {
             public void onFocusChange(View v, boolean f) {
                 ((Button) v).setTextColor(f || ((Button) v).isPressed() ? Color.WHITE
                         : (v.getTag() != null ? Color.WHITE : TEXT));
-                v.animate().scaleX(f ? 1.06f : 1f).scaleY(f ? 1.06f : 1f).setDuration(120).start();
+                if (tvMode) v.animate().scaleX(f ? 1.06f : 1f).scaleY(f ? 1.06f : 1f).setDuration(120).start();
             }
         });
         if (primary) b.setTag("primary");
@@ -180,7 +196,7 @@ public final class Ui {
         b.setOnFocusChangeListener(new View.OnFocusChangeListener() {
             @Override
             public void onFocusChange(View v, boolean f) {
-                v.animate().scaleX(f ? 1.15f : 1f).scaleY(f ? 1.15f : 1f).setDuration(120).start();
+                if (tvMode) v.animate().scaleX(f ? 1.15f : 1f).scaleY(f ? 1.15f : 1f).setDuration(120).start();
             }
         });
         return b;

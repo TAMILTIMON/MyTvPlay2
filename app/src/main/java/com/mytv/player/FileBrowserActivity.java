@@ -35,6 +35,7 @@ public class FileBrowserActivity extends AppCompatActivity {
     private ArrayAdapter<String> adapter;
     private ListView listView;
     private File dir = null; // null = list of drives
+    private static final String HOME_MARK = "::home::";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -127,6 +128,8 @@ public class FileBrowserActivity extends AppCompatActivity {
         info.setText(needAllFiles()
                 ? "To see every file (and subtitle files), select the first row and allow “All files access”."
                 : T.t("Subtitle files with the same name as the video are loaded automatically."));
+        rows.add("🏠  " + (T.tamil() ? "முகப்பு" : "Home"));
+        files.add(new File(HOME_MARK));
         if (needAllFiles()) {
             rows.add("🔓  Allow access to all files");
             files.add(null);
@@ -177,8 +180,12 @@ public class FileBrowserActivity extends AppCompatActivity {
     private void open(int pos) {
         if (pos < 0 || pos >= files.size()) return;
         File f = files.get(pos);
+        if (f != null && f.getPath().equals(HOME_MARK)) {
+            Ui.goHome(this, true);
+            return;
+        }
         if (f == null) {
-            if (needAllFiles() && pos == 0) Perms.openFilesSettings(this);
+            if (needAllFiles() && pos == 1) Perms.openFilesSettings(this);
             return;
         }
         if (f.getPath().isEmpty()) {
@@ -193,7 +200,7 @@ public class FileBrowserActivity extends AppCompatActivity {
         List<Store.Item> items = new ArrayList<>();
         int start = 0;
         for (File x : files) {
-            if (x == null || x.getPath().isEmpty() || x.isDirectory()) continue;
+            if (x == null || x.getPath().isEmpty() || x.getPath().equals(HOME_MARK) || x.isDirectory()) continue;
             if (x.equals(f)) start = items.size();
             items.add(new Store.Item(x.getName(), x.getAbsolutePath(), ""));
         }

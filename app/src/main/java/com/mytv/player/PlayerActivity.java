@@ -339,6 +339,11 @@ public class PlayerActivity extends AppCompatActivity {
         infoView.setPadding(0, dp(4), 0, 0);
         tcol.addView(infoView);
         topBar.addView(tcol, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        ctl(topBar, "⌂", 52, false, new View.OnClickListener() {
+            public void onClick(View v) {
+                Ui.goHome(PlayerActivity.this, true);
+            }
+        });
         gearBtn = ctl(topBar, "⚙", 52, false, new View.OnClickListener() {
             public void onClick(View v) {
                 showMenu();
@@ -477,6 +482,9 @@ public class PlayerActivity extends AppCompatActivity {
         loadingView.setVisibility(View.GONE);
     }
 
+    private int trackCacheAge = 0;
+    private String audioName = "", subName = "";
+
     private void updateOverlay() {
         if (mp == null) return;
         long t = mp.getTime(), len = mp.getLength();
@@ -486,8 +494,12 @@ public class PlayerActivity extends AppCompatActivity {
         playBtn.setText(mp.isPlaying() ? "❚❚" : "▶");
         StringBuilder sb = new StringBuilder();
         if (queue.size() > 1) sb.append(index + 1).append('/').append(queue.size()).append("   ");
-        sb.append("🔊 ").append(trackName(mp.getAudioTracks(), mp.getAudioTrack()));
-        sb.append("   💬 ").append(trackName(mp.getSpuTracks(), mp.getSpuTrack()));
+        if (trackCacheAge++ % 4 == 0) {
+            audioName = trackName(mp.getAudioTracks(), mp.getAudioTrack());
+            subName = trackName(mp.getSpuTracks(), mp.getSpuTrack());
+        }
+        sb.append("🔊 ").append(audioName);
+        sb.append("   💬 ").append(subName);
         sb.append(T.t("   Vol ")).append(muted ? "muted" : volume + "%");
         if (rate != 1f) sb.append("   ").append(fmtRate(rate));
         if (sleepAt > 0 || sleepAfterItem) sb.append(T.t("   Sleep ")).append(sleepLabel());
@@ -496,8 +508,11 @@ public class PlayerActivity extends AppCompatActivity {
         infoView.setText(sb.toString());
     }
 
+    private int tickN = 0;
+
     private void onTick() {
-        if (overlayVisible) updateOverlay();
+        tickN++;
+        if (overlayVisible && tickN % 2 == 0) updateOverlay();
         if (loadingView.getVisibility() == View.VISIBLE && torrentUsed && mp != null && !mp.isPlaying()) {
             String ts = TorrentEngine.get(this).shortStatus();
             CharSequence cur = loadingView.getText();
@@ -1360,6 +1375,8 @@ public class PlayerActivity extends AppCompatActivity {
             labels.add(T.t("Stop torrent and delete its data"));
             acts.add(new Runnable() { public void run() { TorrentEngine.get(PlayerActivity.this).stopAsync(); finish(); } });
         }
+        labels.add("🏠  " + (T.tamil() ? "முகப்புக்குச் செல்" : "Go to Home"));
+        acts.add(new Runnable() { public void run() { Ui.goHome(PlayerActivity.this, true); } });
         labels.add(T.t("Phone remote: http://") + Net.ip() + ":" + RemoteService.PORT);
         acts.add(new Runnable() { public void run() { osd("Open http://" + Net.ip() + ":" + RemoteService.PORT + " on your phone"); } });
 

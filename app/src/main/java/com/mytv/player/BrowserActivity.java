@@ -91,6 +91,7 @@ public class BrowserActivity extends AppCompatActivity {
         tb.setBackground(Ui.background());
         tb.addView(small("←", v -> { if (web.canGoBack()) web.goBack(); }));
         tb.addView(small("→", v -> { if (web.canGoForward()) web.goForward(); }));
+        tb.addView(small("🏠", v -> Ui.goHome(this, tv)));
         tb.addView(small("⌂", v -> home()));
         bar = new EditText(this);
         bar.setSingleLine(true);

@@ -40,6 +40,7 @@ public class MainActivity extends AppCompatActivity {
         watchScroll.setVisibility(vis);
         boolean tv = Ui.isTv(this);
         int w = Ui.dp(this, tv ? 208 : 156), ht = w * 9 / 16;
+        if (h.size() > 12) h = h.subList(0, 12);
         for (final Store.Watch x : h) {
             LinearLayout card = new LinearLayout(this);
             card.setOrientation(LinearLayout.VERTICAL);
@@ -47,7 +48,7 @@ public class MainActivity extends AppCompatActivity {
             card.setBackground(Ui.focusCard(this, 18));
             card.setFocusable(true);
             card.setClickable(true);
-            card.setOnFocusChangeListener((v, f) -> v.animate().scaleX(f ? 1.06f : 1f).scaleY(f ? 1.06f : 1f).setDuration(120).start());
+            if (tv) card.setOnFocusChangeListener((v, f) -> v.animate().scaleX(f ? 1.06f : 1f).scaleY(f ? 1.06f : 1f).setDuration(120).start());
             android.widget.FrameLayout pic = new android.widget.FrameLayout(this);
             java.io.File tf = Thumbs.file(this, x.u);
             if (tf.exists()) {
@@ -225,7 +226,7 @@ public class MainActivity extends AppCompatActivity {
                 t.setTextColor(Ui.TEXT);
                 t.setPadding(Ui.dp(MainActivity.this, 20), Ui.dp(MainActivity.this, 16),
                         Ui.dp(MainActivity.this, 20), Ui.dp(MainActivity.this, 16));
-                t.setBackground(Ui.card(MainActivity.this, Ui.CARD, Ui.STROKE, 16));
+                if (convertView == null) t.setBackground(Ui.card(MainActivity.this, Ui.CARD, Ui.STROKE, 16));
                 return t;
             }
         };
@@ -265,7 +266,7 @@ public class MainActivity extends AppCompatActivity {
         t.setFocusable(true);
         t.setClickable(true);
         t.setOnClickListener(l);
-        t.setOnFocusChangeListener((v, f) -> v.animate().scaleX(f ? 1.08f : 1f).scaleY(f ? 1.08f : 1f).setDuration(120).start());
+        if (tv) t.setOnFocusChangeListener((v, f) -> v.animate().scaleX(f ? 1.08f : 1f).scaleY(f ? 1.08f : 1f).setDuration(120).start());
         int iw = Ui.dp(this, tv ? 128 : 56), ih = Ui.dp(this, tv ? 72 : 56);
         if (icon != null) {
             android.widget.ImageView iv = new android.widget.ImageView(this);

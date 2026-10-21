@@ -1,3 +1,12 @@
+TAMILCASTPLAY 1.2 — smoother & easier to navigate
+=================================================
+* Phone remote is much faster: heavy blur effects removed, fewer screen redraws,
+  no 300 ms tap delay, tabs switch the moment you touch them.
+* No more automatic zooming: pinch/double-tap zoom and phone font-scaling are
+  disabled on the remote page; buttons no longer "grow" on phones.
+* 🏠 Home everywhere: phone remote header, player top corner (⌂) and player menu,
+  browser toolbar, Local files (first row). Phone Back button: other tab -> Remote tab -> exit.
+
 TAMILCASTPLAY 1.1 — what's new
 ==============================
 1. FIXED SIGNING KEY (do this once, before pushing):

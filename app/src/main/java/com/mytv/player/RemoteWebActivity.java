@@ -4,6 +4,7 @@ import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.view.View;
 import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -46,6 +47,14 @@ public class RemoteWebActivity extends AppCompatActivity {
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
         s.setMediaPlaybackRequiresUserGesture(false);
+        s.setSupportZoom(false);
+        s.setBuiltInZoomControls(false);
+        s.setDisplayZoomControls(false);
+        s.setTextZoom(100);              // ignore phone font scaling (was making pages look zoomed)
+        s.setUseWideViewPort(true);
+        s.setLoadWithOverviewMode(false);
+        web.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        web.setVerticalScrollBarEnabled(false);
         web.addJavascriptInterface(new Bridge(), "MyTV");
         web.setWebViewClient(new WebViewClient() {
             @Override
@@ -88,8 +97,13 @@ public class RemoteWebActivity extends AppCompatActivity {
 
     @Override
     public void onBackPressed() {
-        if (web.canGoBack()) web.goBack();
-        else super.onBackPressed();
+        // first go back to the Remote tab, then leave
+        web.evaluateJavascript("window.backTab?backTab():false", v -> {
+            if (!"true".equals(v)) {
+                if (web.canGoBack()) web.goBack();
+                else finish();
+            }
+        });
     }
 
     @Override
@@ -163,6 +177,11 @@ public class RemoteWebActivity extends AppCompatActivity {
         @JavascriptInterface
         public void openBrowser() {
             runOnUiThread(() -> startActivity(new Intent(RemoteWebActivity.this, BrowserActivity.class)));
+        }
+
+        @JavascriptInterface
+        public void home() {
+            runOnUiThread(() -> Ui.goHome(RemoteWebActivity.this, false));
         }
 
         @JavascriptInterface
