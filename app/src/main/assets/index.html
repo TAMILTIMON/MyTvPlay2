@@ -159,7 +159,10 @@ label.sw{display:flex;align-items:center;gap:10px;font-size:14px;margin:6px 0}
     <div class="btns"><button class="g" onclick="cmd('mute')">🔇</button><button class="g" onclick="cmd('vol',50)">50%</button><button class="g" onclick="cmd('vol',100)">100%</button><button class="g" onclick="cmd('vol',150)">150%</button><button onclick="cmd('vol',200)">200% 🔥</button></div>
   </div>
 
-  <div class="card"><div class="sec">Queue</div><div id="queue" class="dim">Empty</div></div>
+  <div class="card"><div class="sec"><span>Queue</span><button class="g" id="saveq" style="padding:6px 12px;font-size:12px;display:none" onclick="saveQueue()">💾 Save as playlist</button></div>
+    <input id="qsearch" placeholder="🔍 Search channel / name…" style="display:none">
+    <div id="qres"></div>
+    <div id="queue" class="dim">Empty</div></div>
 </div>
 
 <!-- ================= TRACKS ================= -->
@@ -461,7 +464,8 @@ function render(){
   if(q!==lastQ){lastQ=q;const box=$('queue');box.innerHTML='';
     const q0=S.qstart||0;
     (S.queue||[]).forEach((n,k)=>{const i=q0+k;const d=document.createElement('div');d.className='q'+(i===S.idx?' cur':'');d.textContent=(i===S.idx?'▶ ':(i+1)+'. ')+n;d.onclick=()=>cmd('item',i);box.appendChild(d);});
-    if(S.count>200){const h=document.createElement('div');h.className='dim';h.style.marginTop='8px';h.textContent=S.count+' '+tr('channels')+' — '+tr('use Library to search');box.appendChild(h);}
+    if(S.count>200){const h=document.createElement('div');h.className='dim';h.style.marginTop='8px';h.textContent=S.count+' '+tr('channels')+' — '+tr('search above, or Save as playlist');box.appendChild(h);}
+    $('qsearch').style.display=S.count>20?'block':'none';$('saveq').style.display=S.count>1?'inline-block':'none';
     setTimeout(()=>{const c=box.querySelector('.cur');if(c&&curTab==='remote')c.scrollIntoView({block:'nearest'});},50);
     if(!(S.queue||[]).length)box.textContent='Empty';}
 }
@@ -491,7 +495,7 @@ async function playNow(mode){
   toast(r.msg||(r.ok?'Sent':'Failed'));
   if(r.ok){$('purl').value='';$('ptitle').value='';$('psub').value='';}
 }
-async function saveLink(){const r=await post('/add',{playlist:$('ppl').value,title:$('ptitle').value,url:$('purl').value,sub:$('psub').value});toast(r.ok?'Saved to playlist':(r.msg||'Failed'));load();}
+async function saveLink(){toast(tr('Adding…'));const r=await post('/add',{playlist:$('ppl').value,title:$('ptitle').value,url:$('purl').value,sub:$('psub').value});toast(r.ok?(r.msg||tr('Saved')):(r.msg||'Failed'));load();}
 
 // ---------- multi TV ----------
 async function openDevices(){
@@ -597,12 +601,14 @@ function renderItems(st,items){
     const s=document.createElement('span');s.textContent=((it.u.startsWith('magnet:')||/\.torrent$/i.test(it.u))?'🧲 ':'🎬 ')+it.t;s.title=it.u;
     s.onclick=()=>{if(st.selMode){ck.checked=!ck.checked;ck.onchange();}};
     const pl=document.createElement('button');pl.textContent='▶';pl.className='g';pl.onclick=async()=>{const r=await post('/playlist',{playlist:st.name,idx:i});toast(r.msg);};
+    if(/\.(m3u8?|pls)(\?|\||$)/i.test(it.u)){const ex=document.createElement('button');ex.textContent='📥 '+tr('Channels');ex.className='g';ex.title=tr('Load all channels of this list');
+      ex.onclick=async()=>{toast(tr('Loading channels…'));const r=await post('/expand',{playlist:st.name,idx:i});toast(r.msg);load();};row.appendChild(ex);}
     const b=document.createElement('button');b.textContent='✕';b.className='del';b.onclick=async()=>{await post('/del',{playlist:st.name,idx:i});load();};
-    row.appendChild(ck);row.appendChild(s);row.appendChild(pl);row.appendChild(b);
+    row.insertBefore(ck,row.firstChild);row.insertBefore(s,ck.nextSibling);row.appendChild(pl);row.appendChild(b);
     const more=st.list.querySelector('.more');st.list.insertBefore(row,more);
   });
 }
-async function add(){const r=await post('/add',{playlist:$('pl').value,title:$('ti').value,url:$('ur').value,sub:$('us').value});toast(r.ok?'Added':(r.msg||'Failed'));if(r.ok){$('ti').value='';$('ur').value='';$('us').value='';}load();}
+async function add(){toast(tr('Adding…'));const r=await post('/add',{playlist:$('pl').value,title:$('ti').value,url:$('ur').value,sub:$('us').value});toast(r.ok?(r.msg||tr('Added')):(r.msg||'Failed'));if(r.ok){$('ti').value='';$('ur').value='';$('us').value='';}load();}
 async function imp(){toast('Importing…');const r=await post('/import',{playlist:$('ipl').value,link:$('lk').value,text:$('tx').value});toast(r.ok?('Imported '+r.added+' videos'):(r.msg||'Failed'));if(r.ok){$('lk').value='';$('tx').value='';}load();}
 
 (function(){const u=qp.get('url');if(u){$('purl').value=u;showTab('cast');playNow('now');history.replaceState(null,'','/');}})();
@@ -632,6 +638,15 @@ async function loadHistory(){
       box.appendChild(e);});
   }catch(e){}
 }
+let qt=null;
+$('qsearch').addEventListener('input',()=>{clearTimeout(qt);qt=setTimeout(async()=>{
+  const q=$('qsearch').value.trim();const box=$('qres');box.innerHTML='';$('queue').style.display=q?'none':'block';if(!q)return;
+  const d=await (await api('/qsearch?q='+encodeURIComponent(q))).json();
+  if(!d.items.length){box.innerHTML='<div class="dim" style="padding:8px 0">'+tr('No channel found')+'</div>';return;}
+  d.items.forEach(it=>{const e=document.createElement('div');e.className='q'+(it.cur?' cur':'');e.textContent=(it.i+1)+'. '+it.t;
+    e.onclick=()=>{cmd('item',it.i);$('qsearch').value='';box.innerHTML='';$('queue').style.display='block';};box.appendChild(e);});
+},300);});
+async function saveQueue(){const n=prompt(tr('Playlist name'),'IPTV');if(n===null)return;const r=await post('/savequeue',{playlist:n||'IPTV'});toast(r.msg);load();}
 async function tvBrowse(){const r=await post('/browse',{url:$('burl').value.trim()});toast(r.msg);}
 setInterval(()=>{if(!document.hidden)loadHistory();},20000);
 
@@ -646,16 +661,33 @@ const TA={"Now playing":"இப்போது இயங்குவது","Not
 "Remote ":"ரிமோட்","Audio/Subs":"ஒலி/வசனம்","Picture/EQ":"படம்/EQ","Cast":"அனுப்பு","Library":"நூலகம்","TVs on this Wi-Fi":"இந்த Wi-Fi இல் உள்ள டிவிகள்","More options…":"மேலும்…",
 "Enter the PIN shown on the TV":"டிவியில் தெரியும் PIN-ஐ உள்ளிடவும்","Connect":"இணை","Enter the 4 digits":"4 இலக்கங்களை உள்ளிடவும்","Connected ✅":"இணைக்கப்பட்டது ✅","⏹ Stop":"⏹ நிறுத்து","↩ Back":"↩ பின்","⌂ Home":"⌂ முகப்பு","⚙ Menu":"⚙ மெனு",
 "Search words or a web address":"தேடல் சொற்கள் அல்லது இணைய முகவரி","Title (optional)":"தலைப்பு (விருப்பம்)","Subtitle link (optional)":"வசன இணைப்பு (விருப்பம்)","Playlist name":"பிளேலிஸ்ட் பெயர்","channels":"சேனல்கள்","use Library to search":"தேட நூலகத்தைப் பயன்படுத்தவும்","Search":"தேடு","Show more":"மேலும் காட்டு","No channel found":"சேனல் கிடைக்கவில்லை","Playlists":"பிளேலிஸ்ட்கள்","Select all":"அனைத்தும் தேர்வு","Select none":"எதுவும் வேண்டாம்","Delete":"நீக்கு","playlists":"பிளேலிஸ்ட்கள்","Nothing selected":"எதையும் தேர்வு செய்யவில்லை","Select":"தேர்வு","Delete playlist":"பிளேலிஸ்டை நீக்கு","Search channel / name":"சேனல் / பெயர் தேடு","search results":"தேடல் முடிவுகள்","Cancel":"ரத்து"};
-let LANG='en';try{LANG=localStorage.getItem('lang')||''}catch(e){}
-function tr(t){return LANG==='ta'&&TA[t]?TA[t]:t;}
+const HI={"Now playing":"अभी चल रहा है","Nothing playing":"कुछ नहीं चल रहा","Use Cast to play something":"कुछ चलाने के लिए Cast खोलें","Remote":"रिमोट","Volume":"आवाज़","Queue":"कतार","Empty":"खाली",
+"Apps on the TV":"टीवी के ऐप्स","tap to open":"खोलने के लिए टैप करें","Continue watching":"देखना जारी रखें","min left":"मिनट बाकी","Remove from Continue watching":"देखना जारी रखें से हटाएँ",
+"Audio track":"ऑडियो ट्रैक","Audio delay (lip-sync)":"ऑडियो देरी (लिप-सिंक)","Subtitles":"सबटाइटल","🚫 Turn subtitles off":"🚫 सबटाइटल बंद करें","Subtitle delay":"सबटाइटल देरी","Add a subtitle":"सबटाइटल जोड़ें","⬆ Send file to TV":"⬆ फ़ाइल टीवी पर भेजें","Load from link":"लिंक से लोड करें","Subtitle style":"सबटाइटल स्टाइल","Dark box behind text":"टेक्स्ट के पीछे काला बॉक्स",
+"Picture fit":"पिक्चर फ़िट","Aspect ratio":"आस्पेक्ट रेशियो","Zoom / crop":"ज़ूम / क्रॉप","Equalizer":"इक्वलाइज़र","On":"चालू","Reset (flat)":"रीसेट (फ़्लैट)","Playback":"प्लेबैक","Speed":"गति","Sleep timer":"स्लीप टाइमर","Decoder":"डिकोडर","Network buffer":"नेटवर्क बफ़र",
+"From this phone":"इस फ़ोन से","📱 Play videos / songs from this phone":"📱 इस फ़ोन के वीडियो / गाने चलाएँ","+ Add phone files to the TV queue":"+ फ़ोन की फ़ाइलें टीवी कतार में जोड़ें","🧲 Open a .torrent file":"🧲 .torrent फ़ाइल खोलें","⬆ Send to TV and play":"⬆ टीवी पर भेजें और चलाएँ","🧲 Play .torrent file":"🧲 .torrent फ़ाइल चलाएँ",
+"Browser":"ब्राउज़र","🌐 Search the web on this phone & send videos":"🌐 इस फ़ोन पर वेब खोजें और वीडियो भेजें","📺 Open on the TV browser":"📺 टीवी ब्राउज़र में खोलें","Play a link":"लिंक चलाएँ","▶ Play on TV":"▶ टीवी पर चलाएँ","+ Queue":"+ कतार","Torrent":"टॉरेंट","peers":"पीयर","done":"पूरा","No torrent running":"कोई टॉरेंट नहीं चल रहा","Stop & delete data":"रोकें और डेटा मिटाएँ",
+"Import M3U playlist":"M3U प्लेलिस्ट इम्पोर्ट करें","Import":"इम्पोर्ट","Add to a playlist":"प्लेलिस्ट में जोड़ें","Add":"जोड़ें","TV settings":"टीवी सेटिंग्स","TV app theme":"टीवी ऐप थीम","TV name (shown when scanning)":"टीवी का नाम (खोजते समय दिखेगा)","Save":"सेव करें",
+"Audio/Subs":"ऑडियो/सबटाइटल","Picture/EQ":"पिक्चर/EQ","Cast":"भेजें","Library":"लाइब्रेरी","TVs on this Wi-Fi":"इस Wi-Fi के टीवी","More options…":"और विकल्प…",
+"Enter the PIN shown on the TV":"टीवी पर दिखा PIN डालें","Connect":"जोड़ें","Enter the 4 digits":"4 अंक डालें","Connected ✅":"जुड़ गया ✅","⏹ Stop":"⏹ रोकें","↩ Back":"↩ पीछे","⌂ Home":"⌂ होम","⚙ Menu":"⚙ मेन्यू",
+"Search words or a web address":"खोज शब्द या वेब पता","Title (optional)":"शीर्षक (वैकल्पिक)","Subtitle link (optional)":"सबटाइटल लिंक (वैकल्पिक)","Playlist name":"प्लेलिस्ट का नाम","channels":"चैनल","Search":"खोजें","Show more":"और दिखाएँ","No channel found":"कोई चैनल नहीं मिला",
+"Playlists":"प्लेलिस्ट","Select all":"सभी चुनें","Select none":"कुछ नहीं चुनें","Delete":"मिटाएँ","playlists":"प्लेलिस्ट","Nothing selected":"कुछ नहीं चुना","Select":"चुनें","Delete playlist":"प्लेलिस्ट मिटाएँ","Search channel / name":"चैनल / नाम खोजें","search results":"खोज के नतीजे","Cancel":"रद्द करें",
+"💾 Save as playlist":"💾 प्लेलिस्ट के रूप में सेव करें","search above, or Save as playlist":"ऊपर खोजें, या प्लेलिस्ट के रूप में सेव करें","Channels":"चैनल","Load all channels of this list":"इस सूची के सभी चैनल लोड करें","Loading channels…":"चैनल लोड हो रहे हैं…","Adding…":"जोड़ा जा रहा है…","Added":"जुड़ गया","Saved":"सेव हुआ"};
+Object.assign(TA,{"💾 Save as playlist":"💾 பிளேலிஸ்டாகச் சேமி","search above, or Save as playlist":"மேலே தேடவும், அல்லது பிளேலிஸ்டாகச் சேமிக்கவும்","Channels":"சேனல்கள்","Load all channels of this list":"இந்தப் பட்டியலின் அனைத்து சேனல்களையும் ஏற்று","Loading channels…":"சேனல்கள் ஏற்றப்படுகின்றன…","Adding…":"சேர்க்கிறது…","Added":"சேர்க்கப்பட்டது","Saved":"சேமிக்கப்பட்டது"});
+const DICTS={ta:TA,hi:HI};
+let LANG='';try{LANG=localStorage.getItem('lang')||''}catch(e){}
+function D(){return DICTS[LANG]||null;}
+function tr(t){const d=D();return d&&d[t]?d[t]:t;}
 function applyLang(){
-  $('langBtn').textContent=LANG==='ta'?'EN':'த';
-  const walk=n=>{if(n.nodeType===3){const k=n._en||n.nodeValue.trim();if(TA[k]){n._en=k;n.nodeValue=n.nodeValue.replace(n.nodeValue.trim(),LANG==='ta'?TA[k]:k);}else if(n._en){n.nodeValue=LANG==='ta'?(TA[n._en]||n._en):n._en;}return;}
-    if(n.nodeType===1&&n.tagName!=='SCRIPT'&&n.tagName!=='STYLE'){if(n.placeholder){const k=n._ph||n.placeholder;if(TA[k]){n._ph=k;n.placeholder=LANG==='ta'?TA[k]:k;}}n.childNodes.forEach(walk);}};
+  $('langBtn').textContent=LANG==='ta'?'अ':LANG==='hi'?'EN':'த';
+  $('langBtn').title=LANG==='ta'?'हिन्दी':LANG==='hi'?'English':'தமிழ்';
+  const d=D();
+  const walk=n=>{if(n.nodeType===3){const k=n._en||n.nodeValue.trim();if(k&&(TA[k]||HI[k])){n._en=k;const v=d&&d[k]?d[k]:k;n.nodeValue=n.nodeValue.replace(n.nodeValue.trim(),v);}return;}
+    if(n.nodeType===1&&n.tagName!=='SCRIPT'&&n.tagName!=='STYLE'){if(n.placeholder){const k=n._ph||n.placeholder.replace(/^🔍 /,'');if(TA[k]||HI[k]){n._ph=k;const pre=n.placeholder.startsWith('🔍 ')?'🔍 ':'';n.placeholder=pre+(d&&d[k]?d[k]:k);}}n.childNodes.forEach(walk);}};
   walk(document.body);
 }
-function toggleLang(){LANG=LANG==='ta'?'en':'ta';try{localStorage.setItem('lang',LANG)}catch(e){}applyLang();}
-(async()=>{if(!LANG){try{const s=await (await api('/state')).json();LANG=s.lang==='ta'?'ta':'en';}catch(e){LANG='en';}}applyLang();})();
+function toggleLang(){LANG=LANG==='en'||!LANG?'ta':LANG==='ta'?'hi':'en';try{localStorage.setItem('lang',LANG)}catch(e){}applyLang();}
+(async()=>{if(!LANG){try{const s=await (await api('/state')).json();LANG=(s.lang==='ta'||s.lang==='hi')?s.lang:'en';}catch(e){LANG='en';}}applyLang();})();
 
 loadOptions().then(poll);load();loadApps();loadHistory();
 </script>

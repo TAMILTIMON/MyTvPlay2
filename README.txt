@@ -1,3 +1,19 @@
+TAMILCASTPLAY 1.5 — channels & Hindi
+====================================
+* Adding a channel-list link (.m3u / .m3u8 / .pls) to a playlist now adds ALL its
+  channels (11,000+ for iptv-org) so they show in the Library and on the TV home.
+  Old playlists that contain just the link: tap "📥 Channels" next to it (Library).
+* Phone Remote tab > Queue: search box for the channels playing on the TV,
+  and "💾 Save as playlist".
+* Player: new 📺 button next to 🔊 in the control bar = channel list with live search.
+  With a physical remote on channel lists:
+    OK            = open channel list (type to search, ▼ into the list, OK to play)
+    0-9           = type a channel number (e.g. 1 2 3 = channel 123)
+    CH+ / CH-     = next / previous channel
+    Guide / TV key = channel list
+* Languages: English, தமிழ், हिन्दी — TV: ⚙ Settings > Language; phone page: the
+  language button at the top switches த → अ → EN.
+
 TAMILCASTPLAY 1.4 — search & bulk delete
 ========================================
 TV home:

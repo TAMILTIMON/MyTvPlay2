@@ -75,8 +75,54 @@ public class WebServer extends NanoHTTPD {
                 case "/add": {
                     String u = val(p, "url");
                     if (!Formats.looksPlayable(u)) return fail("That does not look like a link (http://, https://, magnet:, rtsp:// …)");
+                    // a channel list link (m3u/pls)? add all its channels instead of the single link
+                    List<Store.Item> ch = Formats.maybeList(u) ? readChannelList(u) : null;
+                    if (ch != null && !ch.isEmpty()) {
+                        int n = Store.addAll(val(p, "playlist"), ch);
+                        return json(new JSONObject().put("ok", true).put("msg", n + " channels added").toString());
+                    }
                     Store.add(val(p, "playlist"), new Store.Item(val(p, "title"), u, val(p, "sub")));
                     return ok();
+                }
+
+                case "/expand": {
+                    String pl = val(p, "playlist");
+                    int idx = Integer.parseInt(val(p, "idx"));
+                    List<Store.Item> items = Store.items(pl);
+                    if (idx < 0 || idx >= items.size()) return fail("Not found");
+                    List<Store.Item> ch = readChannelList(items.get(idx).u);
+                    if (ch == null || ch.isEmpty()) return fail("This link is a single video, not a channel list");
+                    java.util.Set<Integer> one = new java.util.HashSet<>();
+                    one.add(idx);
+                    Store.delMany(pl, one);
+                    int n = Store.addAll(pl, ch);
+                    return msg(n + " channels added");
+                }
+
+                case "/savequeue": {
+                    final PlayerActivity pl = Remote.player;
+                    if (pl == null) return fail("Nothing is playing on the TV");
+                    List<Store.Item> q = Remote.call(new Callable<List<Store.Item>>() {
+                        public List<Store.Item> call() {
+                            return pl.queueCopy();
+                        }
+                    });
+                    String name = val(p, "playlist").isEmpty() ? "IPTV" : val(p, "playlist");
+                    Store.delPlaylist(name);
+                    int n = Store.addAll(name, q);
+                    return msg(n + " saved to playlist “" + name + "”");
+                }
+
+                case "/qsearch": {
+                    final PlayerActivity pl = Remote.player;
+                    if (pl == null) return json("{\"items\":[]}");
+                    final String q = val(p, "q");
+                    org.json.JSONArray a = Remote.call(new Callable<org.json.JSONArray>() {
+                        public org.json.JSONArray call() throws Exception {
+                            return pl.searchQueue(q);
+                        }
+                    });
+                    return json(new JSONObject().put("items", a).toString());
                 }
 
                 case "/import": {
@@ -335,6 +381,18 @@ public class WebServer extends NanoHTTPD {
         String t = s.getHeaders().get("x-token");
         if (t == null || t.isEmpty()) t = p.get("t");
         return Pair.valid(t);
+    }
+
+    /** Downloads an .m3u/.pls link; returns its channels, or null when it is a single HLS video. */
+    private List<Store.Item> readChannelList(String u) {
+        try {
+            String url = u.split("\\|")[0];
+            String text = url.startsWith("/") ? new String(readFile(new File(url)), "UTF-8") : Net.fetchText(url);
+            if (text.contains("#EXT-X-")) return null;
+            return Formats.ext(url).equals("pls") ? Store.parsePls(text) : Store.parseM3u(text);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private static java.util.Set<Integer> ints(String csv) {

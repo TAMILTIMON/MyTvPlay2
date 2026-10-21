@@ -43,8 +43,8 @@ public final class SettingsDialog {
         final String[] themes = {"dark", "light", "system"};
         final String[] themeNames = {T.t("Dark"), T.t("Light"), T.t("Follow system")};
         String[] items = {
-                "🌐  Language / மொழி: " + (T.tamil() ? "தமிழ்" : "English"),
-                "🔐  " + (T.tamil() ? "ரிமோட் PIN: " : "Remote PIN: ") + (Pair.enabled() ? Pair.pin() : (T.tamil() ? "அணை" : "Off")),
+                "🌐  Language / மொழி / भाषा: " + T.langName(),
+                "🔐  " + T.t("Remote PIN: ") + (Pair.enabled() ? Pair.pin() : T.t("Off")),
                 T.t("🎨  Theme: ") + themeNames[idx(themes, Store.getStr("theme", "dark"))],
                 T.t("📺  Device name: ") + Discovery.deviceName(a),
                 T.t("🖼  Picture fit: ") + PlayerActivity.FIT_NAMES[Math.max(0, Math.min(3, Store.getInt("fit", 0)))],
@@ -66,9 +66,11 @@ public final class SettingsDialog {
             @Override
             public void onClick(DialogInterface d, int w) {
                 if (w == 0) {
-                    choose(a, "Language / மொழி", new String[]{"English", "தமிழ் (Tamil)"}, T.tamil() ? 1 : 0, new IntCb() {
+                    final String[] codes = {"en", "ta", "hi"};
+                    choose(a, "Language / மொழி / भाषा", new String[]{"English", "தமிழ் (Tamil)", "हिन्दी (Hindi)"},
+                            java.util.Arrays.asList(codes).indexOf(T.lang()), new IntCb() {
                         public void on(int i) {
-                            Store.putStr("lang", i == 1 ? "ta" : "en");
+                            Store.putStr("lang", codes[i]);
                             restart(a);
                         }
                     });
@@ -209,11 +211,9 @@ public final class SettingsDialog {
 
     static void pinMenu(final Activity a) {
         String[] items = {
-                (T.tamil() ? "PIN தேவை: " : "Ask for PIN: ") + (Pair.enabled() ? "ON" : "OFF"),
-                T.tamil() ? "புதிய PIN (இணைந்த போன்கள் அனைத்தும் மறக்கப்படும்)" : "New PIN (forget all paired phones)"};
+                T.t("Ask for PIN: ") + (Pair.enabled() ? "ON" : "OFF"),T.t("New PIN (forget all paired phones)")};
         new AlertDialog.Builder(a).setTitle("🔐  PIN: " + Pair.pin())
-                .setMessage(T.tamil() ? "போன் முதல் முறை இணையும்போது இந்த PIN கேட்கப்படும்."
-                        : "Phones must enter this PIN once before they can control this device.")
+                .setMessage(T.t("Phones must enter this PIN once before they can control this device."))
                 .setItems(items, new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface d, int w) {
                         if (w == 0) Store.putBool("pin_on", !Pair.enabled());

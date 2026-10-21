@@ -128,7 +128,7 @@ public class FileBrowserActivity extends AppCompatActivity {
         info.setText(needAllFiles()
                 ? "To see every file (and subtitle files), select the first row and allow “All files access”."
                 : T.t("Subtitle files with the same name as the video are loaded automatically."));
-        rows.add("🏠  " + (T.tamil() ? "முகப்பு" : "Home"));
+        rows.add("🏠  " + T.t("Home"));
         files.add(new File(HOME_MARK));
         if (needAllFiles()) {
             rows.add("🔓  Allow access to all files");

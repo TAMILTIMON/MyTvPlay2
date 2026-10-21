@@ -400,6 +400,7 @@ public class PlayerActivity extends AppCompatActivity {
         ctl(btns, "⏭", 46, false, v -> { next(); showOverlay(); });
         View gap = new View(this);
         btns.addView(gap, new LinearLayout.LayoutParams(dp(18), 1));
+        ctl(btns, "📺", 46, false, v -> menuQueue());
         ctl(btns, "🔊", 46, false, v -> menuAudio());
         ctl(btns, "💬", 46, false, v -> menuSubs());
         ctl(btns, "⛶", 46, false, v -> menuFit());
@@ -740,7 +741,7 @@ public class PlayerActivity extends AppCompatActivity {
         final int token = ++resolveToken;
         if (mp != null) mp.stop();
         titleView.setText(it.t);
-        showLoading(T.tamil() ? "பட்டியலைப் படிக்கிறது…" : "Reading the list…");
+        showLoading(T.t("Reading the list…"));
         showOverlay();
         new Thread(new Runnable() {
             public void run() {
@@ -778,7 +779,7 @@ public class PlayerActivity extends AppCompatActivity {
                         for (Store.Item x : found) checkedStreams.add(x.u);
                         queue.remove(i);
                         queue.addAll(i, found);
-                        osd(found.size() + (T.tamil() ? " சேனல்கள் · ▼ ☰ → பிளேலிஸ்ட்" : " channels · ▼ then ☰ → Playlist to choose"));
+                        osd(found.size() + T.t(" channels · OK or 📺 = channel list"));
                         playIndex(i, true);
                     }
                 });
@@ -866,7 +867,7 @@ public class PlayerActivity extends AppCompatActivity {
 
     private void onPlayError(String msg) {
         if (channelMode()) {
-            showLoading(msg + "\n" + (T.tamil() ? "OK மீண்டும் முயற்சி · CH+/CH− வேறு சேனல்" : "OK = retry · CH+ / CH− = another channel · ▼ ☰ = list"));
+            showLoading(msg + "\n" + T.t("OK = retry · CH+ / CH− = another channel · 📺 = list"));
             showOverlay();
             return;
         }
@@ -950,7 +951,7 @@ public class PlayerActivity extends AppCompatActivity {
             return;
         }
         if (channelMode()) {
-            showLoading(T.tamil() ? "சேனல் நின்றது · OK மீண்டும் முயற்சி" : "Channel stopped — OK = retry, CH+ / CH− = another channel");
+            showLoading(T.t("Channel stopped — OK = retry, CH+ / CH− = another channel"));
             showOverlay();
             return;
         }
@@ -1180,7 +1181,18 @@ public class PlayerActivity extends AppCompatActivity {
             case KeyEvent.KEYCODE_SPACE:
             case KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE:
             case KeyEvent.KEYCODE_HEADSETHOOK:
-                if (repeat == 0) togglePause();
+                if (repeat == 0) {
+                    boolean okKey = code == KeyEvent.KEYCODE_DPAD_CENTER || code == KeyEvent.KEYCODE_ENTER
+                            || code == KeyEvent.KEYCODE_NUMPAD_ENTER;
+                    if (okKey && channelMode() && mp.isPlaying()) menuQueue();
+                    else togglePause();
+                }
+                return true;
+            case KeyEvent.KEYCODE_GUIDE:
+            case KeyEvent.KEYCODE_TV:
+            case KeyEvent.KEYCODE_BOOKMARK:
+            case KeyEvent.KEYCODE_LAST_CHANNEL:
+                if (repeat == 0) menuQueue();
                 return true;
             case KeyEvent.KEYCODE_MEDIA_PLAY:
                 mp.play();
@@ -1260,6 +1272,13 @@ public class PlayerActivity extends AppCompatActivity {
                 if (repeat == 0) finish();
                 return true;
             default:
+                if (code >= KeyEvent.KEYCODE_0 && code <= KeyEvent.KEYCODE_9 && repeat == 0 && channelMode()) {
+                    numBuf.append(code - KeyEvent.KEYCODE_0);
+                    osd(T.t("Channel ") + numBuf + "_");
+                    handler.removeCallbacks(numGo);
+                    handler.postDelayed(numGo, numBuf.length() >= 5 ? 0 : 1600);
+                    return true;
+                }
                 if (code >= KeyEvent.KEYCODE_0 && code <= KeyEvent.KEYCODE_9 && repeat == 0) {
                     long len = mp.getLength();
                     if (len > 0 && mp.isSeekable()) {
@@ -1455,7 +1474,7 @@ public class PlayerActivity extends AppCompatActivity {
             labels.add(T.t("Stop torrent and delete its data"));
             acts.add(new Runnable() { public void run() { TorrentEngine.get(PlayerActivity.this).stopAsync(); finish(); } });
         }
-        labels.add("🏠  " + (T.tamil() ? "முகப்புக்குச் செல்" : "Go to Home"));
+        labels.add("🏠  " + T.t("Go to Home"));
         acts.add(new Runnable() { public void run() { Ui.goHome(PlayerActivity.this, true); } });
         labels.add(T.t("Phone remote: http://") + Net.ip() + ":" + RemoteService.PORT);
         acts.add(new Runnable() { public void run() { osd("Open http://" + Net.ip() + ":" + RemoteService.PORT + " on your phone"); } });
@@ -1690,51 +1709,91 @@ public class PlayerActivity extends AppCompatActivity {
                 }).show();
     }
 
+    /**
+     * Channel / playlist list with live search. Works with the TV remote:
+     * type in the box (on-screen keyboard), press ▼ to go into the list, OK to play.
+     */
     private void menuQueue() {
-        if (queue.size() <= 30) {
-            String[] names = new String[queue.size()];
-            for (int i = 0; i < queue.size(); i++) names[i] = (i + 1) + ". " + queue.get(i).t;
-            choose(T.t("Playlist"), names, index, new IntCb() {
-                public void on(int i) {
-                    playIndex(i, true);
-                }
-            });
-            return;
-        }
-        // big list (IPTV): search box + results
+        if (queue.isEmpty()) return;
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(16), dp(4), dp(16), 0);
         final android.widget.EditText q = new android.widget.EditText(this);
-        q.setHint(T.tamil() ? "சேனல் பெயர் (காலியாக விட்டால் அனைத்தும்)" : "Channel name (leave empty for all)");
+        q.setHint("🔍 " + T.t("Type a channel name…"));
         q.setSingleLine(true);
-        new AlertDialog.Builder(this).setTitle("🔍  " + queue.size() + (T.tamil() ? " சேனல்கள்" : " channels"))
-                .setView(q)
-                .setPositiveButton(T.tamil() ? "தேடு" : "Search", new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface d, int w) {
-                        showMatches(q.getText().toString());
-                    }
-                }).show();
-    }
-
-    private void showMatches(String query) {
-        String ql = query.trim().toLowerCase(Locale.ROOT);
+        q.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);
+        box.addView(q);
+        final android.widget.ListView lv = new android.widget.ListView(this);
         final List<Integer> idx = new ArrayList<>();
-        List<String> names = new ArrayList<>();
-        int sel = -1;
-        for (int i = 0; i < queue.size() && idx.size() < 2000; i++) {
-            if (!ql.isEmpty() && !queue.get(i).t.toLowerCase(Locale.ROOT).contains(ql)) continue;
-            if (i == index) sel = idx.size();
-            idx.add(i);
-            names.add((i + 1) + ". " + queue.get(i).t);
-        }
-        if (idx.isEmpty()) {
-            osd(T.tamil() ? "எதுவும் கிடைக்கவில்லை" : "No channel found");
-            return;
-        }
-        choose(names.size() + " / " + queue.size(), names.toArray(new String[0]), sel, new IntCb() {
-            public void on(int i) {
-                playIndex(idx.get(i), true);
+        final List<String> names = new ArrayList<>();
+        final android.widget.ArrayAdapter<String> ad = new android.widget.ArrayAdapter<>(this,
+                android.R.layout.simple_list_item_activated_1, names);
+        lv.setAdapter(ad);
+        lv.setChoiceMode(android.widget.ListView.CHOICE_MODE_SINGLE);
+        box.addView(lv, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                Math.min(dp(420), (int) (getResources().getDisplayMetrics().heightPixels * 0.62f))));
+        final Runnable[] rebuild = new Runnable[1];
+        rebuild[0] = new Runnable() {
+            public void run() {
+                String ql = q.getText().toString().trim().toLowerCase(Locale.ROOT);
+                idx.clear();
+                names.clear();
+                int sel = -1;
+                for (int i = 0; i < queue.size() && idx.size() < 3000; i++) {
+                    if (!ql.isEmpty() && !queue.get(i).t.toLowerCase(Locale.ROOT).contains(ql)) continue;
+                    if (i == index) sel = idx.size();
+                    idx.add(i);
+                    names.add((i == index ? "▶ " : "") + (i + 1) + ".  " + queue.get(i).t);
+                }
+                ad.notifyDataSetChanged();
+                if (sel >= 0) {
+                    lv.setItemChecked(sel, true);
+                    lv.setSelection(Math.max(0, sel - 3));
+                }
+            }
+        };
+        q.addTextChangedListener(new android.text.TextWatcher() {
+            public void beforeTextChanged(CharSequence c, int a, int b, int d) { }
+            public void onTextChanged(CharSequence c, int a, int b, int d) { }
+            public void afterTextChanged(android.text.Editable e) {
+                rebuild[0].run();
+            }
+        });
+        rebuild[0].run();
+        final AlertDialog d = new AlertDialog.Builder(this)
+                .setTitle(T.t("📺 Channels") + "  ·  " + queue.size())
+                .setView(box).setNegativeButton(T.t("Close"), null).create();
+        lv.setOnItemClickListener(new android.widget.AdapterView.OnItemClickListener() {
+            public void onItemClick(android.widget.AdapterView<?> p, View v, int pos, long id) {
+                d.dismiss();
+                playIndex(idx.get(pos), true);
+            }
+        });
+        q.setOnEditorActionListener((v, act, ev) -> {
+            lv.requestFocus();
+            return false;
+        });
+        d.show();
+        lv.post(new Runnable() {
+            public void run() {
+                lv.requestFocus();
             }
         });
     }
+
+    // ---- type a channel number on the remote (channel lists) ----
+    private final StringBuilder numBuf = new StringBuilder();
+    private final Runnable numGo = new Runnable() {
+        public void run() {
+            try {
+                int n = Integer.parseInt(numBuf.toString());
+                if (n >= 1 && n <= queue.size()) playIndex(n - 1, true);
+                else osd(T.t("No channel found"));
+            } catch (Exception ignored) {
+            }
+            numBuf.setLength(0);
+        }
+    };
 
     static String[] eqLabels() {
         float[] f = BAND_FREQS != null ? BAND_FREQS : DEFAULT_FREQS;
@@ -2044,6 +2103,20 @@ public class PlayerActivity extends AppCompatActivity {
         }
         if (msg != null && !msg.isEmpty()) osd(msg);
         return msg == null ? "" : msg;
+    }
+
+    public JSONArray searchQueue(String query) throws Exception {
+        String ql = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
+        JSONArray a = new JSONArray();
+        for (int i = 0; i < queue.size() && a.length() < 200; i++) {
+            if (!ql.isEmpty() && !queue.get(i).t.toLowerCase(Locale.ROOT).contains(ql)) continue;
+            a.put(new JSONObject().put("i", i).put("t", queue.get(i).t).put("cur", i == index));
+        }
+        return a;
+    }
+
+    public List<Store.Item> queueCopy() {
+        return new ArrayList<>(queue);
     }
 
     public void enqueue(Store.Item it) {
