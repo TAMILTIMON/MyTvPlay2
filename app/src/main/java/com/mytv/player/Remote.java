@@ -106,7 +106,7 @@ public final class Remote {
                 } catch (Exception ignored) {
                 }
             }
-            return "Open My TV Player on the TV first";
+            return "Open TamilCastPlay on the TV first";
         }
     }
 }

@@ -19,7 +19,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-/** Finds other My TV Player devices on the Wi-Fi (network service + quick IP scan). */
+/** Finds other TamilCastPlay devices on the Wi-Fi (network service + quick IP scan). */
 public final class Discovery {
     public static final String TYPE = "_mytvplayer._tcp.";
 
@@ -84,7 +84,7 @@ public final class Discovery {
         reg = null;
     }
 
-    /** Asks one address whether it runs My TV Player. */
+    /** Asks one address whether it runs TamilCastPlay. */
     public static Device ping(String ip, int timeout) {
         HttpURLConnection c = null;
         try {

@@ -99,7 +99,7 @@ public class WebServer extends NanoHTTPD {
                     }
                     Remote.play(ctx, Collections.singletonList(it), 0);
                     if (App.visible == 0 && !Perms.overlayOk(ctx)) {
-                        return msg("Sent — if the TV doesn't start, open My TV Player on the TV once, or allow “Display over other apps” in its ⚙ Settings");
+                        return msg("Sent — if the TV doesn't start, open TamilCastPlay on the TV once, or allow “Display over other apps” in its ⚙ Settings");
                     }
                     return msg(Formats.isTorrent(u) ? "Starting torrent on the TV… (getting info can take a minute)"
                             : "Playing on the TV");
@@ -170,7 +170,7 @@ public class WebServer extends NanoHTTPD {
                     final String pkg = val(p, "pkg");
                     if (pkg.isEmpty()) return fail("No app chosen");
                     if (App.visible == 0 && !Perms.overlayOk(ctx)) {
-                        return fail("Open My TV Player on the TV first, or allow “Display over other apps” in its ⚙ Settings");
+                        return fail("Open TamilCastPlay on the TV first, or allow “Display over other apps” in its ⚙ Settings");
                     }
                     String r = Remote.call(new Callable<String>() {
                         public String call() {
@@ -268,7 +268,7 @@ public class WebServer extends NanoHTTPD {
         if (items.size() == 1) Store.addRecent(items.get(0));
         Remote.play(ctx, items, 0);
         if (App.visible == 0 && !Perms.overlayOk(ctx)) {
-            return "Sent — if the TV doesn't start, open My TV Player on the TV once, or allow “Display over other apps” in its ⚙ Settings";
+            return "Sent — if the TV doesn't start, open TamilCastPlay on the TV once, or allow “Display over other apps” in its ⚙ Settings";
         }
         return Formats.isTorrent(items.get(0).u) ? "Starting torrent on the TV… (can take a minute)" : "Playing on the TV";
     }

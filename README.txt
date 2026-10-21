@@ -1,7 +1,13 @@
+TAMILCASTPLAY 1.0 (app id: com.tamil.castplay)
+=============================================
+Installs as a NEW app next to the old "My TV Player" (com.mytv.player).
+Playlists/settings from the old app are not copied. Remove the old one with:
+   adb uninstall com.mytv.player      (or TV Settings > Apps > My TV Player > Uninstall)
+
 MY TV PLAYER 3.1 — what's new
 =============================
 * No laptop needed for permissions. On first start the TV app asks:
-  "Allow the phone to start videos" -> Allow -> switch My TV Player ON -> Back.
+  "Allow the phone to start videos" -> Allow -> switch TamilCastPlay ON -> Back.
   Also in ⚙ Settings (display over other apps, all-files access), and as a
   row on the home screen until it is allowed. Some TVs hide this screen; then
   the TV shows the manual path: Settings > Apps > Special app access.
@@ -24,7 +30,7 @@ MY TV PLAYER 3.0
 * Several TVs: install on each TV, give each a name (⚙ Settings > Device name).
 * Equalizer sliders are now vertical (up/down) on TV, phone and browser.
 * .torrent files: upload from browser/phone, links ending in .torrent, or open
-  a .torrent file on the TV with "Open with My TV Player".
+  a .torrent file on the TV with "Open with TamilCastPlay".
 * TV player now has on-screen buttons and a ⚙ settings button in the corner:
   press ▼ to reach the buttons (◀ ▶ to move, OK to press, Back to hide),
   press ▲ to jump to the ⚙ corner button. Phones: tap the video.
@@ -40,29 +46,29 @@ BUILD IT WITH GITHUB (free)
 ==============================================
 
 BUILD
-1. Sign in at github.com. Open your MyTVPlayer repository (or make a new
-   Public one named MyTVPlayer).
-2. Unzip MyTVPlayer.zip on your PC. Open the unzipped folder, select
+1. Sign in at github.com. Open your MyTvPlay2 repository (or make a new
+   Public one named MyTvPlay2).
+2. Unzip TamilCastPlay.zip on your PC. Open the unzipped folder, select
    EVERYTHING inside (including the .github folder) and drag it into
    "Add file > Upload files". Replace the old files. Press "Commit changes".
 3. Open the "Actions" tab. Wait 5-15 minutes for a green tick.
    A red cross means the build failed: open it, copy the error, send it to Claude.
-4. Open the finished run > "Artifacts" > MyTVPlayer-apk. Unzip it. Inside:
-      app-armeabi-v7a-debug.apk   (most TVs, 32-bit)
-      app-arm64-v8a-debug.apk     (64-bit TVs)
-      app-universal-debug.apk     (works on all, bigger)
+4. Open the finished run > "Artifacts" > TamilCastPlay-apk. Unzip it. Inside:
+      TamilCastPlay-armeabi-v7a-debug.apk   (most TVs, 32-bit)
+      TamilCastPlay-arm64-v8a-debug.apk     (64-bit TVs)
+      TamilCastPlay-universal-debug.apk     (works on all, bigger)
    Not sure? Run:  adb shell getprop ro.product.cpu.abi
 5. Install on the TV:
       adb connect 192.168.1.33:5555
-      adb install -r app-armeabi-v7a-debug.apk
-   Install on the phone: copy app-universal-debug.apk (or arm64) to the phone
+      adb install -r TamilCastPlay-armeabi-v7a-debug.apk
+   Install on the phone: copy TamilCastPlay-universal-debug.apk (or arm64) to the phone
    and open it (allow "install unknown apps"). Updates from 2.0 install over it.
 
 ONE-TIME PERMISSIONS (run from your PC, recommended)
    Phone can start videos even when the app is closed:
-      adb shell appops set com.mytv.player SYSTEM_ALERT_WINDOW allow
+      adb shell appops set com.tamil.castplay SYSTEM_ALERT_WINDOW allow
    See all files on USB/storage (including subtitle files):
-      adb shell appops set com.mytv.player MANAGE_EXTERNAL_STORAGE allow
+      adb shell appops set com.tamil.castplay MANAGE_EXTERNAL_STORAGE allow
 
 PHONE REMOTE
    Open the address shown on the TV, e.g. http://192.168.1.33:8080, on your
@@ -100,12 +106,12 @@ MAGNET / TORRENT LINKS
 FORMATS
    Uses the VLC engine: mkv mp4 avi wmv flv mov ts m2ts vob iso webm rmvb 3gp
    ..., audio mp3 flac aac ac3 dts opus wav ..., streams http https hls(m3u8)
-   dash rtsp rtmp udp. Other apps can use "Open with My TV Player".
+   dash rtsp rtmp udp. Other apps can use "Open with TamilCastPlay".
    Subtitle files next to a local video with the same name load automatically.
 
 IF THE BUILD FAILS WITH "Could not find org.videolan.android:libvlc-all:3.6.2"
    In app/build.gradle change 3.6.2 to 3.6.0 (or 3.5.1) and commit again.
 
 Add to the tv-detox home screen:
-   adb shell am start -n com.ansub.tvhome/.MainActivity --es apps org.videolan.vlc,in.startv.hotstar,com.netflix.ninja,com.mxtech.videoplayer.ad,com.mxtech.videoplayer.television,com.mytv.player
-To remove the app:  adb uninstall com.mytv.player
+   adb shell am start -n com.ansub.tvhome/.MainActivity --es apps org.videolan.vlc,in.startv.hotstar,com.netflix.ninja,com.mxtech.videoplayer.ad,com.mxtech.videoplayer.television,com.tamil.castplay
+To remove the app:  adb uninstall com.tamil.castplay

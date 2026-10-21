@@ -42,8 +42,8 @@ public final class Perms {
     public static void askOverlay(final Activity a) {
         new AlertDialog.Builder(a)
                 .setTitle("📱  Allow the phone to start videos")
-                .setMessage("So your phone can play videos on this TV even when My TV Player is closed, "
-                        + "allow “Display over other apps”.\n\nOn the next screen choose My TV Player and switch it ON, "
+                .setMessage("So your phone can play videos on this TV even when TamilCastPlay is closed, "
+                        + "allow “Display over other apps”.\n\nOn the next screen choose TamilCastPlay and switch it ON, "
                         + "then press Back.")
                 .setPositiveButton("Allow", new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface d, int w) {
@@ -92,8 +92,8 @@ public final class Perms {
     private static void help(Activity a, String what) {
         new AlertDialog.Builder(a).setTitle("Open it in TV Settings")
                 .setMessage("This TV has no direct shortcut. Go to:\n\nSettings → Apps → Special app access → "
-                        + what + " → My TV Player → ON\n\nIf your TV doesn't have that option, everything still works "
-                        + "while My TV Player is open on the TV.")
+                        + what + " → TamilCastPlay → ON\n\nIf your TV doesn't have that option, everything still works "
+                        + "while TamilCastPlay is open on the TV.")
                 .setPositiveButton("OK", null).show();
     }
 }

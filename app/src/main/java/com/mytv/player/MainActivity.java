@@ -241,7 +241,7 @@ public class MainActivity extends AppCompatActivity {
         rows.clear();
         actions.clear();
         if (current == null) {
-            header.setText("My TV Player");
+            header.setText("TamilCastPlay");
             if (Ui.isTv(this) && !Perms.overlayOk(this)) {
                 rows.add("🔓   Allow the phone to start videos when this app is closed  (recommended)");
                 actions.add(() -> Perms.openOverlaySettings(this));

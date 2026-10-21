@@ -58,7 +58,7 @@ public class ConnectActivity extends AppCompatActivity {
         t.setOrientation(LinearLayout.VERTICAL);
         t.setPadding(Ui.dp(this, 12), 0, 0, 0);
         TextView h = Ui.text(this, 24, Ui.TEXT, true);
-        h.setText("My TV Player");
+        h.setText("TamilCastPlay");
         TextView s = Ui.text(this, 13, Ui.DIM, false);
         s.setText("Remote · cast phone videos & songs");
         t.addView(h);
@@ -116,7 +116,7 @@ public class ConnectActivity extends AppCompatActivity {
         });
         root.addView(self, full());
         TextView tip = Ui.text(this, 13, Ui.DIM, false);
-        tip.setText("\nPhone and TV must be on the same Wi-Fi, and My TV Player must be installed on the TV "
+        tip.setText("\nPhone and TV must be on the same Wi-Fi, and TamilCastPlay must be installed on the TV "
                 + "(it runs in the background after the first start).");
         root.addView(tip);
         setContentView(sv);
@@ -172,7 +172,7 @@ public class ConnectActivity extends AppCompatActivity {
                         if (id != scanId) return;
                         spinner.setVisibility(View.GONE);
                         status.setText(found.isEmpty()
-                                ? "No TV found. Open My TV Player once on the TV, check both are on the same Wi-Fi, then scan again."
+                                ? "No TV found. Open TamilCastPlay once on the TV, check both are on the same Wi-Fi, then scan again."
                                 : found.size() + (found.size() == 1 ? " device found. Tap to connect." : " devices found. Tap one to connect."));
                     }
                 });
@@ -250,7 +250,7 @@ public class ConnectActivity extends AppCompatActivity {
                     new Thread(() -> {
                         final Discovery.Device dev = Discovery.ping(ip, 2500);
                         main.post(() -> {
-                            if (dev == null) Toast.makeText(this, "No My TV Player at " + ip, Toast.LENGTH_LONG).show();
+                            if (dev == null) Toast.makeText(this, "No TamilCastPlay at " + ip, Toast.LENGTH_LONG).show();
                             else open(dev.ip, dev.name);
                         });
                     }).start();

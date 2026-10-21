@@ -79,7 +79,7 @@ public class RemoteWebActivity extends AppCompatActivity {
         String bg = Ui.dark() ? "#0b0913" : "#f5f3fb", fg = Ui.dark() ? "#f3f0ff" : "#1b1530";
         web.loadDataWithBaseURL(null, "<html><body style='background:" + bg + ";color:" + fg
                 + ";font-family:sans-serif;padding:40px;text-align:center'><h2>📺 Cannot reach the TV</h2>"
-                + "<p>Is the TV on and My TV Player started once? Same Wi-Fi?</p>"
+                + "<p>Is the TV on and TamilCastPlay started once? Same Wi-Fi?</p>"
                 + "<p><button style='padding:14px 24px;border:0;border-radius:24px;background:#8b5cf6;color:#fff;font-size:16px' "
                 + "onclick='MyTV.retry()'>Try again</button></p><p><button style='padding:12px 22px;border:0;border-radius:24px;"
                 + "background:#ec4899;color:#fff' onclick='MyTV.switchTv()'>Choose another TV</button></p></body></html>",

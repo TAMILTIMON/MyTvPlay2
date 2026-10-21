@@ -19,7 +19,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 public final class Net {
-    public static final String UA = "Mozilla/5.0 (Linux; Android 11; MyTVPlayer) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36";
+    public static final String UA = "Mozilla/5.0 (Linux; Android 11; TamilCastPlay) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36";
 
     private Net() {
     }

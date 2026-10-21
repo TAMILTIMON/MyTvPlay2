@@ -44,7 +44,7 @@
         android:allowBackup="false"
         android:banner="@drawable/banner"
         android:icon="@drawable/icon"
-        android:label="My TV Player"
+        android:label="TamilCastPlay"
         android:largeHeap="true"
         android:requestLegacyExternalStorage="true"
         android:theme="@style/AppTheme"
@@ -68,7 +68,7 @@
         <activity
             android:name=".ConnectActivity"
             android:exported="false"
-            android:label="My TV Remote" />
+            android:label="TamilCastPlay Remote" />
 
         <activity
             android:name=".RemoteWebActivity"
@@ -81,7 +81,7 @@
             android:configChanges="orientation|screenSize|keyboardHidden|keyboard|navigation|smallestScreenSize|screenLayout|uiMode"
             android:exported="true"
             android:launchMode="singleTop">
-            <!-- "Open with My TV Player" for video/audio files and streams from other apps -->
+            <!-- "Open with TamilCastPlay" for video/audio files and streams from other apps -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
