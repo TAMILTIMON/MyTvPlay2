@@ -6,7 +6,12 @@ import android.content.SharedPreferences;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.util.ArrayList;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -31,6 +36,9 @@ public class Store {
     private static SharedPreferences prefs, posPrefs, setPrefs;
     private static final LinkedHashMap<String, List<Item>> data = new LinkedHashMap<>();
     public static volatile int version = 0;
+    private static File dir;
+    /** Playlists are saved one file each, in the background (big IPTV lists stay fast). */
+    private static final ExecutorService IO = Executors.newSingleThreadExecutor();
 
     public static synchronized void init(Context c) {
         if (prefs != null) return;
@@ -38,48 +46,103 @@ public class Store {
         prefs = app.getSharedPreferences("mytv", Context.MODE_PRIVATE);
         posPrefs = app.getSharedPreferences("mytv_pos", Context.MODE_PRIVATE);
         setPrefs = app.getSharedPreferences("mytv_settings", Context.MODE_PRIVATE);
+        dir = new File(app.getFilesDir(), "playlists");
+        //noinspection ResultOfMethodCallIgnored
+        dir.mkdirs();
         load();
+    }
+
+    private static File fileFor(String name) {
+        return new File(dir, "pl_" + Integer.toHexString(name.hashCode()) + "_" + name.length() + ".json");
+    }
+
+    private static List<Item> readItems(JSONArray it) throws Exception {
+        List<Item> l = new ArrayList<>(it.length());
+        for (int j = 0; j < it.length(); j++) {
+            JSONObject x = it.getJSONObject(j);
+            l.add(new Item(x.optString("t"), x.optString("u"), x.optString("s", "")));
+        }
+        return l;
     }
 
     private static void load() {
         data.clear();
         try {
-            JSONObject o = new JSONObject(prefs.getString("data", "{\"playlists\":[]}"));
-            JSONArray a = o.getJSONArray("playlists");
-            for (int i = 0; i < a.length(); i++) {
-                JSONObject p = a.getJSONObject(i);
-                JSONArray it = p.getJSONArray("items");
-                List<Item> l = new ArrayList<>();
-                for (int j = 0; j < it.length(); j++) {
-                    JSONObject x = it.getJSONObject(j);
-                    l.add(new Item(x.optString("t"), x.optString("u"), x.optString("s", "")));
+            String legacy = prefs.getString("data", null);
+            if (legacy != null) {
+                // old format (everything in one preference) -> move to files
+                JSONArray a = new JSONObject(legacy).getJSONArray("playlists");
+                for (int i = 0; i < a.length(); i++) {
+                    JSONObject p = a.getJSONObject(i);
+                    data.put(p.getString("name"), readItems(p.getJSONArray("items")));
                 }
-                data.put(p.getString("name"), l);
+                for (String n : data.keySet()) saveList(n);
+                saveIndex();
+                prefs.edit().remove("data").apply();
+                return;
+            }
+            JSONArray names = new JSONArray(prefs.getString("index", "[]"));
+            for (int i = 0; i < names.length(); i++) {
+                String n = names.getString(i);
+                List<Item> l = new ArrayList<>();
+                File f = fileFor(n);
+                if (f.exists()) {
+                    byte[] b = new byte[(int) f.length()];
+                    try (FileInputStream in = new FileInputStream(f)) {
+                        int off = 0, r;
+                        while (off < b.length && (r = in.read(b, off, b.length - off)) > 0) off += r;
+                    }
+                    l = readItems(new JSONArray(new String(b, "UTF-8")));
+                }
+                data.put(n, l);
             }
         } catch (Exception ignored) {
         }
     }
 
-    private static String buildJson() {
-        try {
-            JSONArray arr = new JSONArray();
-            for (String name : data.keySet()) {
-                JSONArray items = new JSONArray();
-                for (Item it : data.get(name)) {
-                    JSONObject x = new JSONObject().put("t", it.t).put("u", it.u);
-                    if (!it.s.isEmpty()) x.put("s", it.s);
-                    items.put(x);
-                }
-                arr.put(new JSONObject().put("name", name).put("items", items));
-            }
-            return new JSONObject().put("playlists", arr).toString();
-        } catch (Exception e) {
-            return "{\"playlists\":[]}";
+    private static JSONArray itemsJson(List<Item> items, int from, int max) throws Exception {
+        JSONArray a = new JSONArray();
+        for (int i = from; i < items.size() && a.length() < max; i++) {
+            Item it = items.get(i);
+            JSONObject x = new JSONObject().put("t", it.t).put("u", it.u);
+            if (!it.s.isEmpty()) x.put("s", it.s);
+            a.put(x);
         }
+        return a;
     }
 
-    private static void save() {
-        prefs.edit().putString("data", buildJson()).apply();
+    private static void saveIndex() {
+        JSONArray a = new JSONArray();
+        for (String n : data.keySet()) a.put(n);
+        prefs.edit().putString("index", a.toString()).apply();
+    }
+
+    private static void saveList(final String name) {
+        final List<Item> copy = data.containsKey(name) ? new ArrayList<>(data.get(name)) : null;
+        final File f = fileFor(name);
+        IO.execute(new Runnable() {
+            public void run() {
+                try {
+                    if (copy == null) {
+                        //noinspection ResultOfMethodCallIgnored
+                        f.delete();
+                        return;
+                    }
+                    File tmp = new File(f.getPath() + ".tmp");
+                    try (FileOutputStream o = new FileOutputStream(tmp)) {
+                        o.write(itemsJson(copy, 0, Integer.MAX_VALUE).toString().getBytes("UTF-8"));
+                    }
+                    //noinspection ResultOfMethodCallIgnored
+                    tmp.renameTo(f);
+                } catch (Exception ignored) {
+                }
+            }
+        });
+    }
+
+    private static void changed(String name, boolean namesChanged) {
+        saveList(name);
+        if (namesChanged) saveIndex();
         version++;
     }
 
@@ -88,8 +151,40 @@ public class Store {
         return n.isEmpty() ? "My Playlist" : n;
     }
 
+    /** For the phone page: every playlist with its size and only the first `limit` items. */
     public static synchronized String toJson() {
-        return buildJson();
+        return toJson(300);
+    }
+
+    public static synchronized String toJson(int limit) {
+        try {
+            JSONArray arr = new JSONArray();
+            for (String name : names()) {
+                List<Item> l = data.get(name);
+                arr.put(new JSONObject().put("name", name).put("count", l.size()).put("items", itemsJson(l, 0, limit)));
+            }
+            return new JSONObject().put("playlists", arr).toString();
+        } catch (Exception e) {
+            return "{\"playlists\":[]}";
+        }
+    }
+
+    /** One page of a playlist (phone page "show more" / search). */
+    public static synchronized String pageJson(String name, int from, int max, String query) {
+        try {
+            List<Item> l = data.get(name);
+            if (l == null) l = new ArrayList<>();
+            JSONArray a = new JSONArray();
+            String q = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
+            for (int i = Math.max(0, from); i < l.size() && a.length() < max; i++) {
+                Item it = l.get(i);
+                if (!q.isEmpty() && !it.t.toLowerCase(Locale.ROOT).contains(q)) continue;
+                a.put(new JSONObject().put("i", i).put("t", it.t).put("u", it.u));
+            }
+            return new JSONObject().put("name", name).put("count", l.size()).put("items", a).toString();
+        } catch (Exception e) {
+            return "{}";
+        }
     }
 
     /** Playlist names, "Recently played" first. */
@@ -98,6 +193,11 @@ public class Store {
         if (data.containsKey(RECENT)) l.add(RECENT);
         for (String n : data.keySet()) if (!RECENT.equals(n)) l.add(n);
         return l;
+    }
+
+    public static synchronized int count(String name) {
+        List<Item> l = data.get(name);
+        return l == null ? 0 : l.size();
     }
 
     public static synchronized List<Item> items(String name) {
@@ -115,30 +215,35 @@ public class Store {
     }
 
     public static synchronized void add(String name, Item item) {
-        list(cleanName(name)).add(item);
-        save();
+        String n = cleanName(name);
+        boolean isNew = !data.containsKey(n);
+        list(n).add(item);
+        changed(n, isNew);
     }
 
     public static synchronized int addAll(String name, List<Item> items) {
-        list(cleanName(name)).addAll(items);
-        save();
+        String n = cleanName(name);
+        boolean isNew = !data.containsKey(n);
+        list(n).addAll(items);
+        changed(n, isNew);
         return items.size();
     }
 
     public static synchronized void addRecent(Item item) {
+        boolean isNew = !data.containsKey(RECENT);
         List<Item> l = list(RECENT);
         Iterator<Item> i = l.iterator();
         while (i.hasNext()) if (i.next().u.equals(item.u)) i.remove();
         l.add(0, item);
         while (l.size() > MAX_RECENT) l.remove(l.size() - 1);
-        save();
+        changed(RECENT, isNew);
     }
 
     public static synchronized void delItem(String name, int idx) {
         List<Item> l = data.get(name);
         if (l != null && idx >= 0 && idx < l.size()) {
             l.remove(idx);
-            save();
+            changed(name, false);
         }
     }
 
@@ -149,11 +254,52 @@ public class Store {
         if (idx < 0 || idx >= l.size() || to < 0 || to >= l.size()) return;
         Item it = l.remove(idx);
         l.add(to, it);
-        save();
+        changed(name, false);
+    }
+
+    /** Deletes the items at these positions. Returns how many were removed. */
+    public static synchronized int delMany(String name, java.util.Set<Integer> idx) {
+        List<Item> l = data.get(name);
+        if (l == null || idx.isEmpty()) return 0;
+        List<Item> keep = new ArrayList<>(l.size());
+        for (int i = 0; i < l.size(); i++) if (!idx.contains(i)) keep.add(l.get(i));
+        int removed = l.size() - keep.size();
+        l.clear();
+        l.addAll(keep);
+        if (removed > 0) changed(name, false);
+        return removed;
+    }
+
+    /** "Select all" delete: every item (or every item matching the search), except some. */
+    public static synchronized int delMatching(String name, String query, java.util.Set<Integer> except) {
+        List<Item> l = data.get(name);
+        if (l == null) return 0;
+        String q = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
+        java.util.Set<Integer> del = new java.util.HashSet<>();
+        for (int i = 0; i < l.size(); i++) {
+            if (except.contains(i)) continue;
+            if (q.isEmpty() || l.get(i).t.toLowerCase(Locale.ROOT).contains(q)) del.add(i);
+        }
+        return delMany(name, del);
+    }
+
+    public static synchronized int delPlaylists(java.util.Collection<String> names) {
+        int n = 0;
+        for (String name : names) {
+            if (data.remove(name) != null) {
+                saveList(name);
+                n++;
+            }
+        }
+        if (n > 0) {
+            saveIndex();
+            version++;
+        }
+        return n;
     }
 
     public static synchronized void delPlaylist(String name) {
-        if (data.remove(name) != null) save();
+        if (data.remove(name) != null) changed(name, true);
     }
 
     // ---------- continue watching ----------
@@ -278,10 +424,34 @@ public class Store {
         putStr("eq_bands", sb.toString());
     }
 
-    /** Reads an M3U playlist, or a plain list of links, one per line. */
+    /** Reads a PLS playlist (File1=..., Title1=...). */
+    public static List<Item> parsePls(String text) {
+        java.util.TreeMap<Integer, String[]> m = new java.util.TreeMap<>();
+        for (String raw : text.split("\\r?\\n")) {
+            String line = raw.trim();
+            java.util.regex.Matcher x = java.util.regex.Pattern.compile("(?i)^(file|title)(\\d+)=(.*)$").matcher(line);
+            if (!x.find()) continue;
+            int n = Integer.parseInt(x.group(2));
+            String[] e = m.get(n);
+            if (e == null) {
+                e = new String[2];
+                m.put(n, e);
+            }
+            if (x.group(1).equalsIgnoreCase("file")) e[0] = x.group(3).trim();
+            else e[1] = x.group(3).trim();
+        }
+        List<Item> out = new ArrayList<>();
+        for (String[] e : m.values()) if (e[0] != null && Formats.looksPlayable(e[0])) out.add(new Item(e[1], e[0], ""));
+        return out;
+    }
+
+    private static final java.util.regex.Pattern ATTR =
+            java.util.regex.Pattern.compile("(http-user-agent|http-referrer|http-referer)=\"([^\"]*)\"", java.util.regex.Pattern.CASE_INSENSITIVE);
+
+    /** Reads an M3U playlist (IPTV lists too), or a plain list of links, one per line. */
     public static List<Item> parseM3u(String text) {
         List<Item> out = new ArrayList<>();
-        String title = null;
+        String title = null, ua = null, ref = null;
         for (String raw : text.split("\\r?\\n")) {
             String line = raw.trim();
             if (line.isEmpty()) continue;
@@ -289,11 +459,30 @@ public class Store {
             if (line.startsWith("#EXTINF")) {
                 int c = line.lastIndexOf(',');
                 title = c >= 0 ? line.substring(c + 1).trim() : null;
+                java.util.regex.Matcher m = ATTR.matcher(c >= 0 ? line.substring(0, c) : line);
+                while (m.find()) {
+                    if (m.group(1).toLowerCase(Locale.ROOT).contains("agent")) ua = m.group(2);
+                    else ref = m.group(2);
+                }
+            } else if (line.startsWith("#EXTVLCOPT:")) {
+                String o = line.substring(11).trim();
+                if (o.toLowerCase(Locale.ROOT).startsWith("http-user-agent=")) ua = o.substring(16);
+                else if (o.toLowerCase(Locale.ROOT).startsWith("http-referrer=")) ref = o.substring(14);
+                else if (o.toLowerCase(Locale.ROOT).startsWith("http-referer=")) ref = o.substring(13);
             } else if (line.startsWith("#")) {
                 continue;
             } else if (Formats.looksPlayable(line)) {
-                out.add(new Item(title, line, ""));
+                String u = line;
+                if ((ua != null || ref != null) && u.startsWith("http") && u.indexOf('|') < 0) {
+                    StringBuilder h = new StringBuilder("|");
+                    if (ref != null) h.append("Referer=").append(android.net.Uri.encode(ref));
+                    if (ua != null) h.append(ref != null ? "&" : "").append("User-Agent=").append(android.net.Uri.encode(ua));
+                    u = u + h;
+                }
+                out.add(new Item(title, u, ""));
                 title = null;
+                ua = null;
+                ref = null;
             }
         }
         return out;

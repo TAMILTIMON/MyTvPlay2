@@ -102,6 +102,102 @@ public class MainActivity extends AppCompatActivity {
     private ArrayAdapter<String> adapter;
     private ListView listView;
     private String current = null;
+    private String filter = "";
+
+    private interface OnDelete {
+        void run(boolean[] checked);
+    }
+
+    /** Multi-select dialog with a "Select all" button that doesn't close the dialog. */
+    private void multiSelect(String title, final String[] names, final OnDelete onDelete) {
+        final boolean[] checked = new boolean[names.length];
+        final androidx.appcompat.app.AlertDialog d = new androidx.appcompat.app.AlertDialog.Builder(this).setTitle(title)
+                .setMultiChoiceItems(names, checked, (dd, w, on) -> checked[w] = on)
+                .setNeutralButton(T.tamil() ? "அனைத்தும் தேர்வு" : "Select all", null)
+                .setPositiveButton(T.tamil() ? "நீக்கு" : "Delete", null)
+                .setNegativeButton(T.t("Cancel"), null).create();
+        d.setOnShowListener(x -> {
+            d.getButton(android.content.DialogInterface.BUTTON_NEUTRAL).setOnClickListener(v -> {
+                boolean all = true;
+                for (boolean c : checked) all &= c;
+                for (int i = 0; i < checked.length; i++) {
+                    checked[i] = !all;
+                    d.getListView().setItemChecked(i, !all);
+                }
+                ((android.widget.Button) v).setText(!all ? (T.tamil() ? "எதுவும் இல்லை" : "Select none")
+                        : (T.tamil() ? "அனைத்தும் தேர்வு" : "Select all"));
+            });
+            d.getButton(android.content.DialogInterface.BUTTON_POSITIVE).setOnClickListener(v -> {
+                int n = 0;
+                for (boolean c : checked) if (c) n++;
+                if (n == 0) {
+                    android.widget.Toast.makeText(this, T.tamil() ? "எதையும் தேர்வு செய்யவில்லை" : "Nothing selected",
+                            android.widget.Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                final int count = n;
+                new androidx.appcompat.app.AlertDialog.Builder(this)
+                        .setTitle((T.tamil() ? "நீக்கவா? " : "Delete ") + count + (T.tamil() ? "" : "?"))
+                        .setMessage(T.tamil() ? "இதைத் திரும்பப் பெற முடியாது." : "This cannot be undone.")
+                        .setPositiveButton(T.tamil() ? "நீக்கு" : "Delete", (a, b) -> {
+                            d.dismiss();
+                            onDelete.run(checked);
+                        })
+                        .setNegativeButton(T.t("Cancel"), null).show();
+            });
+        });
+        d.show();
+    }
+
+    private void deletePlaylists() {
+        final List<String> names = Store.names();
+        String[] labels = new String[names.size()];
+        for (int i = 0; i < labels.length; i++) labels[i] = names.get(i) + "   ·   " + Store.count(names.get(i));
+        multiSelect(T.tamil() ? "பிளேலிஸ்ட்களை நீக்கு" : "Delete playlists", labels, checked -> {
+            List<String> del = new ArrayList<>();
+            for (int i = 0; i < checked.length; i++) if (checked[i]) del.add(names.get(i));
+            int n = Store.delPlaylists(del);
+            android.widget.Toast.makeText(this, n + (T.tamil() ? " நீக்கப்பட்டது" : " deleted"), android.widget.Toast.LENGTH_SHORT).show();
+            refresh();
+        });
+    }
+
+    private void deleteItems() {
+        final String pl = current;
+        final List<Store.Item> items = Store.items(pl);
+        final List<Integer> idx = new ArrayList<>();
+        List<String> labels = new ArrayList<>();
+        String fl = filter.toLowerCase(java.util.Locale.ROOT);
+        for (int i = 0; i < items.size(); i++) {
+            if (!fl.isEmpty() && !items.get(i).t.toLowerCase(java.util.Locale.ROOT).contains(fl)) continue;
+            idx.add(i);
+            labels.add(items.get(i).t);
+        }
+        multiSelect((T.tamil() ? "நீக்க தேர்வு செய்யவும் · " : "Select to delete · ") + idx.size(), labels.toArray(new String[0]), checked -> {
+            java.util.Set<Integer> del = new java.util.HashSet<>();
+            for (int i = 0; i < checked.length; i++) if (checked[i]) del.add(idx.get(i));
+            int n = Store.delMany(pl, del);
+            filter = "";
+            android.widget.Toast.makeText(this, n + (T.tamil() ? " நீக்கப்பட்டது" : " deleted"), android.widget.Toast.LENGTH_SHORT).show();
+            refresh();
+        });
+    }
+
+    private void askFilter() {
+        if (!filter.isEmpty()) {
+            filter = "";
+            refresh();
+            return;
+        }
+        final android.widget.EditText e = new android.widget.EditText(this);
+        e.setSingleLine(true);
+        e.setHint(T.tamil() ? "சேனல் / வீடியோ பெயர்" : "Channel / video name");
+        new androidx.appcompat.app.AlertDialog.Builder(this).setTitle("🔍").setView(e)
+                .setPositiveButton(T.tamil() ? "தேடு" : "Search", (d, w) -> {
+                    filter = e.getText().toString().trim();
+                    refresh();
+                }).show();
+    }
     private int seen = -1;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable tick = new Runnable() {
@@ -347,11 +443,15 @@ public class MainActivity extends AppCompatActivity {
                 actions.add(() -> startActivity(new Intent(this, ConnectActivity.class)));
             }
             for (final String n : Store.names()) {
-                rows.add((Store.RECENT.equals(n) ? "🕘   " : "🎵   ") + n + "   ·   " + Store.items(n).size());
+                rows.add((Store.RECENT.equals(n) ? "🕘   " : "🎵   ") + n + "   ·   " + Store.count(n));
                 actions.add(() -> {
                     current = n;
                     refresh();
                 });
+            }
+            if (!Store.names().isEmpty()) {
+                rows.add("🗑   " + (T.tamil() ? "பிளேலிஸ்ட்களைத் தேர்ந்து நீக்கு…" : "Select & delete playlists…"));
+                actions.add(this::deletePlaylists);
             }
             if (Store.names().isEmpty()) {
                 rows.add(T.t("No playlists yet — add videos, links, magnets or .torrent files from your phone."));
@@ -365,7 +465,15 @@ public class MainActivity extends AppCompatActivity {
             }
             header.setText(current);
             final List<Store.Item> items = Store.items(current);
+            if (!items.isEmpty()) {
+                rows.add("🔍   " + (T.tamil() ? "சேனல் / பெயர் தேடு" : "Search channel / name") + (filter.isEmpty() ? "" : "  “" + filter + "”  ✕") + "   ·   " + items.size());
+                actions.add(this::askFilter);
+                rows.add("🗑   " + (T.tamil() ? "தேர்ந்து நீக்கு…" : "Select & delete…") + (filter.isEmpty() ? "" : "  (" + (T.tamil() ? "தேடல் முடிவுகள்" : "search results") + ")"));
+                actions.add(this::deleteItems);
+            }
+            String fl = filter.toLowerCase(java.util.Locale.ROOT);
             for (int i = 0; i < items.size(); i++) {
+                if (!fl.isEmpty() && !items.get(i).t.toLowerCase(java.util.Locale.ROOT).contains(fl)) continue;
                 final int idx = i;
                 rows.add((Formats.isTorrent(items.get(i).u) ? "🧲   " : "▶   ") + items.get(i).t);
                 actions.add(() -> Remote.play(this, Store.items(current), idx));
@@ -397,6 +505,7 @@ public class MainActivity extends AppCompatActivity {
     public void onBackPressed() {
         if (current != null) {
             current = null;
+            filter = "";
             refresh();
         } else {
             super.onBackPressed();

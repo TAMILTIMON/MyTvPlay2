@@ -639,6 +639,10 @@ public class PlayerActivity extends AppCompatActivity {
             resolveTorrent(i);
             return;
         }
+        if (Formats.maybeList(it.u) && !checkedStreams.contains(it.u)) {
+            expandList(i);
+            return;
+        }
         String th = torrentHash(it.u);
         if (th != null && !TorrentEngine.get(this).isActiveHash(th)) {
             String src = Store.getStr("torsrc_" + th, "");
@@ -720,6 +724,68 @@ public class PlayerActivity extends AppCompatActivity {
         }
     }
 
+    private final java.util.HashSet<String> checkedStreams = new java.util.HashSet<>();
+
+    /** Many channels in the list = IPTV: don't auto-skip or close when a channel fails. */
+    private boolean channelMode() {
+        return queue.size() > 20;
+    }
+
+    /**
+     * An .m3u/.m3u8/.pls link: if it is a normal HLS video stream, play it; if it is a
+     * channel list (like iptv-org), open all its channels as the playlist.
+     */
+    private void expandList(final int i) {
+        final Store.Item it = queue.get(i);
+        final int token = ++resolveToken;
+        if (mp != null) mp.stop();
+        titleView.setText(it.t);
+        showLoading(T.tamil() ? "பட்டியலைப் படிக்கிறது…" : "Reading the list…");
+        showOverlay();
+        new Thread(new Runnable() {
+            public void run() {
+                List<Store.Item> items = null;
+                try {
+                    String url = it.u.split("\\|")[0];
+                    String text;
+                    if (url.startsWith("/")) {
+                        java.io.File f = new java.io.File(url);
+                        byte[] b = new byte[(int) Math.min(f.length(), 40_000_000)];
+                        try (java.io.FileInputStream in = new java.io.FileInputStream(f)) {
+                            int off = 0, r;
+                            while (off < b.length && (r = in.read(b, off, b.length - off)) > 0) off += r;
+                        }
+                        text = new String(b, "UTF-8");
+                    } else {
+                        text = Net.fetchText(url);
+                    }
+                    boolean hls = text.contains("#EXT-X-");
+                    if (!hls) {
+                        items = Formats.ext(url).equals("pls") ? Store.parsePls(text) : Store.parseM3u(text);
+                    }
+                } catch (Exception ignored) {
+                    // could not read it ourselves: let the engine try
+                }
+                final List<Store.Item> found = items;
+                handler.post(new Runnable() {
+                    public void run() {
+                        if (token != resolveToken || isFinishing() || i >= queue.size()) return;
+                        if (found == null || found.isEmpty()) {
+                            checkedStreams.add(it.u);
+                            playIndex(i, true);
+                            return;
+                        }
+                        for (Store.Item x : found) checkedStreams.add(x.u);
+                        queue.remove(i);
+                        queue.addAll(i, found);
+                        osd(found.size() + (T.tamil() ? " சேனல்கள் · ▼ ☰ → பிளேலிஸ்ட்" : " channels · ▼ then ☰ → Playlist to choose"));
+                        playIndex(i, true);
+                    }
+                });
+            }
+        }).start();
+    }
+
     private static String torrentHash(String u) {
         String mark = "127.0.0.1:" + RemoteService.PORT + "/torrent/";
         int k = u.indexOf(mark);
@@ -799,6 +865,11 @@ public class PlayerActivity extends AppCompatActivity {
     }
 
     private void onPlayError(String msg) {
+        if (channelMode()) {
+            showLoading(msg + "\n" + (T.tamil() ? "OK மீண்டும் முயற்சி · CH+/CH− வேறு சேனல்" : "OK = retry · CH+ / CH− = another channel · ▼ ☰ = list"));
+            showOverlay();
+            return;
+        }
         showLoading(msg);
         Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
         final int token = resolveToken;
@@ -876,6 +947,11 @@ public class PlayerActivity extends AppCompatActivity {
         if (sleepAfterItem) {
             Toast.makeText(this, T.t("Sleep timer: stopped"), Toast.LENGTH_LONG).show();
             finish();
+            return;
+        }
+        if (channelMode()) {
+            showLoading(T.tamil() ? "சேனல் நின்றது · OK மீண்டும் முயற்சி" : "Channel stopped — OK = retry, CH+ / CH− = another channel");
+            showOverlay();
             return;
         }
         if (index + 1 < queue.size()) playIndex(index + 1, true);
@@ -1198,6 +1274,10 @@ public class PlayerActivity extends AppCompatActivity {
     }
 
     private void togglePause() {
+        if (channelMode() && !mp.isPlaying() && loadingView.getVisibility() == View.VISIBLE && current() != null) {
+            playIndex(index, false);
+            return;
+        }
         if (mp.isPlaying()) mp.pause();
         else if (ended && current() != null) playIndex(index, false);
         else mp.play();
@@ -1611,11 +1691,47 @@ public class PlayerActivity extends AppCompatActivity {
     }
 
     private void menuQueue() {
-        String[] names = new String[queue.size()];
-        for (int i = 0; i < queue.size(); i++) names[i] = (i + 1) + ". " + queue.get(i).t;
-        choose(T.t("Playlist"), names, index, new IntCb() {
+        if (queue.size() <= 30) {
+            String[] names = new String[queue.size()];
+            for (int i = 0; i < queue.size(); i++) names[i] = (i + 1) + ". " + queue.get(i).t;
+            choose(T.t("Playlist"), names, index, new IntCb() {
+                public void on(int i) {
+                    playIndex(i, true);
+                }
+            });
+            return;
+        }
+        // big list (IPTV): search box + results
+        final android.widget.EditText q = new android.widget.EditText(this);
+        q.setHint(T.tamil() ? "சேனல் பெயர் (காலியாக விட்டால் அனைத்தும்)" : "Channel name (leave empty for all)");
+        q.setSingleLine(true);
+        new AlertDialog.Builder(this).setTitle("🔍  " + queue.size() + (T.tamil() ? " சேனல்கள்" : " channels"))
+                .setView(q)
+                .setPositiveButton(T.tamil() ? "தேடு" : "Search", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface d, int w) {
+                        showMatches(q.getText().toString());
+                    }
+                }).show();
+    }
+
+    private void showMatches(String query) {
+        String ql = query.trim().toLowerCase(Locale.ROOT);
+        final List<Integer> idx = new ArrayList<>();
+        List<String> names = new ArrayList<>();
+        int sel = -1;
+        for (int i = 0; i < queue.size() && idx.size() < 2000; i++) {
+            if (!ql.isEmpty() && !queue.get(i).t.toLowerCase(Locale.ROOT).contains(ql)) continue;
+            if (i == index) sel = idx.size();
+            idx.add(i);
+            names.add((i + 1) + ". " + queue.get(i).t);
+        }
+        if (idx.isEmpty()) {
+            osd(T.tamil() ? "எதுவும் கிடைக்கவில்லை" : "No channel found");
+            return;
+        }
+        choose(names.size() + " / " + queue.size(), names.toArray(new String[0]), sel, new IntCb() {
             public void on(int i) {
-                playIndex(i, true);
+                playIndex(idx.get(i), true);
             }
         });
     }
@@ -1961,8 +2077,10 @@ public class PlayerActivity extends AppCompatActivity {
         o.put("sleep", sleepLabel());
         o.put("loading", loadingView.getVisibility() == View.VISIBLE ? loadingView.getText().toString() : "");
         JSONArray q = new JSONArray();
-        for (int i = 0; i < queue.size() && i < 500; i++) q.put(queue.get(i).t);
+        int qs = Math.max(0, Math.min(index - 50, queue.size() - 200));
+        for (int i = qs; i < queue.size() && i < qs + 200; i++) q.put(queue.get(i).t);
         o.put("queue", q);
+        o.put("qstart", qs);
         return o;
     }
 

@@ -55,6 +55,7 @@ input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;bac
 .vwrap input{position:absolute;width:170px;left:-70px;top:76px;transform:rotate(-90deg);margin:0;
   background:linear-gradient(90deg,var(--acc),var(--acc2))}
 .band .f{font-size:10px;color:var(--dim);margin-top:6px;white-space:nowrap}
+#queue{max-height:360px;overflow-y:auto}
 .q{padding:10px 4px;border-top:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;font-size:14px}
 .q.cur{color:var(--acc);font-weight:700}
 .it{display:flex;align-items:center;gap:8px;padding:9px 0;border-top:1px solid var(--line)}
@@ -95,6 +96,9 @@ nav button.on{background:linear-gradient(135deg,var(--acc),var(--acc2));color:#f
 .cwi small{color:var(--dim);font-size:11px}
 .pin{display:flex;gap:10px;justify-content:center;margin:16px 0}
 .pin input{width:56px;height:64px;text-align:center;font-size:28px;font-weight:700;padding:0;margin:0}
+.it .ck{width:22px;height:22px;flex:none;accent-color:var(--acc)}
+label.chk{padding:8px 0;border-top:1px solid var(--line);margin:0}
+label.chk input{width:22px;height:22px;accent-color:var(--acc)}
 .only-app,.only-web{display:none}
 .app .only-app{display:block}.web .only-web{display:block}
 label.sw{display:flex;align-items:center;gap:10px;font-size:14px;margin:6px 0}
@@ -455,7 +459,10 @@ function render(){
   $('tor2').textContent=t.active?t.name:(t.state&&t.state!=='idle'?t.state:'No torrent running');
   const q=JSON.stringify([S.queue||[],S.idx]);
   if(q!==lastQ){lastQ=q;const box=$('queue');box.innerHTML='';
-    (S.queue||[]).forEach((n,i)=>{const d=document.createElement('div');d.className='q'+(i===S.idx?' cur':'');d.textContent=(i===S.idx?'▶ ':(i+1)+'. ')+n;d.onclick=()=>cmd('item',i);box.appendChild(d);});
+    const q0=S.qstart||0;
+    (S.queue||[]).forEach((n,k)=>{const i=q0+k;const d=document.createElement('div');d.className='q'+(i===S.idx?' cur':'');d.textContent=(i===S.idx?'▶ ':(i+1)+'. ')+n;d.onclick=()=>cmd('item',i);box.appendChild(d);});
+    if(S.count>200){const h=document.createElement('div');h.className='dim';h.style.marginTop='8px';h.textContent=S.count+' '+tr('channels')+' — '+tr('use Library to search');box.appendChild(h);}
+    setTimeout(()=>{const c=box.querySelector('.cur');if(c&&curTab==='remote')c.scrollIntoView({block:'nearest'});},50);
     if(!(S.queue||[]).length)box.textContent='Empty';}
 }
 let polling=false;
@@ -503,26 +510,96 @@ async function openDevices(){
 async function load(){try{const d=await (await api('/data')).json();renderLists(d.playlists);}catch(e){}}
 function renderLists(pls){
   const dl=$('pls');dl.innerHTML='';const box=$('lists');box.innerHTML='';
+  // ---- manage playlists (bulk delete)
+  if(pls.length){
+    const m=document.createElement('div');m.className='card';
+    m.innerHTML='<div class="sec"><span>'+tr('Playlists')+' · '+pls.length+'</span></div>';
+    const chosen=new Set();
+    const wrap=document.createElement('div');
+    pls.forEach(p=>{const l=document.createElement('label');l.className='sw chk';
+      const c=document.createElement('input');c.type='checkbox';c.onchange=()=>{c.checked?chosen.add(p.name):chosen.delete(p.name);upd();};
+      const t=document.createElement('span');t.textContent=p.name+' · '+(p.count||p.items.length);
+      l.appendChild(c);l.appendChild(t);wrap.appendChild(l);});
+    m.appendChild(wrap);
+    const bar=document.createElement('div');bar.className='btns';bar.style.marginTop='8px';
+    const all=document.createElement('button');all.className='g';all.textContent=tr('Select all');
+    const del=document.createElement('button');del.className='del';
+    function upd(){del.textContent='🗑 '+tr('Delete')+' ('+chosen.size+')';all.textContent=chosen.size===pls.length?tr('Select none'):tr('Select all');}
+    all.onclick=()=>{const on=chosen.size!==pls.length;chosen.clear();wrap.querySelectorAll('input').forEach((c,i)=>{c.checked=on;if(on)chosen.add(pls[i].name);});upd();};
+    del.onclick=async()=>{if(!chosen.size){toast(tr('Nothing selected'));return;}
+      if(!confirm(tr('Delete')+' '+chosen.size+' '+tr('playlists')+'?'))return;
+      const r=await post('/delpls',{names:[...chosen].join('\n')});toast(r.msg);load();};
+    upd();bar.appendChild(all);bar.appendChild(del);m.appendChild(bar);box.appendChild(m);
+  }
   pls.forEach(function(p){
     const o=document.createElement('option');o.value=p.name;dl.appendChild(o);
     const c=document.createElement('div');c.className='card';
+    const st={name:p.name,count:p.count||p.items.length,q:'',sel:new Set(),all:false,except:new Set(),selMode:false,list:null};
     const h=document.createElement('div');h.className='sec';
-    const ht=document.createElement('span');ht.textContent=p.name+' · '+p.items.length;
+    const ht=document.createElement('span');ht.textContent=p.name+' · '+st.count;
     const bx=document.createElement('div');bx.className='row';
-    const pp=document.createElement('button');pp.textContent='▶ Play';pp.style.padding='7px 14px';pp.style.fontSize='13px';
+    const pp=document.createElement('button');pp.textContent='▶';pp.style.padding='7px 14px';pp.style.fontSize='13px';
     pp.onclick=async()=>{const r=await post('/playlist',{playlist:p.name,idx:0});toast(r.msg);};
-    const dp=document.createElement('button');dp.textContent='Delete';dp.className='del';
-    dp.onclick=async()=>{if(confirm('Delete playlist '+p.name+'?')){await post('/delpl',{playlist:p.name});load();}};
-    bx.appendChild(pp);bx.appendChild(dp);h.appendChild(ht);h.appendChild(bx);c.appendChild(h);
-    p.items.forEach(function(it,i){
-      const row=document.createElement('div');row.className='it';
-      const s=document.createElement('span');s.textContent=((it.u.startsWith('magnet:')||/\.torrent$/i.test(it.u))?'🧲 ':'🎬 ')+it.t;s.title=it.u;
-      const pl=document.createElement('button');pl.textContent='▶';pl.className='g';pl.onclick=async()=>{const r=await post('/playlist',{playlist:p.name,idx:i});toast(r.msg);};
-      const up=document.createElement('button');up.textContent='↑';up.className='g';up.onclick=async()=>{await post('/move',{playlist:p.name,idx:i,dir:-1});load();};
-      const b=document.createElement('button');b.textContent='✕';b.className='del';b.onclick=async()=>{await post('/del',{playlist:p.name,idx:i});load();};
-      row.appendChild(s);row.appendChild(pl);row.appendChild(up);row.appendChild(b);c.appendChild(row);
-    });
-    box.appendChild(c);
+    const sm=document.createElement('button');sm.className='g';sm.textContent='☑';sm.title=tr('Select');sm.style.padding='7px 12px';
+    const dp=document.createElement('button');dp.textContent='🗑';dp.className='del';
+    dp.onclick=async()=>{if(confirm(tr('Delete playlist')+' '+p.name+'?')){await post('/delpl',{playlist:p.name});load();}};
+    bx.appendChild(pp);bx.appendChild(sm);bx.appendChild(dp);h.appendChild(ht);h.appendChild(bx);c.appendChild(h);
+    // search (every playlist)
+    const sr=document.createElement('input');sr.placeholder='🔍 '+tr('Search channel / name')+'…';sr.style.margin='4px 0 6px';
+    let tmo=null;sr.oninput=()=>{clearTimeout(tmo);tmo=setTimeout(()=>{st.q=sr.value.trim();st.all=false;st.sel.clear();st.except.clear();updBar();pageList(st,0,true);},300);};
+    c.appendChild(sr);
+    // select bar
+    const sb=document.createElement('div');sb.className='btns';sb.style.display='none';sb.style.margin='4px 0 8px';
+    const sa=document.createElement('button');sa.className='g';
+    const sd=document.createElement('button');sd.className='del';
+    const sx=document.createElement('button');sx.className='g';sx.textContent=tr('Cancel');
+    sb.appendChild(sa);sb.appendChild(sd);sb.appendChild(sx);c.appendChild(sb);
+    st.selected=()=>st.all?(st.matchCount-st.except.size):st.sel.size;
+    function updBar(){sa.textContent=st.all?tr('Select none'):tr('Select all')+(st.q?' ('+tr('search results')+')':'');sd.textContent='🗑 '+tr('Delete')+' ('+(st.selected()||0)+')';}
+    st.updBar=updBar;
+    sm.onclick=()=>{st.selMode=!st.selMode;sb.style.display=st.selMode?'flex':'none';st.all=false;st.sel.clear();st.except.clear();updBar();
+      st.list.querySelectorAll('.it').forEach(r=>{const c=r.querySelector('.ck');c.style.display=st.selMode?'block':'none';c.checked=false;});};
+    sx.onclick=()=>sm.onclick();
+    sa.onclick=()=>{st.all=!st.all;st.sel.clear();st.except.clear();st.list.querySelectorAll('.ck').forEach(c=>c.checked=st.all);updBar();};
+    sd.onclick=async()=>{const n=st.selected();if(!n){toast(tr('Nothing selected'));return;}
+      if(!confirm(tr('Delete')+' '+n+'?'))return;
+      const r=st.all?await post('/delmany',{playlist:p.name,all:1,q:st.q,except:[...st.except].join(',')})
+                    :await post('/delmany',{playlist:p.name,idx:[...st.sel].join(',')});
+      toast(r.msg);load();};
+    const list=document.createElement('div');c.appendChild(list);st.list=list;
+    st.matchCount=st.count;
+    renderItems(st,p.items.map((it,i)=>Object.assign({i:i},it)));
+    if(st.count>p.items.length)addMore(st,p.items.length);
+    updBar();box.appendChild(c);
+  });
+}
+function addMore(st,from){
+  const b=document.createElement('button');b.className='g w more';b.style.marginTop='8px';b.textContent=tr('Show more');
+  b.onclick=()=>{b.remove();pageList(st,from,false);};st.list.appendChild(b);
+}
+async function pageList(st,from,replace){
+  const d=await (await api('/page?playlist='+encodeURIComponent(st.name)+'&from='+from+'&q='+encodeURIComponent(st.q||''))).json();
+  if(replace){st.list.innerHTML='';st.matchCount=st.q?d.items.length:st.count;}
+  else if(st.q)st.matchCount+=d.items.length;
+  renderItems(st,d.items);
+  if(d.items.length===200){const last=d.items[d.items.length-1].i+1;addMore(st,last);if(st.q&&replace)st.matchCount=Infinity;}
+  if(!d.items.length&&replace)st.list.innerHTML='<div class="dim" style="padding:8px 0">'+tr('No channel found')+'</div>';
+  if(st.q&&st.matchCount===Infinity){/* count unknown until all pages loaded: count server-side */st.matchCount=await countMatches(st);}
+  st.updBar();
+}
+async function countMatches(st){let n=0,from=0;for(let k=0;k<200;k++){const d=await (await api('/page?playlist='+encodeURIComponent(st.name)+'&from='+from+'&q='+encodeURIComponent(st.q))).json();n+=d.items.length;if(d.items.length<200)break;from=d.items[d.items.length-1].i+1;}return n;}
+function renderItems(st,items){
+  items.forEach(function(it){const i=it.i;
+    const row=document.createElement('div');row.className='it';
+    const ck=document.createElement('input');ck.type='checkbox';ck.className='ck';ck.style.display=st.selMode?'block':'none';
+    ck.checked=st.all?!st.except.has(i):st.sel.has(i);
+    ck.onchange=()=>{if(st.all){ck.checked?st.except.delete(i):st.except.add(i);}else{ck.checked?st.sel.add(i):st.sel.delete(i);}st.updBar();};
+    const s=document.createElement('span');s.textContent=((it.u.startsWith('magnet:')||/\.torrent$/i.test(it.u))?'🧲 ':'🎬 ')+it.t;s.title=it.u;
+    s.onclick=()=>{if(st.selMode){ck.checked=!ck.checked;ck.onchange();}};
+    const pl=document.createElement('button');pl.textContent='▶';pl.className='g';pl.onclick=async()=>{const r=await post('/playlist',{playlist:st.name,idx:i});toast(r.msg);};
+    const b=document.createElement('button');b.textContent='✕';b.className='del';b.onclick=async()=>{await post('/del',{playlist:st.name,idx:i});load();};
+    row.appendChild(ck);row.appendChild(s);row.appendChild(pl);row.appendChild(b);
+    const more=st.list.querySelector('.more');st.list.insertBefore(row,more);
   });
 }
 async function add(){const r=await post('/add',{playlist:$('pl').value,title:$('ti').value,url:$('ur').value,sub:$('us').value});toast(r.ok?'Added':(r.msg||'Failed'));if(r.ok){$('ti').value='';$('ur').value='';$('us').value='';}load();}
@@ -568,7 +645,7 @@ const TA={"Now playing":"இப்போது இயங்குவது","Not
 "Import M3U playlist":"M3U பிளேலிஸ்ட் இறக்குமதி","Import":"இறக்குமதி","Add to a playlist":"பிளேலிஸ்டில் சேர்","Add":"சேர்","TV settings":"டிவி அமைப்புகள்","TV app theme":"டிவி செயலி தீம்","TV name (shown when scanning)":"டிவி பெயர் (தேடும்போது தெரியும்)","Save":"சேமி",
 "Remote ":"ரிமோட்","Audio/Subs":"ஒலி/வசனம்","Picture/EQ":"படம்/EQ","Cast":"அனுப்பு","Library":"நூலகம்","TVs on this Wi-Fi":"இந்த Wi-Fi இல் உள்ள டிவிகள்","More options…":"மேலும்…",
 "Enter the PIN shown on the TV":"டிவியில் தெரியும் PIN-ஐ உள்ளிடவும்","Connect":"இணை","Enter the 4 digits":"4 இலக்கங்களை உள்ளிடவும்","Connected ✅":"இணைக்கப்பட்டது ✅","⏹ Stop":"⏹ நிறுத்து","↩ Back":"↩ பின்","⌂ Home":"⌂ முகப்பு","⚙ Menu":"⚙ மெனு",
-"Search words or a web address":"தேடல் சொற்கள் அல்லது இணைய முகவரி","Title (optional)":"தலைப்பு (விருப்பம்)","Subtitle link (optional)":"வசன இணைப்பு (விருப்பம்)","Playlist name":"பிளேலிஸ்ட் பெயர்"};
+"Search words or a web address":"தேடல் சொற்கள் அல்லது இணைய முகவரி","Title (optional)":"தலைப்பு (விருப்பம்)","Subtitle link (optional)":"வசன இணைப்பு (விருப்பம்)","Playlist name":"பிளேலிஸ்ட் பெயர்","channels":"சேனல்கள்","use Library to search":"தேட நூலகத்தைப் பயன்படுத்தவும்","Search":"தேடு","Show more":"மேலும் காட்டு","No channel found":"சேனல் கிடைக்கவில்லை","Playlists":"பிளேலிஸ்ட்கள்","Select all":"அனைத்தும் தேர்வு","Select none":"எதுவும் வேண்டாம்","Delete":"நீக்கு","playlists":"பிளேலிஸ்ட்கள்","Nothing selected":"எதையும் தேர்வு செய்யவில்லை","Select":"தேர்வு","Delete playlist":"பிளேலிஸ்டை நீக்கு","Search channel / name":"சேனல் / பெயர் தேடு","search results":"தேடல் முடிவுகள்","Cancel":"ரத்து"};
 let LANG='en';try{LANG=localStorage.getItem('lang')||''}catch(e){}
 function tr(t){return LANG==='ta'&&TA[t]?TA[t]:t;}
 function applyLang(){

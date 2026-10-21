@@ -1,3 +1,29 @@
+TAMILCASTPLAY 1.4 — search & bulk delete
+========================================
+TV home:
+* Open a playlist > "🔍 Search channel / name" (works on every playlist).
+* "🗑 Select & delete…" > tick channels, or "Select all" > Delete.
+  After a search, it lists only the search results (e.g. delete all "Radio" channels).
+* Home screen > "🗑 Select & delete playlists…" > tick or "Select all" > Delete.
+Phone page (Library tab):
+* Search box on every playlist.
+* ☑ = select mode: tick channels, "Select all" (whole playlist, or all search
+  results), untick any you want to keep, then "🗑 Delete (n)".
+* Top card "Playlists": tick playlists or "Select all" > Delete.
+Every delete asks for confirmation.
+
+TAMILCASTPLAY 1.3 — IPTV channel lists
+======================================
+* .m3u / .m3u8 / .pls channel lists (e.g. https://iptv-org.github.io/iptv/index.m3u,
+  11,000+ channels) now open as a channel list instead of jumping back to Home.
+  Normal .m3u8 video streams still play directly.
+* Channel mode: a dead channel shows a message instead of closing or skipping.
+  OK = retry, CH+ / CH- = next / previous channel, ▼ then ☰ = searchable channel list.
+* Search box for big playlists on the TV home screen, in the player and on the phone page.
+* Phone page loads big playlists 100-200 at a time ("Show more") — no more freezing.
+* Playlists are saved one file each in the background — the app stays fast with huge lists.
+* Channels that need a special user-agent / referrer (EXTVLCOPT) now play.
+
 TAMILCASTPLAY 1.2 — smoother & easier to navigate
 =================================================
 * Phone remote is much faster: heavy blur effects removed, fewer screen redraws,

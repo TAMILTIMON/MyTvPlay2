@@ -96,7 +96,7 @@ public final class Net {
     }
 
     public static String fetchText(String u) throws Exception {
-        return new String(fetch(u, 8_000_000).data, "UTF-8");
+        return new String(fetch(u, 40_000_000).data, "UTF-8");
     }
 
     public static File subDir(Context c) {

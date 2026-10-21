@@ -57,6 +57,12 @@ public final class Formats {
         return VIDEO.contains(e) || AUDIO.contains(e) || PLAYLISTS.contains(e);
     }
 
+    /** .m3u / .m3u8 / .pls links can be channel lists (IPTV) rather than one video. */
+    public static boolean maybeList(String url) {
+        String e = ext(url == null ? "" : url.split("\\|")[0]);
+        return e.equals("m3u") || e.equals("m3u8") || e.equals("pls");
+    }
+
     public static boolean isTorrent(String url) {
         if (url == null) return false;
         String l = url.trim().toLowerCase(Locale.US);

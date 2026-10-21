@@ -61,7 +61,16 @@ public class WebServer extends NanoHTTPD {
 
             switch (uri) {
                 case "/data":
-                    return json(Store.toJson());
+                    return json(Store.toJson(100));
+
+                case "/page": {
+                    int from = 0;
+                    try {
+                        from = Integer.parseInt(val(p, "from"));
+                    } catch (Exception ignored) {
+                    }
+                    return json(Store.pageJson(val(p, "playlist"), from, 200, val(p, "q")));
+                }
 
                 case "/add": {
                     String u = val(p, "url");
@@ -87,6 +96,23 @@ public class WebServer extends NanoHTTPD {
                 case "/move":
                     Store.moveItem(val(p, "playlist"), Integer.parseInt(val(p, "idx")), Integer.parseInt(val(p, "dir")));
                     return ok();
+
+                case "/delmany": {
+                    String pl = val(p, "playlist");
+                    int n;
+                    if ("1".equals(val(p, "all"))) {
+                        n = Store.delMatching(pl, val(p, "q"), ints(val(p, "except")));
+                    } else {
+                        n = Store.delMany(pl, ints(val(p, "idx")));
+                    }
+                    return msg(n + " deleted");
+                }
+
+                case "/delpls": {
+                    java.util.List<String> names = new java.util.ArrayList<>();
+                    for (String n : val(p, "names").split("\n")) if (!n.trim().isEmpty()) names.add(n.trim());
+                    return msg(Store.delPlaylists(names) + " playlists deleted");
+                }
 
                 case "/delpl":
                     Store.delPlaylist(val(p, "playlist"));
@@ -309,6 +335,17 @@ public class WebServer extends NanoHTTPD {
         String t = s.getHeaders().get("x-token");
         if (t == null || t.isEmpty()) t = p.get("t");
         return Pair.valid(t);
+    }
+
+    private static java.util.Set<Integer> ints(String csv) {
+        java.util.Set<Integer> s = new java.util.HashSet<>();
+        for (String x : csv.split(",")) {
+            try {
+                if (!x.trim().isEmpty()) s.add(Integer.parseInt(x.trim()));
+            } catch (Exception ignored) {
+            }
+        }
+        return s;
     }
 
     private File bigDir() {
