@@ -80,6 +80,12 @@ nav button.on{background:linear-gradient(135deg,var(--acc),var(--acc2));color:#f
 .modal .card{width:100%;max-width:520px;max-height:80vh;overflow:auto}
 .dev{display:flex;align-items:center;gap:12px;padding:12px;border-radius:14px;border:1px solid var(--line);margin-bottom:8px;cursor:pointer;background:var(--field)}
 .dev.me{border-color:var(--acc)}
+.apps{display:grid;grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:10px}
+.app{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 4px;border-radius:16px;background:var(--field);border:1px solid var(--line);cursor:pointer;font-size:12px;text-align:center}
+.app:active{transform:scale(.95)}
+.app img,.app .ph{width:48px;height:48px;border-radius:12px}
+.app .ph{display:grid;place-items:center;background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff;font-weight:700;font-size:20px}
+.app span{width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .only-app,.only-web{display:none}
 .app .only-app{display:block}.web .only-web{display:block}
 label.sw{display:flex;align-items:center;gap:10px;font-size:14px;margin:6px 0}
@@ -111,6 +117,11 @@ label.sw{display:flex;align-items:center;gap:10px;font-size:14px;margin:6px 0}
     </div>
     <div class="ctr"><button class="g" onclick="cmd('jump',-30000)">−30s</button><button class="g" onclick="cmd('stop')">⏹ Stop</button><button class="g" onclick="cmd('jump',30000)">+30s</button></div>
     <div id="torbox" style="display:none"><div class="bar"><i id="torbar"></i></div><div class="dim" id="tor" style="margin-top:6px"></div></div>
+  </div>
+
+  <div class="card">
+    <div class="sec">Apps on the TV <span class="dim" style="letter-spacing:0;text-transform:none">tap to open</span></div>
+    <div class="apps" id="apps"><div class="dim">Loading…</div></div>
   </div>
 
   <div class="card">
@@ -449,7 +460,18 @@ async function add(){const r=await post('/add',{playlist:$('pl').value,title:$('
 async function imp(){toast('Importing…');const r=await post('/import',{playlist:$('ipl').value,link:$('lk').value,text:$('tx').value});toast(r.ok?('Imported '+r.added+' videos'):(r.msg||'Failed'));if(r.ok){$('lk').value='';$('tx').value='';}load();}
 
 (function(){const u=qp.get('url');if(u){$('purl').value=u;document.querySelector('[data-t=cast]').click();playNow('now');history.replaceState(null,'','/');}})();
-loadOptions().then(poll);load();
+async function loadApps(){
+  try{const d=await (await fetch('/apps')).json();const box=$('apps');box.innerHTML='';
+    d.apps.forEach(a=>{const e=document.createElement('div');e.className='app';
+      if(a.icon){const i=document.createElement('img');i.src=a.icon;e.appendChild(i);}
+      else{const ph=document.createElement('div');ph.className='ph';ph.textContent=a.name[0];e.appendChild(ph);}
+      const n=document.createElement('span');n.textContent=a.name+(a.installed?'':' ⬇');e.appendChild(n);
+      e.onclick=async()=>{if(navigator.vibrate)navigator.vibrate(15);const r=await post('/launch',{pkg:a.pkg});toast(r.msg);};
+      box.appendChild(e);});
+    if(!d.apps.length)box.innerHTML='<div class="dim">No apps yet. On the TV home screen choose “＋ Add apps”.</div>';
+  }catch(e){$('apps').innerHTML='<div class="dim">Cannot load apps</div>';}
+}
+loadOptions().then(poll);load();loadApps();
 </script>
 </body>
 </html>

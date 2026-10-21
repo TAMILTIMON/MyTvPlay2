@@ -125,8 +125,7 @@ public class FileBrowserActivity extends AppCompatActivity {
         rows.clear();
         files.clear();
         info.setText(needAllFiles()
-                ? "To see every file (and subtitle files), allow “All files access”: select the first row, or run\n"
-                + "adb shell appops set com.mytv.player MANAGE_EXTERNAL_STORAGE allow"
+                ? "To see every file (and subtitle files), select the first row and allow “All files access”."
                 : "Subtitle files with the same name as the video are loaded automatically.");
         if (needAllFiles()) {
             rows.add("🔓  Allow access to all files");
@@ -179,7 +178,7 @@ public class FileBrowserActivity extends AppCompatActivity {
         if (pos < 0 || pos >= files.size()) return;
         File f = files.get(pos);
         if (f == null) {
-            if (needAllFiles() && pos == 0) requestAllFiles();
+            if (needAllFiles() && pos == 0) Perms.openFilesSettings(this);
             return;
         }
         if (f.getPath().isEmpty()) {

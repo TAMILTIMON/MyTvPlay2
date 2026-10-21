@@ -56,6 +56,8 @@ public final class SettingsDialog {
                 "🌐  Network buffer: " + Store.getInt("cache", 2000) / 1000f + " s",
                 "🔌  Start phone remote when device boots: " + (Store.getBool("boot", Ui.isTv(a)) ? "On" : "Off"),
                 "🧹  Clear “Recently played”",
+                "🔓  Allow phone to start videos (display over apps): " + (Perms.overlayOk(a) ? "Allowed" : "Not allowed"),
+                "🔓  Allow access to all files (USB, subtitles): " + (Perms.filesOk() ? "Allowed" : "Not allowed"),
                 "📱  Use as remote for another TV…",
                 "ℹ  Phone remote address: http://" + Net.ip() + ":" + RemoteService.PORT};
         new AlertDialog.Builder(a).setTitle("⚙  Settings").setItems(items, new DialogInterface.OnClickListener() {
@@ -161,6 +163,12 @@ public final class SettingsDialog {
                         Store.delPlaylist(Store.RECENT);
                         break;
                     case 13:
+                        Perms.openOverlaySettings(a);
+                        break;
+                    case 14:
+                        Perms.openFilesSettings(a);
+                        break;
+                    case 15:
                         a.startActivity(new Intent(a, ConnectActivity.class));
                         break;
                     default:

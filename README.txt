@@ -1,5 +1,17 @@
-MY TV PLAYER 3.0 — what's new
+MY TV PLAYER 3.1 — what's new
 =============================
+* No laptop needed for permissions. On first start the TV app asks:
+  "Allow the phone to start videos" -> Allow -> switch My TV Player ON -> Back.
+  Also in ⚙ Settings (display over other apps, all-files access), and as a
+  row on the home screen until it is allowed. Some TVs hide this screen; then
+  the TV shows the manual path: Settings > Apps > Special app access.
+* APPS hub: Netflix, JioHotstar, SonyLIV, Spotify, YouTube, Prime Video, ZEE5…
+  as tiles on the home screen and in the phone app (Remote tab). Tap to open the
+  official app — log in once in each app, it stays logged in. "＋ Add apps"
+  lets you add any installed app or get missing ones from the Play Store.
+
+MY TV PLAYER 3.0
+================
 * New glass design (purple/pink) on the TV, the phone app and the browser page.
 * Dark and Light theme everywhere (TV: ⚙ Settings or the ☀/🌙 button; phone: ☀/🌙 at the top).
 * ONE apk for TV and phone. Install the same apk on your phone:

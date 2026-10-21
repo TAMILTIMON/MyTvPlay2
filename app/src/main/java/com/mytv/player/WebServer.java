@@ -98,6 +98,9 @@ public class WebServer extends NanoHTTPD {
                         return msg("Added to the TV queue");
                     }
                     Remote.play(ctx, Collections.singletonList(it), 0);
+                    if (App.visible == 0 && !Perms.overlayOk(ctx)) {
+                        return msg("Sent — if the TV doesn't start, open My TV Player on the TV once, or allow “Display over other apps” in its ⚙ Settings");
+                    }
                     return msg(Formats.isTorrent(u) ? "Starting torrent on the TV… (getting info can take a minute)"
                             : "Playing on the TV");
                 }
@@ -152,6 +155,29 @@ public class WebServer extends NanoHTTPD {
                         return msg("Saved to playlist " + val(p, "playlist"));
                     }
                     return msg(playItems(Collections.singletonList(it), val(p, "mode")));
+                }
+
+                case "/apps": {
+                    org.json.JSONArray a = new org.json.JSONArray();
+                    for (AppsHub.App ap : AppsHub.favorites(ctx)) {
+                        a.put(new JSONObject().put("name", ap.name).put("pkg", ap.pkg).put("installed", ap.installed)
+                                .put("icon", ap.installed ? AppsHub.iconBase64(ctx, ap.pkg) : ""));
+                    }
+                    return json(new JSONObject().put("apps", a).toString());
+                }
+
+                case "/launch": {
+                    final String pkg = val(p, "pkg");
+                    if (pkg.isEmpty()) return fail("No app chosen");
+                    if (App.visible == 0 && !Perms.overlayOk(ctx)) {
+                        return fail("Open My TV Player on the TV first, or allow “Display over other apps” in its ⚙ Settings");
+                    }
+                    String r = Remote.call(new Callable<String>() {
+                        public String call() {
+                            return AppsHub.launch(ctx, pkg);
+                        }
+                    });
+                    return msg(r);
                 }
 
                 case "/state":
@@ -241,6 +267,9 @@ public class WebServer extends NanoHTTPD {
         }
         if (items.size() == 1) Store.addRecent(items.get(0));
         Remote.play(ctx, items, 0);
+        if (App.visible == 0 && !Perms.overlayOk(ctx)) {
+            return "Sent — if the TV doesn't start, open My TV Player on the TV once, or allow “Display over other apps” in its ⚙ Settings";
+        }
         return Formats.isTorrent(items.get(0).u) ? "Starting torrent on the TV… (can take a minute)" : "Playing on the TV";
     }
 

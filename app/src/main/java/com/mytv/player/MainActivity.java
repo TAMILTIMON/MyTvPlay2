@@ -25,6 +25,7 @@ public class MainActivity extends AppCompatActivity {
     public static final String EXTRA_PLAYER_HOME = "player_home";
 
     private TextView header, info;
+    private LinearLayout appsRow;
     private final List<String> rows = new ArrayList<>();
     private final List<Runnable> actions = new ArrayList<>();
     private ArrayAdapter<String> adapter;
@@ -104,6 +105,23 @@ public class MainActivity extends AppCompatActivity {
         ilp.setMargins(0, Ui.dp(this, 18), 0, Ui.dp(this, 14));
         root.addView(info, ilp);
 
+        // ---- Apps hub: Netflix, JioHotstar, Spotify, SonyLIV … in one place
+        TextView appsLabel = Ui.text(this, 12, Ui.DIM, true);
+        appsLabel.setText("APPS");
+        appsLabel.setLetterSpacing(0.18f);
+        appsLabel.setPadding(Ui.dp(this, 4), 0, 0, Ui.dp(this, 8));
+        root.addView(appsLabel);
+        android.widget.HorizontalScrollView hs = new android.widget.HorizontalScrollView(this);
+        hs.setHorizontalScrollBarEnabled(false);
+        hs.setClipToPadding(false);
+        hs.setPadding(Ui.dp(this, 4), Ui.dp(this, 6), Ui.dp(this, 4), Ui.dp(this, 6));
+        appsRow = new LinearLayout(this);
+        hs.addView(appsRow);
+        LinearLayout.LayoutParams alp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT);
+        alp.setMargins(0, 0, 0, Ui.dp(this, 14));
+        root.addView(hs, alp);
+
         listView = new ListView(this);
         listView.setDivider(null);
         listView.setSelector(Ui.listSelector(this));
@@ -132,6 +150,80 @@ public class MainActivity extends AppCompatActivity {
         listView.requestFocus();
         refresh();
         updateInfo();
+        Perms.firstRun(this);
+    }
+
+    private void buildApps() {
+        if (appsRow == null) return;
+        appsRow.removeAllViews();
+        boolean tv = Ui.isTv(this);
+        for (final AppsHub.App a : AppsHub.favorites(this)) {
+            addTile(a.name, AppsHub.icon(this, a.pkg), tv, v -> {
+                String m = AppsHub.launch(this, a.pkg);
+                if (!a.installed) android.widget.Toast.makeText(this, m, android.widget.Toast.LENGTH_LONG).show();
+            });
+        }
+        addTile("＋ Apps", null, tv, v -> editApps());
+    }
+
+    private void addTile(String name, android.graphics.drawable.Drawable icon, boolean tv, View.OnClickListener l) {
+        LinearLayout t = new LinearLayout(this);
+        t.setOrientation(LinearLayout.VERTICAL);
+        t.setGravity(Gravity.CENTER);
+        t.setPadding(Ui.dp(this, 10), Ui.dp(this, 10), Ui.dp(this, 10), Ui.dp(this, 8));
+        t.setBackground(Ui.focusCard(this, 18));
+        t.setFocusable(true);
+        t.setClickable(true);
+        t.setOnClickListener(l);
+        t.setOnFocusChangeListener((v, f) -> v.animate().scaleX(f ? 1.08f : 1f).scaleY(f ? 1.08f : 1f).setDuration(120).start());
+        int iw = Ui.dp(this, tv ? 128 : 56), ih = Ui.dp(this, tv ? 72 : 56);
+        if (icon != null) {
+            android.widget.ImageView iv = new android.widget.ImageView(this);
+            iv.setImageDrawable(icon);
+            iv.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+            t.addView(iv, new LinearLayout.LayoutParams(iw, ih));
+        } else {
+            TextView plus = Ui.text(this, 28, 0xFFFFFFFF, true);
+            plus.setText("＋");
+            plus.setGravity(Gravity.CENTER);
+            plus.setBackground(Ui.gradient(this, 14));
+            t.addView(plus, new LinearLayout.LayoutParams(iw, ih));
+            name = "Add apps";
+        }
+        TextView n = Ui.text(this, 13, Ui.TEXT, false);
+        n.setText(name);
+        n.setSingleLine(true);
+        n.setGravity(Gravity.CENTER);
+        n.setPadding(0, Ui.dp(this, 6), 0, 0);
+        t.addView(n, new LinearLayout.LayoutParams(iw, ViewGroup.LayoutParams.WRAP_CONTENT));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.setMargins(0, 0, Ui.dp(this, 12), 0);
+        appsRow.addView(t, lp);
+    }
+
+    private void editApps() {
+        final List<AppsHub.App> all = AppsHub.choices(this);
+        final List<String> chosen = new ArrayList<>();
+        for (AppsHub.App f : AppsHub.favorites(this)) chosen.add(f.pkg);
+        String[] names = new String[all.size()];
+        boolean[] checked = new boolean[all.size()];
+        for (int i = 0; i < all.size(); i++) {
+            AppsHub.App a = all.get(i);
+            names[i] = a.name + (a.installed ? "" : "   (not installed – tap tile to get it)");
+            checked[i] = chosen.contains(a.pkg);
+        }
+        new androidx.appcompat.app.AlertDialog.Builder(this).setTitle("Apps on the home screen")
+                .setMultiChoiceItems(names, checked, (d, w, on) -> {
+                    String p = all.get(w).pkg;
+                    if (on && !chosen.contains(p)) chosen.add(p);
+                    if (!on) chosen.remove(p);
+                })
+                .setPositiveButton("Save", (d, w) -> {
+                    AppsHub.saveFavorites(chosen);
+                    buildApps();
+                })
+                .setNegativeButton("Cancel", null).show();
     }
 
     private void updateInfo() {
@@ -140,10 +232,7 @@ public class MainActivity extends AppCompatActivity {
         if (RemoteService.error != null) sb.append(RemoteService.error);
         else sb.append("📱  Control from your phone: install this same app on the phone (it finds this TV by itself), "
                 + "or open  http://").append(Net.ip()).append(":").append(RemoteService.PORT).append("  in a browser.");
-        if (Build.VERSION.SDK_INT >= 23 && Ui.isTv(this) && !Settings.canDrawOverlays(this)) {
-            sb.append("\nTip: to let the phone start videos while this app is closed, run once on your PC:  "
-                    + "adb shell appops set com.mytv.player SYSTEM_ALERT_WINDOW allow");
-        }
+
         info.setText(sb.toString());
     }
 
@@ -153,6 +242,10 @@ public class MainActivity extends AppCompatActivity {
         actions.clear();
         if (current == null) {
             header.setText("My TV Player");
+            if (Ui.isTv(this) && !Perms.overlayOk(this)) {
+                rows.add("🔓   Allow the phone to start videos when this app is closed  (recommended)");
+                actions.add(() -> Perms.openOverlaySettings(this));
+            }
             rows.add("📁   Local files  ·  USB drive / storage");
             actions.add(() -> startActivity(new Intent(this, FileBrowserActivity.class)));
             if (!Ui.isTv(this)) {
@@ -194,6 +287,8 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        buildApps();
+        refresh();
         handler.post(tick);
     }
 
