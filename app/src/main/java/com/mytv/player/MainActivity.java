@@ -247,7 +247,8 @@ public class MainActivity extends AppCompatActivity {
         titles.addView(sub);
         top.addView(titles, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
 
-        Button theme = Ui.button(this, Ui.dark() ? T.t("☀ Light") : T.t("🌙 Dark"), false);
+        boolean narrow = getResources().getConfiguration().screenWidthDp < 600;
+        Button theme = Ui.button(this, narrow ? (Ui.dark() ? "☀" : "🌙") : Ui.dark() ? T.t("☀ Light") : T.t("🌙 Dark"), false);
         theme.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 Store.putStr("theme", Ui.dark() ? "light" : "dark");
@@ -255,7 +256,7 @@ public class MainActivity extends AppCompatActivity {
             }
         });
         top.addView(theme);
-        Button gear = Ui.button(this, T.t("⚙ Settings"), true);
+        Button gear = Ui.button(this, narrow ? "⚙" : T.t("⚙ Settings"), true);
         gear.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 SettingsDialog.show(MainActivity.this);

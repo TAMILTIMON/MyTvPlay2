@@ -1,3 +1,15 @@
+TAMILCASTPLAY 1.7 — native phone remote
+=======================================
+* The phone app's remote is now a real Android screen (no web page inside the app):
+  fits every phone size in portrait and landscape, normal keyboard for the PIN and
+  search boxes, no zooming, no freezing, faster.
+  Tabs: Remote · Subtitles · Equalizer · Cast · Playlist. Back = Remote tab.
+  Playlists: tap 📂 to open with live search; long-press a channel for
+  Play / Load all channels / Delete; "Select & delete…" with Select all.
+  The browser page (http://TV-IP:8080) is unchanged; "🌐 Web version" is in the
+  Playlist tab if you ever want it inside the app.
+* Home screen and browser toolbars use icon buttons on phones so they fit.
+
 TAMILCASTPLAY 1.6 — phone app fits the screen + player modes
 =============================================================
 Phone app remote:

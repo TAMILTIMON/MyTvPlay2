@@ -35,6 +35,8 @@ public final class T {
     }
 
     static {
+        TA.put("Load all channels", "அனைத்து சேனல்களையும் ஏற்று");
+        HI.put("Load all channels", "सभी चैनल लोड करें");
         TA.put("Repeat: ", "மீண்டும் இயக்கு: ");
         HI.put("Repeat: ", "दोहराएँ: ");
         TA.put("Shuffle: ", "கலக்கு: ");

@@ -240,9 +240,9 @@ public class ConnectActivity extends AppCompatActivity {
 
     private void open(String ip, String name) {
         Store.putStr("last_tv", ip);
-        startActivity(new Intent(this, RemoteWebActivity.class)
-                .putExtra(RemoteWebActivity.EXTRA_IP, ip)
-                .putExtra(RemoteWebActivity.EXTRA_NAME, name));
+        startActivity(new Intent(this, NativeRemoteActivity.class)
+                .putExtra(NativeRemoteActivity.EXTRA_IP, ip)
+                .putExtra(NativeRemoteActivity.EXTRA_NAME, name));
     }
 
     private void manual() {

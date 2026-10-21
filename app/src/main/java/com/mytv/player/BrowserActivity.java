@@ -90,9 +90,10 @@ public class BrowserActivity extends AppCompatActivity {
         tb.setPadding(p, p + Ui.dp(this, tv ? 4 : 18), p, p);
         tb.setBackground(Ui.background());
         tb.addView(small("←", v -> { if (web.canGoBack()) web.goBack(); }));
-        tb.addView(small("→", v -> { if (web.canGoForward()) web.goForward(); }));
+        final boolean narrow = getResources().getConfiguration().screenWidthDp < 600;
+        if (!narrow) tb.addView(small("→", v -> { if (web.canGoForward()) web.goForward(); }));
         tb.addView(small("🏠", v -> Ui.goHome(this, tv)));
-        tb.addView(small("⌂", v -> home()));
+        if (!narrow) tb.addView(small("⌂", v -> home()));
         bar = new EditText(this);
         bar.setSingleLine(true);
         bar.setHint(T.t("Search or type a link"));

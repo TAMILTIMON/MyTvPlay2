@@ -100,6 +100,12 @@
             android:label="TamilCastPlay Remote" />
 
         <activity
+            android:name=".NativeRemoteActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|uiMode|smallestScreenSize"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize|stateHidden" />
+
+        <activity
             android:name=".RemoteWebActivity"
             android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|uiMode"
             android:exported="false"
