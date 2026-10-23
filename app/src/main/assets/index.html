@@ -1,0 +1,831 @@
+<!doctype html>
+<html data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>TamilCastPlay</title>
+<style>
+:root{--acc:#8b5cf6;--acc2:#ec4899;--acc3:#3b82f6;--ok:#22c55e;--bad:#ef4444;--r:18px}
+html[data-theme=dark]{--bg:#0b0913;--bg2:#1c1236;--glass:#17122a;--glass2:#221b3a;--line:rgba(255,255,255,.12);--text:#f3f0ff;--dim:#a59fbd;--field:rgba(0,0,0,.25);--shadow:0 4px 14px rgba(0,0,0,.3)}
+html[data-theme=light]{--bg:#f5f3fb;--bg2:#e7dffc;--glass:#ffffff;--glass2:#ffffff;--line:rgba(42,27,92,.12);--text:#1b1530;--dim:#6b6482;--field:rgba(42,27,92,.05);--shadow:0 4px 14px rgba(80,60,160,.10)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+html,body{margin:0;min-height:100%;max-width:100%;overflow-x:hidden}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--text);background:var(--bg);
+  background-image:radial-gradient(900px 500px at 0% 0%,rgba(139,92,246,0.28),transparent 60%),radial-gradient(700px 500px at 100% 100%,rgba(236,72,153,0.22),transparent 60%),linear-gradient(160deg,var(--bg2),var(--bg) 55%);
+  padding:0 12px calc(130px + env(safe-area-inset-bottom));max-width:760px;margin:0 auto;width:100%;box-sizing:border-box}
+header{display:flex;align-items:center;gap:8px;padding:calc(10px + env(safe-area-inset-top)) 2px 10px;position:sticky;top:0;z-index:4;background:var(--bg);transition:transform .25s}
+body.hidebars header{transform:translateY(-110%)}
+.logo{width:42px;height:42px;border-radius:13px;background:linear-gradient(135deg,var(--acc),var(--acc2));display:grid;place-items:center;color:#fff;font-size:18px;box-shadow:0 6px 20px rgba(139,92,246,0.45)}
+header .t{flex:1;min-width:0}header b{display:block;font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+header small{color:var(--dim);font-size:12px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card{min-width:0;overflow:hidden;background:var(--glass);border:1px solid var(--line);border-radius:var(--r);padding:16px;margin-bottom:14px;box-shadow:var(--shadow)}
+.sec{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);margin:0 0 12px;font-weight:700;display:flex;justify-content:space-between;align-items:center;gap:8px}
+input,textarea,select{width:100%;padding:12px 14px;margin-bottom:10px;border-radius:14px;border:1px solid var(--line);background:var(--field);color:var(--text);font-size:16px;outline:none;font-family:inherit}
+input:focus,textarea:focus,select:focus{border-color:var(--acc)}
+select option{background:var(--bg);color:var(--text)}
+input[type=checkbox]{width:auto;margin:0}
+button{font-family:inherit;border:0;border-radius:999px;padding:11px 18px;font-size:15px;cursor:pointer;color:#fff;background:linear-gradient(135deg,var(--acc),var(--acc2));font-weight:600;transition:transform .1s,filter .2s}
+button:active{transform:scale(.95)}
+button.g{background:var(--glass2);color:var(--text);border:1px solid var(--line);font-weight:500}
+button.del{background:rgba(239,68,68,0.22);color:var(--bad);border:1px solid rgba(239,68,68,0.40);padding:7px 12px;font-size:13px}
+button.ic{width:44px;height:44px;padding:0;display:grid;place-items:center;font-size:18px;flex:none}
+button.big{width:66px;height:66px;font-size:24px;box-shadow:0 8px 26px rgba(139,92,246,0.50)}
+.w{width:100%}
+.row{display:flex;align-items:center;gap:10px}
+.btns{display:flex;flex-wrap:wrap;gap:8px}.btns>button{flex:1 1 auto}
+.ctr{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:8px}
+.dim{color:var(--dim);font-size:13px}
+.np{display:flex;gap:14px;align-items:center}
+.art{width:64px;height:64px;border-radius:16px;flex:none;background:linear-gradient(135deg,var(--acc),var(--acc2) 60%,var(--acc3));display:grid;place-items:center;font-size:26px;color:#fff}
+.np .t{min-width:0;flex:1}
+#np{font-size:17px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pill{display:inline-block;font-size:11px;padding:3px 9px;border-radius:99px;background:rgba(139,92,246,0.25);color:var(--text);margin-top:5px}
+input[type=range]{-webkit-appearance:none;appearance:none;height:6px;padding:0;border:0;border-radius:6px;background:var(--line);margin:14px 0}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#fff;border:4px solid var(--acc);box-shadow:0 2px 10px rgba(0,0,0,.3)}
+input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:#fff;border:4px solid var(--acc)}
+.tl{display:flex;justify-content:space-between;font-size:13px;color:var(--dim);font-variant-numeric:tabular-nums}
+.dpad{position:relative;margin:6px auto 4px;border-radius:50%;background:var(--glass2);border:1px solid var(--line)}
+.dpad button{position:absolute;background:none;color:var(--text);font-size:22px;width:72px;height:72px;padding:0}
+.dpad .ok{border-radius:50%;background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff;font-weight:700;box-shadow:0 8px 26px rgba(139,92,246,0.50)}
+.band{flex:1;display:flex;flex-direction:column;align-items:center;min-width:0}
+.band .v{font-size:11px;color:var(--text);font-variant-numeric:tabular-nums;height:16px}
+.band .f{font-size:10px;color:var(--dim);margin-top:6px;white-space:nowrap}
+#queue{max-height:360px;overflow-y:auto}
+.q{padding:10px 4px;border-top:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;font-size:14px}
+.q.cur{color:var(--acc);font-weight:700}
+.it{display:flex;align-items:center;gap:8px;padding:9px 0;border-top:1px solid var(--line)}
+.it span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:14px}
+.it button{padding:7px 11px;font-size:13px}
+.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:6px}
+.chips button{flex:none;padding:8px 14px;font-size:13px}
+#rep.on,#shuf.on,.chips button.g.on{background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff;border-color:transparent}
+.stat{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.stat div{background:var(--field);border-radius:14px;padding:10px;text-align:center}
+.stat b{display:block;font-size:17px}.stat small{color:var(--dim);font-size:11px}
+.bar{height:6px;border-radius:6px;background:var(--line);overflow:hidden;margin-top:10px}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--ok),var(--acc3))}
+nav{background:var(--bar,var(--glass2)) !important;position:fixed;left:50%;transform:translateX(-50%);bottom:calc(10px + env(safe-area-inset-bottom));width:min(740px,calc(100% - 20px));display:flex;gap:4px;padding:6px;border-radius:24px;background:var(--glass2);border:1px solid var(--line);box-shadow:var(--shadow);z-index:5}
+nav button{flex:1;background:none;color:var(--dim);font-size:11px;font-weight:600;padding:8px 2px;border-radius:18px;line-height:1.5}
+nav button span{font-size:19px;display:block}
+nav button.on{background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff}
+.tab{display:none}.tab.on{display:block}
+#toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(10px);background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff;padding:11px 18px;border-radius:16px;opacity:0;transition:.25s;pointer-events:none;max-width:90%;text-align:center;font-size:14px;z-index:9;box-shadow:var(--shadow)}
+#toast.on{opacity:1;transform:translateX(-50%)}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:flex-end;justify-content:center;z-index:8;padding:12px}
+.modal.on{display:flex}
+.modal .card{width:100%;max-width:520px;max-height:80vh;overflow:auto}
+.dev{display:flex;align-items:center;gap:12px;padding:12px;border-radius:14px;border:1px solid var(--line);margin-bottom:8px;cursor:pointer;background:var(--field)}
+.dev.me{border-color:var(--acc)}
+.apps{display:grid;grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:10px}
+.app{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 4px;border-radius:16px;background:var(--field);border:1px solid var(--line);cursor:pointer;font-size:12px;text-align:center}
+.app:active{transform:scale(.95)}
+.app img,.app .ph{width:48px;height:48px;border-radius:12px}
+.app .ph{display:grid;place-items:center;background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff;font-weight:700;font-size:20px}
+.app span{width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cw{display:flex;gap:12px;overflow-x:auto;padding-bottom:4px}
+.cwi{flex:none;width:150px;cursor:pointer}
+.cwi .th{position:relative;width:150px;height:84px;border-radius:14px;overflow:hidden;background:linear-gradient(135deg,var(--acc),var(--acc2));display:grid;place-items:center;color:#fff;font-size:26px}
+.cwi .th img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.cwi .th i{position:absolute;left:0;bottom:0;height:4px;background:linear-gradient(90deg,var(--acc),var(--acc2))}
+.cwi b{display:block;font-size:13px;margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cwi small{color:var(--dim);font-size:11px}
+.pin{display:flex;gap:10px;justify-content:center;margin:16px 0}
+.pin input{width:56px;height:64px;text-align:center;font-size:28px;font-weight:700;padding:0;margin:0}
+.it .ck{width:22px;height:22px;flex:none;accent-color:var(--acc)}
+label.chk{padding:8px 0;border-top:1px solid var(--line);margin:0}
+label.chk input{width:22px;height:22px;accent-color:var(--acc)}
+@media (max-width:480px){
+  header .logo{display:none}
+  header button.ic{width:38px;height:38px;font-size:16px}
+  .card{padding:14px 12px}
+  .ctr{gap:6px}.ctr button.ic{width:42px;height:42px}
+  button.big{width:58px;height:58px}
+  .btns>button{padding:10px 8px;font-size:14px}
+}
+.dpad{width:min(240px,72vw);height:min(240px,72vw)}
+.dpad .u{top:2%;left:50%;transform:translateX(-50%)}.dpad .d{bottom:2%;left:50%;transform:translateX(-50%)}
+.dpad .l{left:2%;top:50%;transform:translateY(-50%)}.dpad .r{right:2%;top:50%;transform:translateY(-50%)}
+.dpad .ok{left:50%;top:50%;transform:translate(-50%,-50%);width:40%;height:40%}
+/* vertical EQ (custom, never overflows) */
+.eq{display:grid;grid-template-columns:repeat(11,minmax(0,1fr));gap:2px;height:auto;padding-top:6px;align-items:end}
+.band{min-width:0}
+.vs{position:relative;width:100%;height:170px;touch-action:none;cursor:pointer}
+.vs .tr{position:absolute;left:50%;top:10px;bottom:10px;width:8px;margin-left:-4px;border-radius:8px;background:var(--line)}
+.vs .fill{position:absolute;left:0;right:0;border-radius:8px;background:linear-gradient(180deg,var(--acc2),var(--acc))}
+.vs .knob{position:absolute;left:50%;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;background:#fff;border:4px solid var(--acc);box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.vs .mid{position:absolute;left:15%;right:15%;top:50%;height:1px;background:var(--line)}
+/* bottom bar: single-line labels, auto-hide */
+nav{transition:transform .25s}
+body.hidebars nav{transform:translate(-50%,150%)}
+nav button{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10.5px;min-width:0;padding:8px 2px}
+nav button span{font-size:18px}
+#showbars{position:fixed;right:14px;bottom:calc(18px + env(safe-area-inset-bottom));z-index:6;display:none;width:46px;height:46px;border-radius:50%;padding:0;font-size:20px;box-shadow:0 6px 18px rgba(0,0,0,.35)}
+body.hidebars #showbars{display:grid;place-items:center}
+.dpad .ok:active{transform:translate(-50%,-50%) scale(.94)}
+.dpad .u:active,.dpad .d:active{transform:translateX(-50%) scale(.9)}
+.dpad .l:active,.dpad .r:active{transform:translateY(-50%) scale(.9)}
+.only-app,.only-web{display:none}
+.app .only-app{display:block}.web .only-web{display:block}
+label.sw{display:flex;align-items:center;gap:10px;font-size:14px;margin:6px 0}
+</style>
+</head>
+<body class="web">
+<header>
+  <button class="g ic" onclick="goHome()" title="Home">🏠</button>
+  <div class="logo">▶</div>
+  <div class="t"><b>TamilCastPlay</b><small id="devname">Connecting…</small></div>
+  <button class="g ic" onclick="openDevices()" title="Switch TV">📺</button>
+  <button class="g ic" onclick="toggleLang()" id="langBtn" title="Language">த</button>
+  <button class="g ic" onclick="toggleTheme()" id="themeBtn" title="Theme">☀</button>
+</header>
+
+<!-- ================= REMOTE ================= -->
+<div class="tab on" id="t-remote">
+  <div class="card" id="cwcard" style="display:none">
+    <div class="sec">Continue watching</div>
+    <div class="cw" id="cw"></div>
+  </div>
+  <div class="card">
+    <div class="sec">Now playing <span id="state" class="pill">idle</span></div>
+    <div class="np"><div class="art" id="art">♪</div>
+      <div class="t"><div id="np">Nothing playing</div><div class="dim" id="sub1">Use Cast to play something</div></div>
+    </div>
+    <input type="range" id="seek" min="0" max="1000" value="0">
+    <div class="tl"><span id="time">0:00</span><span id="len"></span></div>
+    <div class="ctr">
+      <button class="g ic" onclick="cmd('prev')">⏮</button>
+      <button class="g ic" onclick="cmd('jump',-10000)">↺</button>
+      <button class="big ic" id="pp" onclick="cmd('toggle')">▶</button>
+      <button class="g ic" onclick="cmd('jump',10000)">↻</button>
+      <button class="g ic" onclick="cmd('next')">⏭</button>
+    </div>
+    <div class="ctr"><button class="g" onclick="cmd('jump',-30000)">−30s</button><button class="g" onclick="cmd('stop')">⏹ Stop</button><button class="g" onclick="cmd('jump',30000)">+30s</button></div>
+    <div class="ctr"><button class="g" onclick="cmd('bmadd')" title="Bookmark this scene">🔖</button><button class="g" onclick="bmList()">🔖…</button><button class="g" onclick="cmd('screenshot')" title="Screenshot">📸</button><button class="g" onclick="cmd('audioonly')" title="Audio only">🎵</button></div>
+    <div class="ctr"><button class="g" id="rep" onclick="cmd('repeat')">🔁 Repeat: Off</button><button class="g" id="shuf" onclick="cmd('shuffle')">🔀 Shuffle: Off</button></div>
+    <button class="g w" id="otherbtn" style="display:none;margin-top:8px" onclick="post('/otherallow',{}).then(r=>toast(r.msg))">📺 Show other apps' videos (YouTube, Netflix…) here</button>
+    <div id="torbox" style="display:none"><div class="bar"><i id="torbar"></i></div><div class="dim" id="tor" style="margin-top:6px"></div></div>
+  </div>
+
+  <div class="card">
+    <div class="sec">Apps on the TV <span class="dim" style="letter-spacing:0;text-transform:none">tap to open</span></div>
+    <div class="apps" id="apps"><div class="dim">Loading…</div></div>
+  </div>
+
+  <div class="card">
+    <div class="sec">Remote</div>
+    <div class="dpad">
+      <button class="u" onclick="key('up')">▲</button><button class="l" onclick="key('left')">◀</button>
+      <button class="ok" onclick="key('ok')">OK</button>
+      <button class="r" onclick="key('right')">▶</button><button class="d" onclick="key('down')">▼</button>
+    </div>
+    <div class="btns" style="margin-top:6px"><button class="g" onclick="key('back')">↩</button><button class="g" onclick="key('home')">⌂</button><button class="g" onclick="key('recents')">▢</button><button class="g" onclick="cmd('menu')">⚙</button></div>
+    <div class="btns" style="margin-top:6px"><button class="g" onclick="key('vol_down')">🔉</button><button class="g" onclick="key('vol_mute')">🔇</button><button class="g" onclick="key('vol_up')">🔊</button><button class="g" onclick="key('media_playpause')">⏯</button></div>
+    <button class="w" id="adbbtn" style="display:none;margin-top:8px" onclick="if(confirm('Full remote for every app (ADB).\n\nTV: Settings > Device Preferences > About > press Build 7 times, then Developer options > USB / Network debugging ON.\n\nConnect now? (tick Always allow on the TV)'))cmd('adbsetup')">🔌 Full remote for every app (ADB)</button>
+    <div class="dim" id="acchint" style="display:none;margin-top:8px">ℹ To control other apps, turn on TV Settings &gt; Accessibility &gt; TamilCastPlay</div>
+    <div class="row" style="margin-top:8px"><input id="typebox" placeholder="⌨ Type text on the TV (search boxes)" style="margin:0"><button class="g" onclick="typeText()">⌨</button></div>
+  </div>
+
+  <div class="card">
+    <div class="sec">Volume <span id="volv">100%</span></div>
+    <input type="range" id="vol" min="0" max="200" step="5" value="100">
+    <div class="btns"><button class="g" onclick="cmd('mute')">🔇</button><button class="g" onclick="cmd('vol',50)">50%</button><button class="g" onclick="cmd('vol',100)">100%</button><button class="g" onclick="cmd('vol',150)">150%</button><button onclick="cmd('vol',200)">200% 🔥</button></div>
+    <div class="sec" style="margin-top:16px">☀ Brightness <span id="brv">100%</span></div>
+    <input type="range" id="bright" min="10" max="150" step="5" value="100">
+    <div class="btns"><button class="g" onclick="cmd('bright',50)">50%</button><button class="g" onclick="cmd('bright',75)">75%</button><button class="g" onclick="cmd('bright',100)">100%</button><button class="g" onclick="cmd('bright',125)">125%</button></div>
+  </div>
+
+  <div class="card"><div class="sec"><span>Queue</span><button class="g" id="saveq" style="padding:6px 12px;font-size:12px;display:none" onclick="saveQueue()">💾 Save as playlist</button></div>
+    <input id="qsearch" placeholder="🔍 Search channel / name…" style="display:none">
+    <div id="qres"></div>
+    <div id="queue" class="dim">Empty</div></div>
+</div>
+
+<!-- ================= TRACKS ================= -->
+<div class="tab" id="t-tracks">
+  <div class="card">
+    <div class="sec">Audio track</div>
+    <select id="audio" onchange="cmd('audio',this.value)"></select>
+    <div class="sec" style="margin-top:6px">Audio delay (lip-sync) <span id="adv">0 s</span></div>
+    <div class="btns"><button class="g" onclick="delay('adelay',-500)">−0.5</button><button class="g" onclick="delay('adelay',-50)">−0.05</button><button class="g" onclick="cmd('adelay',0)">0</button><button class="g" onclick="delay('adelay',50)">+0.05</button><button class="g" onclick="delay('adelay',500)">+0.5</button></div>
+  </div>
+  <div class="card">
+    <div class="sec">Subtitles</div>
+    <select id="subs" onchange="cmd('sub',this.value)"></select>
+    <button class="g w" onclick="cmd('sub',-1)">🚫 Turn subtitles off</button>
+    <div class="sec" style="margin-top:14px">Subtitle delay <span id="sdv">0 s</span></div>
+    <div class="btns"><button class="g" onclick="delay('sdelay',-1000)">−1</button><button class="g" onclick="delay('sdelay',-100)">−0.1</button><button class="g" onclick="cmd('sdelay',0)">0</button><button class="g" onclick="delay('sdelay',100)">+0.1</button><button class="g" onclick="delay('sdelay',1000)">+1</button></div>
+  </div>
+  <div class="card">
+    <div class="sec">Add a subtitle</div>
+    <input type="file" id="subfile" accept=".srt,.ass,.ssa,.vtt,.sub,.idx,.smi,.txt,.zip,.gz">
+    <button class="w" onclick="upload('/subupload','subfile')">⬆ Send file to TV</button>
+    <div style="height:12px"></div>
+    <div class="row" style="margin-bottom:10px"><input id="subq" placeholder="🔎 Find subtitles online (movie name)" style="margin:0"><button onclick="subFind()">🔎</button></div>
+    <div id="subres"></div>
+    <input id="suburl" placeholder="…or paste a subtitle link (.srt / .zip / .gz)">
+    <button class="g w" onclick="subUrl()">Load from link</button>
+  </div>
+  <div class="card">
+    <div class="sec">Subtitle style</div>
+    <select id="subsize" onchange="cmd('subsize',this.value)"></select>
+    <select id="subenc" onchange="cmd('subenc',this.value)"></select>
+    <label class="sw"><input type="checkbox" id="subbg" onchange="cmd('subbg',this.checked?1:0)"> Dark box behind text</label>
+  </div>
+</div>
+
+<!-- ================= PICTURE & SOUND ================= -->
+<div class="tab" id="t-pic">
+  <div class="card">
+    <div class="sec">Picture fit</div>
+    <div class="chips" id="fitchips"></div>
+    <div class="sec" style="margin-top:8px">Aspect ratio</div>
+    <div class="chips" id="aspchips"></div>
+    <div class="sec" style="margin-top:8px">Zoom / crop <span id="zoomv">100%</span></div>
+    <select id="zoomsel" onchange="cmd('zoom',this.value)"></select>
+    <input type="range" id="zoom" min="50" max="300" step="1" value="100">
+  </div>
+  <div class="card">
+    <div class="sec">Equalizer <label class="sw" style="margin:0;text-transform:none;letter-spacing:0"><input type="checkbox" id="eqon" onchange="cmd('eq_on',this.checked?1:0)"> On</label></div>
+    <select id="preset" onchange="cmd('eq_preset',this.value)"></select>
+    <div class="eq" id="eqbands"></div>
+    <button class="g w" onclick="cmd('eq_reset')" style="margin-top:10px">Reset (flat)</button>
+  </div>
+  <div class="card">
+    <div class="sec">Playback</div>
+    <div class="dim">Speed</div><select id="rate" onchange="cmd('rate',this.value)"></select>
+    <div class="dim">Sleep timer <span id="sleepv"></span></div><select id="sleep" onchange="cmd('sleep',this.value)"></select>
+    <div class="dim">Decoder</div><select id="hw" onchange="cmd('hw',this.value)"><option value="0">Hardware (auto, best)</option><option value="1">Software (if picture is green/broken)</option></select>
+    <div class="dim">Network buffer</div><select id="cache" onchange="cmd('cache',this.value)"></select>
+    <div class="dim">🗣 Clear dialogue (quiet voices, loud music) — works all the time while on</div>
+    <select id="dialog" onchange="cmd('dialog',this.value)"><option value="0">Off</option><option value="1">Light boost</option><option value="2">Medium boost</option><option value="3">Strong boost</option></select>
+    <label class="sw"><input type="checkbox" id="level" onchange="cmd('level',this.checked?1:0)"> 📊 Volume levelling between channels</label>
+    <label class="sw"><input type="checkbox" id="afr" onchange="cmd('afr',this.checked?1:0)"> 🎞 Auto frame-rate (smooth 24p)</label>
+    <div class="dim">Streaming quality (saves data on IPTV / HLS)</div>
+    <select id="qual" onchange="cmd('quality',this.value)"><option value="0">Best</option><option value="1080">1080p</option><option value="720">720p</option><option value="480">480p</option><option value="360">360p (saves most data)</option></select>
+  </div>
+</div>
+
+<!-- ================= CAST ================= -->
+<div class="tab" id="t-cast">
+  <div class="card">
+    <div class="sec">From this phone</div>
+    <div class="only-app">
+      <button class="w" onclick="MyTV.pickMedia('now')">📱 Play videos / songs from this phone</button>
+      <div style="height:8px"></div>
+      <button class="g w" onclick="MyTV.pickMedia('queue')">+ Add phone files to the TV queue</button>
+      <div style="height:8px"></div>
+      <button class="g w" onclick="MyTV.pickTorrent()">🧲 Open a .torrent file</button>
+      <div class="dim" style="margin-top:10px">Files stream straight from your phone — keep the app open while watching.</div>
+    </div>
+    <div class="only-web">
+      <input type="file" id="mediafile" accept="video/*,audio/*,.mkv,.avi,.flac">
+      <button class="w" onclick="upload('/mediaupload','mediafile')">⬆ Send to TV and play</button>
+      <div class="bar"><i id="upbar"></i></div><div class="dim" id="upmsg" style="margin-top:6px">Browser sends a copy to the TV. For big movies use the phone app (streams instantly).</div>
+      <div style="height:14px"></div>
+      <input type="file" id="torfile" accept=".torrent,application/x-bittorrent">
+      <button class="g w" onclick="upload('/torrentupload','torfile')">🧲 Play .torrent file</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="sec">Browser</div>
+    <button class="w only-app" onclick="MyTV.openBrowser()">🌐 Search the web on this phone &amp; send videos</button>
+    <div class="only-app" style="height:10px"></div>
+    <input id="burl" placeholder="Search words or a web address">
+    <button class="g w" onclick="tvBrowse()">📺 Open on the TV browser</button>
+  </div>
+
+  <div class="card">
+    <div class="sec">Play a link</div>
+    <textarea id="purl" rows="3" placeholder="Video link, stream (m3u8, mpd, rtsp…), magnet:?xt=… or .torrent link"></textarea>
+    <input id="ptitle" placeholder="Title (optional)">
+    <input id="psub" placeholder="Subtitle link (optional)">
+    <div class="btns"><button onclick="playNow('now')">▶ Play on TV</button><button class="g" onclick="playNow('queue')">+ Queue</button><button class="g" onclick="post('/dl',{url:$('purl').value}).then(r=>{toast(r.msg);dlList();})">⬇ Later</button></div>
+    <div class="row" style="margin-top:10px"><input id="ppl" list="pls" placeholder="Playlist name" style="margin:0"><button class="g" onclick="saveLink()">💾</button></div>
+  </div>
+  <div class="card">
+    <div class="sec">Torrent</div>
+    <div class="stat"><div><b id="tpeers">–</b><small>peers</small></div><div><b id="tspeed">–</b><small>MB/s</small></div><div><b id="tprog">–</b><small>done</small></div></div>
+    <div class="dim" id="tor2" style="margin-top:10px">No torrent running</div>
+    <button class="del" onclick="post('/torrentstop',{}).then(r=>toast(r.msg))" style="margin-top:10px">Stop &amp; delete data</button>
+    <div class="dim" id="tcache" style="margin-top:10px"></div>
+    <div class="sec" style="margin-top:14px">⬇ Downloads <label class="sw" style="margin:0;text-transform:none;letter-spacing:0"><input type="checkbox" id="dlnight" onchange="post('/dlnight',{v:this.checked?1:0}).then(r=>toast(r.msg))"> night only</label></div>
+    <div id="dllist" class="dim">—</div>
+    <div class="btns" style="margin-top:6px"><button class="g" onclick="cacheInfo()">💾 Storage used</button><button class="del" onclick="if(confirm('Delete saved torrents? (kept movies stay)'))post('/torrentcache',{do:'clear'}).then(r=>toast(r.msg))">🗑 Clear saved</button></div>
+  </div>
+  <div class="card">
+    <div class="sec">Import M3U playlist</div>
+    <input id="ipl" list="pls" placeholder="Playlist name">
+    <input id="lk" placeholder="Link to an .m3u / .m3u8 file">
+    <textarea id="tx" rows="3" placeholder="…or paste M3U text / one link per line"></textarea>
+    <button class="w" onclick="imp()">Import</button>
+  </div>
+</div>
+
+<!-- ================= LIBRARY ================= -->
+<div class="tab" id="t-lists">
+  <div class="card">
+    <div class="sec">Add to a playlist</div>
+    <input id="pl" list="pls" placeholder="Playlist name"><datalist id="pls"></datalist>
+    <input id="ti" placeholder="Title (optional)">
+    <input id="ur" placeholder="Link, magnet:… or .torrent link">
+    <input id="us" placeholder="Subtitle link (optional)">
+    <button class="w" onclick="add()">Add</button>
+  </div>
+  <div id="lists"></div>
+  <div class="card">
+    <div class="sec">💾 Backup &amp; restore</div>
+    <div class="btns"><button onclick="location.href='/backup?t='+TOK">💾 Download backup</button></div>
+    <input type="file" id="restfile" accept=".json" style="margin-top:10px">
+    <button class="g w" onclick="if(confirm('Restore playlists and settings from this backup?'))upload('/restore','restfile')">♻ Restore backup</button>
+  </div>
+  <div class="card">
+    <div class="sec">📊 My TV</div>
+    <pre id="tvrep" style="white-space:pre-wrap;font-size:12px;line-height:1.35;margin:0 0 10px;color:var(--text)">Tap Refresh</pre>
+    <div class="dim" id="tvline" style="color:var(--acc);font-weight:600"></div>
+    <div class="btns" style="margin-top:8px"><button onclick="tvInfo()">🔄 Refresh</button><button onclick="tvTest('speed')">🌐 Speed test</button><button onclick="post('/tvclean',{}).then(r=>{toast(r.msg);tvInfo();})">🧹 Free memory</button></div>
+    <div class="btns" style="margin-top:6px"><button class="g" onclick="tvTest('disk')">💾 Storage speed</button><button class="g" onclick="tvTest('bench')">⚙ CPU / RAM speed</button></div>
+  </div>
+  <div class="card">
+    <div class="sec">This page</div>
+    <label class="sw"><input type="checkbox" id="autohide" onchange="setAutoHide(this.checked)"> Auto-hide top &amp; bottom bars while scrolling</label>
+  </div>
+  <div class="card">
+    <div class="sec">TV settings</div>
+    <div class="dim">TV app theme</div>
+    <select id="apptheme" onchange="cmd('apptheme',this.value)"><option value="dark">Dark</option><option value="light">Light</option><option value="system">Follow system</option></select>
+    <div class="dim">TV colours (palette)</div>
+    <select id="palsel" onchange="cmd('palette',this.value)"></select>
+    <label class="sw"><input type="checkbox" id="followpal" onchange="setFollow(this.checked)"> Use the TV's colours on this page</label>
+    <div class="dim">TV name (shown when scanning)</div>
+    <div class="row"><input id="devin" placeholder="Living room TV" style="margin:0"><button class="g" onclick="cmd('devname',$('devin').value)">Save</button></div>
+  </div>
+</div>
+
+<nav>
+  <button class="on" data-t="remote"><span>🎮</span>Remote</button>
+  <button data-t="tracks"><span>💬</span>Audio/Subs</button>
+  <button data-t="pic"><span>🎚</span>Picture/EQ</button>
+  <button data-t="cast"><span>📡</span>Cast</button>
+  <button data-t="lists"><span>📚</span>Library</button>
+</nav>
+
+<div class="modal" id="devmodal" onclick="if(event.target===this)this.classList.remove('on')">
+  <div class="card"><div class="sec">TVs on this Wi-Fi <button class="g" style="padding:6px 12px;font-size:12px" onclick="openDevices()">🔄</button></div>
+  <div id="devlist" class="dim">Scanning…</div>
+  <button class="g w only-app" onclick="MyTV.switchTv()">More options…</button></div>
+</div>
+<div class="modal" id="pinmodal">
+  <div class="card" style="text-align:center"><div class="sec" style="justify-content:center">🔐 <span>Enter the PIN shown on the TV</span></div>
+  <div class="dim">TV Settings → Remote PIN</div>
+  <div class="pin"><input inputmode="numeric" maxlength="1"><input inputmode="numeric" maxlength="1"><input inputmode="numeric" maxlength="1"><input inputmode="numeric" maxlength="1"></div>
+  <button class="w" onclick="sendPin()">Connect</button><div class="dim" id="pinmsg" style="margin-top:10px"></div></div>
+</div>
+<button id="showbars" onclick="showBars()" title="Menu">☰</button>
+<div id="toast"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+const APP=!!window.MyTV;
+document.body.className=APP?'app':'web';
+let S={},O=null,lastQ='',lastA='',lastS='',eqBuilt=0;
+// ---------- theme ----------
+const qp=new URLSearchParams(location.search);
+function setTheme(t){document.documentElement.dataset.theme=t;if(typeof _palSig!=='undefined'){_palSig='';}$('themeBtn').textContent=t==='dark'?'☀':'🌙';try{localStorage.setItem('theme',t)}catch(e){}if(APP)try{MyTV.setTheme(t)}catch(e){}}
+function toggleTheme(){setTheme(document.documentElement.dataset.theme==='dark'?'light':'dark');}
+let saved=null;try{saved=localStorage.getItem('theme')}catch(e){}
+setTheme(qp.get('theme')||saved||(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'));
+
+// ---------- PIN pairing ----------
+let TOK='';try{TOK=localStorage.getItem('tok')||''}catch(e){}
+if(!TOK&&APP){try{TOK=MyTV.getToken()||''}catch(e){}}
+let pinWait=null;
+function askPin(){
+  if(pinWait)return pinWait;
+  $('pinmodal').classList.add('on');const ins=[...document.querySelectorAll('.pin input')];ins.forEach(i=>i.value='');ins[0].focus();
+  pinWait=new Promise(res=>{window._pinDone=res;});return pinWait;
+}
+document.querySelectorAll('.pin input').forEach((el,i,all)=>{el.addEventListener('input',()=>{el.value=el.value.replace(/\D/g,'');if(el.value&&i<3)all[i+1].focus();if(i===3&&el.value)sendPin();});
+  el.addEventListener('keydown',e=>{if(e.key==='Backspace'&&!el.value&&i>0)all[i-1].focus();});});
+async function sendPin(){
+  const pin=[...document.querySelectorAll('.pin input')].map(i=>i.value).join('');
+  if(pin.length<4){$('pinmsg').textContent=tr('Enter the 4 digits');return;}
+  const r=await (await fetch('/pair',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'pin='+pin})).json().catch(()=>({ok:false,msg:'Cannot reach the TV'}));
+  if(r.ok&&r.token){TOK=r.token;try{localStorage.setItem('tok',TOK)}catch(e){}if(APP)try{MyTV.setToken(TOK)}catch(e){}
+    $('pinmodal').classList.remove('on');const d=window._pinDone;pinWait=null;if(d)d();toast(tr('Connected ✅'));loadApps();loadHistory();load();}
+  else{$('pinmsg').textContent=r.msg||'Wrong PIN';document.querySelectorAll('.pin input').forEach(i=>i.value='');document.querySelector('.pin input').focus();}
+}
+async function api(path,opt){
+  opt=opt||{};const h=Object.assign({},opt.headers||{});h['X-Token']=TOK;
+  const r=await fetch(path,Object.assign({},opt,{headers:h}));
+  if(r.status===401){await askPin();return api(path,opt);}
+  return r;
+}
+
+function toast(t){if(!t)return;const e=$('toast');e.textContent=t;e.classList.add('on');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('on'),2600);}
+window.toast=toast;
+async function post(path,obj){
+  try{const r=await api(path,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams(obj)});return await r.json();}
+  catch(e){return {ok:false,msg:'Cannot reach the TV. Same Wi-Fi?'};}
+}
+async function cmd(c,v,b){const r=await post('/cmd',{c:c,v:v==null?'':v,b:b==null?'':b});if(r&&r.msg)toast(r.msg);poll();return r;}
+async function key(k){if(navigator.vibrate)navigator.vibrate(15);const r=await post('/key',{k:k});if(r&&!r.ok)toast(r.msg);setTimeout(poll,300);}
+function delay(k,d){cmd(k,(k==='adelay'?(S.adelay||0):(S.sdelay||0))+d);}
+function fmt(ms){ms=Math.max(0,ms|0);let s=Math.floor(ms/1000),h=Math.floor(s/3600),m=Math.floor(s/60)%60;s%=60;return (h?h+':'+String(m).padStart(2,'0'):m)+':'+String(s).padStart(2,'0');}
+function busy(el){return el._t&&Date.now()-el._t<2500;}
+function setVal(el,v){if(el&&!busy(el)&&document.activeElement!==el)el.value=v;}
+function fill(sel,pairs,cur){const el=$(sel);const sig=JSON.stringify(pairs);if(el._sig!==sig){el.innerHTML='';pairs.forEach(p=>{const o=document.createElement('option');o.value=p[0];o.textContent=p[1];el.appendChild(o);});el._sig=sig;}setVal(el,String(cur));}
+function chips(id,pairs,cur,c){const box=$(id);const sig=JSON.stringify(pairs);if(box._sig!==sig){box.innerHTML='';pairs.forEach(p=>{const b=document.createElement('button');b.className='g';b.textContent=p[1].replace(/ \(.*\)/,'');b.title=p[1];b.dataset.v=p[0];b.onclick=()=>cmd(c,p[0]);box.appendChild(b);});box._sig=sig;}
+  box.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v===String(cur)));}
+
+let AUTOHIDE=true;try{AUTOHIDE=localStorage.getItem('autohide')!=='0'}catch(e){}
+function setAutoHide(on){AUTOHIDE=on;try{localStorage.setItem('autohide',on?'1':'0')}catch(e){}if(!on)showBars();}
+function showBars(){document.body.classList.remove('hidebars');}
+let lastY=0;
+addEventListener('scroll',()=>{const y=window.scrollY;
+  if(AUTOHIDE){if(y>lastY+8&&y>90)document.body.classList.add('hidebars');else if(y<lastY-8||y<40)showBars();}
+  lastY=y;},{passive:true});
+let curTab='remote';
+function showTab(t){
+  if(t===curTab)return;curTab=t;
+  document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x.dataset.t===t));
+  document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.id==='t-'+t));
+  if(t==='lists')load();if(t==='remote')loadHistory();
+  window.scrollTo(0,0);showBars();poll();
+}
+document.querySelectorAll('nav button').forEach(b=>{
+  b.addEventListener('pointerdown',e=>{e.preventDefault();showTab(b.dataset.t);});
+  b.addEventListener('click',()=>showTab(b.dataset.t));
+});
+function backTab(){
+  const m=document.querySelector('.modal.on');if(m&&m.id!=='pinmodal'){m.classList.remove('on');return true;}
+  if(curTab!=='remote'){showTab('remote');return true;}return false;
+}
+function goHome(){if(APP){MyTV.home();}else{document.querySelectorAll('.modal.on').forEach(m=>{if(m.id!=='pinmodal')m.classList.remove('on')});showTab('remote');}}
+
+$('seek').addEventListener('input',e=>{e.target._t=Date.now();if(S.len)$('time').textContent=fmt(S.len*e.target.value/1000);});
+$('seek').addEventListener('change',e=>{e.target._t=Date.now();if(S.len)cmd('seek',Math.round(S.len*e.target.value/1000));});
+$('vol').addEventListener('input',e=>{e.target._t=Date.now();$('volv').textContent=e.target.value+'%';});
+$('vol').addEventListener('change',e=>{e.target._t=Date.now();cmd('vol',e.target.value);});
+$('bright').addEventListener('input',e=>{e.target._t=Date.now();$('brv').textContent=e.target.value+'%';});
+$('bright').addEventListener('change',e=>{e.target._t=Date.now();cmd('bright',e.target.value);});
+$('zoom').addEventListener('input',e=>{e.target._t=Date.now();$('zoomv').textContent=e.target.value+'%';});
+$('zoom').addEventListener('change',e=>{e.target._t=Date.now();cmd('zoom',e.target.value);});
+
+async function loadOptions(){
+  try{O=await (await api('/options')).json();}catch(e){return;}
+  fill('zoomsel',O.zooms,100);
+  fill('subsize',O.subsizes.map(p=>[p[0],'Size: '+p[1]]),16);fill('subenc',O.encs.map(p=>[p[0],'Encoding: '+p[1]]),'');
+  fill('rate',O.speeds.map(s=>[String(s),s+'x']),'1');
+  fill('cache',O.caches.map(c=>[String(c),(c/1000)+' seconds']),2000);
+  fill('sleep',O.sleeps.map(m=>[String(m),m===0?'Off':m<0?'End of this video':m+' minutes']),'0');
+}
+
+// ---------- vertical equalizer ----------
+function vSlider(val,onFinal){
+  const el=document.createElement('div');el.className='vs';
+  el.innerHTML='<div class="tr"><div class="mid"></div><i class="fill"></i><b class="knob"></b></div>';
+  const tr=el.firstChild,fill=tr.querySelector('.fill'),knob=tr.querySelector('.knob');
+  const MIN=-20,MAX=20;let v=+val||0,cb=null;
+  function draw(){const f=(v-MIN)/(MAX-MIN),y=(1-f)*100,z=50;knob.style.top=y+'%';fill.style.top=Math.min(y,z)+'%';fill.style.bottom=(100-Math.max(y,z))+'%';}
+  function fromY(cy){const r=tr.getBoundingClientRect();let f=1-(cy-r.top)/r.height;f=Math.max(0,Math.min(1,f));return Math.round((MIN+f*(MAX-MIN))*2)/2;}
+  el.addEventListener('pointerdown',e=>{e.preventDefault();el.setPointerCapture(e.pointerId);el._t=Date.now();v=fromY(e.clientY);draw();if(cb)cb(v);});
+  el.addEventListener('pointermove',e=>{if(!el.hasPointerCapture(e.pointerId))return;el._t=Date.now();v=fromY(e.clientY);draw();if(cb)cb(v);});
+  el.addEventListener('pointerup',e=>{el._t=Date.now();onFinal(v);});
+  draw();
+  return {el:el,set:x=>{v=+x||0;draw();},onMove:f=>cb=f};
+}
+function buildEq(bands){
+  const box=$('eqbands');box.innerHTML='';
+  const mk=(label,val,send)=>{
+    const d=document.createElement('div');d.className='band';
+    const t=document.createElement('div');t.className='v';
+    const fmtv=x=>(+x>0?'+':'')+(+x).toFixed(0);t.textContent=fmtv(val);
+    const sl=vSlider(val,x=>send(x));sl.onMove(x=>t.textContent=fmtv(x));
+    const f=document.createElement('div');f.className='f';f.textContent=label;
+    d.appendChild(t);d.appendChild(sl.el);d.appendChild(f);box.appendChild(d);return [sl,t];
+  };
+  box._pre=mk('Pre',S.eq.preamp,v=>cmd('eq_preamp',v));
+  box._bands=bands.map((b,k)=>mk(b.f.replace(' Hz','').replace(' kHz','k'),b.v,v=>cmd('eq_band',v,k)));
+  eqBuilt=bands.length;
+}
+function showEq(x,val){if(!busy(x[0].el)){x[0].set(val);x[1].textContent=(+val>0?'+':'')+(+val).toFixed(0);}}
+
+let FOLLOW=true;try{FOLLOW=localStorage.getItem('followpal')!=='0'}catch(e){}
+function setFollow(on){FOLLOW=on;try{localStorage.setItem('followpal',on?'1':'0')}catch(e){}if(!on){const st=document.documentElement.style;['--acc','--acc2','--acc3','--bg','--bg2','--glass','--glass2','--bar','--text','--dim'].forEach(v=>st.removeProperty(v));_palSig='';}else applyPal();}
+var _palSig='';
+function applyPal(){
+  const P=S.pal;if(!P||!FOLLOW)return;const sig=JSON.stringify(P)+document.documentElement.dataset.theme;if(sig===_palSig)return;_palSig=sig;
+  const st=document.documentElement.style;st.setProperty('--acc',P.acc);st.setProperty('--acc2',P.acc2);st.setProperty('--acc3',P.acc3);
+  const pageDark=document.documentElement.dataset.theme==='dark';
+  if(P.custom||pageDark===P.dark){st.setProperty('--bg',P.bg);st.setProperty('--bg2',P.bg2);st.setProperty('--glass',P.card);st.setProperty('--glass2',P.card);st.setProperty('--bar',P.bar);st.setProperty('--text',P.text);st.setProperty('--dim',P.dim);}
+  else ['--bg','--bg2','--glass','--glass2','--bar','--text','--dim'].forEach(v=>st.removeProperty(v));
+}
+function render(){
+  if(!S.player&&S.other){const o=S.other;S.player=true;S.title='📺 '+o.app+' · '+o.title+(o.artist?' — '+o.artist:'');S.pos=o.pos;S.len=o.len;S.playing=o.playing;}
+  if($('otherbtn'))$('otherbtn').style.display=S.otherAllowed===false?'block':'none';
+  applyPal();
+  if(O&&O.palettes)fill('palsel',O.palettes.map((n,i)=>[String(i),n]),S.pal?String(S.pal.i):'0');
+  const p=S.player;
+  $('devname').textContent=(S.device||'TV')+' · '+location.hostname;
+  $('np').textContent=p?(S.title||'Playing'):'Nothing playing';
+  $('state').textContent=p?(S.loading?'loading':S.playing?'playing':'paused'):'idle';
+  $('art').textContent=p&&S.playing?'♫':'♪';
+  $('sub1').textContent=p?((S.count>1?(S.idx+1)+' of '+S.count:'')+(S.rate&&S.rate!=1?' · '+S.rate+'x':'')+(S.sleep&&S.sleep!=='Off'?' · 💤 '+S.sleep:'')+(S.loading?' · '+S.loading.split('\n')[0]:'')):'Open the Cast tab to play something';
+  $('pp').textContent=p&&S.playing?'❚❚':'▶';
+  $('acchint').style.display=S.access===false?'block':'none';
+  $('adbbtn').style.display=S.adb===false?'block':'none';
+  setVal($('dialog'),String(S.dialog||0));$('level').checked=!!S.level;$('afr').checked=!!S.afr;
+  if(S.profile)$('devname').textContent=(S.device||'TV')+' · '+S.profile;
+  if(S.scan)$('tor').textContent=S.scan;
+  setVal($('bright'),S.bright||100);if(!busy($('bright')))$('brv').textContent=(S.bright||100)+'%'+((S.bright||100)>100?' (boost)':'');
+  setVal($('qual'),String(S.quality||0));
+  const RN=['Off','One','All'];
+  $('rep').textContent=(S.repeat===1?'🔂 ':'🔁 ')+tr('Repeat')+': '+tr(RN[S.repeat||0]);
+  $('rep').classList.toggle('on',!!S.repeat);$('shuf').classList.toggle('on',!!S.shuffle);
+  $('shuf').textContent='🔀 '+tr('Shuffle')+': '+tr(S.shuffle?'On':'Off');
+  if(p&&S.len>0){setVal($('seek'),Math.round(1000*S.pos/S.len));if(!busy($('seek')))$('time').textContent=fmt(S.pos);$('len').textContent=fmt(S.len);}
+  else{$('time').textContent=p?('● Live '+fmt(S.pos)):'0:00';$('len').textContent='';}
+  setVal($('vol'),S.vol);if(!busy($('vol')))$('volv').textContent=(S.muted?'🔇 ':'')+S.vol+'%'+(S.vol>100?' boost':'');
+  const a=JSON.stringify(S.audio||[]);if(a!==lastA){lastA=a;fill('audio',(S.audio||[]).map(t=>[String(t.id),t.name]),S.audioSel);}else setVal($('audio'),String(S.audioSel));
+  const s=JSON.stringify(S.subs||[]);if(s!==lastS){lastS=s;fill('subs',(S.subs||[]).map(t=>[String(t.id),t.name]),S.subSel);}else setVal($('subs'),String(S.subSel));
+  if(!p){fill('audio',[['','(nothing playing)']],'');fill('subs',[['','(nothing playing)']],'');lastA=lastS='';}
+  $('adv').textContent=((S.adelay||0)/1000).toFixed(2)+' s';$('sdv').textContent=((S.sdelay||0)/1000).toFixed(2)+' s';
+  if(O){
+    chips('fitchips',O.fits,S.fit,'fit');chips('aspchips',O.aspects,S.aspect,'aspect');
+    setVal($('zoomsel'),String(S.zoom));setVal($('subsize'),String(S.subsize));setVal($('subenc'),S.subenc);setVal($('cache'),String(S.cache));
+    if(S.rate)setVal($('rate'),String(S.rate));$('sleepv').textContent=S.sleep&&S.sleep!=='Off'?'· '+S.sleep:'';
+  }
+  setVal($('zoom'),S.zoom);if(!busy($('zoom')))$('zoomv').textContent=S.zoom+'%';
+  $('subbg').checked=!!S.subbg;setVal($('hw'),String(S.hw));setVal($('apptheme'),S.apptheme||'dark');
+  if(!$('devin').value&&S.device)$('devin').value=S.device;
+  if(S.eq){
+    $('eqon').checked=S.eq.on;
+    if(O)fill('preset',[['-1','Preset: Custom']].concat(O.presets.map((n,i)=>[String(i),'Preset: '+n])),String(S.eq.preset));
+    if(eqBuilt!==S.eq.bands.length)buildEq(S.eq.bands);
+    const box=$('eqbands');if(box._pre)showEq(box._pre,S.eq.preamp);
+    (box._bands||[]).forEach((x,k)=>{if(S.eq.bands[k])showEq(x,S.eq.bands[k].v);});
+  }
+  const t=S.torrent||{};
+  $('torbox').style.display=t.active||(t.state&&t.state!=='idle')?'block':'none';
+  $('torbar').style.width=(t.progress||0)+'%';
+  $('tor').textContent=t.active?('🧲 '+t.name+' · '+t.peers+' peers · '+((t.speed||0)/1048576).toFixed(2)+' MB/s · '+t.progress+'%'):(t.state&&t.state!=='idle'?'🧲 '+t.state:'');
+  $('tpeers').textContent=t.active?t.peers:'–';$('tspeed').textContent=t.active?((t.speed||0)/1048576).toFixed(1):'–';$('tprog').textContent=t.active?t.progress+'%':'–';
+  $('tor2').textContent=t.active?t.name:(t.state&&t.state!=='idle'?t.state:'No torrent running');
+  const q=JSON.stringify([S.queue||[],S.idx]);
+  if(q!==lastQ){lastQ=q;const box=$('queue');box.innerHTML='';
+    const q0=S.qstart||0;
+    (S.queue||[]).forEach((n,k)=>{const i=q0+k;const d=document.createElement('div');d.className='q'+(i===S.idx?' cur':'');d.textContent=(i===S.idx?'▶ ':(i+1)+'. ')+n;d.onclick=()=>cmd('item',i);box.appendChild(d);});
+    if(S.count>200){const h=document.createElement('div');h.className='dim';h.style.marginTop='8px';h.textContent=S.count+' '+tr('channels')+' — '+tr('search above, or Save as playlist');box.appendChild(h);}
+    $('qsearch').style.display=S.count>20?'block':'none';$('saveq').style.display=S.count>1?'inline-block':'none';
+    setTimeout(()=>{const c=box.querySelector('.cur');if(c&&curTab==='remote')c.scrollIntoView({block:'nearest'});},50);
+    if(!(S.queue||[]).length)box.textContent='Empty';}
+}
+let polling=false;
+async function poll(){
+  if(polling)return;polling=true;
+  try{S=await (await api('/state')).json();if(!O||(S.player&&O.presets&&O.presets.length<2))await loadOptions();render();}
+  catch(e){$('np').textContent='Cannot reach the TV';$('devname').textContent='Offline – is the TV on?';}
+  polling=false;
+}
+setInterval(()=>{if(!document.hidden&&curTab!=='lists')poll();},1500);
+
+// ---------- uploads (browser) ----------
+function upload(path,inputId){
+  const f=$(inputId).files[0];if(!f){toast('Choose a file first');return;}
+  const fd=new FormData();fd.append('file',f,f.name);
+  const x=new XMLHttpRequest();x.open('POST',path);x.setRequestHeader('X-Token',TOK);
+  const bar=$('upbar');
+  x.upload.onprogress=e=>{if(e.lengthComputable&&bar){bar.style.width=(100*e.loaded/e.total)+'%';$('upmsg').textContent='Sending '+Math.round(100*e.loaded/e.total)+'%…';}};
+  x.onload=()=>{if(x.status===401){askPin().then(()=>upload(path,inputId));return;}try{const r=JSON.parse(x.responseText);toast(r.msg||(r.ok?'Done':'Failed'));}catch(e){toast('Failed');}if(bar){bar.style.width='0';$('upmsg').textContent='Done.';}$(inputId).value='';};
+  x.onerror=()=>toast('Upload failed');
+  toast('Sending to TV…');x.send(fd);
+}
+async function subUrl(){const u=$('suburl').value.trim();if(!u){toast('Paste a link first');return;}toast('Downloading subtitle…');const r=await cmd('subadd',u);if(r.ok)$('suburl').value='';}
+async function playNow(mode){
+  const r=await post('/play',{url:$('purl').value,title:$('ptitle').value,sub:$('psub').value,mode:mode});
+  toast(r.msg||(r.ok?'Sent':'Failed'));
+  if(r.ok){$('purl').value='';$('ptitle').value='';$('psub').value='';}
+}
+async function saveLink(){toast(tr('Adding…'));const r=await post('/add',{playlist:$('ppl').value,title:$('ptitle').value,url:$('purl').value,sub:$('psub').value});toast(r.ok?(r.msg||tr('Saved')):(r.msg||'Failed'));load();}
+
+// ---------- multi TV ----------
+async function openDevices(){
+  $('devmodal').classList.add('on');$('devlist').textContent='Scanning the Wi-Fi… (a few seconds)';
+  try{const d=await (await api('/devices')).json();const box=$('devlist');box.innerHTML='';
+    d.devices.forEach(v=>{const e=document.createElement('div');e.className='dev'+(v.me?' me':'');
+      e.innerHTML='<div class="art" style="width:40px;height:40px;font-size:18px;border-radius:12px">📺</div><div style="flex:1;min-width:0"><b></b><div class="dim"></div></div>';
+      e.querySelector('b').textContent=v.name;e.querySelector('.dim').textContent=v.ip+(v.me?' · connected':'');
+      e.onclick=()=>{if(v.me){$('devmodal').classList.remove('on');return;}if(APP)MyTV.openTv(v.ip);else location.href='http://'+v.ip+':8080/';};
+      box.appendChild(e);});
+    if(d.devices.length<2)box.insertAdjacentHTML('beforeend','<div class="dim">No other TVs found. Install TamilCastPlay on each TV and open it once.</div>');
+  }catch(e){$('devlist').textContent='Scan failed';}
+}
+
+// ---------- playlists ----------
+async function load(){try{const d=await (await api('/data')).json();renderLists(d.playlists);}catch(e){}}
+function renderLists(pls){
+  const dl=$('pls');dl.innerHTML='';const box=$('lists');box.innerHTML='';
+  // ---- manage playlists (bulk delete)
+  if(pls.length){
+    const m=document.createElement('div');m.className='card';
+    m.innerHTML='<div class="sec"><span>'+tr('Playlists')+' · '+pls.length+'</span></div>';
+    const chosen=new Set();
+    const wrap=document.createElement('div');
+    pls.forEach(p=>{const l=document.createElement('label');l.className='sw chk';
+      const c=document.createElement('input');c.type='checkbox';c.onchange=()=>{c.checked?chosen.add(p.name):chosen.delete(p.name);upd();};
+      const t=document.createElement('span');t.textContent=p.name+' · '+(p.count||p.items.length);
+      l.appendChild(c);l.appendChild(t);wrap.appendChild(l);});
+    m.appendChild(wrap);
+    const bar=document.createElement('div');bar.className='btns';bar.style.marginTop='8px';
+    const all=document.createElement('button');all.className='g';all.textContent=tr('Select all');
+    const del=document.createElement('button');del.className='del';
+    function upd(){del.textContent='🗑 '+tr('Delete')+' ('+chosen.size+')';all.textContent=chosen.size===pls.length?tr('Select none'):tr('Select all');}
+    all.onclick=()=>{const on=chosen.size!==pls.length;chosen.clear();wrap.querySelectorAll('input').forEach((c,i)=>{c.checked=on;if(on)chosen.add(pls[i].name);});upd();};
+    del.onclick=async()=>{if(!chosen.size){toast(tr('Nothing selected'));return;}
+      if(!confirm(tr('Delete')+' '+chosen.size+' '+tr('playlists')+'?'))return;
+      const r=await post('/delpls',{names:[...chosen].join('\n')});toast(r.msg);load();};
+    upd();bar.appendChild(all);bar.appendChild(del);m.appendChild(bar);box.appendChild(m);
+  }
+  pls.forEach(function(p){
+    const o=document.createElement('option');o.value=p.name;dl.appendChild(o);
+    const c=document.createElement('div');c.className='card';
+    const st={name:p.name,count:p.count||p.items.length,q:'',sel:new Set(),all:false,except:new Set(),selMode:false,list:null};
+    const h=document.createElement('div');h.className='sec';
+    const ht=document.createElement('span');ht.textContent=p.name+' · '+st.count;
+    const bx=document.createElement('div');bx.className='row';
+    const pp=document.createElement('button');pp.textContent='▶';pp.style.padding='7px 14px';pp.style.fontSize='13px';
+    pp.onclick=async()=>{const r=await post('/playlist',{playlist:p.name,idx:0});toast(r.msg);};
+    const sm=document.createElement('button');sm.className='g';sm.textContent='☑';sm.title=tr('Select');sm.style.padding='7px 12px';
+    const dp=document.createElement('button');dp.textContent='🗑';dp.className='del';
+    dp.onclick=async()=>{if(confirm(tr('Delete playlist')+' '+p.name+'?')){await post('/delpl',{playlist:p.name});load();}};
+    const tools=document.createElement('button');tools.className='g';tools.textContent='⚙';tools.style.padding='7px 12px';
+    tools.onclick=async()=>{const ch=prompt('1 = rename\n2 = update channels from link\n3 = check channels (find dead)\n4 = remove dead channels found','');
+      if(ch==='1'){const n=prompt('New name',p.name);if(n){const r=await post('/rename',{playlist:p.name,name:n});toast(r.msg);load();}}
+      else if(ch==='2'){toast('…');const r=await post('/refreshlist',{playlist:p.name});toast(r.msg);load();}
+      else if(ch==='3'){const r=await post('/scan',{playlist:p.name});toast(r.msg);}
+      else if(ch==='4'){const r=await post('/scan',{playlist:p.name,do:'remove'});toast(r.msg);load();}};
+    bx.appendChild(pp);bx.appendChild(sm);bx.appendChild(tools);bx.appendChild(dp);h.appendChild(ht);h.appendChild(bx);c.appendChild(h);
+    // search (every playlist)
+    const sr=document.createElement('input');sr.placeholder='🔍 '+tr('Search channel / name')+'…';sr.style.margin='4px 0 6px';
+    let tmo=null;sr.oninput=()=>{clearTimeout(tmo);tmo=setTimeout(()=>{st.q=sr.value.trim();st.all=false;st.sel.clear();st.except.clear();updBar();pageList(st,0,true);},300);};
+    c.appendChild(sr);
+    // select bar
+    const sb=document.createElement('div');sb.className='btns';sb.style.display='none';sb.style.margin='4px 0 8px';
+    const sa=document.createElement('button');sa.className='g';
+    const sd=document.createElement('button');sd.className='del';
+    const sx=document.createElement('button');sx.className='g';sx.textContent=tr('Cancel');
+    sb.appendChild(sa);sb.appendChild(sd);sb.appendChild(sx);c.appendChild(sb);
+    st.selected=()=>st.all?(st.matchCount-st.except.size):st.sel.size;
+    function updBar(){sa.textContent=st.all?tr('Select none'):tr('Select all')+(st.q?' ('+tr('search results')+')':'');sd.textContent='🗑 '+tr('Delete')+' ('+(st.selected()||0)+')';}
+    st.updBar=updBar;
+    sm.onclick=()=>{st.selMode=!st.selMode;sb.style.display=st.selMode?'flex':'none';st.all=false;st.sel.clear();st.except.clear();updBar();
+      st.list.querySelectorAll('.it').forEach(r=>{const c=r.querySelector('.ck');c.style.display=st.selMode?'block':'none';c.checked=false;});};
+    sx.onclick=()=>sm.onclick();
+    sa.onclick=()=>{st.all=!st.all;st.sel.clear();st.except.clear();st.list.querySelectorAll('.ck').forEach(c=>c.checked=st.all);updBar();};
+    sd.onclick=async()=>{const n=st.selected();if(!n){toast(tr('Nothing selected'));return;}
+      if(!confirm(tr('Delete')+' '+n+'?'))return;
+      const r=st.all?await post('/delmany',{playlist:p.name,all:1,q:st.q,except:[...st.except].join(',')})
+                    :await post('/delmany',{playlist:p.name,idx:[...st.sel].join(',')});
+      toast(r.msg);load();};
+    const list=document.createElement('div');c.appendChild(list);st.list=list;
+    st.matchCount=st.count;
+    renderItems(st,p.items.map((it,i)=>Object.assign({i:i},it)));
+    if(st.count>p.items.length)addMore(st,p.items.length);
+    updBar();box.appendChild(c);
+  });
+}
+function addMore(st,from){
+  const b=document.createElement('button');b.className='g w more';b.style.marginTop='8px';b.textContent=tr('Show more');
+  b.onclick=()=>{b.remove();pageList(st,from,false);};st.list.appendChild(b);
+}
+async function pageList(st,from,replace){
+  const d=await (await api('/page?playlist='+encodeURIComponent(st.name)+'&from='+from+'&q='+encodeURIComponent(st.q||''))).json();
+  if(replace){st.list.innerHTML='';st.matchCount=st.q?d.items.length:st.count;}
+  else if(st.q)st.matchCount+=d.items.length;
+  renderItems(st,d.items);
+  if(d.items.length===200){const last=d.items[d.items.length-1].i+1;addMore(st,last);if(st.q&&replace)st.matchCount=Infinity;}
+  if(!d.items.length&&replace)st.list.innerHTML='<div class="dim" style="padding:8px 0">'+tr('No channel found')+'</div>';
+  if(st.q&&st.matchCount===Infinity){/* count unknown until all pages loaded: count server-side */st.matchCount=await countMatches(st);}
+  st.updBar();
+}
+async function countMatches(st){let n=0,from=0;for(let k=0;k<200;k++){const d=await (await api('/page?playlist='+encodeURIComponent(st.name)+'&from='+from+'&q='+encodeURIComponent(st.q))).json();n+=d.items.length;if(d.items.length<200)break;from=d.items[d.items.length-1].i+1;}return n;}
+function renderItems(st,items){
+  items.forEach(function(it){const i=it.i;
+    const row=document.createElement('div');row.className='it';
+    const ck=document.createElement('input');ck.type='checkbox';ck.className='ck';ck.style.display=st.selMode?'block':'none';
+    ck.checked=st.all?!st.except.has(i):st.sel.has(i);
+    ck.onchange=()=>{if(st.all){ck.checked?st.except.delete(i):st.except.add(i);}else{ck.checked?st.sel.add(i):st.sel.delete(i);}st.updBar();};
+    const s=document.createElement('span');s.textContent=((it.u.startsWith('magnet:')||/\.torrent$/i.test(it.u))?'🧲 ':'🎬 ')+it.t;s.title=it.u;
+    s.onclick=()=>{if(st.selMode){ck.checked=!ck.checked;ck.onchange();}};
+    const pl=document.createElement('button');pl.textContent='▶';pl.className='g';pl.onclick=async()=>{const r=await post('/playlist',{playlist:st.name,idx:i});toast(r.msg);};
+    if(/\.(m3u8?|pls)(\?|\||$)/i.test(it.u)){const ex=document.createElement('button');ex.textContent='📥 '+tr('Channels');ex.className='g';ex.title=tr('Load all channels of this list');
+      ex.onclick=async()=>{toast(tr('Loading channels…'));const r=await post('/expand',{playlist:st.name,idx:i});toast(r.msg);load();};row.appendChild(ex);}
+    const b=document.createElement('button');b.textContent='✕';b.className='del';b.onclick=async()=>{await post('/del',{playlist:st.name,idx:i});load();};
+    s.ondblclick=async()=>{const t=prompt('Name',it.t);if(t===null)return;const u=prompt('Link',it.u);if(u===null)return;const r=await post('/edit',{playlist:st.name,idx:i,title:t,url:u});toast(r.msg);load();};
+    const fv=document.createElement('button');fv.textContent='★';fv.className='g';fv.title='Favourite';fv.onclick=async()=>{const r=await post('/fav',{url:it.u});toast(r.msg);};row.appendChild(fv);
+    row.insertBefore(ck,row.firstChild);row.insertBefore(s,ck.nextSibling);row.appendChild(pl);row.appendChild(b);
+    const more=st.list.querySelector('.more');st.list.insertBefore(row,more);
+  });
+}
+async function add(){toast(tr('Adding…'));const r=await post('/add',{playlist:$('pl').value,title:$('ti').value,url:$('ur').value,sub:$('us').value});toast(r.ok?(r.msg||tr('Added')):(r.msg||'Failed'));if(r.ok){$('ti').value='';$('ur').value='';$('us').value='';}load();}
+async function imp(){toast('Importing…');const r=await post('/import',{playlist:$('ipl').value,link:$('lk').value,text:$('tx').value});toast(r.ok?('Imported '+r.added+' videos'):(r.msg||'Failed'));if(r.ok){$('lk').value='';$('tx').value='';}load();}
+
+(function(){const u=qp.get('url');if(u){$('purl').value=u;showTab('cast');playNow('now');history.replaceState(null,'','/');}})();
+async function loadApps(){
+  try{const d=await (await api('/apps')).json();const box=$('apps');box.innerHTML='';
+    d.apps.forEach(a=>{const e=document.createElement('div');e.className='app';
+      if(a.icon){const i=document.createElement('img');i.src=a.icon;e.appendChild(i);}
+      else{const ph=document.createElement('div');ph.className='ph';ph.textContent=a.name[0];e.appendChild(ph);}
+      const n=document.createElement('span');n.textContent=a.name+(a.installed?'':' ⬇');e.appendChild(n);
+      e.onclick=async()=>{if(navigator.vibrate)navigator.vibrate(15);const r=await post('/launch',{pkg:a.pkg});toast(r.msg);};
+      box.appendChild(e);});
+    if(!d.apps.length)box.innerHTML='<div class="dim">No apps yet. On the TV home screen choose “＋ Add apps”.</div>';
+  }catch(e){$('apps').innerHTML='<div class="dim">Cannot load apps</div>';}
+}
+async function loadHistory(){
+  try{const d=await (await api('/history')).json();const box=$('cw');box.innerHTML='';
+    $('cwcard').style.display=d.items.length?'block':'none';
+    d.items.forEach(w=>{const e=document.createElement('div');e.className='cwi';
+      const th=document.createElement('div');th.className='th';th.textContent='▶';
+      if(w.thumb){const im=document.createElement('img');im.src='/thumb?k='+w.thumb+'&t='+TOK;th.appendChild(im);}
+      const bar=document.createElement('i');bar.style.width=(w.l?Math.min(100,100*w.p/w.l):0)+'%';th.appendChild(bar);
+      const b=document.createElement('b');b.textContent=w.t;
+      const sm=document.createElement('small');sm.textContent=Math.max(1,Math.round((w.l-w.p)/60000))+' '+tr('min left');
+      e.appendChild(th);e.appendChild(b);e.appendChild(sm);
+      e.onclick=async()=>{const r=await post('/play',{url:w.u,title:w.t});toast(r.msg);};
+      e.oncontextmenu=async(ev)=>{ev.preventDefault();if(confirm(tr('Remove from Continue watching')+'?')){await post('/historydel',{url:w.u});loadHistory();}};
+      box.appendChild(e);});
+  }catch(e){}
+}
+let qt=null;
+$('qsearch').addEventListener('input',()=>{clearTimeout(qt);qt=setTimeout(async()=>{
+  const q=$('qsearch').value.trim();const box=$('qres');box.innerHTML='';$('queue').style.display=q?'none':'block';if(!q)return;
+  const d=await (await api('/qsearch?q='+encodeURIComponent(q))).json();
+  if(!d.items.length){box.innerHTML='<div class="dim" style="padding:8px 0">'+tr('No channel found')+'</div>';return;}
+  d.items.forEach(it=>{const e=document.createElement('div');e.className='q'+(it.cur?' cur':'');e.textContent=(it.i+1)+'. '+it.t;
+    e.onclick=()=>{cmd('item',it.i);$('qsearch').value='';box.innerHTML='';$('queue').style.display='block';};box.appendChild(e);});
+},300);});
+async function saveQueue(){const n=prompt(tr('Playlist name'),'IPTV');if(n===null)return;const r=await post('/savequeue',{playlist:n||'IPTV'});toast(r.msg);load();}
+async function typeText(){const t=$('typebox').value;if(!t)return;const r=await post('/type',{text:t});toast(r.msg);$('typebox').value='';}
+async function cacheInfo(){const d=await (await api('/torrentcache')).json();$('tcache').textContent='💾 '+(d.bytes/1073741824).toFixed(2)+' GB used by saved torrents';}
+async function subFind(){const q=$('subq').value.trim()||(S.title||'');toast('🔎 …');const d=await (await api('/subsearch?q='+encodeURIComponent(q))).json();
+  const box=$('subres');box.innerHTML='';if(!d.items||!d.items.length){toast(d.msg||'No subtitles found');return;}
+  d.items.forEach((t,i)=>{const e=document.createElement('div');e.className='q';e.textContent=t;e.onclick=async()=>{const r=await post('/subpick',{i:i});toast(r.msg);box.innerHTML='';};box.appendChild(e);});}
+async function dlList(){try{const d=await (await api('/dllist')).json();$('dlnight').checked=d.night;const box=$('dllist');box.innerHTML='';
+  if(!d.items.length){box.textContent='—';return;}
+  d.items.forEach(x=>{const e=document.createElement('div');e.className='it';const s=document.createElement('span');s.textContent=(x.done?'✅ ':'⬇ ')+x.name+' · '+x.state;
+    const b=document.createElement('button');b.className='del';b.textContent='✕';b.onclick=async()=>{await post('/dlcancel',{src:x.src,del:0});dlList();};e.appendChild(s);e.appendChild(b);box.appendChild(e);});}catch(e){}}
+setInterval(()=>{if(curTab==='cast')dlList();},5000);
+function bmList(){const b=S.bookmarks||[];if(!b.length){toast('🔖 none yet');return;}
+  const n=prompt(b.map((x,i)=>(i+1)+'. '+fmt(x.t)).join('\n')+'\n\nJump to number:','1');if(n)cmd('bmjump',parseInt(n)-1);}
+async function tvInfo(){try{const d=await (await api('/tvinfo')).json();$('tvrep').textContent=d.report;$('tvline').textContent=d.line||'';if(d.testing)setTimeout(tvInfo,1500);}catch(e){}}
+async function tvTest(t){const r=await post('/tvtest',{t:t});toast(r.msg);setTimeout(tvInfo,1200);}
+async function tvBrowse(){const r=await post('/browse',{url:$('burl').value.trim()});toast(r.msg);}
+setInterval(()=>{if(!document.hidden)loadHistory();},20000);
+
+// ---------- Tamil / English ----------
+const TA={"Now playing":"இப்போது இயங்குவது","Nothing playing":"எதுவும் இயங்கவில்லை","Use Cast to play something":"ஏதாவது இயக்க Cast திறக்கவும்","Remote":"ரிமோட்","Volume":"ஒலி அளவு","Queue":"வரிசை","Empty":"காலி",
+"Apps on the TV":"டிவியில் உள்ள செயலிகள்","tap to open":"திறக்க தட்டவும்","Continue watching":"தொடர்ந்து பார்க்க","min left":"நிமிடம் மீதம்","Remove from Continue watching":"தொடர்ந்து பார்க்க பட்டியலிலிருந்து நீக்கு",
+"Audio track":"ஒலித் தடம்","Audio delay (lip-sync)":"ஒலி தாமதம் (உதடு ஒத்திசைவு)","Subtitles":"வசனங்கள்","🚫 Turn subtitles off":"🚫 வசனங்களை அணை","Subtitle delay":"வசன தாமதம்","Add a subtitle":"வசனம் சேர்","⬆ Send file to TV":"⬆ கோப்பை டிவிக்கு அனுப்பு","Load from link":"இணைப்பிலிருந்து ஏற்று","Subtitle style":"வசன பாணி","Dark box behind text":"எழுத்துக்குப் பின் கருப்புப் பெட்டி",
+"Picture fit":"படப் பொருத்தம்","Aspect ratio":"திரை விகிதம்","Zoom / crop":"ஜூம் / வெட்டு","Equalizer":"ஈக்வலைசர்","On":"இயக்கு","Reset (flat)":"மீட்டமை (சமநிலை)","Playback":"இயக்கம்","Speed":"வேகம்","Sleep timer":"உறக்க நேரம்","Decoder":"டிகோடர்","Network buffer":"நெட்வொர்க் பஃபர்",
+"From this phone":"இந்த போனிலிருந்து","📱 Play videos / songs from this phone":"📱 இந்த போனின் வீடியோ / பாடல்களை இயக்கு","+ Add phone files to the TV queue":"+ போன் கோப்புகளை டிவி வரிசையில் சேர்","🧲 Open a .torrent file":"🧲 .torrent கோப்பைத் திற","⬆ Send to TV and play":"⬆ டிவிக்கு அனுப்பி இயக்கு","🧲 Play .torrent file":"🧲 .torrent கோப்பை இயக்கு",
+"Browser":"உலாவி","🌐 Search the web on this phone & send videos":"🌐 இந்த போனில் இணையத்தில் தேடி வீடியோ அனுப்பு","📺 Open on the TV browser":"📺 டிவி உலாவியில் திற","Play a link":"இணைப்பை இயக்கு","▶ Play on TV":"▶ டிவியில் இயக்கு","+ Queue":"+ வரிசையில் சேர்","Torrent":"டொரண்ட்","peers":"பியர்கள்","done":"முடிந்தது","No torrent running":"டொரண்ட் எதுவும் இயங்கவில்லை","Stop & delete data":"நிறுத்தி தரவை அழி",
+"Import M3U playlist":"M3U பிளேலிஸ்ட் இறக்குமதி","Import":"இறக்குமதி","Add to a playlist":"பிளேலிஸ்டில் சேர்","Add":"சேர்","TV settings":"டிவி அமைப்புகள்","TV app theme":"டிவி செயலி தீம்","TV name (shown when scanning)":"டிவி பெயர் (தேடும்போது தெரியும்)","Save":"சேமி",
+"Remote ":"ரிமோட்","Audio/Subs":"ஒலி/வசனம்","Picture/EQ":"படம்/EQ","Cast":"அனுப்பு","Library":"நூலகம்","TVs on this Wi-Fi":"இந்த Wi-Fi இல் உள்ள டிவிகள்","More options…":"மேலும்…",
+"Enter the PIN shown on the TV":"டிவியில் தெரியும் PIN-ஐ உள்ளிடவும்","Connect":"இணை","Enter the 4 digits":"4 இலக்கங்களை உள்ளிடவும்","Connected ✅":"இணைக்கப்பட்டது ✅","⏹ Stop":"⏹ நிறுத்து","↩ Back":"↩ பின்","⌂ Home":"⌂ முகப்பு","⚙ Menu":"⚙ மெனு",
+"Search words or a web address":"தேடல் சொற்கள் அல்லது இணைய முகவரி","Title (optional)":"தலைப்பு (விருப்பம்)","Subtitle link (optional)":"வசன இணைப்பு (விருப்பம்)","Playlist name":"பிளேலிஸ்ட் பெயர்","channels":"சேனல்கள்","use Library to search":"தேட நூலகத்தைப் பயன்படுத்தவும்","Search":"தேடு","Show more":"மேலும் காட்டு","No channel found":"சேனல் கிடைக்கவில்லை","Playlists":"பிளேலிஸ்ட்கள்","Select all":"அனைத்தும் தேர்வு","Select none":"எதுவும் வேண்டாம்","Delete":"நீக்கு","playlists":"பிளேலிஸ்ட்கள்","Nothing selected":"எதையும் தேர்வு செய்யவில்லை","Select":"தேர்வு","Delete playlist":"பிளேலிஸ்டை நீக்கு","Search channel / name":"சேனல் / பெயர் தேடு","search results":"தேடல் முடிவுகள்","Cancel":"ரத்து"};
+const HI={"Now playing":"अभी चल रहा है","Nothing playing":"कुछ नहीं चल रहा","Use Cast to play something":"कुछ चलाने के लिए Cast खोलें","Remote":"रिमोट","Volume":"आवाज़","Queue":"कतार","Empty":"खाली",
+"Apps on the TV":"टीवी के ऐप्स","tap to open":"खोलने के लिए टैप करें","Continue watching":"देखना जारी रखें","min left":"मिनट बाकी","Remove from Continue watching":"देखना जारी रखें से हटाएँ",
+"Audio track":"ऑडियो ट्रैक","Audio delay (lip-sync)":"ऑडियो देरी (लिप-सिंक)","Subtitles":"सबटाइटल","🚫 Turn subtitles off":"🚫 सबटाइटल बंद करें","Subtitle delay":"सबटाइटल देरी","Add a subtitle":"सबटाइटल जोड़ें","⬆ Send file to TV":"⬆ फ़ाइल टीवी पर भेजें","Load from link":"लिंक से लोड करें","Subtitle style":"सबटाइटल स्टाइल","Dark box behind text":"टेक्स्ट के पीछे काला बॉक्स",
+"Picture fit":"पिक्चर फ़िट","Aspect ratio":"आस्पेक्ट रेशियो","Zoom / crop":"ज़ूम / क्रॉप","Equalizer":"इक्वलाइज़र","On":"चालू","Reset (flat)":"रीसेट (फ़्लैट)","Playback":"प्लेबैक","Speed":"गति","Sleep timer":"स्लीप टाइमर","Decoder":"डिकोडर","Network buffer":"नेटवर्क बफ़र",
+"From this phone":"इस फ़ोन से","📱 Play videos / songs from this phone":"📱 इस फ़ोन के वीडियो / गाने चलाएँ","+ Add phone files to the TV queue":"+ फ़ोन की फ़ाइलें टीवी कतार में जोड़ें","🧲 Open a .torrent file":"🧲 .torrent फ़ाइल खोलें","⬆ Send to TV and play":"⬆ टीवी पर भेजें और चलाएँ","🧲 Play .torrent file":"🧲 .torrent फ़ाइल चलाएँ",
+"Browser":"ब्राउज़र","🌐 Search the web on this phone & send videos":"🌐 इस फ़ोन पर वेब खोजें और वीडियो भेजें","📺 Open on the TV browser":"📺 टीवी ब्राउज़र में खोलें","Play a link":"लिंक चलाएँ","▶ Play on TV":"▶ टीवी पर चलाएँ","+ Queue":"+ कतार","Torrent":"टॉरेंट","peers":"पीयर","done":"पूरा","No torrent running":"कोई टॉरेंट नहीं चल रहा","Stop & delete data":"रोकें और डेटा मिटाएँ",
+"Import M3U playlist":"M3U प्लेलिस्ट इम्पोर्ट करें","Import":"इम्पोर्ट","Add to a playlist":"प्लेलिस्ट में जोड़ें","Add":"जोड़ें","TV settings":"टीवी सेटिंग्स","TV app theme":"टीवी ऐप थीम","TV name (shown when scanning)":"टीवी का नाम (खोजते समय दिखेगा)","Save":"सेव करें",
+"Audio/Subs":"ऑडियो/सबटाइटल","Picture/EQ":"पिक्चर/EQ","Cast":"भेजें","Library":"लाइब्रेरी","TVs on this Wi-Fi":"इस Wi-Fi के टीवी","More options…":"और विकल्प…",
+"Enter the PIN shown on the TV":"टीवी पर दिखा PIN डालें","Connect":"जोड़ें","Enter the 4 digits":"4 अंक डालें","Connected ✅":"जुड़ गया ✅","⏹ Stop":"⏹ रोकें","↩ Back":"↩ पीछे","⌂ Home":"⌂ होम","⚙ Menu":"⚙ मेन्यू",
+"Search words or a web address":"खोज शब्द या वेब पता","Title (optional)":"शीर्षक (वैकल्पिक)","Subtitle link (optional)":"सबटाइटल लिंक (वैकल्पिक)","Playlist name":"प्लेलिस्ट का नाम","channels":"चैनल","Search":"खोजें","Show more":"और दिखाएँ","No channel found":"कोई चैनल नहीं मिला",
+"Playlists":"प्लेलिस्ट","Select all":"सभी चुनें","Select none":"कुछ नहीं चुनें","Delete":"मिटाएँ","playlists":"प्लेलिस्ट","Nothing selected":"कुछ नहीं चुना","Select":"चुनें","Delete playlist":"प्लेलिस्ट मिटाएँ","Search channel / name":"चैनल / नाम खोजें","search results":"खोज के नतीजे","Cancel":"रद्द करें",
+"💾 Save as playlist":"💾 प्लेलिस्ट के रूप में सेव करें","search above, or Save as playlist":"ऊपर खोजें, या प्लेलिस्ट के रूप में सेव करें","Channels":"चैनल","Load all channels of this list":"इस सूची के सभी चैनल लोड करें","Loading channels…":"चैनल लोड हो रहे हैं…","Adding…":"जोड़ा जा रहा है…","Added":"जुड़ गया","Saved":"सेव हुआ"};
+Object.assign(HI,{"ℹ To control other apps, turn on TV Settings > Accessibility > TamilCastPlay":"ℹ दूसरे ऐप चलाने के लिए: टीवी सेटिंग्स > Accessibility > TamilCastPlay चालू करें","Type text on the TV (search boxes)":"टीवी पर लिखें (सर्च बॉक्स)","Repeat":"दोहराएँ","Shuffle":"शफ़ल","Off":"बंद","On":"चालू","One":"एक","All":"सभी","This page":"यह पेज","Auto-hide top & bottom bars while scrolling":"स्क्रॉल करते समय ऊपर-नीचे की पट्टियाँ छिपाएँ"});
+Object.assign(TA,{"ℹ To control other apps, turn on TV Settings > Accessibility > TamilCastPlay":"ℹ பிற செயலிகளைக் கட்டுப்படுத்த: டிவி அமைப்புகள் > Accessibility > TamilCastPlay இயக்கவும்","Type text on the TV (search boxes)":"டிவியில் எழுது (தேடல் பெட்டிகள்)","Repeat":"மீண்டும்","Shuffle":"கலக்கு","Off":"அணை","On":"இயக்கு","One":"ஒன்று","All":"அனைத்தும்","This page":"இந்தப் பக்கம்","Auto-hide top & bottom bars while scrolling":"உருட்டும்போது மேல்/கீழ் பட்டிகளை மறை","💾 Save as playlist":"💾 பிளேலிஸ்டாகச் சேமி","search above, or Save as playlist":"மேலே தேடவும், அல்லது பிளேலிஸ்டாகச் சேமிக்கவும்","Channels":"சேனல்கள்","Load all channels of this list":"இந்தப் பட்டியலின் அனைத்து சேனல்களையும் ஏற்று","Loading channels…":"சேனல்கள் ஏற்றப்படுகின்றன…","Adding…":"சேர்க்கிறது…","Added":"சேர்க்கப்பட்டது","Saved":"சேமிக்கப்பட்டது"});
+const DICTS={ta:TA,hi:HI};
+let LANG='';try{LANG=localStorage.getItem('lang')||''}catch(e){}
+function D(){return DICTS[LANG]||null;}
+function tr(t){const d=D();return d&&d[t]?d[t]:t;}
+function applyLang(){
+  $('langBtn').textContent=LANG==='ta'?'अ':LANG==='hi'?'EN':'த';
+  $('langBtn').title=LANG==='ta'?'हिन्दी':LANG==='hi'?'English':'தமிழ்';
+  const d=D();
+  const walk=n=>{if(n.nodeType===3){const k=n._en||n.nodeValue.trim();if(k&&(TA[k]||HI[k])){n._en=k;const v=d&&d[k]?d[k]:k;n.nodeValue=n.nodeValue.replace(n.nodeValue.trim(),v);}return;}
+    if(n.nodeType===1&&n.tagName!=='SCRIPT'&&n.tagName!=='STYLE'){if(n.placeholder){const k=n._ph||n.placeholder.replace(/^🔍 /,'');if(TA[k]||HI[k]){n._ph=k;const pre=n.placeholder.startsWith('🔍 ')?'🔍 ':'';n.placeholder=pre+(d&&d[k]?d[k]:k);}}n.childNodes.forEach(walk);}};
+  walk(document.body);
+}
+function toggleLang(){LANG=LANG==='en'||!LANG?'ta':LANG==='ta'?'hi':'en';try{localStorage.setItem('lang',LANG)}catch(e){}applyLang();}
+(async()=>{if(!LANG){try{const s=await (await api('/state')).json();LANG=(s.lang==='ta'||s.lang==='hi')?s.lang:'en';}catch(e){LANG='en';}}applyLang();})();
+
+$('autohide').checked=AUTOHIDE;$('followpal').checked=FOLLOW;
+loadOptions().then(poll);load();loadApps();loadHistory();
+</script>
+</body>
+</html>

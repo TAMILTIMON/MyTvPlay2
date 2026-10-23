@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="acc_desc">Lets the TamilCastPlay phone app work like a TV remote everywhere on this TV: arrows, OK, Back, Home, Recent apps and typing text into search boxes. It does not read or collect anything.</string>
+    <string name="acc_label">TamilCastPlay phone remote</string>
+</resources>
