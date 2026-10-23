@@ -22,8 +22,11 @@
     <uses-feature android:name="android.software.leanback" android:required="false" />
 
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+<<<<<<< HEAD
     <uses-permission android:name="android.permission.KILL_BACKGROUND_PROCESSES" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+=======
+>>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
 
     <!-- Needed on Android 11+ to see and open other apps (Netflix, JioHotstar, Spotify, SonyLIV…) -->
     <queries>
@@ -82,6 +85,7 @@
             android:name=".FileBrowserActivity"
             android:exported="false" />
 
+<<<<<<< HEAD
         <activity
             android:name=".TvInfoActivity"
             android:exported="false" />
@@ -94,6 +98,8 @@
             android:name=".NetworkActivity"
             android:exported="false" />
 
+=======
+>>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
         <!-- "Share" any link / video / song / .torrent from another phone app -> play on the TV -->
         <activity
             android:name=".ShareActivity"
@@ -208,6 +214,7 @@
                 android:value="Media-style notification that remote-controls a TV on the local network" />
         </service>
 
+<<<<<<< HEAD
         <!-- lets the remote show / control videos playing in other apps -->
         <service
             android:name=".MediaWatch"
@@ -229,6 +236,8 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+=======
+>>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
         <receiver
             android:name=".BootReceiver"
             android:exported="true">

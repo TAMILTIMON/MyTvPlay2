@@ -5,6 +5,7 @@ import android.app.Application;
 import android.os.Bundle;
 
 public class App extends Application {
+<<<<<<< HEAD
     public static final String DEFAULT_IPTV = "https://iptv-org.github.io/iptv/index.m3u";
     public static final String DEFAULT_IPTV_NAME = "IPTV · World (iptv-org)";
 
@@ -23,6 +24,8 @@ public class App extends Application {
             }
         }).start();
     }
+=======
+>>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
     /** Number of visible activities of this app (0 = app is in the background). */
     public static volatile int visible = 0;
 
@@ -45,7 +48,10 @@ public class App extends Application {
         Net.cleanSubtitleCache(this);
         TorrentEngine.cleanupAsync(this);
         RemoteService.start(this);
+<<<<<<< HEAD
         seedIptv();
+=======
+>>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
         registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {
             public void onActivityStarted(Activity a) { visible++; }
             public void onActivityStopped(Activity a) { visible = Math.max(0, visible - 1); }

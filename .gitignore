@@ -3,7 +3,11 @@ build/
 local.properties
 *.iml
 .idea/
+<<<<<<< HEAD
 *.jks
 *.keystore
 KEYSTORE_B64.txt
 GITHUB_SECRETS.txt
+=======
+>>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
+*.crdownload

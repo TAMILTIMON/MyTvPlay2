@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 TAMILCASTPLAY 2.3.1 — 🗣 Clear dialogue
 ======================================
 "Night mode" is now "Clear dialogue" with levels Off / Light / Medium / Strong.
@@ -115,6 +116,8 @@ TAMILCASTPLAY 2.0 — brightness, torrent cache, quality, full remote
   ⚙ Settings > Full remote (or the 🔌 button on the phone) > Connect > on the TV
   tick "Always allow" > OK. Keys take ~0.5 s each this way.
 
+=======
+>>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
 TAMILCASTPLAY 1.9 — player keys fixed + colour palettes
 =======================================================
 Player (TV remote)

@@ -69,11 +69,15 @@ public class NativeRemoteActivity extends AppCompatActivity {
     private int curTab = 0;
 
     // live views
+<<<<<<< HEAD
     private Button otherBtn, nightBtn, levelBtn, afrBtn;
     private TextView accessHint, brLabel;
     private SeekBar bright;
     private Button adbBtn, qualBtn;
     private long brTouch;
+=======
+    private TextView accessHint;
+>>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
     private TextView npTitle, npSub, tLeft, tRight, volLabel, torLine, adLabel, sdLabel, zoomLabel, devLine;
     private SeekBar seek, vol, zoom;
     private Button playBtn, repBtn, shufBtn, audioBtn, subBtn, fitBtn, aspBtn, sizeBtn, encBtn, presetBtn,
@@ -535,6 +539,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
         np.addView(ctl);
         row(np, btn("−30s", false, v -> cmd("jump", "-30000")), btn("⏹", false, v -> cmd("stop", "")),
                 btn("+30s", false, v -> cmd("jump", "30000")));
+<<<<<<< HEAD
         row(np, btn("🔖", false, v -> cmd("bmadd", "")), btn("🔖…", false, v -> {
                     JSONArray bm = S.optJSONArray("bookmarks");
                     if (bm == null || bm.length() == 0) {
@@ -552,6 +557,11 @@ public class NativeRemoteActivity extends AppCompatActivity {
         otherBtn = full(np, btn("📺 " + T.t("Show other apps' videos on the remote"), false,
                 v -> call("/otherallow", null, r -> toast(r.optString("msg")))));
         otherBtn.setVisibility(View.GONE);
+=======
+        repBtn = btn("🔁", false, v -> cmd("repeat", ""));
+        shufBtn = btn("🔀", false, v -> cmd("shuffle", ""));
+        row(np, repBtn, shufBtn);
+>>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
         torLine = Ui.text(this, 12, Ui.DIM, false);
         torLine.setVisibility(View.GONE);
         np.addView(torLine);
@@ -594,6 +604,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
         accessHint.setText("ℹ " + T.t("To control other apps, turn on TV Settings > Accessibility > TamilCastPlay"));
         accessHint.setVisibility(View.GONE);
         dc.addView(accessHint);
+<<<<<<< HEAD
         adbBtn = full(dc, btn("🔌 " + T.t("Full remote for every app (ADB)"), true, v -> {
             new AlertDialog.Builder(this).setTitle("🔌 " + T.t("Full remote for every app (ADB)"))
                     .setMessage(T.t("Makes the phone remote work in EVERY app (YouTube, Netflix, settings) by pressing real keys.")
@@ -603,6 +614,8 @@ public class NativeRemoteActivity extends AppCompatActivity {
                     .setPositiveButton(T.t("Connect"), (dd, ww) -> cmd("adbsetup", ""))
                     .setNegativeButton(T.t("Cancel"), null).show();
         }));
+=======
+>>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
         final EditText typeBox = field(dc, "⌨ " + T.t("Type text on the TV (search boxes)"), false);
         full(dc, btn("⌨ " + T.t("Send text"), false, v -> {
             String tx = typeBox.getText().toString();
@@ -637,6 +650,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
         row(vc, btn("🔇", false, v -> cmd("mute", "")), btn("50", false, v -> cmd("vol", "50")),
                 btn("100", false, v -> cmd("vol", "100")), btn("150", false, v -> cmd("vol", "150")),
                 btn("200", true, v -> cmd("vol", "200")));
+<<<<<<< HEAD
         // brightness of the picture on the TV
         brLabel = Ui.text(this, 14, Ui.TEXT, true);
         brLabel.setPadding(0, dp(10), 0, 0);
@@ -661,6 +675,8 @@ public class NativeRemoteActivity extends AppCompatActivity {
         });
         row(vc, btn("☀ 50", false, v -> cmd("bright", "50")), btn("☀ 75", false, v -> cmd("bright", "75")),
                 btn("☀ 100", false, v -> cmd("bright", "100")), btn("☀ 125", false, v -> cmd("bright", "125")));
+=======
+>>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
 
         // apps
         LinearLayout ac = card(p, "Apps");
@@ -871,6 +887,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
                 btn("+1", false, v -> delay("sdelay", 1000)));
 
         LinearLayout add = card(p, T.t("Load subtitles"));
+<<<<<<< HEAD
         full(add, btn("🔎 " + T.t("Find subtitles online…"), true, v -> {
             final EditText q = new EditText(this);
             q.setSingleLine(true);
@@ -891,6 +908,8 @@ public class NativeRemoteActivity extends AppCompatActivity {
                         });
                     }).setNegativeButton(T.t("Cancel"), null).show();
         }));
+=======
+>>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
         full(add, btn("📁 " + T.t("Load subtitles") + " (.srt .ass .vtt .zip)", true, v -> {
             Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*");
             startActivityForResult(i, PICK_SUB);
@@ -1027,6 +1046,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
         sleepBtn = full(pb, btn("", false, v -> pickSleep()));
         hwBtn = full(pb, btn("", false, v -> cmd("hw", S.optInt("hw") == 1 ? "0" : "1")));
         cacheBtn = full(pb, btn("", false, v -> pickCache()));
+<<<<<<< HEAD
         nightBtn = full(pb, btn("🗣", true, v -> {
             String[] n = {PlayerActivity.dialogName(0), PlayerActivity.dialogName(1), PlayerActivity.dialogName(2), PlayerActivity.dialogName(3)};
             new AlertDialog.Builder(this).setTitle("🗣 " + T.t("Clear dialogue (quiet voices, loud music)"))
@@ -1044,6 +1064,8 @@ public class NativeRemoteActivity extends AppCompatActivity {
                     .setItems(names, (d, w) -> cmd("quality", String.valueOf(qs[w]))).show();
         }));
         label(pb, "ℹ IPTV / HLS / DASH streams use the lower quality. Torrents: picks the matching file when a torrent has several.");
+=======
+>>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
         return p;
     }
 
@@ -1124,6 +1146,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
             call("/play", m("url", url.getText().toString().trim(), "title", title.getText().toString(), "mode", "queue"), null);
             hideKeyboard();
         }));
+<<<<<<< HEAD
         full(pl, btn("⬇ " + T.t("Download for later") + " (magnet / .torrent)", false, v -> {
             call("/dl", m("url", url.getText().toString().trim()), null);
             hideKeyboard();
@@ -1139,6 +1162,8 @@ public class NativeRemoteActivity extends AppCompatActivity {
                             (d, w) -> call("/dlnight", m("v", r.optBoolean("night") ? "0" : "1"), null))
                     .setPositiveButton(T.t("Close"), null).show();
         })));
+=======
+>>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
         final EditText pln = field(pl, T.t("Playlist name"), false);
         full(pl, btn("💾 " + T.t("Save"), false, v -> {
             toast("…");
@@ -1154,6 +1179,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
         final TextView ts = label(tc, "—");
         ts.setTag("torstat");
         full(tc, btn("⏹ " + T.t("Stop torrent and delete its data"), false, v -> call("/torrentstop", null, null)));
+<<<<<<< HEAD
         final TextView cacheInfo = label(tc, "");
         full(tc, btn("🧲 " + T.t("Torrent storage: ") + "…", false, v -> call("/torrentcache", null, r -> {
             final double gb = r.optLong("bytes") / 1073741824.0;
@@ -1162,6 +1188,8 @@ public class NativeRemoteActivity extends AppCompatActivity {
                     .setItems(new String[]{"🗑 Delete saved torrents (keep my kept movies)", "🗑 Delete everything (also kept movies)"},
                             (d, w) -> call("/torrentcache", m("do", w == 0 ? "clear" : "all"), null)).show();
         })));
+=======
+>>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
 
         LinearLayout im = card(p, "M3U");
         final EditText ipl = field(im, T.t("Playlist name"), false);
@@ -1270,7 +1298,10 @@ public class NativeRemoteActivity extends AppCompatActivity {
             cmd("devname", dn.getText().toString().trim());
             hideKeyboard();
         }));
+<<<<<<< HEAD
         full(tvs, btn("📊 " + T.t("My TV") + " · " + T.t("storage, memory, speed test"), true, v -> myTv()));
+=======
+>>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
         full(tvs, btn("🎨 " + T.t("TV colours (palette)"), false, v -> {
             String[] names = Palette.NAMES;
             new AlertDialog.Builder(this).setTitle(T.t("Palette")).setItems(names, (d, w) -> cmd("palette", String.valueOf(w))).show();
@@ -1281,6 +1312,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
         return p;
     }
 
+<<<<<<< HEAD
     /** Report from the TV + tests and cleaning, run on the TV. */
     private void myTv() {
         ScrollView sv = new ScrollView(this);
@@ -1324,6 +1356,8 @@ public class NativeRemoteActivity extends AppCompatActivity {
         dlg.show();
     }
 
+=======
+>>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
     private void loadLists() {
         call("/data", null, r -> {
             listsBox.removeAllViews();
@@ -1351,6 +1385,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
                 lp.setMargins(dp(6), 0, 0, 0);
                 rw.addView(play, lp);
                 rw.setOnClickListener(v -> openPlaylist(name));
+<<<<<<< HEAD
                 rw.setOnLongClickListener(v -> {
                     String[] acts = {"✏ " + T.t("Rename playlist"), "🔄 " + T.t("Update channels from link"),
                             "🩺 " + T.t("Check channels (find ones that don't work)"), "🗑 " + T.t("Remove channels that don't work")};
@@ -1377,6 +1412,8 @@ public class NativeRemoteActivity extends AppCompatActivity {
                     }).show();
                     return true;
                 });
+=======
+>>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
                 listsBox.addView(rw);
             }
         });
@@ -1508,8 +1545,11 @@ public class NativeRemoteActivity extends AppCompatActivity {
             final String u = urls.get(pos);
             List<String> acts = new ArrayList<>();
             acts.add(T.t("▶ Play now"));
+<<<<<<< HEAD
             acts.add("★ " + T.t("Favourite"));
             acts.add("✏ " + T.t("Edit name / link"));
+=======
+>>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
             boolean list = Formats.maybeList(u);
             if (list) acts.add("📥 " + T.t("Load all channels"));
             acts.add("🗑 " + T.t("Delete"));
@@ -1518,6 +1558,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
                 if (w == 0) {
                     call("/playlist", m("playlist", name, "idx", String.valueOf(i)), null);
                     dlg.dismiss();
+<<<<<<< HEAD
                 } else if (w == 1) {
                     call("/fav", m("url", u), null);
                 } else if (w == 2) {
@@ -1535,6 +1576,9 @@ public class NativeRemoteActivity extends AppCompatActivity {
                                 load[0].run();
                             })).setNegativeButton(T.t("Cancel"), null).show();
                 } else if (isList && w == 3) {
+=======
+                } else if (isList && w == 1) {
+>>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
                     toast("…");
                     call("/expand", m("playlist", name, "idx", String.valueOf(i)), r -> {
                         toast(r.optString("msg"));
@@ -1591,6 +1635,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
     }
 
     private void render() {
+<<<<<<< HEAD
         JSONObject oth = S.optJSONObject("other");
         if (!S.optBoolean("player") && oth != null) {
             // another app (YouTube, Netflix…) is playing: show it like our own player
@@ -1602,6 +1647,8 @@ public class NativeRemoteActivity extends AppCompatActivity {
             }
         }
         otherBtn.setVisibility(!S.optBoolean("otherAllowed", true) ? View.VISIBLE : View.GONE);
+=======
+>>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
         boolean p = S.optBoolean("player");
         String dev = S.optString("device", tvName);
         setIf(devLine, dev + " · " + ip);
@@ -1641,6 +1688,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
         if (tstat instanceof TextView) setIf((TextView) tstat, ts.isEmpty() ? "—" : ts);
         renderQueue();
         accessHint.setVisibility(S.optBoolean("access", true) ? View.GONE : View.VISIBLE);
+<<<<<<< HEAD
         adbBtn.setVisibility(S.optBoolean("adb", true) ? View.GONE : View.VISIBLE);
         if (System.currentTimeMillis() - brTouch > 2500) {
             int bv = S.optInt("bright", 100);
@@ -1649,6 +1697,8 @@ public class NativeRemoteActivity extends AppCompatActivity {
         }
         int qv = S.optInt("quality", 0);
         setIf(qualBtn, "📶  " + T.t("Streaming quality: ") + (qv == 0 ? T.t("Best") : qv + "p"));
+=======
+>>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
 
         // tracks
         setIf(audioBtn, "🔊  " + trackName("audio", "audioSel"));
@@ -1684,10 +1734,13 @@ public class NativeRemoteActivity extends AppCompatActivity {
         setIf(sleepBtn, "💤  " + T.t("Sleep timer: ") + S.optString("sleep", T.t("Off")));
         setIf(hwBtn, "⚙  " + T.t("Decoder: ") + (S.optInt("hw") == 1 ? T.t("Software") : T.t("Hardware (auto)")));
         setIf(cacheBtn, "🌐  " + T.t("Network buffer: ") + (S.optInt("cache", 2000) / 1000f) + " s");
+<<<<<<< HEAD
         setIf(nightBtn, "🗣  " + T.t("Clear dialogue (quiet voices, loud music)") + ": " + PlayerActivity.dialogName(S.optInt("dialog")));
         setIf(levelBtn, "📊  " + T.t("Volume levelling") + ": " + T.t(S.optBoolean("level") ? "On" : "Off"));
         setIf(afrBtn, "🎞  " + T.t("Auto frame-rate (smooth 24p)") + ": " + T.t(S.optBoolean("afr") ? "On" : "Off"));
         setIf(devLine, dev + " · " + ip + (S.optString("profile").isEmpty() ? "" : " · " + S.optString("profile")));
+=======
+>>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
     }
 
     private String trackName(String listKey, String selKey) {

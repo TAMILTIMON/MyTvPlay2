@@ -62,6 +62,7 @@ public final class SettingsDialog {
                 T.t("🔓  Allow phone to start videos (display over apps): ") + (Perms.overlayOk(a) ? T.t("Allowed") : T.t("Not allowed")),
                 T.t("🔓  Allow access to all files (USB, subtitles): ") + (Perms.filesOk() ? T.t("Allowed") : T.t("Not allowed")),
                 "🎮  " + T.t("Control the whole TV from the phone") + ": " + T.t(Perms.accessOk(a) ? "Allowed" : "Not allowed"),
+<<<<<<< HEAD
                 "🔌  " + T.t("Full remote for every app (ADB)") + ": " + T.t(AdbClient.enabled() ? "On" : "Off"),
                 "📺  " + T.t("Show other apps' videos on the remote") + ": " + T.t(SessionWatcher.allowed(a) ? "On" : "Off"),
                 "⬇  " + T.t("Downloads") + " · " + T.t("night only") + ": " + T.t(TorrentDownloads.nightOnly() ? "On" : "Off"),
@@ -70,6 +71,9 @@ public final class SettingsDialog {
                 "🧲  " + T.t("Torrent storage: ") + String.format(java.util.Locale.US, "%.2f GB", TorrentEngine.cacheBytes(a) / 1073741824.0),
                 T.t("📱  Use as remote for another TV…"),
                 "👨‍👩‍👧  " + T.t("Profiles & kids lock") + ": " + Family.label(),
+=======
+                T.t("📱  Use as remote for another TV…"),
+>>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
                 T.t("ℹ  Phone remote address: http://") + Net.ip() + ":" + RemoteService.PORT};
         new AlertDialog.Builder(a).setTitle(T.t("⚙  Settings")).setItems(items, new DialogInterface.OnClickListener() {
             @Override
@@ -202,6 +206,7 @@ public final class SettingsDialog {
                         Perms.openAccessSettings(a);
                         break;
                     case 16:
+<<<<<<< HEAD
                         adbSetup(a);
                         break;
                     case 17:
@@ -238,6 +243,10 @@ public final class SettingsDialog {
                         if (Family.isKids()) Family.askPin(a, "", () -> Family.manage(a, a::recreate));
                         else Family.manage(a, a::recreate);
                         break;
+=======
+                        a.startActivity(new Intent(a, ConnectActivity.class));
+                        break;
+>>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
                     default:
                         break;
                 }
@@ -245,6 +254,7 @@ public final class SettingsDialog {
         }).show();
     }
 
+<<<<<<< HEAD
     /** ADB full remote: steps, then connect (TV asks "Allow debugging?"). */
     static void adbSetup(final Activity a) {
         String steps = T.t("Makes the phone remote work in EVERY app (YouTube, Netflix, settings) by pressing real keys.")
@@ -298,6 +308,8 @@ public final class SettingsDialog {
         }).show();
     }
 
+=======
+>>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
     /** Restarts the app so every screen uses the new language. */
     static void restart(Activity a) {
         Intent i = new Intent(a, MainActivity.class);

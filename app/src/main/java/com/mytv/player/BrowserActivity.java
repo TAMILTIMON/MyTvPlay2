@@ -114,9 +114,13 @@ public class BrowserActivity extends AppCompatActivity {
         videosBtn = Ui.button(this, "🎬 0", true);
         videosBtn.setOnClickListener(v -> showVideos());
         tb.addView(videosBtn);
+<<<<<<< HEAD
         tabsBtn = small("⧉1", v -> showTabs());
         tb.addView(tabsBtn);
         tb.addView(small("⋮", v -> menu()));
+=======
+        tb.addView(small("☆", v -> bookmarks()));
+>>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
         col.addView(tb);
 
         loading = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
@@ -125,8 +129,12 @@ public class BrowserActivity extends AppCompatActivity {
 
         webBox = new FrameLayout(this);
         web = new WebView(this);
+<<<<<<< HEAD
         tabs.add(web);
         webBox.addView(web, 0, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+=======
+        webBox.addView(web, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+>>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
         if (tv) {
             cursor = new CursorView(this);
             webBox.addView(cursor, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
@@ -134,6 +142,7 @@ public class BrowserActivity extends AppCompatActivity {
         col.addView(webBox, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
         setContentView(root);
 
+<<<<<<< HEAD
         configure(web);
 
         String start = getIntent().getStringExtra(EXTRA_URL);
@@ -145,6 +154,8 @@ public class BrowserActivity extends AppCompatActivity {
     /** All the WebView settings and listeners, for every tab. */
     @SuppressLint("SetJavaScriptEnabled")
     private void configure(final WebView web) {
+=======
+>>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
@@ -154,7 +165,11 @@ public class BrowserActivity extends AppCompatActivity {
         s.setSupportZoom(true);
         s.setBuiltInZoomControls(true);
         s.setDisplayZoomControls(false);
+<<<<<<< HEAD
         applyUa(web);
+=======
+        if (tv) s.setUserAgentString(s.getUserAgentString().replace("; wv", ""));
+>>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(web, true);
 
@@ -166,18 +181,24 @@ public class BrowserActivity extends AppCompatActivity {
 
             @Override
             public void onPageStarted(WebView v, String url, Bitmap f) {
+<<<<<<< HEAD
                 if (v != web) return;
+=======
+>>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
                 found.clear();
                 updateVideos();
                 if (!bar.hasFocus() && !url.startsWith("data:") && !url.startsWith("about:")) bar.setText(url);
             }
 
             @Override
+<<<<<<< HEAD
             public void onPageFinished(WebView v, String url) {
                 if (url != null && url.startsWith("http") && !Store.getBool("b_private", false)) addHistory(v.getTitle(), url);
             }
 
             @Override
+=======
+>>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
             public WebResourceResponse shouldInterceptRequest(WebView v, WebResourceRequest r) {
                 sniff(r.getUrl().toString(), null);
                 return null;
@@ -217,6 +238,7 @@ public class BrowserActivity extends AppCompatActivity {
             return false;
         });
 
+<<<<<<< HEAD
     }
 
     // ---------------------------------------------------------------- tabs
@@ -380,6 +402,12 @@ public class BrowserActivity extends AppCompatActivity {
         String ua = WebSettings.getDefaultUserAgent(this).replace("; wv", "");
         if (Store.getBool("b_desktop", false)) ua = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36";
         s.setUserAgentString(ua);
+=======
+        String start = getIntent().getStringExtra(EXTRA_URL);
+        if (start != null && !start.isEmpty()) go(start);
+        else home();
+        if (tv) web.requestFocus();
+>>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
     }
 
     private Button small(String label, View.OnClickListener l) {
@@ -431,6 +459,7 @@ public class BrowserActivity extends AppCompatActivity {
         for (String[] b : bookmarkList()) {
             h.append("<a href='").append(b[1].replace("'", "%27")).append("'>").append(android.text.Html.escapeHtml(b[0])).append("</a>");
         }
+<<<<<<< HEAD
         h.append("</div>");
         List<String[]> rec = Store.getBool("b_private", false) ? new ArrayList<String[]>() : history(8);
         if (!rec.isEmpty()) {
@@ -441,6 +470,9 @@ public class BrowserActivity extends AppCompatActivity {
             h.append("</div>");
         }
         h.append("<p>").append(T.t("Videos found on a page appear under 🎬. Long-press any link to play it."))
+=======
+        h.append("</div><p>").append(T.t("Videos found on a page appear under 🎬. Long-press any link to play it."))
+>>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
                 .append(tv ? " " + T.t("Remote: arrows move the pointer, OK clicks, Menu opens the address bar.") : "")
                 .append("</p></body></html>");
         web.loadDataWithBaseURL("https://tamilcastplay.local/", h.toString(), "text/html", "utf-8", null);
@@ -514,6 +546,7 @@ public class BrowserActivity extends AppCompatActivity {
         final String t = title != null ? title : (web.getTitle() != null && !Formats.isTorrent(url) ? web.getTitle() : Formats.titleFromUrl(url));
         final List<String> labels = new ArrayList<>();
         final List<Runnable> acts = new ArrayList<>();
+<<<<<<< HEAD
         if (Formats.isTorrent(url)) {
             // magnet / .torrent found: play now or keep for later
             labels.add("⬇ " + T.t("Download for later") + (tv ? "" : " (" + T.t("on the TV") + ")"));
@@ -540,6 +573,8 @@ public class BrowserActivity extends AppCompatActivity {
                 }
             });
         }
+=======
+>>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
         labels.add(T.t(tv ? "▶ Play on this TV" : "▶ Play on this phone"));
         acts.add(() -> {
             List<Store.Item> one = new ArrayList<>();
@@ -567,7 +602,11 @@ public class BrowserActivity extends AppCompatActivity {
         });
         labels.add(T.t("Open link here"));
         acts.add(() -> web.loadUrl(url));
+<<<<<<< HEAD
         new AlertDialog.Builder(this).setTitle((Formats.isTorrent(url) ? "🧲 " + T.t("Torrent found — play or download?") + "\n" : "") + t)
+=======
+        new AlertDialog.Builder(this).setTitle(t)
+>>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
                 .setItems(labels.toArray(new String[0]), (d, w) -> acts.get(w).run()).show();
     }
 
@@ -716,7 +755,11 @@ public class BrowserActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+<<<<<<< HEAD
         for (WebView w : tabs) w.destroy();
+=======
+        if (web != null) web.destroy();
+>>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
         super.onDestroy();
     }
 

@@ -41,7 +41,10 @@ public class RemoteService extends Service {
             running = true;
             error = null;
             Discovery.register(this);
+<<<<<<< HEAD
             if (Ui.isTv(this) || !Store.getStr("dl_list", "[]").equals("[]")) TorrentDownloads.resumeAll(this);
+=======
+>>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
         } catch (Exception e) {
             server = null;
             running = false;

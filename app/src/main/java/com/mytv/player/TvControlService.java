@@ -99,9 +99,12 @@ public class TvControlService extends Service {
                 try {
                     JSONObject s = TvClient.post(target, "/state", new HashMap<String, String>());
                     boolean p = s.optBoolean("player");
+<<<<<<< HEAD
                     JSONObject oth = s.optJSONObject("other");
                     if (!p && oth != null) s = oth.put("player", true).put("title", oth.optString("app") + " · " + oth.optString("title"));
                     p = s.optBoolean("player");
+=======
+>>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
                     title = p ? s.optString("title") : T.t("Nothing playing");
                     playing = p && s.optBoolean("playing");
                     long pos = s.optLong("pos"), len = s.optLong("len");

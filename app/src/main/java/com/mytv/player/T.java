@@ -35,6 +35,7 @@ public final class T {
     }
 
     static {
+<<<<<<< HEAD
         TA.put("Light boost", "குறைந்த அளவு");
         HI.put("Light boost", "हल्का");
         TA.put("Medium boost", "நடுத்தர அளவு");
@@ -265,6 +266,8 @@ public final class T {
         HI.put("Makes the phone remote work in EVERY app (YouTube, Netflix, settings) by pressing real keys.", "असली बटन दबाकर फ़ोन रिमोट हर ऐप में चलेगा (YouTube, Netflix, सेटिंग्स)।");
         TA.put("Torrent storage: ", "டொரண்ட் சேமிப்பு: ");
         HI.put("Torrent storage: ", "टॉरेंट स्टोरेज: ");
+=======
+>>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
         TA.put("Colours & style", "நிறங்கள் & பாணி");
         HI.put("Colours & style", "रंग और स्टाइल");
         TA.put("Palette", "நிறத் தொகுப்பு");

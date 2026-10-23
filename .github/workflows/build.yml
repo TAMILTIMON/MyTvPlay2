@@ -7,8 +7,11 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+<<<<<<< HEAD
     permissions:
       contents: write
+=======
+>>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
     steps:
       - uses: actions/checkout@v4
 
@@ -22,6 +25,7 @@ jobs:
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null || true
           $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-34" "build-tools;34.0.0" || true
 
+<<<<<<< HEAD
       - name: Version number (used by in-app auto-update)
         run: echo "VCODE=$((100 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
 
@@ -37,10 +41,13 @@ jobs:
             echo "::warning::No KEYSTORE_B64 secret found - building with a temporary key (updates may not install over older builds)"
           fi
 
+=======
+>>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.5'
 
+<<<<<<< HEAD
       - name: Build APKs
         env:
           TCP_STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
@@ -67,3 +74,12 @@ jobs:
           body: Automatic build from commit ${{ github.sha }}
           files: app/build/outputs/apk/release/*.apk
           make_latest: true
+=======
+      - name: Build debug APKs
+        run: gradle assembleDebug --no-daemon --stacktrace
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MyTVPlayer-apk
+          path: app/build/outputs/apk/debug/*.apk
+>>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
