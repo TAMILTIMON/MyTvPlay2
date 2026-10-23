@@ -12,6 +12,18 @@ public class App extends Application {
     public void onCreate() {
         super.onCreate();
         Store.init(this);
+        // remember why the app closed, to show it next time (helps fixing problems)
+        final Thread.UncaughtExceptionHandler prev = Thread.getDefaultUncaughtExceptionHandler();
+        Thread.setDefaultUncaughtExceptionHandler((th, ex) -> {
+            try {
+                java.io.StringWriter sw = new java.io.StringWriter();
+                ex.printStackTrace(new java.io.PrintWriter(sw));
+                String st = sw.toString();
+                Store.putStr("lastcrash", st.length() > 3000 ? st.substring(0, 3000) : st);
+            } catch (Throwable ignored) {
+            }
+            if (prev != null) prev.uncaughtException(th, ex);
+        });
         Net.cleanSubtitleCache(this);
         TorrentEngine.cleanupAsync(this);
         RemoteService.start(this);

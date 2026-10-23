@@ -1,3 +1,53 @@
+TAMILCASTPLAY 1.9 — player keys fixed + colour palettes
+=======================================================
+Player (TV remote)
+* OK now plays/pauses even when the timeline bar is selected.
+* Back no longer closes the player by accident: 1st press hides the controls,
+  then "Press Back again to exit". Stop key still exits straight away.
+* Every rewind / forward key style works (Rewind, Fast-forward, Skip/Step back &
+  forward): 10 s per press, 60 s when you hold it.
+* If anything ever closes the app, the TV home shows the reason next time (Copy
+  button) — please send it if that happens.
+Colours
+* ⚙ Settings > Colours & style: 10 palettes (Purple Night, Ocean Blue, Emerald,
+  Sunset Orange, Ruby Red, Royal Gold, Pink Rose, Mono Grey, Teal & Amber,
+  Midnight Blue) plus your own colours for: main colour, second colour,
+  background, cards and top/bottom bars. "Reset custom colours" goes back.
+* Phone app: Playlist tab > "TV colours" (changes the TV) and
+  "This phone app's colours" (changes the phone app).
+* Browser page follows the TV's colours (switch off in Library > TV settings).
+
+TAMILCASTPLAY 1.8.1
+===================
+* "Control the whole TV" / permission buttons now try the TV-brand Settings screens
+  (Android TV settings, phone settings, main Settings) and skip ones that only show
+  "no app can handle this action". If nothing opens, the app shows the path and an
+  adb command (Copy button). Manual path on most TVs:
+     Settings > Device Preferences > Accessibility > TamilCastPlay phone remote > ON
+  adb (PC or a phone adb app):
+     adb shell settings put secure enabled_accessibility_services com.tamil.castplay/com.mytv.player.TvAccess
+     adb shell settings put secure accessibility_enabled 1
+
+TAMILCASTPLAY 1.8 — timeline, gestures, notification remote, whole-TV control
+=============================================================================
+Player
+* Timeline you can use: drag it with a finger, or on the TV press ▼ (buttons) then ▲
+  to reach the bar and use ◀ ▶ (10 s steps, it jumps when you stop pressing).
+* Phone gestures like MX Player / VLC:
+    left side up/down  = brightness
+    right side up/down = volume (goes past 100% up to 200% boost)
+    swipe sideways     = seek (shows +time and target time)
+    double-tap left / right = -10 s / +10 s, double-tap middle = pause
+Phone remote
+* Notification bar + lock screen controls for the TV: -10s, play/pause, +10s, next, stop.
+  Tap the notification to open the remote; swipe it away to close it.
+  (Android 13+: allow notifications when the app asks.)
+* Whole-TV control like the Google TV remote: arrows, OK, Back, Home, Recent apps (▢),
+  TV volume 🔉 🔇 🔊, play/pause for any app (⏯), and "Type text" into search boxes.
+  One-time switch on the TV: TamilCastPlay home > "🎮 Control the whole TV from the phone"
+  (or ⚙ Settings) > choose "TamilCastPlay phone remote" > ON.
+  TV volume and ⏯ work even without the switch.
+
 TAMILCASTPLAY 1.7 — native phone remote
 =======================================
 * The phone app's remote is now a real Android screen (no web page inside the app):

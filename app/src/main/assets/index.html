@@ -65,7 +65,7 @@ input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;bac
 .stat b{display:block;font-size:17px}.stat small{color:var(--dim);font-size:11px}
 .bar{height:6px;border-radius:6px;background:var(--line);overflow:hidden;margin-top:10px}
 .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--ok),var(--acc3))}
-nav{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(10px + env(safe-area-inset-bottom));width:min(740px,calc(100% - 20px));display:flex;gap:4px;padding:6px;border-radius:24px;background:var(--glass2);border:1px solid var(--line);box-shadow:var(--shadow);z-index:5}
+nav{background:var(--bar,var(--glass2)) !important;position:fixed;left:50%;transform:translateX(-50%);bottom:calc(10px + env(safe-area-inset-bottom));width:min(740px,calc(100% - 20px));display:flex;gap:4px;padding:6px;border-radius:24px;background:var(--glass2);border:1px solid var(--line);box-shadow:var(--shadow);z-index:5}
 nav button{flex:1;background:none;color:var(--dim);font-size:11px;font-weight:600;padding:8px 2px;border-radius:18px;line-height:1.5}
 nav button span{font-size:19px;display:block}
 nav button.on{background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff}
@@ -177,7 +177,10 @@ label.sw{display:flex;align-items:center;gap:10px;font-size:14px;margin:6px 0}
       <button class="ok" onclick="key('ok')">OK</button>
       <button class="r" onclick="key('right')">▶</button><button class="d" onclick="key('down')">▼</button>
     </div>
-    <div class="ctr"><button class="g" onclick="key('back')">↩ Back</button><button class="g" onclick="key('home')">⌂ Home</button><button class="g" onclick="cmd('menu')">⚙ Menu</button></div>
+    <div class="btns" style="margin-top:6px"><button class="g" onclick="key('back')">↩</button><button class="g" onclick="key('home')">⌂</button><button class="g" onclick="key('recents')">▢</button><button class="g" onclick="cmd('menu')">⚙</button></div>
+    <div class="btns" style="margin-top:6px"><button class="g" onclick="key('vol_down')">🔉</button><button class="g" onclick="key('vol_mute')">🔇</button><button class="g" onclick="key('vol_up')">🔊</button><button class="g" onclick="key('media_playpause')">⏯</button></div>
+    <div class="dim" id="acchint" style="display:none;margin-top:8px">ℹ To control other apps, turn on TV Settings &gt; Accessibility &gt; TamilCastPlay</div>
+    <div class="row" style="margin-top:8px"><input id="typebox" placeholder="⌨ Type text on the TV (search boxes)" style="margin:0"><button class="g" onclick="typeText()">⌨</button></div>
   </div>
 
   <div class="card">
@@ -320,6 +323,9 @@ label.sw{display:flex;align-items:center;gap:10px;font-size:14px;margin:6px 0}
     <div class="sec">TV settings</div>
     <div class="dim">TV app theme</div>
     <select id="apptheme" onchange="cmd('apptheme',this.value)"><option value="dark">Dark</option><option value="light">Light</option><option value="system">Follow system</option></select>
+    <div class="dim">TV colours (palette)</div>
+    <select id="palsel" onchange="cmd('palette',this.value)"></select>
+    <label class="sw"><input type="checkbox" id="followpal" onchange="setFollow(this.checked)"> Use the TV's colours on this page</label>
     <div class="dim">TV name (shown when scanning)</div>
     <div class="row"><input id="devin" placeholder="Living room TV" style="margin:0"><button class="g" onclick="cmd('devname',$('devin').value)">Save</button></div>
   </div>
@@ -354,7 +360,7 @@ document.body.className=APP?'app':'web';
 let S={},O=null,lastQ='',lastA='',lastS='',eqBuilt=0;
 // ---------- theme ----------
 const qp=new URLSearchParams(location.search);
-function setTheme(t){document.documentElement.dataset.theme=t;$('themeBtn').textContent=t==='dark'?'☀':'🌙';try{localStorage.setItem('theme',t)}catch(e){}if(APP)try{MyTV.setTheme(t)}catch(e){}}
+function setTheme(t){document.documentElement.dataset.theme=t;if(typeof _palSig!=='undefined'){_palSig='';}$('themeBtn').textContent=t==='dark'?'☀':'🌙';try{localStorage.setItem('theme',t)}catch(e){}if(APP)try{MyTV.setTheme(t)}catch(e){}}
 function toggleTheme(){setTheme(document.documentElement.dataset.theme==='dark'?'light':'dark');}
 let saved=null;try{saved=localStorage.getItem('theme')}catch(e){}
 setTheme(qp.get('theme')||saved||(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'));
@@ -472,7 +478,19 @@ function buildEq(bands){
 }
 function showEq(x,val){if(!busy(x[0].el)){x[0].set(val);x[1].textContent=(+val>0?'+':'')+(+val).toFixed(0);}}
 
+let FOLLOW=true;try{FOLLOW=localStorage.getItem('followpal')!=='0'}catch(e){}
+function setFollow(on){FOLLOW=on;try{localStorage.setItem('followpal',on?'1':'0')}catch(e){}if(!on){const st=document.documentElement.style;['--acc','--acc2','--acc3','--bg','--bg2','--glass','--glass2','--bar','--text','--dim'].forEach(v=>st.removeProperty(v));_palSig='';}else applyPal();}
+var _palSig='';
+function applyPal(){
+  const P=S.pal;if(!P||!FOLLOW)return;const sig=JSON.stringify(P)+document.documentElement.dataset.theme;if(sig===_palSig)return;_palSig=sig;
+  const st=document.documentElement.style;st.setProperty('--acc',P.acc);st.setProperty('--acc2',P.acc2);st.setProperty('--acc3',P.acc3);
+  const pageDark=document.documentElement.dataset.theme==='dark';
+  if(P.custom||pageDark===P.dark){st.setProperty('--bg',P.bg);st.setProperty('--bg2',P.bg2);st.setProperty('--glass',P.card);st.setProperty('--glass2',P.card);st.setProperty('--bar',P.bar);st.setProperty('--text',P.text);st.setProperty('--dim',P.dim);}
+  else ['--bg','--bg2','--glass','--glass2','--bar','--text','--dim'].forEach(v=>st.removeProperty(v));
+}
 function render(){
+  applyPal();
+  if(O&&O.palettes)fill('palsel',O.palettes.map((n,i)=>[String(i),n]),S.pal?String(S.pal.i):'0');
   const p=S.player;
   $('devname').textContent=(S.device||'TV')+' · '+location.hostname;
   $('np').textContent=p?(S.title||'Playing'):'Nothing playing';
@@ -480,6 +498,7 @@ function render(){
   $('art').textContent=p&&S.playing?'♫':'♪';
   $('sub1').textContent=p?((S.count>1?(S.idx+1)+' of '+S.count:'')+(S.rate&&S.rate!=1?' · '+S.rate+'x':'')+(S.sleep&&S.sleep!=='Off'?' · 💤 '+S.sleep:'')+(S.loading?' · '+S.loading.split('\n')[0]:'')):'Open the Cast tab to play something';
   $('pp').textContent=p&&S.playing?'❚❚':'▶';
+  $('acchint').style.display=S.access===false?'block':'none';
   const RN=['Off','One','All'];
   $('rep').textContent=(S.repeat===1?'🔂 ':'🔁 ')+tr('Repeat')+': '+tr(RN[S.repeat||0]);
   $('rep').classList.toggle('on',!!S.repeat);$('shuf').classList.toggle('on',!!S.shuffle);
@@ -699,6 +718,7 @@ $('qsearch').addEventListener('input',()=>{clearTimeout(qt);qt=setTimeout(async(
     e.onclick=()=>{cmd('item',it.i);$('qsearch').value='';box.innerHTML='';$('queue').style.display='block';};box.appendChild(e);});
 },300);});
 async function saveQueue(){const n=prompt(tr('Playlist name'),'IPTV');if(n===null)return;const r=await post('/savequeue',{playlist:n||'IPTV'});toast(r.msg);load();}
+async function typeText(){const t=$('typebox').value;if(!t)return;const r=await post('/type',{text:t});toast(r.msg);$('typebox').value='';}
 async function tvBrowse(){const r=await post('/browse',{url:$('burl').value.trim()});toast(r.msg);}
 setInterval(()=>{if(!document.hidden)loadHistory();},20000);
 
@@ -725,8 +745,8 @@ const HI={"Now playing":"अभी चल रहा है","Nothing playing":"�
 "Search words or a web address":"खोज शब्द या वेब पता","Title (optional)":"शीर्षक (वैकल्पिक)","Subtitle link (optional)":"सबटाइटल लिंक (वैकल्पिक)","Playlist name":"प्लेलिस्ट का नाम","channels":"चैनल","Search":"खोजें","Show more":"और दिखाएँ","No channel found":"कोई चैनल नहीं मिला",
 "Playlists":"प्लेलिस्ट","Select all":"सभी चुनें","Select none":"कुछ नहीं चुनें","Delete":"मिटाएँ","playlists":"प्लेलिस्ट","Nothing selected":"कुछ नहीं चुना","Select":"चुनें","Delete playlist":"प्लेलिस्ट मिटाएँ","Search channel / name":"चैनल / नाम खोजें","search results":"खोज के नतीजे","Cancel":"रद्द करें",
 "💾 Save as playlist":"💾 प्लेलिस्ट के रूप में सेव करें","search above, or Save as playlist":"ऊपर खोजें, या प्लेलिस्ट के रूप में सेव करें","Channels":"चैनल","Load all channels of this list":"इस सूची के सभी चैनल लोड करें","Loading channels…":"चैनल लोड हो रहे हैं…","Adding…":"जोड़ा जा रहा है…","Added":"जुड़ गया","Saved":"सेव हुआ"};
-Object.assign(HI,{"Repeat":"दोहराएँ","Shuffle":"शफ़ल","Off":"बंद","On":"चालू","One":"एक","All":"सभी","This page":"यह पेज","Auto-hide top & bottom bars while scrolling":"स्क्रॉल करते समय ऊपर-नीचे की पट्टियाँ छिपाएँ"});
-Object.assign(TA,{"Repeat":"மீண்டும்","Shuffle":"கலக்கு","Off":"அணை","On":"இயக்கு","One":"ஒன்று","All":"அனைத்தும்","This page":"இந்தப் பக்கம்","Auto-hide top & bottom bars while scrolling":"உருட்டும்போது மேல்/கீழ் பட்டிகளை மறை","💾 Save as playlist":"💾 பிளேலிஸ்டாகச் சேமி","search above, or Save as playlist":"மேலே தேடவும், அல்லது பிளேலிஸ்டாகச் சேமிக்கவும்","Channels":"சேனல்கள்","Load all channels of this list":"இந்தப் பட்டியலின் அனைத்து சேனல்களையும் ஏற்று","Loading channels…":"சேனல்கள் ஏற்றப்படுகின்றன…","Adding…":"சேர்க்கிறது…","Added":"சேர்க்கப்பட்டது","Saved":"சேமிக்கப்பட்டது"});
+Object.assign(HI,{"ℹ To control other apps, turn on TV Settings > Accessibility > TamilCastPlay":"ℹ दूसरे ऐप चलाने के लिए: टीवी सेटिंग्स > Accessibility > TamilCastPlay चालू करें","Type text on the TV (search boxes)":"टीवी पर लिखें (सर्च बॉक्स)","Repeat":"दोहराएँ","Shuffle":"शफ़ल","Off":"बंद","On":"चालू","One":"एक","All":"सभी","This page":"यह पेज","Auto-hide top & bottom bars while scrolling":"स्क्रॉल करते समय ऊपर-नीचे की पट्टियाँ छिपाएँ"});
+Object.assign(TA,{"ℹ To control other apps, turn on TV Settings > Accessibility > TamilCastPlay":"ℹ பிற செயலிகளைக் கட்டுப்படுத்த: டிவி அமைப்புகள் > Accessibility > TamilCastPlay இயக்கவும்","Type text on the TV (search boxes)":"டிவியில் எழுது (தேடல் பெட்டிகள்)","Repeat":"மீண்டும்","Shuffle":"கலக்கு","Off":"அணை","On":"இயக்கு","One":"ஒன்று","All":"அனைத்தும்","This page":"இந்தப் பக்கம்","Auto-hide top & bottom bars while scrolling":"உருட்டும்போது மேல்/கீழ் பட்டிகளை மறை","💾 Save as playlist":"💾 பிளேலிஸ்டாகச் சேமி","search above, or Save as playlist":"மேலே தேடவும், அல்லது பிளேலிஸ்டாகச் சேமிக்கவும்","Channels":"சேனல்கள்","Load all channels of this list":"இந்தப் பட்டியலின் அனைத்து சேனல்களையும் ஏற்று","Loading channels…":"சேனல்கள் ஏற்றப்படுகின்றன…","Adding…":"சேர்க்கிறது…","Added":"சேர்க்கப்பட்டது","Saved":"சேமிக்கப்பட்டது"});
 const DICTS={ta:TA,hi:HI};
 let LANG='';try{LANG=localStorage.getItem('lang')||''}catch(e){}
 function D(){return DICTS[LANG]||null;}
@@ -742,7 +762,7 @@ function applyLang(){
 function toggleLang(){LANG=LANG==='en'||!LANG?'ta':LANG==='ta'?'hi':'en';try{localStorage.setItem('lang',LANG)}catch(e){}applyLang();}
 (async()=>{if(!LANG){try{const s=await (await api('/state')).json();LANG=(s.lang==='ta'||s.lang==='hi')?s.lang:'en';}catch(e){LANG='en';}}applyLang();})();
 
-$('autohide').checked=AUTOHIDE;
+$('autohide').checked=AUTOHIDE;$('followpal').checked=FOLLOW;
 loadOptions().then(poll);load();loadApps();loadHistory();
 </script>
 </body>

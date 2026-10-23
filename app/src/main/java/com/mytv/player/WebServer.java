@@ -316,6 +316,18 @@ public class WebServer extends NanoHTTPD {
                     String c = val(p, "c");
                     String v = val(p, "v");
                     String b = val(p, "b");
+                    if ("palette".equals(c)) {
+                        try {
+                            int pi = Integer.parseInt(v);
+                            Store.putInt("pal", pi);
+                            Store.putInt("c_acc", 0);
+                            Store.putInt("c_acc2", 0);
+                            return msg("🎨 " + Palette.NAMES[Math.max(0, Math.min(Palette.NAMES.length - 1, pi))]
+                                    + " (applies when you reopen a screen)");
+                        } catch (Exception e) {
+                            return fail("Bad palette");
+                        }
+                    }
                     if ("apptheme".equals(c)) {
                         Store.putStr("theme", v);
                         return msg("TV app theme: " + v + " (applies when you reopen a screen)");
@@ -341,8 +353,13 @@ public class WebServer extends NanoHTTPD {
                         Remote.openHome(ctx);
                         return ok();
                     }
-                    String err = Remote.pressKey(Remote.keyCode(k));
+                    String err = Remote.press(ctx, k);
                     return err == null ? ok() : fail(err);
+                }
+
+                case "/type": {
+                    String err = Remote.type(ctx, val(p, "text"));
+                    return err == null ? msg("✅") : fail(err);
                 }
 
                 case "/subupload": {
@@ -492,6 +509,13 @@ public class WebServer extends NanoHTTPD {
         o.put("device", Discovery.deviceName(ctx));
         o.put("apptheme", Store.getStr("theme", "dark"));
         o.put("lang", Store.getStr("lang", "en"));
+        o.put("access", TvAccess.on());
+        boolean tvDark = !"light".equals(Store.getStr("theme", "dark"));
+        int[] pc = Palette.resolve(tvDark);
+        o.put("pal", new JSONObject().put("i", Palette.index()).put("custom", Palette.hasCustom()).put("dark", tvDark)
+                .put("acc", Palette.hex(pc[0])).put("acc2", Palette.hex(pc[1])).put("acc3", Palette.hex(pc[2]))
+                .put("bg", Palette.hex(pc[3])).put("bg2", Palette.hex(pc[4])).put("card", Palette.hex(pc[5]))
+                .put("bar", Palette.hex(pc[6])).put("text", Palette.hex(pc[7])).put("dim", Palette.hex(pc[8])));
         PlayerActivity.putSettings(o);
         o.put("torrent", TorrentEngine.get(ctx).status());
         return o;

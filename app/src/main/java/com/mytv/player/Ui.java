@@ -20,8 +20,10 @@ public final class Ui {
     private Ui() {
     }
 
-    public static final int ACCENT = 0xFF8B5CF6, ACCENT2 = 0xFFEC4899, ACCENT3 = 0xFF3B82F6;
+    public static int ACCENT = 0xFF8B5CF6, ACCENT2 = 0xFFEC4899, ACCENT3 = 0xFF3B82F6;
     public static int BG, BG2, CARD, STROKE, TEXT, DIM, FIELD;
+    /** Opaque card colour and top/bottom bar colour (from the chosen palette). */
+    public static int SOLID = 0xFF17122A, BAR = 0xFF1A1430;
     private static boolean dark = true;
     /** Focus "grow" effects only on TVs (D-pad). On phones they look like random zooming. */
     public static boolean tvMode = false;
@@ -64,13 +66,21 @@ public final class Ui {
         dark = isDark(a);
         tvMode = isTv(a);
         a.setTheme(dark ? R.style.AppTheme : R.style.AppTheme_Light);
-        if (dark) {
-            BG = 0xFF0B0913; BG2 = 0xFF1C1236; CARD = 0x1FFFFFFF; STROKE = 0x29FFFFFF;
-            TEXT = 0xFFF3F0FF; DIM = 0xFFA59FBD; FIELD = 0x26000000;
-        } else {
-            BG = 0xFFF5F3FB; BG2 = 0xFFE7DFFC; CARD = 0xE6FFFFFF; STROKE = 0x1F2A1B5C;
-            TEXT = 0xFF1B1530; DIM = 0xFF6B6482; FIELD = 0x0D000000;
-        }
+        int[] c = Palette.resolve(dark);
+        ACCENT = c[0];
+        ACCENT2 = c[1];
+        ACCENT3 = c[2];
+        BG = c[3];
+        BG2 = c[4];
+        SOLID = c[5];
+        BAR = c[6];
+        TEXT = c[7];
+        DIM = c[8];
+        boolean darkBg = Palette.lum(BG) < 0.5f;
+        CARD = Store.getInt("c_card", 0) != 0 ? (0xE6000000 | (SOLID & 0xFFFFFF)) : (darkBg ? 0x1FFFFFFF : 0xE6FFFFFF);
+        STROKE = darkBg ? 0x29FFFFFF : 0x1F2A1B5C;
+        FIELD = darkBg ? 0x26000000 : 0x0D000000;
+        dark = darkBg;
     }
 
     public static boolean dark() {

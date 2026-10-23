@@ -69,6 +69,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
     private int curTab = 0;
 
     // live views
+    private TextView accessHint;
     private TextView npTitle, npSub, tLeft, tRight, volLabel, torLine, adLabel, sdLabel, zoomLabel, devLine;
     private SeekBar seek, vol, zoom;
     private Button playBtn, repBtn, shufBtn, audioBtn, subBtn, fitBtn, aspBtn, sizeBtn, encBtn, presetBtn,
@@ -138,7 +139,8 @@ public class NativeRemoteActivity extends AppCompatActivity {
         // ---- bottom tabs (always on one line, never cover content)
         LinearLayout nav = new LinearLayout(this);
         nav.setPadding(dp(6), dp(6), dp(6), dp(6));
-        nav.setBackground(Ui.card(this, Ui.dark() ? 0xFF1A1430 : 0xFFFFFFFF, Ui.STROKE, 0));
+        nav.setBackground(Ui.card(this, Ui.BAR, Ui.STROKE, 0));
+        top.setBackground(Ui.card(this, Ui.BAR, 0, 0));
         String[] ic = {"🎮", "💬", "🎚", "📡", "📚"};
         String[] lb = {T.t("Remote"), T.t("Subtitles"), T.t("Equalizer"), "Cast", T.t("Playlist")};
         for (int i = 0; i < 5; i++) {
@@ -161,6 +163,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
         setContentView(root);
         showTab(0);
         RemoteService.start(this);
+        TvControlService.start(this, ip, tvName);
     }
 
     private int dp(float v) {
@@ -229,7 +232,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
         LinearLayout c = new LinearLayout(this);
         c.setOrientation(LinearLayout.VERTICAL);
         c.setPadding(dp(14), dp(12), dp(14), dp(14));
-        c.setBackground(Ui.card(this, Ui.dark() ? 0xFF17122A : 0xFFFFFFFF, Ui.STROKE, 18));
+        c.setBackground(Ui.card(this, Ui.SOLID, Ui.STROKE, 18));
         if (title != null) {
             TextView t = Ui.text(this, 11, Ui.DIM, true);
             t.setText(title.toUpperCase(Locale.ROOT));
@@ -564,7 +567,23 @@ public class NativeRemoteActivity extends AppCompatActivity {
         plp.gravity = Gravity.CENTER_HORIZONTAL;
         plp.setMargins(0, dp(4), 0, dp(8));
         dc.addView(pad, plp);
-        row(dc, btn("↩", false, v -> key("back")), btn("⌂", false, v -> key("home")), btn("⚙ " + T.t("Options"), false, v -> cmd("menu", "")));
+        row(dc, btn("↩", false, v -> key("back")), btn("⌂", false, v -> key("home")), btn("▢", false, v -> key("recents")),
+                btn("⚙", false, v -> cmd("menu", "")));
+        // TV's own volume and play/pause for any app (Netflix, YouTube…)
+        row(dc, btn("🔉", false, v -> key("vol_down")), btn("🔇", false, v -> key("vol_mute")),
+                btn("🔊", false, v -> key("vol_up")), btn("⏯", false, v -> key("media_playpause")));
+        accessHint = Ui.text(this, 12, Ui.DIM, false);
+        accessHint.setText("ℹ " + T.t("To control other apps, turn on TV Settings > Accessibility > TamilCastPlay"));
+        accessHint.setVisibility(View.GONE);
+        dc.addView(accessHint);
+        final EditText typeBox = field(dc, "⌨ " + T.t("Type text on the TV (search boxes)"), false);
+        full(dc, btn("⌨ " + T.t("Send text"), false, v -> {
+            String tx = typeBox.getText().toString();
+            if (tx.isEmpty()) return;
+            call("/type", m("text", tx), r -> toast(r.optString("msg")));
+            typeBox.setText("");
+            hideKeyboard();
+        }));
 
         // volume
         LinearLayout vc = card(p, T.t("Volume"));
@@ -1140,6 +1159,11 @@ public class NativeRemoteActivity extends AppCompatActivity {
             cmd("devname", dn.getText().toString().trim());
             hideKeyboard();
         }));
+        full(tvs, btn("🎨 " + T.t("TV colours (palette)"), false, v -> {
+            String[] names = Palette.NAMES;
+            new AlertDialog.Builder(this).setTitle(T.t("Palette")).setItems(names, (d, w) -> cmd("palette", String.valueOf(w))).show();
+        }));
+        full(tvs, btn("🎨 " + T.t("This phone app's colours"), false, v -> Palette.show(this)));
         full(tvs, btn("🌐 Web version", false, v -> startActivity(new Intent(this, RemoteWebActivity.class)
                 .putExtra(RemoteWebActivity.EXTRA_IP, ip).putExtra(RemoteWebActivity.EXTRA_NAME, tvName))));
         return p;
@@ -1406,6 +1430,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
         View tstat = pages[3].findViewWithTag("torstat");
         if (tstat instanceof TextView) setIf((TextView) tstat, ts.isEmpty() ? "—" : ts);
         renderQueue();
+        accessHint.setVisibility(S.optBoolean("access", true) ? View.GONE : View.VISIBLE);
 
         // tracks
         setIf(audioBtn, "🔊  " + trackName("audio", "audioSel"));

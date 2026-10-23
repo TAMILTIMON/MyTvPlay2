@@ -45,6 +45,7 @@ public final class SettingsDialog {
         String[] items = {
                 "🌐  Language / மொழி / भाषा: " + T.langName(),
                 "🔐  " + T.t("Remote PIN: ") + (Pair.enabled() ? Pair.pin() : T.t("Off")),
+                "🎨  " + T.t("Colours & style") + ": " + Palette.NAMES[Palette.index()] + (Palette.hasCustom() ? " +" : ""),
                 T.t("🎨  Theme: ") + themeNames[idx(themes, Store.getStr("theme", "dark"))],
                 T.t("📺  Device name: ") + Discovery.deviceName(a),
                 T.t("🖼  Picture fit: ") + PlayerActivity.FIT_NAMES[Math.max(0, Math.min(3, Store.getInt("fit", 0)))],
@@ -60,6 +61,7 @@ public final class SettingsDialog {
                 T.t("🧹  Clear “Recently played”"),
                 T.t("🔓  Allow phone to start videos (display over apps): ") + (Perms.overlayOk(a) ? T.t("Allowed") : T.t("Not allowed")),
                 T.t("🔓  Allow access to all files (USB, subtitles): ") + (Perms.filesOk() ? T.t("Allowed") : T.t("Not allowed")),
+                "🎮  " + T.t("Control the whole TV from the phone") + ": " + T.t(Perms.accessOk(a) ? "Allowed" : "Not allowed"),
                 T.t("📱  Use as remote for another TV…"),
                 T.t("ℹ  Phone remote address: http://") + Net.ip() + ":" + RemoteService.PORT};
         new AlertDialog.Builder(a).setTitle(T.t("⚙  Settings")).setItems(items, new DialogInterface.OnClickListener() {
@@ -80,7 +82,11 @@ public final class SettingsDialog {
                     pinMenu(a);
                     return;
                 }
-                switch (w - 2) {
+                if (w == 2) {
+                    Palette.show(a);
+                    return;
+                }
+                switch (w - 3) {
                     case 0:
                         choose(a, T.t("Theme"), themeNames, idx(themes, Store.getStr("theme", "dark")), new IntCb() {
                             public void on(int i) {
@@ -186,6 +192,9 @@ public final class SettingsDialog {
                         Perms.openFilesSettings(a);
                         break;
                     case 15:
+                        Perms.openAccessSettings(a);
+                        break;
+                    case 16:
                         a.startActivity(new Intent(a, ConnectActivity.class));
                         break;
                     default:

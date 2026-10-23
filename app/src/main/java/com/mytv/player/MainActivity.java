@@ -339,6 +339,17 @@ public class MainActivity extends AppCompatActivity {
         refresh();
         updateInfo();
         Perms.firstRun(this);
+        final String crash = Store.getStr("lastcrash", "");
+        if (!crash.isEmpty()) {
+            Store.putStr("lastcrash", "");
+            new androidx.appcompat.app.AlertDialog.Builder(this).setTitle("⚠ The app closed unexpectedly last time")
+                    .setMessage("Please send this to the developer:\n\n" + crash.substring(0, Math.min(900, crash.length())))
+                    .setPositiveButton("OK", null)
+                    .setNeutralButton("Copy", (d, w) -> {
+                        android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                        if (cm != null) cm.setPrimaryClip(android.content.ClipData.newPlainText("crash", crash));
+                    }).show();
+        }
     }
 
     private void buildApps() {
@@ -437,6 +448,10 @@ public class MainActivity extends AppCompatActivity {
             }
             rows.add("🌐   " + T.t("Browser · search the web & play links"));
             actions.add(() -> startActivity(new Intent(this, BrowserActivity.class)));
+            if (Ui.isTv(this) && !Perms.accessOk(this)) {
+                rows.add("🎮   " + T.t("Control the whole TV from the phone") + "  (" + T.t("recommended") + ")");
+                actions.add(() -> Perms.openAccessSettings(this));
+            }
             rows.add(T.t("📁   Local files  ·  USB drive / storage"));
             actions.add(() -> startActivity(new Intent(this, FileBrowserActivity.class)));
             if (!Ui.isTv(this)) {

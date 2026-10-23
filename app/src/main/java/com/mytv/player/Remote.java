@@ -86,6 +86,67 @@ public final class Remote {
      * Presses a key inside this app (works on menus and dialogs too).
      * Must be called from a background thread.
      */
+    /** System keys that work everywhere on the TV, even without the accessibility switch. */
+    public static String systemKey(Context ctx, String k) {
+        android.media.AudioManager am = (android.media.AudioManager) ctx.getSystemService(Context.AUDIO_SERVICE);
+        if (am == null) return "No audio";
+        int s = android.media.AudioManager.STREAM_MUSIC, ui = android.media.AudioManager.FLAG_SHOW_UI;
+        switch (k) {
+            case "vol_up": am.adjustStreamVolume(s, android.media.AudioManager.ADJUST_RAISE, ui); return null;
+            case "vol_down": am.adjustStreamVolume(s, android.media.AudioManager.ADJUST_LOWER, ui); return null;
+            case "vol_mute": am.adjustStreamVolume(s, android.media.AudioManager.ADJUST_TOGGLE_MUTE, ui); return null;
+            default: break;
+        }
+        int code;
+        switch (k) {
+            case "media_playpause": code = KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE; break;
+            case "media_next": code = KeyEvent.KEYCODE_MEDIA_NEXT; break;
+            case "media_prev": code = KeyEvent.KEYCODE_MEDIA_PREVIOUS; break;
+            case "media_ff": code = KeyEvent.KEYCODE_MEDIA_FAST_FORWARD; break;
+            case "media_rew": code = KeyEvent.KEYCODE_MEDIA_REWIND; break;
+            case "media_stop": code = KeyEvent.KEYCODE_MEDIA_STOP; break;
+            default: return "Unknown key";
+        }
+        am.dispatchMediaKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, code));
+        am.dispatchMediaKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, code));
+        return null;
+    }
+
+    /** Arrows / OK / Back / Home / Recents: our own screens directly, any other app via TvAccess. */
+    public static String press(Context ctx, String k) {
+        if (k.startsWith("vol_") || k.startsWith("media_")) return systemKey(ctx, k);
+        final TvAccess acc = TvAccess.inst;
+        boolean ours = App.visible > 0;
+        if (k.equals("home") || k.equals("recents")) {
+            if (acc != null) return acc.key(k) ? null : "Not possible on this TV";
+            if (k.equals("home")) {
+                openHome(ctx);
+                return null;
+            }
+            return needAccess();
+        }
+        if (ours) return pressKey(keyCode(k));
+        if (acc != null) return acc.key(k) ? null : "Nothing to press there";
+        return needAccess();
+    }
+
+    public static String needAccess() {
+        return "To control other apps, turn on TV Settings > Accessibility > TamilCastPlay (⚙ Settings in the app opens it)";
+    }
+
+    public static String type(Context ctx, String text) {
+        if (App.visible > 0) {
+            try {
+                new Instrumentation().sendStringSync(text);
+                return null;
+            } catch (Throwable ignored) {
+            }
+        }
+        TvAccess acc = TvAccess.inst;
+        if (acc == null) return needAccess();
+        return acc.type(text) ? null : "Select a search / text box on the TV first";
+    }
+
     public static String pressKey(final int code) {
         if (code < 0) return "Unknown key";
         try {

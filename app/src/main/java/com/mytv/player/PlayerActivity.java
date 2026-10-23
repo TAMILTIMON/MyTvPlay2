@@ -354,16 +354,7 @@ public class PlayerActivity extends AppCompatActivity {
                 ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER));
         // tap anywhere (phones) = show / hide controls
         View touch = new View(this);
-        touch.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                if (locked) {
-                    flashUnlock();
-                    return;
-                }
-                if (overlayVisible) hideOverlayNow();
-                else showOverlay();
-            }
-        });
+        touch.setOnTouchListener(this::onGesture);
         touch.setFocusable(false);
         root.addView(touch, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
@@ -417,7 +408,7 @@ public class PlayerActivity extends AppCompatActivity {
         osdView = text(19, Color.WHITE);
         osdView.setPadding(dp(20), dp(10), dp(20), dp(10));
         GradientDrawable obg = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
-                new int[]{0xE68B5CF6, 0xE6EC4899});
+                new int[]{0xE6000000 | (Ui.ACCENT & 0xFFFFFF), 0xE6000000 | (Ui.ACCENT2 & 0xFFFFFF)});
         obg.setCornerRadius(dp(22));
         osdView.setBackground(obg);
         osdView.setVisibility(View.GONE);
@@ -438,7 +429,7 @@ public class PlayerActivity extends AppCompatActivity {
         panel.setOrientation(LinearLayout.VERTICAL);
         panel.setPadding(dp(28), dp(18), dp(28), dp(16));
         GradientDrawable pbg = new GradientDrawable();
-        pbg.setColor(0xB3120D22);
+        pbg.setColor(0xCC000000 | (Palette.mix(Ui.BAR, 0xFF000000, Palette.lum(Ui.BAR) > 0.5f ? 0.85f : 0.3f) & 0xFFFFFF));
         pbg.setStroke(dp(1), 0x33FFFFFF);
         pbg.setCornerRadius(dp(26));
         panel.setBackground(pbg);
@@ -448,17 +439,63 @@ public class PlayerActivity extends AppCompatActivity {
         timeView = text(15, Color.WHITE);
         trow.addView(timeView, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
         TextView hint = text(12, 0xFF9C94B8);
-        hint.setText(Ui.isTv(this) ? T.t("◀ ▶ seek · ▼ buttons · ⚙ settings") : T.t("Tap video to hide"));
+        hint.setText(Ui.isTv(this) ? T.t("◀ ▶ seek · ▼ buttons · ⚙ settings")
+                : T.t("Left: brightness · Right: volume · Swipe sideways: seek · Double-tap: ±10 s"));
         trow.addView(hint);
         panel.addView(trow);
 
-        progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
-        progress.setMax(1000);
-        progress.setFocusable(false);
-        progress.setProgressDrawable(progressDrawable());
-        LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(6));
-        plp.setMargins(0, dp(10), 0, dp(14));
-        panel.addView(progress, plp);
+        // timeline you can drag (touch) or move with ◀ ▶ (TV remote: press ▲ from the buttons to reach it)
+        timeline = new SeekBar(this);
+        timeline.setMax(1000);
+        timeline.setProgressDrawable(progressDrawable());
+        GradientDrawable thumb = new GradientDrawable();
+        thumb.setShape(GradientDrawable.OVAL);
+        thumb.setColor(Color.WHITE);
+        thumb.setStroke(dp(3), Ui.ACCENT);
+        thumb.setSize(dp(20), dp(20));
+        timeline.setThumb(thumb);
+        timeline.setSplitTrack(false);
+        timeline.setPadding(dp(12), dp(8), dp(12), dp(8));
+        timeline.setFocusable(true);
+        GradientDrawable tlFocus = new GradientDrawable();
+        tlFocus.setCornerRadius(dp(14));
+        tlFocus.setStroke(dp(2), 0x00000000);
+        timeline.setOnFocusChangeListener((v, f) -> {
+            tlFocus.setStroke(dp(2), f ? Ui.ACCENT2 : 0x00000000);
+            v.setBackground(tlFocus);
+        });
+        timeline.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            public void onProgressChanged(SeekBar sb, int v, boolean user) {
+                if (!user || mp == null) return;
+                long len = mp.getLength();
+                if (len <= 0) return;
+                long target = len * v / 1000;
+                timeView.setText("⏩ " + Net.fmtTime(target) + " / " + Net.fmtTime(len));
+                timelineMoved = System.currentTimeMillis();
+                handler.removeCallbacks(hideOverlay);
+                handler.postDelayed(hideOverlay, 6000);
+                if (!timelineDragging) {
+                    // remote ◀ ▶ on the bar: seek after a short pause
+                    handler.removeCallbacks(timelineSeek);
+                    handler.postDelayed(timelineSeek, 650);
+                }
+            }
+
+            public void onStartTrackingTouch(SeekBar sb) {
+                timelineDragging = true;
+                handler.removeCallbacks(hideOverlay);
+            }
+
+            public void onStopTrackingTouch(SeekBar sb) {
+                timelineDragging = false;
+                timelineSeek.run();
+                handler.postDelayed(hideOverlay, 5000);
+            }
+        });
+        progress = timeline;
+        LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(36));
+        plp.setMargins(-dp(12), dp(4), -dp(12), dp(6));
+        panel.addView(timeline, plp);
 
         LinearLayout btns = new LinearLayout(this);
         btns.setGravity(Gravity.CENTER);
@@ -515,9 +552,167 @@ public class PlayerActivity extends AppCompatActivity {
         return ld;
     }
 
+    // ---- MX / VLC style gestures: left = brightness, right = volume (to 200%), sideways = seek, double tap = ±10 s
+    private float gx, gy, gStartLevel;
+    private int gMode; // 0 none, 1 brightness, 2 volume, 3 seek
+    private long gDownAt, lastTapAt;
+    private float lastTapX;
+    private long gSeekBase, gSeekTarget;
+    private final Runnable singleTap = new Runnable() {
+        public void run() {
+            if (overlayVisible) hideOverlayNow();
+            else showOverlay();
+        }
+    };
+
+    private float brightness() {
+        float b = getWindow().getAttributes().screenBrightness;
+        if (b < 0) {
+            try {
+                b = android.provider.Settings.System.getInt(getContentResolver(),
+                        android.provider.Settings.System.SCREEN_BRIGHTNESS) / 255f;
+            } catch (Exception e) {
+                b = 0.5f;
+            }
+        }
+        return b;
+    }
+
+    private void setBrightness(float b) {
+        b = Math.max(0.01f, Math.min(1f, b));
+        WindowManager.LayoutParams lp = getWindow().getAttributes();
+        lp.screenBrightness = b;
+        getWindow().setAttributes(lp);
+        osd("☀  " + Math.round(b * 100) + "%   " + meter(b));
+    }
+
+    /** 0..100 = phone volume, 100..200 = extra boost in the player (like VLC). */
+    private float volumeLevel() {
+        android.media.AudioManager am = (android.media.AudioManager) getSystemService(AUDIO_SERVICE);
+        int max = am.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC);
+        int cur = am.getStreamVolume(android.media.AudioManager.STREAM_MUSIC);
+        if (cur >= max && volume > 100) return volume;
+        return max == 0 ? 100 : 100f * cur / max;
+    }
+
+    private void setVolumeLevel(float lvl) {
+        lvl = Math.max(0, Math.min(200, lvl));
+        android.media.AudioManager am = (android.media.AudioManager) getSystemService(AUDIO_SERVICE);
+        int max = am.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC);
+        if (lvl <= 100) {
+            am.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, Math.round(lvl / 100f * max), 0);
+            if (volume != 100) command("vol", "100", "");
+        } else {
+            am.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, max, 0);
+            int v = Math.round(lvl / 5f) * 5;
+            if (v != volume) {
+                volume = v;
+                Store.putInt("vol", v);
+                muted = false;
+                applyAudio();
+            }
+        }
+        osd((lvl > 100 ? "🔊 BOOST  " : "🔊  ") + Math.round(lvl) + "%   " + meter(lvl / 200f));
+    }
+
+    private static String meter(float f) {
+        int n = Math.round(Math.max(0, Math.min(1, f)) * 12);
+        StringBuilder b = new StringBuilder();
+        for (int i = 0; i < 12; i++) b.append(i < n ? '▮' : '▯');
+        return b.toString();
+    }
+
+    private boolean onGesture(View v, android.view.MotionEvent e) {
+        if (locked) {
+            if (e.getAction() == android.view.MotionEvent.ACTION_UP) flashUnlock();
+            return true;
+        }
+        int w = v.getWidth(), h = v.getHeight();
+        switch (e.getActionMasked()) {
+            case android.view.MotionEvent.ACTION_DOWN:
+                gx = e.getX();
+                gy = e.getY();
+                gMode = 0;
+                gDownAt = System.currentTimeMillis();
+                return true;
+            case android.view.MotionEvent.ACTION_MOVE: {
+                float dx = e.getX() - gx, dy = e.getY() - gy;
+                if (gMode == 0) {
+                    if (Math.abs(dy) > dp(24) && Math.abs(dy) > Math.abs(dx) * 1.3f) {
+                        gMode = gx < w / 2f ? 1 : 2;
+                        gStartLevel = gMode == 1 ? brightness() : volumeLevel();
+                        handler.removeCallbacks(singleTap);
+                    } else if (Math.abs(dx) > dp(32) && Math.abs(dx) > Math.abs(dy) * 1.3f && mp != null
+                            && mp.isSeekable() && mp.getLength() > 0) {
+                        gMode = 3;
+                        gSeekBase = Math.max(0, mp.getTime());
+                        handler.removeCallbacks(singleTap);
+                    }
+                }
+                float frac = -dy / Math.max(1, h * 0.8f);
+                if (gMode == 1) setBrightness(gStartLevel + frac);
+                else if (gMode == 2) setVolumeLevel(gStartLevel + frac * 200f);
+                else if (gMode == 3) {
+                    // full screen width = 3 minutes, or 1/10 of the movie for long ones
+                    long span = Math.max(180000, mp.getLength() / 10);
+                    gSeekTarget = Math.max(0, Math.min(mp.getLength() - 1000, gSeekBase + (long) (dx / w * span)));
+                    long diff = gSeekTarget - gSeekBase;
+                    osd((diff >= 0 ? "⏩ +" : "⏪ −") + Net.fmtTime(Math.abs(diff)) + "   →  " + Net.fmtTime(gSeekTarget)
+                            + " / " + Net.fmtTime(mp.getLength()));
+                }
+                return true;
+            }
+            case android.view.MotionEvent.ACTION_UP: {
+                if (gMode == 3) {
+                    seekTo(gSeekTarget);
+                } else if (gMode == 0 && System.currentTimeMillis() - gDownAt < 300) {
+                    long now = System.currentTimeMillis();
+                    if (now - lastTapAt < 300 && Math.abs(e.getX() - lastTapX) < dp(80)) {
+                        // double tap: left third back 10 s, right third forward 10 s, middle play/pause
+                        handler.removeCallbacks(singleTap);
+                        lastTapAt = 0;
+                        if (e.getX() < w / 3f) seekBy(-10000);
+                        else if (e.getX() > w * 2 / 3f) seekBy(10000);
+                        else togglePause();
+                    } else {
+                        lastTapAt = now;
+                        lastTapX = e.getX();
+                        handler.removeCallbacks(singleTap);
+                        handler.postDelayed(singleTap, 280);
+                    }
+                }
+                gMode = 0;
+                return true;
+            }
+            default:
+                return true;
+        }
+    }
+
+    private SeekBar timeline;
+    private boolean timelineDragging;
+    private long timelineMoved;
+    private final Runnable timelineSeek = new Runnable() {
+        public void run() {
+            if (mp == null || timeline == null) return;
+            long len = mp.getLength();
+            if (len > 0) seekTo(len * timeline.getProgress() / 1000);
+            timelineMoved = System.currentTimeMillis();
+        }
+    };
+
+    private long lastBack = 0;
+
+    private static boolean isPlayerKey(int c) {
+        return c == KeyEvent.KEYCODE_BACK || c == KeyEvent.KEYCODE_MEDIA_REWIND || c == KeyEvent.KEYCODE_MEDIA_FAST_FORWARD
+                || c == KeyEvent.KEYCODE_MEDIA_SKIP_BACKWARD || c == KeyEvent.KEYCODE_MEDIA_SKIP_FORWARD
+                || c == KeyEvent.KEYCODE_MEDIA_STEP_BACKWARD || c == KeyEvent.KEYCODE_MEDIA_STEP_FORWARD
+                || c == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || c == KeyEvent.KEYCODE_DPAD_CENTER;
+    }
+
     private boolean controlsFocused() {
         View f = getCurrentFocus();
-        return overlayVisible && f instanceof Button;
+        return overlayVisible && (f instanceof Button || f instanceof SeekBar);
     }
 
     private void hideOverlayNow() {
@@ -564,7 +759,10 @@ public class PlayerActivity extends AppCompatActivity {
         long t = mp.getTime(), len = mp.getLength();
         timeView.setText(len > 0 ? Net.fmtTime(t) + " / " + Net.fmtTime(len) + (mp.isPlaying() ? "" : T.t("   ❚❚ Paused"))
                 : (mp.isPlaying() ? T.t("● Live  ") + Net.fmtTime(t) : T.t("❚❚ Paused")));
-        progress.setProgress(len > 0 ? (int) (1000 * Math.max(0, t) / len) : 0);
+        if (!timelineDragging && System.currentTimeMillis() - timelineMoved > 1500) {
+            progress.setProgress(len > 0 ? (int) (1000 * Math.max(0, t) / len) : 0);
+            if (len > 0) timeline.setKeyProgressIncrement(Math.max(1, (int) (10000L * 1000 / len))); // ◀ ▶ = 10 s
+        }
         playBtn.setText(mp.isPlaying() ? "❚❚" : "▶");
         StringBuilder sb = new StringBuilder();
         if (queue.size() > 1) sb.append(index + 1).append('/').append(queue.size()).append("   ");
@@ -1247,14 +1445,30 @@ public class PlayerActivity extends AppCompatActivity {
                 if (event.getAction() == KeyEvent.ACTION_DOWN) hideOverlayNow();
                 return true;
             }
+            // OK while the timeline is selected = play / pause (a bar has no "click")
+            if (getCurrentFocus() instanceof SeekBar && (code == KeyEvent.KEYCODE_DPAD_CENTER
+                    || code == KeyEvent.KEYCODE_ENTER || code == KeyEvent.KEYCODE_NUMPAD_ENTER)) {
+                if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
+                    timelineSeek.run();
+                    togglePause();
+                }
+                return true;
+            }
             if (nav) {
                 handler.removeCallbacks(hideOverlay);
                 handler.postDelayed(hideOverlay, 9000);
                 return super.dispatchKeyEvent(event);
             }
         }
-        if (event.getAction() == KeyEvent.ACTION_DOWN && handleKey(code, event.getRepeatCount())) {
-            return true;
+        if (event.getAction() == KeyEvent.ACTION_DOWN) {
+            try {
+                if (handleKey(code, event.getRepeatCount())) return true;
+            } catch (Throwable t) {
+                osd("⚠ " + t.getClass().getSimpleName());   // never let a key close the player
+                return true;
+            }
+        } else if (isPlayerKey(code)) {
+            return true;   // swallow the key-up too, so the system never acts on it
         }
         return super.dispatchKeyEvent(event);
     }
@@ -1296,10 +1510,16 @@ public class PlayerActivity extends AppCompatActivity {
                 seekBy(repeat >= 3 ? 30000 : 10000);
                 return true;
             case KeyEvent.KEYCODE_MEDIA_REWIND:
-                seekBy(-30000);
+            case KeyEvent.KEYCODE_MEDIA_SKIP_BACKWARD:
+            case KeyEvent.KEYCODE_MEDIA_STEP_BACKWARD:
+                seekBy(repeat >= 3 ? -60000 : -10000);
+                return true;
+            case KeyEvent.KEYCODE_MEDIA_SKIP_FORWARD:
+            case KeyEvent.KEYCODE_MEDIA_STEP_FORWARD:
+                seekBy(repeat >= 3 ? 60000 : 10000);
                 return true;
             case KeyEvent.KEYCODE_MEDIA_FAST_FORWARD:
-                seekBy(30000);
+                seekBy(repeat >= 3 ? 60000 : 10000);
                 return true;
             case KeyEvent.KEYCODE_DPAD_UP:
                 if (repeat == 0) {
@@ -1355,8 +1575,21 @@ public class PlayerActivity extends AppCompatActivity {
                 }
                 return true;
             case KeyEvent.KEYCODE_MEDIA_STOP:
-            case KeyEvent.KEYCODE_BACK:
                 if (repeat == 0) finish();
+                return true;
+            case KeyEvent.KEYCODE_BACK:
+                // Back: first hides the controls, then asks once more before leaving
+                if (repeat > 0) return true;
+                if (overlayVisible) {
+                    hideOverlayNow();
+                    return true;
+                }
+                long now = System.currentTimeMillis();
+                if (now - lastBack < 2500) finish();
+                else {
+                    lastBack = now;
+                    osd(T.t("Press Back again to exit"));
+                }
                 return true;
             default:
                 if (code >= KeyEvent.KEYCODE_0 && code <= KeyEvent.KEYCODE_9 && repeat == 0 && channelMode()) {
@@ -2340,6 +2573,7 @@ public class PlayerActivity extends AppCompatActivity {
         o.put("sleeps", sl);
         String[] pr = PRESETS != null ? PRESETS : DEFAULT_PRESETS;
         o.put("presets", new JSONArray(java.util.Arrays.asList(pr)));
+        o.put("palettes", new JSONArray(java.util.Arrays.asList(Palette.NAMES)));
         return o;
     }
 
