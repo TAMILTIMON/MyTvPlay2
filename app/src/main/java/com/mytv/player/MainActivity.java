@@ -102,10 +102,7 @@ public class MainActivity extends AppCompatActivity {
     private ArrayAdapter<String> adapter;
     private ListView listView;
     private String current = null;
-<<<<<<< HEAD
     private static boolean askedProfile;
-=======
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
     private String filter = "";
 
     private interface OnDelete {
@@ -187,7 +184,6 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-<<<<<<< HEAD
     private final java.util.HashMap<Integer, Integer> rowItem = new java.util.HashMap<>();
 
     /** Long-press (or hold OK) on a channel / video: edit, favourite, move, delete. */
@@ -245,8 +241,6 @@ public class MainActivity extends AppCompatActivity {
                 .setPositiveButton(T.t("Close"), null).show();
     }
 
-=======
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
     private void askFilter() {
         if (!filter.isEmpty()) {
             filter = "";
@@ -319,12 +313,9 @@ public class MainActivity extends AppCompatActivity {
                 recreate();
             }
         });
-<<<<<<< HEAD
         Button prof = Ui.button(this, narrow ? Family.current().optString("emoji", "🙂") : Family.label(), false);
         prof.setOnClickListener(v -> Family.choose(this, this::recreate));
         top.addView(prof);
-=======
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
         top.addView(theme);
         Button gear = Ui.button(this, narrow ? "⚙" : T.t("⚙ Settings"), true);
         gear.setOnClickListener(new View.OnClickListener() {
@@ -400,15 +391,12 @@ public class MainActivity extends AppCompatActivity {
         listView.setAdapter(adapter);
         listView.setDividerHeight(Ui.dp(this, 8));
         listView.setDivider(new android.graphics.drawable.ColorDrawable(0x00000000));
-<<<<<<< HEAD
         listView.setOnItemLongClickListener((parent, view, position, id) -> {
             Integer it = rowItem.get(position);
             if (it == null || current == null) return false;
             editItem(current, it);
             return true;
         });
-=======
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
         listView.setOnItemClickListener((parent, view, position, id) -> {
             if (position >= 0 && position < actions.size() && actions.get(position) != null) actions.get(position).run();
         });
@@ -418,14 +406,11 @@ public class MainActivity extends AppCompatActivity {
         refresh();
         updateInfo();
         Perms.firstRun(this);
-<<<<<<< HEAD
         Updater.check(this, true);
         if (!askedProfile && Family.profiles().size() > 1 && Ui.isTv(this)) {
             askedProfile = true;
             Family.choose(this, this::recreate);
         }
-=======
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
         final String crash = Store.getStr("lastcrash", "");
         if (!crash.isEmpty()) {
             Store.putStr("lastcrash", "");
@@ -444,7 +429,6 @@ public class MainActivity extends AppCompatActivity {
         appsRow.removeAllViews();
         boolean tv = Ui.isTv(this);
         for (final AppsHub.App a : AppsHub.favorites(this)) {
-<<<<<<< HEAD
             if (!Family.appAllowed(a.pkg) && Family.isKids() && Store.getBool("kids_hide", true)) continue;
             addTile((Family.appAllowed(a.pkg) ? "" : "🔒 ") + a.name, AppsHub.icon(this, a.pkg), tv, v -> {
                 Family.Ok go = () -> {
@@ -453,11 +437,6 @@ public class MainActivity extends AppCompatActivity {
                 };
                 if (Family.appAllowed(a.pkg)) go.run();
                 else Family.askPin(this, T.t("This app is locked for the kids profile."), go);
-=======
-            addTile(a.name, AppsHub.icon(this, a.pkg), tv, v -> {
-                String m = AppsHub.launch(this, a.pkg);
-                if (!a.installed) android.widget.Toast.makeText(this, m, android.widget.Toast.LENGTH_LONG).show();
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
             });
         }
         addTile("＋ Apps", null, tv, v -> editApps());
@@ -538,10 +517,7 @@ public class MainActivity extends AppCompatActivity {
         seen = Store.version;
         rows.clear();
         actions.clear();
-<<<<<<< HEAD
         rowItem.clear();
-=======
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
         if (current == null) {
             header.setText("TamilCastPlay");
             if (Ui.isTv(this) && !Perms.overlayOk(this)) {
@@ -554,7 +530,6 @@ public class MainActivity extends AppCompatActivity {
                 rows.add("🎮   " + T.t("Control the whole TV from the phone") + "  (" + T.t("recommended") + ")");
                 actions.add(() -> Perms.openAccessSettings(this));
             }
-<<<<<<< HEAD
             if (!TorrentDownloads.all().isEmpty()) {
                 int act = 0;
                 for (TorrentDownloads.Dl d : TorrentDownloads.all()) if (!d.done) act++;
@@ -563,15 +538,12 @@ public class MainActivity extends AppCompatActivity {
             }
             rows.add("📊   " + T.t("My TV") + "  ·  " + T.t("storage, memory, speed test"));
             actions.add(() -> startActivity(new Intent(this, TvInfoActivity.class)));
-=======
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
             rows.add(T.t("📁   Local files  ·  USB drive / storage"));
             actions.add(() -> startActivity(new Intent(this, FileBrowserActivity.class)));
             if (!Ui.isTv(this)) {
                 rows.add(T.t("📱   Remote control a TV"));
                 actions.add(() -> startActivity(new Intent(this, ConnectActivity.class)));
             }
-<<<<<<< HEAD
             rows.add("🎬   " + T.t("Library") + "  ·  " + T.t("movie posters, watched ✓, sort & filter"));
             actions.add(() -> startActivity(new Intent(this, LibraryActivity.class)));
             rows.add("🖧   " + T.t("Network folders") + "  ·  PC / NAS (SMB, DLNA)");
@@ -583,9 +555,6 @@ public class MainActivity extends AppCompatActivity {
             }
             for (final String n : Store.names()) {
                 if (!Family.playlistAllowed(n)) continue;
-=======
-            for (final String n : Store.names()) {
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
                 rows.add((Store.RECENT.equals(n) ? "🕘   " : "🎵   ") + n + "   ·   " + Store.count(n));
                 actions.add(() -> {
                     current = n;
@@ -608,7 +577,6 @@ public class MainActivity extends AppCompatActivity {
             }
             header.setText(current);
             final List<Store.Item> items = Store.items(current);
-<<<<<<< HEAD
             final String pl = current;
             if (!items.isEmpty()) {
                 String st = ChannelScanner.status();
@@ -656,8 +624,6 @@ public class MainActivity extends AppCompatActivity {
                             refresh();
                         }).setNegativeButton(T.t("Cancel"), null).show();
             });
-=======
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
             if (!items.isEmpty()) {
                 rows.add("🔍   " + T.t("Search channel / name") + (filter.isEmpty() ? "" : "  “" + filter + "”  ✕") + "   ·   " + items.size());
                 actions.add(this::askFilter);
@@ -668,13 +634,9 @@ public class MainActivity extends AppCompatActivity {
             for (int i = 0; i < items.size(); i++) {
                 if (!fl.isEmpty() && !items.get(i).t.toLowerCase(java.util.Locale.ROOT).contains(fl)) continue;
                 final int idx = i;
-<<<<<<< HEAD
                 rowItem.put(rows.size(), i);
                 rows.add((Store.isWatched(items.get(i).u) ? "✓ " : "") + (Formats.isTorrent(items.get(i).u) ? "🧲   " : Store.isFav(items.get(i).u) ? "★   " : "▶   ") + items.get(i).t
                         + (items.get(i).g.isEmpty() ? "" : "   · " + items.get(i).g));
-=======
-                rows.add((Formats.isTorrent(items.get(i).u) ? "🧲   " : "▶   ") + items.get(i).t);
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
                 actions.add(() -> Remote.play(this, Store.items(current), idx));
             }
             if (items.isEmpty()) {

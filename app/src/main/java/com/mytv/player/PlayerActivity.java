@@ -238,11 +238,7 @@ public class PlayerActivity extends AppCompatActivity {
         handler.removeCallbacks(tick);
         savePosition();
         if (mp != null) {
-<<<<<<< HEAD
             if (!audioOnly) mp.pause();      // audio-only keeps playing with the screen off / app in background
-=======
-            mp.pause();
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
             if (viewsAttached) {
                 mp.detachViews();
                 viewsAttached = false;
@@ -253,7 +249,6 @@ public class PlayerActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-<<<<<<< HEAD
         previewEx.execute(() -> {
             if (mmr != null) try {
                 mmr.release();
@@ -261,8 +256,6 @@ public class PlayerActivity extends AppCompatActivity {
             }
         });
         previewEx.shutdown();
-=======
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
         handler.removeCallbacksAndMessages(null);
         if (Remote.player == this) Remote.player = null;
         resolveToken++;
@@ -366,7 +359,6 @@ public class PlayerActivity extends AppCompatActivity {
         videoLayout = new VLCVideoLayout(this);
         root.addView(videoLayout, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER));
-<<<<<<< HEAD
         dimView = new View(this);
         dimView.setBackgroundColor(Color.BLACK);
         dimView.setAlpha(0f);
@@ -374,8 +366,6 @@ public class PlayerActivity extends AppCompatActivity {
         root.addView(dimView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
         applyBrightnessLayer();
-=======
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
         // tap anywhere (phones) = show / hide controls
         View touch = new View(this);
         touch.setOnTouchListener(this::onGesture);
@@ -448,7 +438,6 @@ public class PlayerActivity extends AppCompatActivity {
         ulp.setMargins(dp(28), 0, 0, 0);
         root.addView(unlockBtn, ulp);
 
-<<<<<<< HEAD
         chip = Ui.button(this, "⏩", true);
         chip.setTextSize(16);
         chip.setVisibility(View.GONE);
@@ -458,8 +447,6 @@ public class PlayerActivity extends AppCompatActivity {
         clp.setMargins(0, 0, dp(48), dp(140));
         root.addView(chip, clp);
 
-=======
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
         // ---- bottom glass panel
         panel = new LinearLayout(this);
         panel.setOrientation(LinearLayout.VERTICAL);
@@ -507,10 +494,7 @@ public class PlayerActivity extends AppCompatActivity {
                 if (len <= 0) return;
                 long target = len * v / 1000;
                 timeView.setText("⏩ " + Net.fmtTime(target) + " / " + Net.fmtTime(len));
-<<<<<<< HEAD
                 showPreview(target);
-=======
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
                 timelineMoved = System.currentTimeMillis();
                 handler.removeCallbacks(hideOverlay);
                 handler.postDelayed(hideOverlay, 6000);
@@ -697,10 +681,7 @@ public class PlayerActivity extends AppCompatActivity {
                     long span = Math.max(180000, mp.getLength() / 10);
                     gSeekTarget = Math.max(0, Math.min(mp.getLength() - 1000, gSeekBase + (long) (dx / w * span)));
                     long diff = gSeekTarget - gSeekBase;
-<<<<<<< HEAD
                     showPreview(gSeekTarget);
-=======
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
                     osd((diff >= 0 ? "⏩ +" : "⏪ −") + Net.fmtTime(Math.abs(diff)) + "   →  " + Net.fmtTime(gSeekTarget)
                             + " / " + Net.fmtTime(mp.getLength()));
                 }
@@ -746,15 +727,12 @@ public class PlayerActivity extends AppCompatActivity {
     };
 
     private long lastBack = 0;
-<<<<<<< HEAD
     private int brightPending = 100;
     private final Runnable brightApply = new Runnable() {
         public void run() {
             command("bright", String.valueOf(brightPending), "");
         }
     };
-=======
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
 
     private static boolean isPlayerKey(int c) {
         return c == KeyEvent.KEYCODE_BACK || c == KeyEvent.KEYCODE_MEDIA_REWIND || c == KeyEvent.KEYCODE_MEDIA_FAST_FORWARD
@@ -763,7 +741,6 @@ public class PlayerActivity extends AppCompatActivity {
                 || c == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || c == KeyEvent.KEYCODE_DPAD_CENTER;
     }
 
-<<<<<<< HEAD
     private View dimView;
     private boolean lastBoost;
 
@@ -774,8 +751,6 @@ public class PlayerActivity extends AppCompatActivity {
         if (dimView != null) dimView.setAlpha(b >= 100 ? 0f : Math.min(0.9f, (100 - b) / 100f));
     }
 
-=======
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
     private boolean controlsFocused() {
         View f = getCurrentFocus();
         return overlayVisible && (f instanceof Button || f instanceof SeekBar);
@@ -848,7 +823,6 @@ public class PlayerActivity extends AppCompatActivity {
 
     private int tickN = 0;
 
-<<<<<<< HEAD
     // ---- "Skip intro" and "Next episode in …" (Netflix style)
     private Button chip;
     private int chipMode = 0;          // 0 hidden, 1 skip intro, 2 next episode
@@ -883,10 +857,6 @@ public class PlayerActivity extends AppCompatActivity {
     private void onTick() {
         tickN++;
         updateChip();
-=======
-    private void onTick() {
-        tickN++;
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
         if (overlayVisible && tickN % 2 == 0) updateOverlay();
         if (loadingView.getVisibility() == View.VISIBLE && torrentUsed && mp != null && !mp.isPlaying()) {
             String ts = TorrentEngine.get(this).shortStatus();
@@ -901,7 +871,6 @@ public class PlayerActivity extends AppCompatActivity {
             return;
         }
         if (System.currentTimeMillis() - lastSave > 15000) savePosition();
-<<<<<<< HEAD
         if (mp != null && mp.isPlaying()) {
             Family.tick(0.5f);
             if (Family.minutesLeft() == 0 && !timesUpShown) {
@@ -918,8 +887,6 @@ public class PlayerActivity extends AppCompatActivity {
                         .setNegativeButton(T.t("Close"), (d, w) -> finish()).show();
             }
         }
-=======
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
     }
 
     // =====================================================================
@@ -930,7 +897,6 @@ public class PlayerActivity extends AppCompatActivity {
         o.add("--network-caching=" + Store.getInt("cache", 2000));
         o.add("--http-reconnect");
         o.add("--audio-time-stretch");
-<<<<<<< HEAD
         List<String> af = new ArrayList<>();
         int dl = dialogLevel();
         if (dl > 0) {
@@ -957,8 +923,6 @@ public class PlayerActivity extends AppCompatActivity {
             o.add("--preferred-resolution=" + q);   // HLS / DASH / IPTV: pick this quality or lower
             o.add("--adaptive-maxheight=" + q);
         }
-=======
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
         o.add("--freetype-rel-fontsize=" + Store.getInt("subsize", 16));
         o.add("--freetype-color=16777215");
         if (Store.getBool("subbg", false)) {
@@ -1053,7 +1017,6 @@ public class PlayerActivity extends AppCompatActivity {
         return index >= 0 && index < queue.size() ? queue.get(index) : null;
     }
 
-<<<<<<< HEAD
     static String dialogName(int l) {
         return T.t(l == 1 ? "Light boost" : l == 2 ? "Medium boost" : l == 3 ? "Strong boost" : "Off");
     }
@@ -1354,10 +1317,6 @@ public class PlayerActivity extends AppCompatActivity {
         if (queue.size() > 20) Store.addRecentChannel(queue.get(i).u);
         skipDone = false;
         nextShownFor = -1;
-=======
-    private void playIndex(int i, boolean resume) {
-        if (i < 0 || i >= queue.size() || mp == null) return;
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
         savePosition();
         index = i;
         Store.Item it = queue.get(i);
@@ -1402,7 +1361,6 @@ public class PlayerActivity extends AppCompatActivity {
         }
         if (startMs > 0) m.addOption(String.format(Locale.US, ":start-time=%.2f", startMs / 1000.0));
         if (Store.getInt("hw", 0) == 1) m.setHWDecoderEnabled(false, false);
-<<<<<<< HEAD
         if (it.u.contains("127.0.0.1:" + RemoteService.PORT + "/torrent/")) m.addOption(":network-caching=8000");
         int br = Store.getInt("bright", 100);
         if (br > 100) {
@@ -1412,8 +1370,6 @@ public class PlayerActivity extends AppCompatActivity {
             m.addOption(String.format(Locale.US, ":contrast=%.2f", 1f + (br - 100) / 400f));
             m.setHWDecoderEnabled(false, false);
         }
-=======
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
         if (it.u.startsWith("http")) {
             String ua = Net.UA, ref = null;
             int bar = it.u.indexOf('|');
@@ -1602,7 +1558,6 @@ public class PlayerActivity extends AppCompatActivity {
         }).start();
     }
 
-<<<<<<< HEAD
     private int torrentRetries = 0;
 
     private void onPlayError(String msg) {
@@ -1618,9 +1573,6 @@ public class PlayerActivity extends AppCompatActivity {
             }, 4000);
             return;
         }
-=======
-    private void onPlayError(String msg) {
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
         if (channelMode()) {
             showLoading(msg + "\n" + T.t("OK = retry · CH+ / CH− = another channel · 📺 = list"));
             showOverlay();
@@ -1644,12 +1596,9 @@ public class PlayerActivity extends AppCompatActivity {
             switch (e.type) {
                 case MediaPlayer.Event.Playing:
                     hideLoading();
-<<<<<<< HEAD
                     torrentRetries = 0;
                     if (audioOnly) handler.postDelayed(() -> { if (mp != null && audioOnly) mp.setVideoTrack(-1); }, 600);
                     handler.postDelayed(PlayerActivity.this::applyAfr, 1500);
-=======
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
                     applyAudio();
                     applyPicture();
                     handler.postDelayed(new Runnable() {
@@ -1701,7 +1650,6 @@ public class PlayerActivity extends AppCompatActivity {
     private void onEnded() {
         if (ended) return;
         ended = true;
-<<<<<<< HEAD
         Store.Item fin = current();
         final String th = fin == null ? null : torrentHash(fin.u);
         if (th != null && !Store.getBool("tkeep_" + th, false) && !Store.getBool("tasked_" + th, false)) {
@@ -1740,9 +1688,6 @@ public class PlayerActivity extends AppCompatActivity {
     private void afterEnded() {
         Store.Item it = current();
         if (it != null) Store.setWatched(it.u, true);
-=======
-        Store.Item it = current();
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
         if (it != null) {
             Store.setPos(it.u, 0);
             Store.removeHistory(it.u);
@@ -1788,14 +1733,10 @@ public class PlayerActivity extends AppCompatActivity {
         boolean nearEnd = pos > len - Math.max(15000, len / 50);
         Store.setPos(it.u, nearEnd ? 0 : pos);
         boolean resumable = !it.u.startsWith("content:") && !it.u.contains("/local/") && len > 60000;
-<<<<<<< HEAD
         if (nearEnd) {
             Store.removeHistory(it.u);
             Store.setWatched(it.u, true);
         }
-=======
-        if (nearEnd) Store.removeHistory(it.u);
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
         else if (resumable && pos > 5000) {
             Store.putHistory(it.t, it.u, pos, len);
             Thumbs.request(this, it.u, pos);
@@ -1813,7 +1754,6 @@ public class PlayerActivity extends AppCompatActivity {
         applyEq();
     }
 
-<<<<<<< HEAD
     /** 0 off, 1 light, 2 medium, 3 strong. The old "Night mode" switch counts as medium. */
     static int dialogLevel() {
         int d = Store.getInt("dialog", -1);
@@ -1828,17 +1768,11 @@ public class PlayerActivity extends AppCompatActivity {
         if (mp == null) return;
         int dl = dialogLevel();
         if (!Store.getBool("eq_on", false) && dl == 0) {
-=======
-    private void applyEq() {
-        if (mp == null) return;
-        if (!Store.getBool("eq_on", false)) {
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
             mp.setEqualizer(null);
             return;
         }
         try {
             MediaPlayer.Equalizer eq = MediaPlayer.Equalizer.create();
-<<<<<<< HEAD
             boolean user = Store.getBool("eq_on", false);
             eq.setPreAmp((user ? Store.getFloat("eq_preamp", 0f) : 0f) - (dl > 0 ? dl : 0));
             float[] b = Store.getBands();
@@ -1848,12 +1782,6 @@ public class PlayerActivity extends AppCompatActivity {
                 float v = (user ? b[i] : 0f) + (i < VOICE.length ? VOICE[i] * m : 0f);
                 eq.setAmp(i, Math.max(-20f, Math.min(20f, v)));
             }
-=======
-            eq.setPreAmp(Store.getFloat("eq_preamp", 0f));
-            float[] b = Store.getBands();
-            int n = Math.min(b.length, MediaPlayer.Equalizer.getBandCount());
-            for (int i = 0; i < n; i++) eq.setAmp(i, b[i]);
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
             mp.setEqualizer(eq);
         } catch (Throwable ignored) {
         }
@@ -2049,13 +1977,10 @@ public class PlayerActivity extends AppCompatActivity {
             case KeyEvent.KEYCODE_SPACE:
             case KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE:
             case KeyEvent.KEYCODE_HEADSETHOOK:
-<<<<<<< HEAD
                 if (repeat == 0 && chipMode != 0 && !overlayVisible && code != KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE) {
                     chipAction();
                     return true;
                 }
-=======
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
                 if (repeat == 0) {
                     boolean okKey = code == KeyEvent.KEYCODE_DPAD_CENTER || code == KeyEvent.KEYCODE_ENTER
                             || code == KeyEvent.KEYCODE_NUMPAD_ENTER;
@@ -2063,7 +1988,6 @@ public class PlayerActivity extends AppCompatActivity {
                     else togglePause();
                 }
                 return true;
-<<<<<<< HEAD
             case KeyEvent.KEYCODE_BOOKMARK:
                 if (repeat == 0) {
                     if (channelMode()) menuQueue();
@@ -2076,13 +2000,6 @@ public class PlayerActivity extends AppCompatActivity {
                 return true;
             case KeyEvent.KEYCODE_LAST_CHANNEL:
                 if (repeat == 0) lastChannel();
-=======
-            case KeyEvent.KEYCODE_GUIDE:
-            case KeyEvent.KEYCODE_TV:
-            case KeyEvent.KEYCODE_BOOKMARK:
-            case KeyEvent.KEYCODE_LAST_CHANNEL:
-                if (repeat == 0) menuQueue();
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
                 return true;
             case KeyEvent.KEYCODE_MEDIA_PLAY:
                 mp.play();
@@ -2396,7 +2313,6 @@ public class PlayerActivity extends AppCompatActivity {
             labels.add("🔒  " + T.t("Lock screen"));
             acts.add(new Runnable() { public void run() { command("lock", "1", ""); } });
         }
-<<<<<<< HEAD
         labels.add("🔖  " + T.t("Bookmark this scene"));
         acts.add(new Runnable() { public void run() { addBookmark(); } });
         if (current() != null && Store.bookmarks(current().u).length() > 0) {
@@ -2435,8 +2351,6 @@ public class PlayerActivity extends AppCompatActivity {
             for (int i = 0; i < qs.length; i++) if (qs[i] == Store.getInt("quality", 0)) sel = i;
             choose(T.t("Streaming quality: "), names, sel, new IntCb() { public void on(int i) { command("quality", String.valueOf(qs[i]), ""); } });
         } });
-=======
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
         labels.add("🏠  " + T.t("Go to Home"));
         acts.add(new Runnable() { public void run() { Ui.goHome(PlayerActivity.this, true); } });
         labels.add(T.t("Phone remote: http://") + Net.ip() + ":" + RemoteService.PORT);
@@ -2490,18 +2404,14 @@ public class PlayerActivity extends AppCompatActivity {
         }
         if (sel < 0 && mp.getSpuTrack() < 0) sel = 0;
         final int extra = ids.size();
-<<<<<<< HEAD
         names.add("🔎 " + T.t("Find subtitles online…"));
         names.add("⚙ " + T.t("Online subtitle settings (languages, API key)"));
-=======
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
         names.add(T.t("➕ Load a subtitle file from your phone…"));
         names.add(T.t("Subtitle delay…"));
         names.add(T.t("Subtitle style…"));
         choose(T.t("Subtitles"), names.toArray(new String[0]), sel, new IntCb() {
             public void on(int i) {
                 if (i < extra) command("sub", String.valueOf(ids.get(i)), "");
-<<<<<<< HEAD
                 else if (i == extra) findSubsOnline();
                 else if (i == extra + 1) subOnlineSettings();
                 else if (i == extra + 2) new AlertDialog.Builder(PlayerActivity.this).setTitle(T.t("Load subtitles"))
@@ -2509,19 +2419,11 @@ public class PlayerActivity extends AppCompatActivity {
                                 + "\n\nthen go to “Audio & Subs” and upload a .srt/.ass file or paste a subtitle link.")
                         .setPositiveButton(T.t("OK"), null).show();
                 else if (i == extra + 3) menuSubDelay();
-=======
-                else if (i == extra) new AlertDialog.Builder(PlayerActivity.this).setTitle(T.t("Load subtitles"))
-                        .setMessage("On your phone open\n\nhttp://" + Net.ip() + ":" + RemoteService.PORT
-                                + "\n\nthen go to “Audio & Subs” and upload a .srt/.ass file or paste a subtitle link.")
-                        .setPositiveButton(T.t("OK"), null).show();
-                else if (i == extra + 1) menuSubDelay();
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
                 else menuSubStyle();
             }
         });
     }
 
-<<<<<<< HEAD
     private void findSubsOnline() {
         Store.Item it = current();
         final android.widget.EditText q = new android.widget.EditText(this);
@@ -2581,8 +2483,6 @@ public class PlayerActivity extends AppCompatActivity {
                 }).setNegativeButton(T.t("Cancel"), null).show();
     }
 
-=======
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
     private void menuAspect() {
         choose(T.t("Aspect ratio"), ASPECT_NAMES, aspectIndex(), new IntCb() {
             public void on(int i) {
@@ -2750,32 +2650,22 @@ public class PlayerActivity extends AppCompatActivity {
     }
 
     /**
-<<<<<<< HEAD
      * Channel / playlist list: logos, categories, ★ favourites, 🕘 recent, live search.
      * TV remote: type in the box, ▼ into the list, OK = play, long-press OK = ★ favourite.
      */
     private String chFilter = "";   // "" all, "★" favourites, "🕘" recent, else a category
 
-=======
-     * Channel / playlist list with live search. Works with the TV remote:
-     * type in the box (on-screen keyboard), press ▼ to go into the list, OK to play.
-     */
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
     private void menuQueue() {
         if (queue.isEmpty()) return;
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
         box.setPadding(dp(16), dp(4), dp(16), 0);
-<<<<<<< HEAD
         LinearLayout top = new LinearLayout(this);
         top.setGravity(Gravity.CENTER_VERTICAL);
-=======
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
         final android.widget.EditText q = new android.widget.EditText(this);
         q.setHint("🔍 " + T.t("Type a channel name…"));
         q.setSingleLine(true);
         q.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);
-<<<<<<< HEAD
         top.addView(q, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
         final Button cat = Ui.button(this, "📂", true);
         top.addView(cat, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(44)));
@@ -2869,41 +2759,6 @@ public class PlayerActivity extends AppCompatActivity {
         q.addTextChangedListener(new android.text.TextWatcher() {
             public void beforeTextChanged(CharSequence c, int a1, int b1, int d) { }
             public void onTextChanged(CharSequence c, int a1, int b1, int d) { }
-=======
-        box.addView(q);
-        final android.widget.ListView lv = new android.widget.ListView(this);
-        final List<Integer> idx = new ArrayList<>();
-        final List<String> names = new ArrayList<>();
-        final android.widget.ArrayAdapter<String> ad = new android.widget.ArrayAdapter<>(this,
-                android.R.layout.simple_list_item_activated_1, names);
-        lv.setAdapter(ad);
-        lv.setChoiceMode(android.widget.ListView.CHOICE_MODE_SINGLE);
-        box.addView(lv, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
-                Math.min(dp(420), (int) (getResources().getDisplayMetrics().heightPixels * 0.62f))));
-        final Runnable[] rebuild = new Runnable[1];
-        rebuild[0] = new Runnable() {
-            public void run() {
-                String ql = q.getText().toString().trim().toLowerCase(Locale.ROOT);
-                idx.clear();
-                names.clear();
-                int sel = -1;
-                for (int i = 0; i < queue.size() && idx.size() < 3000; i++) {
-                    if (!ql.isEmpty() && !queue.get(i).t.toLowerCase(Locale.ROOT).contains(ql)) continue;
-                    if (i == index) sel = idx.size();
-                    idx.add(i);
-                    names.add((i == index ? "▶ " : "") + (i + 1) + ".  " + queue.get(i).t);
-                }
-                ad.notifyDataSetChanged();
-                if (sel >= 0) {
-                    lv.setItemChecked(sel, true);
-                    lv.setSelection(Math.max(0, sel - 3));
-                }
-            }
-        };
-        q.addTextChangedListener(new android.text.TextWatcher() {
-            public void beforeTextChanged(CharSequence c, int a, int b, int d) { }
-            public void onTextChanged(CharSequence c, int a, int b, int d) { }
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
             public void afterTextChanged(android.text.Editable e) {
                 rebuild[0].run();
             }
@@ -2912,7 +2767,6 @@ public class PlayerActivity extends AppCompatActivity {
         final AlertDialog d = new AlertDialog.Builder(this)
                 .setTitle(T.t("📺 Channels") + "  ·  " + queue.size())
                 .setView(box).setNegativeButton(T.t("Close"), null).create();
-<<<<<<< HEAD
         lv.setOnItemClickListener((p, v, pos, id) -> {
             d.dismiss();
             playIndex(idx.get(pos), true);
@@ -2925,28 +2779,13 @@ public class PlayerActivity extends AppCompatActivity {
             osd(on ? "★ " + T.t("Added to favourites") : "☆ " + T.t("Removed from favourites"));
             ad.notifyDataSetChanged();
             return true;
-=======
-        lv.setOnItemClickListener(new android.widget.AdapterView.OnItemClickListener() {
-            public void onItemClick(android.widget.AdapterView<?> p, View v, int pos, long id) {
-                d.dismiss();
-                playIndex(idx.get(pos), true);
-            }
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
         });
         q.setOnEditorActionListener((v, act, ev) -> {
             lv.requestFocus();
             return false;
         });
         d.show();
-<<<<<<< HEAD
         lv.post(lv::requestFocus);
-=======
-        lv.post(new Runnable() {
-            public void run() {
-                lv.requestFocus();
-            }
-        });
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
     }
 
     // ---- type a channel number on the remote (channel lists) ----
@@ -3145,7 +2984,6 @@ public class PlayerActivity extends AppCompatActivity {
                 case "adelay":
                     Store.putInt("adelay", Math.max(-30000, Math.min(30000, Math.round(Float.parseFloat(v)))));
                     return "Audio delay " + fmtMs(Store.getInt("adelay", 0));
-<<<<<<< HEAD
                 case "dialog": {
                     int dv = Math.max(0, Math.min(3, Integer.parseInt(v)));
                     Store.putInt("dialog", dv);
@@ -3171,8 +3009,6 @@ public class PlayerActivity extends AppCompatActivity {
                     Store.putInt("quality", qv);
                     return T.t("Streaming quality: ") + (qv == 0 ? T.t("Best") : qv + "p");
                 }
-=======
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
                 default:
                     return null;
             }
@@ -3219,7 +3055,6 @@ public class PlayerActivity extends AppCompatActivity {
             case "adelay":
                 mp.setAudioDelay(Store.getInt("adelay", 0) * 1000L);
                 break;
-<<<<<<< HEAD
             case "dialog":
             case "night":
             case "level":
@@ -3255,8 +3090,6 @@ public class PlayerActivity extends AppCompatActivity {
             case "quality":
                 restartEngine();
                 break;
-=======
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
 
             // ---- player actions ----
             case "toggle": {
@@ -3413,11 +3246,8 @@ public class PlayerActivity extends AppCompatActivity {
         o.put("subs", tracksJson(mp.getSpuTracks(), true));
         o.put("subSel", mp.getSpuTrack());
         o.put("sleep", sleepLabel());
-<<<<<<< HEAD
         o.put("audioOnly", audioOnly);
         o.put("bookmarks", it == null ? new JSONArray() : Store.bookmarks(it.u));
-=======
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
         o.put("repeat", repeatMode());
         o.put("shuffle", shuffleOn());
         o.put("loading", loadingView.getVisibility() == View.VISIBLE ? loadingView.getText().toString() : "");
@@ -3441,15 +3271,12 @@ public class PlayerActivity extends AppCompatActivity {
         o.put("hw", Store.getInt("hw", 0));
         o.put("cache", Store.getInt("cache", 2000));
         o.put("adelay", Store.getInt("adelay", 0));
-<<<<<<< HEAD
         o.put("bright", Store.getInt("bright", 100));
         o.put("night", dialogLevel() > 0);
         o.put("dialog", dialogLevel());
         o.put("level", Store.getBool("level", false));
         o.put("afr", Store.getBool("afr", false));
         o.put("quality", Store.getInt("quality", 0));
-=======
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
         JSONObject eq = new JSONObject();
         eq.put("on", Store.getBool("eq_on", false));
         eq.put("preset", Store.getInt("eq_preset", -1));
@@ -3489,10 +3316,7 @@ public class PlayerActivity extends AppCompatActivity {
         String[] pr = PRESETS != null ? PRESETS : DEFAULT_PRESETS;
         o.put("presets", new JSONArray(java.util.Arrays.asList(pr)));
         o.put("palettes", new JSONArray(java.util.Arrays.asList(Palette.NAMES)));
-<<<<<<< HEAD
         o.put("qualities", new JSONArray(java.util.Arrays.asList(0, 1080, 720, 480, 360)));
-=======
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
         return o;
     }
 

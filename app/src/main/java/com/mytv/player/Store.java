@@ -15,10 +15,7 @@ import java.util.concurrent.Executors;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
-<<<<<<< HEAD
 import java.util.Map;
-=======
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
 import java.util.Locale;
 
 /** Keeps playlists, resume positions and player settings on the TV. */
@@ -29,7 +26,6 @@ public class Store {
 
     public static class Item {
         public final String t, u, s; // title, url, subtitle url (optional)
-<<<<<<< HEAD
         public final String g, l;    // IPTV: group / category, logo url
 
         public Item(String t, String u, String s) {
@@ -42,13 +38,6 @@ public class Store {
             this.s = s == null ? "" : s.trim();
             this.g = g == null ? "" : g.trim();
             this.l = l == null ? "" : l.trim();
-=======
-
-        public Item(String t, String u, String s) {
-            this.u = u == null ? "" : u.trim();
-            this.t = (t == null || t.trim().isEmpty()) ? Formats.titleFromUrl(this.u) : t.trim();
-            this.s = s == null ? "" : s.trim();
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
         }
     }
 
@@ -79,11 +68,7 @@ public class Store {
         List<Item> l = new ArrayList<>(it.length());
         for (int j = 0; j < it.length(); j++) {
             JSONObject x = it.getJSONObject(j);
-<<<<<<< HEAD
             l.add(new Item(x.optString("t"), x.optString("u"), x.optString("s", ""), x.optString("g", ""), x.optString("l", "")));
-=======
-            l.add(new Item(x.optString("t"), x.optString("u"), x.optString("s", "")));
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
         }
         return l;
     }
@@ -129,11 +114,8 @@ public class Store {
             Item it = items.get(i);
             JSONObject x = new JSONObject().put("t", it.t).put("u", it.u);
             if (!it.s.isEmpty()) x.put("s", it.s);
-<<<<<<< HEAD
             if (!it.g.isEmpty()) x.put("g", it.g);
             if (!it.l.isEmpty()) x.put("l", it.l);
-=======
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
             a.put(x);
         }
         return a;
@@ -206,13 +188,8 @@ public class Store {
             String q = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
             for (int i = Math.max(0, from); i < l.size() && a.length() < max; i++) {
                 Item it = l.get(i);
-<<<<<<< HEAD
                 if (!q.isEmpty() && !it.t.toLowerCase(Locale.ROOT).contains(q) && !it.g.toLowerCase(Locale.ROOT).contains(q)) continue;
                 a.put(new JSONObject().put("i", i).put("t", it.t).put("u", it.u).put("g", it.g).put("l", it.l));
-=======
-                if (!q.isEmpty() && !it.t.toLowerCase(Locale.ROOT).contains(q)) continue;
-                a.put(new JSONObject().put("i", i).put("t", it.t).put("u", it.u));
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
             }
             return new JSONObject().put("name", name).put("count", l.size()).put("items", a).toString();
         } catch (Exception e) {
@@ -228,7 +205,6 @@ public class Store {
         return l;
     }
 
-<<<<<<< HEAD
     public static synchronized boolean renamePlaylist(String from, String to) {
         to = cleanName(to);
         if (!data.containsKey(from) || data.containsKey(to)) return false;
@@ -313,8 +289,6 @@ public class Store {
         return new ArrayList<>(urlSet(pk("rch")));
     }
 
-=======
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
     public static synchronized int count(String name) {
         List<Item> l = data.get(name);
         return l == null ? 0 : l.size();
@@ -422,7 +396,6 @@ public class Store {
         if (data.remove(name) != null) changed(name, true);
     }
 
-<<<<<<< HEAD
     // ---------- profiles: each person has own Continue watching, favourites, positions, watched, bookmarks
     public static String profile() {
         return getStr("profile", "0");
@@ -468,8 +441,6 @@ public class Store {
         putStr(pk("bm_" + Thumbs.key(url)), out.toString());
     }
 
-=======
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
     // ---------- continue watching ----------
     public static final class Watch {
         public final String t, u;
@@ -487,11 +458,7 @@ public class Store {
     public static synchronized List<Watch> history() {
         List<Watch> out = new ArrayList<>();
         try {
-<<<<<<< HEAD
             JSONArray a = new JSONArray(getStr(pk("history"), "[]"));
-=======
-            JSONArray a = new JSONArray(getStr("history", "[]"));
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
             for (int i = 0; i < a.length(); i++) {
                 JSONObject o = a.getJSONObject(i);
                 out.add(new Watch(o.optString("t"), o.optString("u"), o.optLong("p"), o.optLong("l"), o.optLong("w")));
@@ -507,11 +474,7 @@ public class Store {
             for (Watch w : l) {
                 a.put(new JSONObject().put("t", w.t).put("u", w.u).put("p", w.pos).put("l", w.len).put("w", w.when));
             }
-<<<<<<< HEAD
             putStr(pk("history"), a.toString());
-=======
-            putStr("history", a.toString());
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
             version++;
         } catch (Exception ignored) {
         }
@@ -537,7 +500,6 @@ public class Store {
         if (changed) saveHistory(l);
     }
 
-<<<<<<< HEAD
     // ---------- backup ----------
     private static final java.util.Set<String> NO_BACKUP = new java.util.HashSet<>(java.util.Arrays.asList(
             "tokens", "lastcrash", "adb_on", "upd_last", "history"));
@@ -591,15 +553,6 @@ public class Store {
 
     public static void setPos(String url, long p) {
         if (posPrefs != null) posPrefs.edit().putLong(pk(url), p).apply();
-=======
-    // ---------- resume positions ----------
-    public static long pos(String url) {
-        return posPrefs == null ? 0 : posPrefs.getLong(url, 0);
-    }
-
-    public static void setPos(String url, long p) {
-        if (posPrefs != null) posPrefs.edit().putLong(url, p).apply();
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
     }
 
     // ---------- settings ----------
@@ -677,24 +630,17 @@ public class Store {
         return out;
     }
 
-<<<<<<< HEAD
     private static final java.util.regex.Pattern GROUP =
             java.util.regex.Pattern.compile("group-title=\"([^\"]*)\"", java.util.regex.Pattern.CASE_INSENSITIVE);
     private static final java.util.regex.Pattern LOGO =
             java.util.regex.Pattern.compile("tvg-logo=\"([^\"]*)\"", java.util.regex.Pattern.CASE_INSENSITIVE);
-=======
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
     private static final java.util.regex.Pattern ATTR =
             java.util.regex.Pattern.compile("(http-user-agent|http-referrer|http-referer)=\"([^\"]*)\"", java.util.regex.Pattern.CASE_INSENSITIVE);
 
     /** Reads an M3U playlist (IPTV lists too), or a plain list of links, one per line. */
     public static List<Item> parseM3u(String text) {
         List<Item> out = new ArrayList<>();
-<<<<<<< HEAD
         String title = null, ua = null, ref = null, group = "", logo = "";
-=======
-        String title = null, ua = null, ref = null;
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
         for (String raw : text.split("\\r?\\n")) {
             String line = raw.trim();
             if (line.isEmpty()) continue;
@@ -702,16 +648,12 @@ public class Store {
             if (line.startsWith("#EXTINF")) {
                 int c = line.lastIndexOf(',');
                 title = c >= 0 ? line.substring(c + 1).trim() : null;
-<<<<<<< HEAD
                 String head = c >= 0 ? line.substring(0, c) : line;
                 java.util.regex.Matcher gm = GROUP.matcher(head);
                 group = gm.find() ? gm.group(1).split(";")[0].trim() : "";
                 java.util.regex.Matcher lm = LOGO.matcher(head);
                 logo = lm.find() ? lm.group(1).trim() : "";
                 java.util.regex.Matcher m = ATTR.matcher(head);
-=======
-                java.util.regex.Matcher m = ATTR.matcher(c >= 0 ? line.substring(0, c) : line);
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
                 while (m.find()) {
                     if (m.group(1).toLowerCase(Locale.ROOT).contains("agent")) ua = m.group(2);
                     else ref = m.group(2);
@@ -731,19 +673,12 @@ public class Store {
                     if (ua != null) h.append(ref != null ? "&" : "").append("User-Agent=").append(android.net.Uri.encode(ua));
                     u = u + h;
                 }
-<<<<<<< HEAD
                 out.add(new Item(title, u, "", group, logo));
                 title = null;
                 ua = null;
                 ref = null;
                 group = "";
                 logo = "";
-=======
-                out.add(new Item(title, u, ""));
-                title = null;
-                ua = null;
-                ref = null;
->>>>>>> 5de5a7615d2ea9d114ecfab7413518f884102d04
             }
         }
         return out;
