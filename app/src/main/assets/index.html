@@ -177,6 +177,7 @@ button.ic svg.lc{width:22px;height:22px}
 #scr{width:100%;aspect-ratio:16/9;border-radius:14px;background:#000;object-fit:contain;display:block}
 .pbtn{display:flex;align-items:center;gap:10px;justify-content:flex-start;margin-bottom:8px}
 .pbtn svg{width:20px;height:20px}
+.lc-in svg{width:1.1em;height:1.1em;vertical-align:-0.18em}
 .only-app,.only-web{display:none}
 .app .only-app{display:block}.web .only-web{display:block}
 label.sw{display:flex;align-items:center;gap:10px;font-size:14px;margin:6px 0}
@@ -958,6 +959,30 @@ document.querySelectorAll('.tab').forEach(t=>{const h=document.createElement('di
 // My TV card gets its own panel
 (function(){const rep=$('tvrep');if(rep){const card=rep.closest('.card');$('t-mytv').appendChild(card);}})();
 paintIcons();
+
+// ---------- no emoji anywhere: leading emoji → Lucide icon, other emoji removed ----------
+const EMO={"👨":"users","📁":"folder","📂":"folder-open","📊":"gauge","🎬":"film","🖧":"network","🌐":"languages","🕘":"clock","🎵":"list-music","★":"star","⭐":"star","☆":"star","✅":"check","🧲":"magnet","🔍":"search","🔎":"search","🗑":"trash","🔄":"refresh-cw","🩺":"gauge","🔓":"lock","🔒":"lock","🔐":"lock","🎮":"gamepad-2","📱":"smartphone","⏰":"clock","⏱":"clock","⬇":"download","📥":"download","💾":"hard-drive","🏠":"house","⌂":"house","⬆":"cloud-download","🖥":"monitor","✏":"settings","＋":"plus","🎞":"film","🎨":"palette","📺":"tv","🖼":"image","📐":"layout-grid","🎚":"sliders-horizontal","🔊":"volume-2","🔉":"volume-1","🔇":"volume-x","💬":"captions","🔤":"languages","⚙":"settings","🔌":"server","🧹":"trash","ℹ":"info","🔖":"bookmark","📸":"camera","🌙":"moon","🕶":"moon","☀":"sun","📶":"wifi","⏩":"skip-forward","⏭":"skip-forward","⏪":"skip-back","⏮":"skip-back","🔁":"repeat","🔂":"repeat-1","🔀":"shuffle","🗣":"mic","📋":"list","📡":"cast","🚀":"sparkles","⧉":"layers","⋮":"menu","☰":"menu","⏯":"circle-play","⏹":"circle-stop","❌":"x","⚠":"info","♻":"refresh-cw","⌨":"keyboard","📤":"cloud-download","☑":"check","🍿":"film"};
+const KEEPC='→←↑↓✓✔✕★▶◀▲▼❚●○•·×–—…';
+let PICT=null;try{PICT=new RegExp('\\p{Extended_Pictographic}','u');}catch(e){}
+function emo(ch){if(KEEPC.includes(ch))return false;const cp=ch.codePointAt(0);if(cp===0xFE0F||cp===0x200D||cp===0x20E3)return true;if(cp>0xFFFF)return true;return PICT?PICT.test(ch):(cp>=0x2300&&cp<=0x2BFF);}
+function stripEmo(t){let o='';for(const ch of t){if(!emo(ch))o+=ch;}return o.replace(/[ \t]{2,}/g,' ');}
+function cleanNode(n){
+  if(n.nodeType===3){const t=n.nodeValue;let has=false;for(const ch of t){if(emo(ch)){has=true;break;}}if(!has)return;
+    const lead=t.trimStart();let icn=null;for(const k in EMO){if(lead.startsWith(k)){icn=EMO[k];break;}}
+    const p=n.parentNode;if(!p)return;
+    if(icn&&ICONS[icn]&&!(p.previousSibling&&p.previousSibling.classList&&p.previousSibling.classList.contains('lc-in'))){
+      const sp=document.createElement('span');sp.className='lc-in';sp.innerHTML=ic(icn)+' ';p.insertBefore(sp,n);}
+    n.nodeValue=stripEmo(t).replace(/^\s+/,lead!==t?' ':'');return;}
+  if(n.nodeType!==1)return;const tg=n.tagName;if(tg==='SCRIPT'||tg==='STYLE'||tg==='svg'||tg==='SVG'||n.closest&&n.closest('svg'))return;
+  if(n.placeholder){const c=stripEmo(n.placeholder).trim();if(c!==n.placeholder)n.placeholder=c;}
+  if(n.tagName==='OPTION'){const c=stripEmo(n.textContent).trim();if(c!==n.textContent)n.textContent=c;return;}
+  n.childNodes.forEach(cleanNode);}
+cleanNode(document.body);
+let cleanQ=new Set(),cleanT=0;
+new MutationObserver(ms=>{ms.forEach(m=>{if(m.type==='characterData')cleanQ.add(m.target);else m.addedNodes.forEach(x=>cleanQ.add(x));});
+  if(!cleanT)cleanT=requestAnimationFrame(()=>{cleanT=0;const q=[...cleanQ];cleanQ.clear();q.forEach(cleanNode);});})
+  .observe(document.body,{childList:true,subtree:true,characterData:true});
+['alert','confirm','prompt'].forEach(f=>{const o=window[f];window[f]=function(m,d){return o.call(window,stripEmo(String(m==null?'':m)),d);};});
 $('autohide').checked=AUTOHIDE;$('followpal').checked=FOLLOW;
 loadOptions().then(poll);load();loadApps();loadHistory();
 </script>

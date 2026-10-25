@@ -144,7 +144,13 @@ public final class Ui {
     /** Rounded pill button; primary = purple gradient, otherwise glass. */
     public static Button button(Context c, String label, boolean primary) {
         Button b = new Button(c);
-        b.setText(label);
+        String ic = UiKit.iconFor(label);
+        String clean = UiKit.noEmoji(label);
+        b.setText(clean);
+        if (ic != null) {
+            b.setCompoundDrawablesWithIntrinsicBounds(new UiKit.Icon(c, ic, 18, primary ? Color.WHITE : TEXT), null, null, null);
+            b.setCompoundDrawablePadding(dp(c, clean.isEmpty() ? 0 : 8));
+        }
         b.setAllCaps(false);
         b.setTextSize(16);
         b.setTextColor(primary ? Color.WHITE : TEXT);
@@ -175,11 +181,17 @@ public final class Ui {
     /** Round icon button (overlay controls, corner settings). Always light text: sits on video / glass. */
     public static Button iconButton(Context c, String label, float sizeDp, boolean primary) {
         Button b = new Button(c);
-        b.setText(label);
+        String ic = UiKit.iconFor(label);
+        if (ic != null) {
+            int is = Math.round(sizeDp * 0.46f);
+            b.setText("");
+            b.setCompoundDrawablesWithIntrinsicBounds(new UiKit.Icon(c, ic, is, Color.WHITE), null, null, null);
+            b.setPadding(dp(c, (sizeDp - is) / 2f), 0, 0, 0);
+        } else b.setText(UiKit.noEmoji(label));
         b.setAllCaps(false);
         b.setTextSize(sizeDp * 0.36f);
         b.setTextColor(Color.WHITE);
-        b.setPadding(0, 0, 0, 0);
+        if (ic == null) b.setPadding(0, 0, 0, 0);
         b.setMinWidth(0);
         b.setMinimumWidth(0);
         b.setMinHeight(0);

@@ -65,9 +65,9 @@ public class VoiceSearchActivity extends Activity {
         }
         if (bestPl != null) {
             Remote.play(this, Store.items(bestPl), bestIdx);
-            Toast.makeText(this, "▶ " + Store.items(bestPl).get(bestIdx).t, Toast.LENGTH_SHORT).show();
+            UiKit.makeToast(this, "▶ " + Store.items(bestPl).get(bestIdx).t, Toast.LENGTH_SHORT).show();
         } else {
-            Toast.makeText(this, T.t("No channel found") + ": " + q, Toast.LENGTH_LONG).show();
+            UiKit.makeToast(this, T.t("No channel found") + ": " + q, Toast.LENGTH_LONG).show();
             Remote.openHome(this);
         }
     }

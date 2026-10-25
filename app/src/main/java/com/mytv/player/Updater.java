@@ -92,25 +92,25 @@ public final class Updater {
                 a.runOnUiThread(() -> {
                     if (a.isFinishing()) return;
                     if (i.code > mine && !i.url.isEmpty()) {
-                        new AlertDialog.Builder(a).setTitle("⬆  " + T.t("Update available"))
+                        new UiDialog(a).setTitle("⬆  " + T.t("Update available"))
                                 .setMessage(i.name + "\n\n" + T.t("Installed") + ": " + installedName(a) + " (" + mine + ")\n"
                                         + T.t("New") + ": " + i.code)
                                 .setPositiveButton(T.t("Update now"), (d, w) -> download(a, i))
                                 .setNegativeButton(T.t("Later"), null).show();
                     } else if (!quiet) {
-                        android.widget.Toast.makeText(a, "✅ " + T.t("You have the latest version") + " (" + installedName(a) + ")",
+                        UiKit.makeToast(a, "✅ " + T.t("You have the latest version") + " (" + installedName(a) + ")",
                                 android.widget.Toast.LENGTH_LONG).show();
                     }
                 });
             } catch (final Exception e) {
-                if (!quiet) a.runOnUiThread(() -> android.widget.Toast.makeText(a, e.getMessage(), android.widget.Toast.LENGTH_LONG).show());
+                if (!quiet) a.runOnUiThread(() -> UiKit.makeToast(a, e.getMessage(), android.widget.Toast.LENGTH_LONG).show());
             }
         }).start();
     }
 
     private static void download(final Activity a, final Info i) {
         if (Build.VERSION.SDK_INT >= 26 && !a.getPackageManager().canRequestPackageInstalls()) {
-            new AlertDialog.Builder(a).setTitle(T.t("Allow installing updates"))
+            new UiDialog(a).setTitle(T.t("Allow installing updates"))
                     .setMessage(T.t("On the next screen switch “Allow from this source” ON for TamilCastPlay, then press Update again."))
                     .setPositiveButton(T.t("Allow"), (d, w) -> Perms.launchFirst(a, new Intent[]{
                             new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + a.getPackageName())),
@@ -118,7 +118,7 @@ public final class Updater {
                     .setNegativeButton(T.t("Cancel"), null).show();
             return;
         }
-        android.widget.Toast.makeText(a, T.t("Downloading update…"), android.widget.Toast.LENGTH_LONG).show();
+        UiKit.makeToast(a, T.t("Downloading update…"), android.widget.Toast.LENGTH_LONG).show();
         new Thread(() -> {
             try {
                 File dir = a.getExternalCacheDir() != null ? a.getExternalCacheDir() : a.getCacheDir();
@@ -134,7 +134,7 @@ public final class Updater {
                 }
                 a.runOnUiThread(() -> install(a, f));
             } catch (final Exception e) {
-                a.runOnUiThread(() -> android.widget.Toast.makeText(a, "Update failed: " + e.getMessage(), android.widget.Toast.LENGTH_LONG).show());
+                a.runOnUiThread(() -> UiKit.makeToast(a, "Update failed: " + e.getMessage(), android.widget.Toast.LENGTH_LONG).show());
             }
         }).start();
     }
@@ -146,7 +146,7 @@ public final class Updater {
                     .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
             a.startActivity(i);
         } catch (Exception e) {
-            android.widget.Toast.makeText(a, "Install failed: " + e.getMessage(), android.widget.Toast.LENGTH_LONG).show();
+            UiKit.makeToast(a, "Install failed: " + e.getMessage(), android.widget.Toast.LENGTH_LONG).show();
         }
     }
 }

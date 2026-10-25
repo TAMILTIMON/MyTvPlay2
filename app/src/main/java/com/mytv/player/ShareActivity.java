@@ -34,7 +34,7 @@ public class ShareActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         RemoteService.start(this);
         if (!collect(getIntent())) {
-            Toast.makeText(this, T.t("Nothing to play in what was shared"), Toast.LENGTH_LONG).show();
+            UiKit.makeToast(this, T.t("Nothing to play in what was shared"), Toast.LENGTH_LONG).show();
             finish();
             return;
         }
@@ -75,7 +75,7 @@ public class ShareActivity extends AppCompatActivity {
     private void findTv() {
         final String last = Store.getStr("last_tv", "");
         final Map<String, Discovery.Device> found = new LinkedHashMap<>();
-        Toast.makeText(this, T.t("Looking for your TV…"), Toast.LENGTH_SHORT).show();
+        UiKit.makeToast(this, T.t("Looking for your TV…"), Toast.LENGTH_SHORT).show();
         new Thread(() -> {
             Discovery.Device d = last.isEmpty() ? null : Discovery.ping(last, 1500);
             if (d != null) {
@@ -90,7 +90,7 @@ public class ShareActivity extends AppCompatActivity {
     private void choose(final Map<String, Discovery.Device> found) {
         if (isFinishing()) return;
         if (found.isEmpty()) {
-            new AlertDialog.Builder(this).setTitle(T.t("No TV found"))
+            new UiDialog(this).setTitle(T.t("No TV found"))
                     .setMessage(T.t("Turn on the TV, open TamilCastPlay once, and make sure the phone is on the same Wi-Fi."))
                     .setPositiveButton(T.t("Play on this phone"), (d, w) -> playHere())
                     .setNegativeButton(T.t("Close"), null)
@@ -100,7 +100,7 @@ public class ShareActivity extends AppCompatActivity {
         final List<Discovery.Device> list = new ArrayList<>(found.values());
         String[] names = new String[list.size()];
         for (int i = 0; i < names.length; i++) names[i] = "📺  " + list.get(i).name + "   (" + list.get(i).ip + ")";
-        new AlertDialog.Builder(this).setTitle(T.t("Play on which TV?"))
+        new UiDialog(this).setTitle(T.t("Play on which TV?"))
                 .setItems(names, (d, w) -> ask(list.get(w), found))
                 .setOnCancelListener(d -> finish()).show();
     }
@@ -108,7 +108,7 @@ public class ShareActivity extends AppCompatActivity {
     private void ask(final Discovery.Device tv, final Map<String, Discovery.Device> found) {
         if (isFinishing()) return;
         String what = titles.size() == 1 ? titles.get(0) : titles.size() + " " + T.t("files");
-        new AlertDialog.Builder(this).setTitle("📺  " + tv.name)
+        new UiDialog(this).setTitle("📺  " + tv.name)
                 .setMessage(what)
                 .setPositiveButton(T.t("▶ Play now"), (d, w) -> send(tv, "now"))
                 .setNeutralButton(T.t("+ Queue"), (d, w) -> send(tv, "queue"))
@@ -139,14 +139,14 @@ public class ShareActivity extends AppCompatActivity {
                 Store.putStr("last_tv", tv.ip);
                 final String msg = r.optString("msg", r.optBoolean("ok") ? "Sent" : "Failed");
                 main.post(() -> {
-                    Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
+                    UiKit.makeToast(this, msg, Toast.LENGTH_LONG).show();
                     finish();
                 });
             } catch (TvClient.AuthNeeded e) {
                 main.post(() -> askPin(tv, mode));
             } catch (Exception e) {
                 main.post(() -> {
-                    Toast.makeText(this, T.t("Cannot reach the TV"), Toast.LENGTH_LONG).show();
+                    UiKit.makeToast(this, T.t("Cannot reach the TV"), Toast.LENGTH_LONG).show();
                     finish();
                 });
             }
@@ -157,14 +157,14 @@ public class ShareActivity extends AppCompatActivity {
         final EditText e = new EditText(this);
         e.setInputType(InputType.TYPE_CLASS_NUMBER);
         e.setHint("1234");
-        new AlertDialog.Builder(this).setTitle(T.t("Enter the PIN shown on the TV"))
+        new UiDialog(this).setTitle(T.t("Enter the PIN shown on the TV"))
                 .setView(e)
                 .setPositiveButton(T.t("OK"), (d, w) -> new Thread(() -> {
                     String err = TvClient.pair(tv.ip, e.getText().toString());
                     main.post(() -> {
                         if (err == null) send(tv, mode);
                         else {
-                            Toast.makeText(this, err, Toast.LENGTH_LONG).show();
+                            UiKit.makeToast(this, err, Toast.LENGTH_LONG).show();
                             askPin(tv, mode);
                         }
                     });

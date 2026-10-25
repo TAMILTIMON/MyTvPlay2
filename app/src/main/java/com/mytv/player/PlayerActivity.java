@@ -18,6 +18,7 @@ import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
@@ -149,7 +150,7 @@ public class PlayerActivity extends AppCompatActivity {
         try {
             createEngine();
         } catch (Throwable t) {
-            Toast.makeText(this, "Could not start the video engine: " + t, Toast.LENGTH_LONG).show();
+            UiKit.makeToast(this, "Could not start the video engine: " + t, Toast.LENGTH_LONG).show();
             finish();
             return;
         }
@@ -291,10 +292,10 @@ public class PlayerActivity extends AppCompatActivity {
     }
 
     private LinearLayout topBar;
-    private Button playBtn;
-    private Button gearBtn;
+    private ImageView playBtn;
+    private ImageView gearBtn;
 
-    private Button repeatBtn, shuffleBtn, unlockBtn;
+    private ImageView repeatBtn, shuffleBtn, unlockBtn;
     private boolean locked;
     private final java.util.Random rng = new java.util.Random();
     private final Runnable hideUnlock = new Runnable() {
@@ -321,7 +322,7 @@ public class PlayerActivity extends AppCompatActivity {
     private void updateModeButtons() {
         if (repeatBtn == null) return;
         int rm = repeatMode();
-        repeatBtn.setText(rm == 1 ? "🔂" : "🔁");
+        UiKit.setIcon(this, repeatBtn, rm == 1 ? "repeat-1" : "repeat", 21, Color.WHITE);
         repeatBtn.setAlpha(rm == 0 ? 0.45f : 1f);
         shuffleBtn.setAlpha(shuffleOn() ? 1f : 0.45f);
     }
@@ -347,9 +348,16 @@ public class PlayerActivity extends AppCompatActivity {
         return n;
     }
 
-    private Button ctl(LinearLayout row, String label, float size, boolean primary, View.OnClickListener l) {
-        Button b = Ui.iconButton(this, label, size, primary);
-        b.setOnClickListener(l);
+    private static final String[][] CTL_ICON = {{"⏮", "skip-back"}, {"↺", "rotate-ccw"}, {"⏯", "play"}, {"↻", "rotate-cw"},
+            {"⏭", "skip-forward"}, {"📺", "list-video"}, {"🔊", "volume-2"}, {"💬", "captions"}, {"⛶", "monitor"},
+            {"🎚", "sliders-horizontal"}, {"🔁", "repeat"}, {"🔀", "shuffle"}, {"☰", "menu"}, {"⌂", "house"},
+            {"⚙", "settings"}, {"🔄", "refresh-cw"}, {"🔒", "lock"}};
+
+    /** Round Lucide button on the player overlay. */
+    private ImageView ctl(LinearLayout row, String label, float size, boolean primary, View.OnClickListener l) {
+        String ic = "circle-play";
+        for (String[] m : CTL_ICON) if (m[0].equals(label)) ic = m[1];
+        ImageView b = UiKit.darkButton(this, ic, Math.round(size), primary, l);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(size), dp(size));
         lp.setMargins(dp(7), 0, dp(7), 0);
         row.addView(b, lp);
@@ -436,7 +444,7 @@ public class PlayerActivity extends AppCompatActivity {
         olp.setMargins(dp(32), dp(96), dp(32), 0);
         root.addView(osdView, olp);
 
-        unlockBtn = Ui.iconButton(this, "🔓", 64, true);
+        unlockBtn = UiKit.darkButton(this, "lock", 64, true, null);
         unlockBtn.setOnClickListener(v -> command("lock", "0", ""));
         unlockBtn.setVisibility(View.GONE);
         FrameLayout.LayoutParams ulp = new FrameLayout.LayoutParams(dp(64), dp(64), Gravity.START | Gravity.CENTER_VERTICAL);
@@ -467,8 +475,8 @@ public class PlayerActivity extends AppCompatActivity {
         timeView = text(15, Color.WHITE);
         trow.addView(timeView, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
         TextView hint = text(12, 0xFF9C94B8);
-        hint.setText(Ui.isTv(this) ? T.t("◀ ▶ seek · ▼ buttons · ⚙ settings")
-                : T.t("Left: brightness · Right: volume · Swipe sideways: seek · Double-tap: ±10 s"));
+        hint.setText(UiKit.noEmoji(Ui.isTv(this) ? T.t("◀ ▶ seek · ▼ buttons · ⚙ settings")
+                : T.t("Left: brightness · Right: volume · Swipe sideways: seek · Double-tap: ±10 s")));
         trow.addView(hint);
         panel.addView(trow);
 
@@ -498,7 +506,7 @@ public class PlayerActivity extends AppCompatActivity {
                 long len = mp.getLength();
                 if (len <= 0) return;
                 long target = len * v / 1000;
-                timeView.setText("⏩ " + Net.fmtTime(target) + " / " + Net.fmtTime(len));
+                timeView.setText(UiKit.noEmoji("⏩ " + Net.fmtTime(target) + " / " + Net.fmtTime(len)));
                 showPreview(target);
                 timelineMoved = System.currentTimeMillis();
                 handler.removeCallbacks(hideOverlay);
@@ -758,7 +766,7 @@ public class PlayerActivity extends AppCompatActivity {
 
     private boolean controlsFocused() {
         View f = getCurrentFocus();
-        return overlayVisible && (f instanceof Button || f instanceof SeekBar);
+        return overlayVisible && (f instanceof Button || f instanceof ImageView || f instanceof SeekBar);
     }
 
     private void hideOverlayNow() {
@@ -782,14 +790,14 @@ public class PlayerActivity extends AppCompatActivity {
     }
 
     private void osd(String msg) {
-        osdView.setText(msg);
+        osdView.setText(UiKit.noEmoji(msg));
         osdView.setVisibility(View.VISIBLE);
         handler.removeCallbacks(hideOsd);
         handler.postDelayed(hideOsd, 2500);
     }
 
     private void showLoading(String msg) {
-        loadingView.setText(msg);
+        loadingView.setText(UiKit.noEmoji(msg));
         loadingView.setVisibility(View.VISIBLE);
     }
 
@@ -809,15 +817,15 @@ public class PlayerActivity extends AppCompatActivity {
             progress.setProgress(len > 0 ? (int) (1000 * Math.max(0, t) / len) : 0);
             if (len > 0) timeline.setKeyProgressIncrement(Math.max(1, (int) (10000L * 1000 / len))); // ◀ ▶ = 10 s
         }
-        playBtn.setText(mp.isPlaying() ? "❚❚" : "▶");
+        UiKit.setIcon(this, playBtn, mp.isPlaying() ? "pause" : "play", 28, Color.WHITE);
         StringBuilder sb = new StringBuilder();
         if (queue.size() > 1) sb.append(index + 1).append('/').append(queue.size()).append("   ");
         if (trackCacheAge++ % 4 == 0) {
             audioName = trackName(mp.getAudioTracks(), mp.getAudioTrack());
             subName = trackName(mp.getSpuTracks(), mp.getSpuTrack());
         }
-        sb.append("🔊 ").append(audioName);
-        sb.append("   💬 ").append(subName);
+        sb.append(T.t("Audio: ")).append(audioName);
+        sb.append("   ·   ").append(T.t("Subtitles: ")).append(subName);
         sb.append(T.t("   Vol ")).append(muted ? "muted" : volume + "%");
         if (rate != 1f) sb.append("   ").append(fmtRate(rate));
         if (sleepAt > 0 || sleepAfterItem) sb.append(T.t("   Sleep ")).append(sleepLabel());
@@ -894,8 +902,8 @@ public class PlayerActivity extends AppCompatActivity {
             if (!skipDone && t > 8000 && t < 180000 && Store.getInt("skip_s", 85) > 0) mode = 1;
             else if (index + 1 < queue.size() && len - t < 16000 && len - t > 0) mode = 2;
         }
-        if (mode == 2) chip.setText("⏭  " + T.t("Next") + ": " + queue.get(index + 1).t + "  ·  " + Math.max(1, (len - t) / 1000) + " s  ·  OK");
-        else if (mode == 1) chip.setText("⏩  " + T.t("Skip intro") + "  ·  OK");
+        if (mode == 2) chip.setText(UiKit.noEmoji("⏭  " + T.t("Next") + ": " + queue.get(index + 1).t + "  ·  " + Math.max(1, (len - t) / 1000) + " s  ·  OK"));
+        else if (mode == 1) chip.setText(UiKit.noEmoji("⏩  " + T.t("Skip intro") + "  ·  OK"));
         if (mode != chipMode) {
             chipMode = mode;
             chip.setVisibility(mode == 0 ? View.GONE : View.VISIBLE);
@@ -924,7 +932,7 @@ public class PlayerActivity extends AppCompatActivity {
         }
         if (sleepAt > 0 && System.currentTimeMillis() >= sleepAt) {
             sleepAt = 0;
-            Toast.makeText(this, T.t("Sleep timer: stopped"), Toast.LENGTH_LONG).show();
+            UiKit.makeToast(this, T.t("Sleep timer: stopped"), Toast.LENGTH_LONG).show();
             finish();
             return;
         }
@@ -934,7 +942,7 @@ public class PlayerActivity extends AppCompatActivity {
             if (Family.minutesLeft() == 0 && !timesUpShown) {
                 timesUpShown = true;
                 mp.pause();
-                new AlertDialog.Builder(this).setTitle("⏰ " + T.t("Time's up for today"))
+                new UiDialog(this).setTitle("⏰ " + T.t("Time's up for today"))
                         .setMessage(T.t("The daily screen time for this profile is used up."))
                         .setCancelable(false)
                         .setPositiveButton("🔒 " + T.t("Parents: +30 min"), (d, w) -> Family.askPin(this, "", () -> {
@@ -1096,9 +1104,9 @@ public class PlayerActivity extends AppCompatActivity {
         final JSONArray a = Store.bookmarks(it.u);
         String[] n = new String[a.length()];
         for (int i = 0; i < n.length; i++) n[i] = "⏱ " + Net.fmtTime(a.optJSONObject(i).optLong("t"));
-        new AlertDialog.Builder(this).setTitle("🔖 " + T.t("Bookmarks")).setItems(n, (d, w) -> {
+        new UiDialog(this).setTitle("🔖 " + T.t("Bookmarks")).setItems(n, (d, w) -> {
             final long t = a.optJSONObject(w).optLong("t");
-            new AlertDialog.Builder(this).setTitle("⏱ " + Net.fmtTime(t))
+            new UiDialog(this).setTitle("⏱ " + Net.fmtTime(t))
                     .setItems(new String[]{"▶ " + T.t("Jump here"), "🗑 " + T.t("Delete")}, (d2, w2) -> {
                         if (w2 == 0) seekTo(t);
                         else Store.delBookmark(it.u, w);
@@ -1231,7 +1239,7 @@ public class PlayerActivity extends AppCompatActivity {
         if (aoLabel == null) {
             aoLabel = text(22, Color.WHITE);
             aoLabel.setGravity(Gravity.CENTER);
-            aoLabel.setText("🎵  " + T.t("Audio only") + "\n" + T.t("☰ menu → Audio only = show the picture"));
+            aoLabel.setText(UiKit.noEmoji("🎵  " + T.t("Audio only") + "\n" + T.t("☰ menu → Audio only = show the picture")));
             root.addView(aoLabel, 2, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER));
         }
@@ -1637,7 +1645,7 @@ public class PlayerActivity extends AppCompatActivity {
             return;
         }
         showLoading(msg);
-        Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
+        UiKit.makeToast(this, msg, Toast.LENGTH_LONG).show();
         final int token = resolveToken;
         handler.postDelayed(new Runnable() {
             @Override
@@ -1727,7 +1735,7 @@ public class PlayerActivity extends AppCompatActivity {
         } catch (Exception ignored) {
         }
         final int f = file;
-        new AlertDialog.Builder(this).setTitle("💾  " + T.t("Keep this movie on the TV?"))
+        new UiDialog(this).setTitle("💾  " + T.t("Keep this movie on the TV?"))
                 .setMessage(it.t + "\n\n" + T.t("Keep = watch again later without internet (in the “Downloads” playlist). Delete = free the space."))
                 .setPositiveButton(T.t("Keep"), (d, w) -> {
                     TorrentEngine.get(this).keep(th, f, it.t, it.u);
@@ -1751,7 +1759,7 @@ public class PlayerActivity extends AppCompatActivity {
             Store.removeHistory(it.u);
         }
         if (sleepAfterItem) {
-            Toast.makeText(this, T.t("Sleep timer: stopped"), Toast.LENGTH_LONG).show();
+            UiKit.makeToast(this, T.t("Sleep timer: stopped"), Toast.LENGTH_LONG).show();
             finish();
             return;
         }
@@ -2267,7 +2275,7 @@ public class PlayerActivity extends AppCompatActivity {
     }
 
     private void choose(String title, String[] items, int checked, final IntCb cb) {
-        new AlertDialog.Builder(this).setTitle(title)
+        new UiDialog(this).setTitle(title)
                 .setSingleChoiceItems(items, checked, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface d, int w) {
@@ -2293,7 +2301,7 @@ public class PlayerActivity extends AppCompatActivity {
         hint.setGravity(Gravity.CENTER);
         hint.setText(T.t("Use ◀ ▶ on the remote to change"));
         box.addView(hint);
-        AlertDialog d = new AlertDialog.Builder(this).setTitle(title).setView(box)
+        AlertDialog d = new UiDialog(this).setTitle(title).setView(box)
                 .setPositiveButton(T.t("Done"), null)
                 .setNeutralButton(T.t("Reset"), new DialogInterface.OnClickListener() {
                     @Override
@@ -2414,7 +2422,7 @@ public class PlayerActivity extends AppCompatActivity {
         labels.add(T.t("Phone remote: http://") + Net.ip() + ":" + RemoteService.PORT);
         acts.add(new Runnable() { public void run() { osd("Open http://" + Net.ip() + ":" + RemoteService.PORT + " on your phone"); } });
 
-        new AlertDialog.Builder(this).setTitle(T.t("Options"))
+        new UiDialog(this).setTitle(T.t("Options"))
                 .setItems(labels.toArray(new String[0]), new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface d, int w) {
@@ -2472,7 +2480,7 @@ public class PlayerActivity extends AppCompatActivity {
                 if (i < extra) command("sub", String.valueOf(ids.get(i)), "");
                 else if (i == extra) findSubsOnline();
                 else if (i == extra + 1) subOnlineSettings();
-                else if (i == extra + 2) new AlertDialog.Builder(PlayerActivity.this).setTitle(T.t("Load subtitles"))
+                else if (i == extra + 2) new UiDialog(PlayerActivity.this).setTitle(T.t("Load subtitles"))
                         .setMessage("On your phone open\n\nhttp://" + Net.ip() + ":" + RemoteService.PORT
                                 + "\n\nthen go to “Audio & Subs” and upload a .srt/.ass file or paste a subtitle link.")
                         .setPositiveButton(T.t("OK"), null).show();
@@ -2487,7 +2495,7 @@ public class PlayerActivity extends AppCompatActivity {
         final android.widget.EditText q = new android.widget.EditText(this);
         q.setSingleLine(true);
         q.setText(it == null ? "" : SubSearch.cleanTitle(it.t));
-        new AlertDialog.Builder(this).setTitle("🔎 " + T.t("Find subtitles online…")).setView(q)
+        new UiDialog(this).setTitle("🔎 " + T.t("Find subtitles online…")).setView(q)
                 .setPositiveButton(T.t("Search"), (d, w) -> {
                     final String query = q.getText().toString().trim();
                     osd("🔎 …");
@@ -2501,7 +2509,7 @@ public class PlayerActivity extends AppCompatActivity {
                                 }
                                 String[] n = new String[hits.size()];
                                 for (int k = 0; k < n.length; k++) n[k] = SubSearch.label(hits.get(k));
-                                new AlertDialog.Builder(this).setTitle(T.t("Subtitles") + " · " + hits.size())
+                                new UiDialog(this).setTitle(T.t("Subtitles") + " · " + hits.size())
                                         .setItems(n, (d2, w2) -> new Thread(() -> {
                                             try {
                                                 final java.io.File f = SubSearch.download(this, hits.get(w2));
@@ -2534,7 +2542,7 @@ public class PlayerActivity extends AppCompatActivity {
         box.addView(langs);
         box.addView(l2);
         box.addView(key);
-        new AlertDialog.Builder(this).setTitle("⚙ " + T.t("Online subtitle settings (languages, API key)")).setView(box)
+        new UiDialog(this).setTitle("⚙ " + T.t("Online subtitle settings (languages, API key)")).setView(box)
                 .setPositiveButton(T.t("Save"), (d, w) -> {
                     Store.putStr("sub_langs", langs.getText().toString().replace(" ", ""));
                     Store.putStr("os_key", key.getText().toString().trim());
@@ -2650,7 +2658,7 @@ public class PlayerActivity extends AppCompatActivity {
         String[] items = {T.t("Size: ") + SUB_SIZE_NAMES[subSizeIndex()],
                 T.t("Background box: ") + (Store.getBool("subbg", false) ? "On" : T.t("Off")),
                 T.t("Text encoding: ") + ENC_NAMES[encIndex()]};
-        new AlertDialog.Builder(this).setTitle(T.t("Subtitle style"))
+        new UiDialog(this).setTitle(T.t("Subtitle style"))
                 .setItems(items, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface d, int w) {
@@ -2684,7 +2692,7 @@ public class PlayerActivity extends AppCompatActivity {
     private void menuEngine() {
         String[] items = {T.t("Decoder: ") + (Store.getInt("hw", 0) == 1 ? T.t("Software (slower, most compatible)") : T.t("Hardware (auto)")),
                 T.t("Network buffer: ") + Store.getInt("cache", 2000) / 1000f + " s"};
-        new AlertDialog.Builder(this).setTitle(T.t("Decoder & buffer"))
+        new UiDialog(this).setTitle(T.t("Decoder & buffer"))
                 .setItems(items, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface d, int w) {
@@ -2787,7 +2795,9 @@ public class PlayerActivity extends AppCompatActivity {
                     idx.add(i);
                 }
             }
-            cat.setText(chFilter.isEmpty() ? "📂 " + T.t("All") : chFilter.length() <= 2 ? chFilter : "📂 " + chFilter);
+            cat.setText(chFilter.isEmpty() ? T.t("All") : "★".equals(chFilter) ? "★ " + T.t("Favourites")
+                    : "🕘".equals(chFilter) ? T.t("Recent channels") : chFilter);
+            cat.setCompoundDrawablesWithIntrinsicBounds(new UiKit.Icon(this, "folder-open", 18, 0xFFFFFFFF), null, null, null);
             ad.notifyDataSetChanged();
             if (sel >= 0) lv.setSelection(Math.max(0, sel - 3));
         };
@@ -2808,7 +2818,7 @@ public class PlayerActivity extends AppCompatActivity {
                 keys.add(e.getKey());
                 names.add("📂 " + e.getKey() + "  ·  " + e.getValue());
             }
-            new AlertDialog.Builder(this).setTitle("📂 " + T.t("Categories"))
+            new UiDialog(this).setTitle("📂 " + T.t("Categories"))
                     .setItems(names.toArray(new String[0]), (d, w) -> {
                         chFilter = keys.get(w);
                         rebuild[0].run();
@@ -2822,7 +2832,7 @@ public class PlayerActivity extends AppCompatActivity {
             }
         });
         rebuild[0].run();
-        final AlertDialog d = new AlertDialog.Builder(this)
+        final AlertDialog d = new UiDialog(this)
                 .setTitle(T.t("📺 Channels") + "  ·  " + queue.size())
                 .setView(box).setNegativeButton(T.t("Close"), null).create();
         lv.setOnItemClickListener((p, v, pos, id) -> {
@@ -2950,7 +2960,7 @@ public class PlayerActivity extends AppCompatActivity {
                 eq.setValues(eqValues());
             }
         });
-        new AlertDialog.Builder(this).setTitle(T.t("🎚  Equalizer")).setView(box).setPositiveButton(T.t("Done"), null).show();
+        new UiDialog(this).setTitle(T.t("🎚  Equalizer")).setView(box).setPositiveButton(T.t("Done"), null).show();
         eq.post(new Runnable() {
             public void run() {
                 eq.requestFocus();

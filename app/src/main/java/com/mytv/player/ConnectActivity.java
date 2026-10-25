@@ -49,10 +49,9 @@ public class ConnectActivity extends AppCompatActivity {
 
         LinearLayout top = new LinearLayout(this);
         top.setGravity(Gravity.CENTER_VERTICAL);
-        TextView logo = Ui.text(this, 22, 0xFFFFFFFF, true);
-        logo.setText("▶");
-        logo.setGravity(Gravity.CENTER);
+        android.widget.FrameLayout logo = new android.widget.FrameLayout(this);
         logo.setBackground(Ui.gradient(this, 14));
+        logo.addView(UiKit.icon(this, "play", 22, 0xFFFFFFFF), new android.widget.FrameLayout.LayoutParams(Ui.dp(this, 46), Ui.dp(this, 46), Gravity.CENTER));
         top.addView(logo, new LinearLayout.LayoutParams(Ui.dp(this, 46), Ui.dp(this, 46)));
         LinearLayout t = new LinearLayout(this);
         t.setOrientation(LinearLayout.VERTICAL);
@@ -64,22 +63,18 @@ public class ConnectActivity extends AppCompatActivity {
         t.addView(h);
         t.addView(s);
         top.addView(t, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
-        Button theme = Ui.button(this, Ui.dark() ? "☀" : "🌙", false);
-        theme.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                Store.putStr("theme", Ui.dark() ? "light" : "dark");
-                getIntent().putExtra("no_auto", true);
-                recreate();
-            }
-        });
-        top.addView(theme);
+        top.addView(UiKit.roundButton(this, Ui.dark() ? "sun" : "moon", 44, false, v -> {
+            Store.putStr("theme", Ui.dark() ? "light" : "dark");
+            getIntent().putExtra("no_auto", true);
+            recreate();
+        }));
         root.addView(top);
 
         LinearLayout sr = new LinearLayout(this);
         sr.setGravity(Gravity.CENTER_VERTICAL);
         sr.setPadding(0, Ui.dp(this, 24), 0, Ui.dp(this, 10));
         TextView label = Ui.text(this, 13, Ui.DIM, true);
-        label.setText(T.t("TVS ON YOUR WI-FI"));
+        label.setText(UiKit.noEmoji(T.t("TVS ON YOUR WI-FI")));
         label.setLetterSpacing(0.15f);
         sr.addView(label, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
         spinner = new ProgressBar(this);
@@ -93,7 +88,20 @@ public class ConnectActivity extends AppCompatActivity {
         status.setPadding(Ui.dp(this, 4), Ui.dp(this, 8), 0, Ui.dp(this, 16));
         root.addView(status);
 
-        Button rescan = Ui.button(this, T.t("🔄  Scan again"), true);
+        TextView ol = Ui.text(this, 13, Ui.DIM, true);
+        ol.setText(T.t("More").toUpperCase(java.util.Locale.ROOT));
+        ol.setLetterSpacing(0.15f);
+        ol.setPadding(0, Ui.dp(this, 8), 0, Ui.dp(this, 6));
+        root.addView(ol);
+        root.addView(UiKit.grid(this, 2,
+                UiKit.tile(this, "refresh-cw", T.t("Scan again"), T.t("find TVs on this Wi-Fi"), 0xFF8B5CF6, v -> startScan()),
+                UiKit.tile(this, "keyboard", T.t("Enter TV address"), T.t("type the TV's IP"), 0xFF3B82F6, v -> manual()),
+                UiKit.tile(this, "search", T.t("Browser"), T.t("search & send videos to TV"), 0xFF22C55E,
+                        v -> startActivity(new Intent(ConnectActivity.this, BrowserActivity.class))),
+                UiKit.tile(this, "smartphone", T.t("Use this phone"), T.t("as a player"), 0xFFF97316,
+                        v -> startActivity(new Intent(ConnectActivity.this, MainActivity.class).putExtra(MainActivity.EXTRA_PLAYER_HOME, true)))));
+        if (false) {
+        Button rescan = Ui.button(this, T.t("Scan again"), true);
         rescan.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 startScan();
@@ -122,6 +130,7 @@ public class ConnectActivity extends AppCompatActivity {
             }
         });
         root.addView(self, full());
+        }
         TextView tip = Ui.text(this, 13, Ui.DIM, false);
         tip.setText("\nPhone and TV must be on the same Wi-Fi, and TamilCastPlay must be installed on the TV "
                 + T.t("(it runs in the background after the first start)."));
@@ -209,11 +218,11 @@ public class ConnectActivity extends AppCompatActivity {
             row.setBackground(Ui.focusCard(this, 18));
             row.setFocusable(true);
             row.setClickable(true);
-            TextView ic = Ui.text(this, 20, 0xFFFFFFFF, false);
-            ic.setText(d.tv ? "📺" : "📱");
-            ic.setGravity(Gravity.CENTER);
-            ic.setBackground(Ui.gradient(this, 12));
-            row.addView(ic, new LinearLayout.LayoutParams(Ui.dp(this, 44), Ui.dp(this, 44)));
+            android.widget.FrameLayout ic = new android.widget.FrameLayout(this);
+            ic.setBackground(Ui.gradient(this, 14));
+            ic.addView(UiKit.icon(this, d.tv ? "tv" : "smartphone", 22, 0xFFFFFFFF),
+                    new android.widget.FrameLayout.LayoutParams(Ui.dp(this, 48), Ui.dp(this, 48), Gravity.CENTER));
+            row.addView(ic, new LinearLayout.LayoutParams(Ui.dp(this, 48), Ui.dp(this, 48)));
             LinearLayout tx = new LinearLayout(this);
             tx.setOrientation(LinearLayout.VERTICAL);
             tx.setPadding(Ui.dp(this, 14), 0, 0, 0);
@@ -224,9 +233,7 @@ public class ConnectActivity extends AppCompatActivity {
             tx.addView(n);
             tx.addView(ip);
             row.addView(tx, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
-            TextView go = Ui.text(this, 22, Ui.ACCENT, true);
-            go.setText("›");
-            row.addView(go);
+            row.addView(UiKit.icon(this, "chevron-right", 22, Ui.ACCENT));
             row.setOnClickListener(new View.OnClickListener() {
                 public void onClick(View v) {
                     open(d.ip, d.name);
@@ -251,14 +258,14 @@ public class ConnectActivity extends AppCompatActivity {
         e.setHint("192.168.1.33");
         e.setInputType(InputType.TYPE_CLASS_PHONE);
         e.setText(Store.getStr("last_tv", ""));
-        new AlertDialog.Builder(this).setTitle(T.t("TV address")).setView(e)
+        new UiDialog(this).setTitle(T.t("TV address")).setView(e)
                 .setPositiveButton(T.t("Connect"), (d, w) -> {
                     final String ip = e.getText().toString().trim().replace("http://", "").replaceAll(":.*", "");
                     if (ip.isEmpty()) return;
                     new Thread(() -> {
                         final Discovery.Device dev = Discovery.ping(ip, 2500);
                         main.post(() -> {
-                            if (dev == null) Toast.makeText(this, "No TamilCastPlay at " + ip, Toast.LENGTH_LONG).show();
+                            if (dev == null) UiKit.makeToast(this, "No TamilCastPlay at " + ip, Toast.LENGTH_LONG).show();
                             else open(dev.ip, dev.name);
                         });
                     }).start();

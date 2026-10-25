@@ -1,3 +1,16 @@
+TAMILCASTPLAY 2.6 — no more emojis, professional icons everywhere
+=================================================================
+* Every menu and dialog (Settings, player menu, Family, Network, Browser …) now shows
+  Lucide icons in front of the options instead of emojis.
+* TV player controls are Lucide icon buttons (play, ±10 s, channels, audio, subtitles,
+  picture, equalizer, repeat, shuffle, menu, home, settings, rotate, lock).
+* Buttons, messages (toasts / on-screen info), notification and widget text never show
+  emojis; normal symbols like → ✓ ★ stay.
+* First screen (phone): TVs as cards with icons; Scan again / Enter TV address /
+  Browser / Use this phone are board tiles.
+* Browser page: any emoji (also in lists and messages added later) becomes a Lucide
+  icon automatically.
+
 TAMILCASTPLAY 2.5 — phone volume buttons, widget, Google Assistant
 ==================================================================
 * Phone volume buttons control the TV while the remote is open. Choose under the

@@ -259,7 +259,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
 
     private EditText field(LinearLayout parent, String hint, boolean multi) {
         EditText e = new EditText(this);
-        e.setHint(hint);
+        e.setHint(UiKit.noEmoji(hint));
         e.setTextColor(Ui.TEXT);
         e.setHintTextColor(Ui.DIM);
         e.setTextSize(15);
@@ -281,7 +281,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
 
     private TextView label(LinearLayout parent, String text) {
         TextView t = Ui.text(this, 13, Ui.DIM, false);
-        t.setText(text);
+        t.setText(UiKit.noEmoji(text));
         t.setPadding(dp(2), dp(6), 0, dp(2));
         parent.addView(t);
         return t;
@@ -296,7 +296,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
     }
 
     private void toast(String m) {
-        if (m != null && !m.isEmpty()) Toast.makeText(this, m, Toast.LENGTH_SHORT).show();
+        if (m != null && !m.isEmpty()) UiKit.makeToast(this, m, Toast.LENGTH_SHORT).show();
     }
 
     // =====================================================================
@@ -317,7 +317,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
             } catch (TvClient.AuthNeeded e) {
                 main.post(this::askPin);
             } catch (Exception e) {
-                main.post(() -> devLine.setText("⚠ " + T.t("Cannot reach the TV") + " · " + ip));
+                main.post(() -> devLine.setText(UiKit.noEmoji("⚠ " + T.t("Cannot reach the TV") + " · " + ip)));
             }
         });
     }
@@ -353,7 +353,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
         e.setHint("1234");
         e.setGravity(Gravity.CENTER);
         e.setTextSize(26);
-        new AlertDialog.Builder(this).setTitle("🔐  " + T.t("Enter the PIN shown on the TV"))
+        new UiDialog(this).setTitle("🔐  " + T.t("Enter the PIN shown on the TV"))
                 .setView(e)
                 .setCancelable(false)
                 .setPositiveButton(T.t("Connect"), (d, w) -> io.execute(() -> {
@@ -433,7 +433,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
             } catch (Exception e) {
                 main.post(() -> {
                     polling = false;
-                    devLine.setText("⚠ " + T.t("Cannot reach the TV") + " · " + ip);
+                    devLine.setText(UiKit.noEmoji("⚠ " + T.t("Cannot reach the TV") + " · " + ip));
                 });
             }
         });
@@ -594,7 +594,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
         accessHint.setText(T.t("To control other apps, turn on TV Settings > Accessibility > TamilCastPlay"));
         accessHint.setVisibility(View.GONE);
         rc.addView(accessHint);
-        adbBtn = full(rc, btn(T.t("Full remote for every app (ADB)"), true, v -> new AlertDialog.Builder(this)
+        adbBtn = full(rc, btn(T.t("Full remote for every app (ADB)"), true, v -> new UiDialog(this)
                 .setTitle(T.t("Full remote for every app (ADB)"))
                 .setMessage(T.t("Makes the phone remote work in EVERY app (YouTube, Netflix, settings) by pressing real keys.")
                         + "\n\n1. TV: Settings → Device Preferences → About → press “Build” 7 times."
@@ -740,14 +740,14 @@ public class NativeRemoteActivity extends AppCompatActivity {
         }
         String[] n = new String[bm.length()];
         for (int i = 0; i < n.length; i++) n[i] = "⏱ " + Net.fmtTime(bm.optJSONObject(i).optLong("t"));
-        new AlertDialog.Builder(this).setTitle(T.t("Bookmarks")).setItems(n, (d, w) -> cmd("bmjump", String.valueOf(w))).show();
+        new UiDialog(this).setTitle(T.t("Bookmarks")).setItems(n, (d, w) -> cmd("bmjump", String.valueOf(w))).show();
     }
 
     private void typeDialog() {
         final EditText e = new EditText(this);
         e.setHint(T.t("Type text on the TV (search boxes)"));
         e.setSingleLine(true);
-        new AlertDialog.Builder(this).setTitle(T.t("Type text on the TV (search boxes)")).setView(e)
+        new UiDialog(this).setTitle(T.t("Type text on the TV (search boxes)")).setView(e)
                 .setPositiveButton(T.t("Send text"), (d, w) -> {
                     if (!e.getText().toString().isEmpty()) call("/type", m("text", e.getText().toString()), r -> toast(r.optString("msg")));
                 }).setNegativeButton(T.t("Cancel"), null).show();
@@ -757,9 +757,9 @@ public class NativeRemoteActivity extends AppCompatActivity {
     private void powerMenu() {
         String[] items = {T.t("Sleep / screen off"), T.t("Wake up"), T.t("Power key"), T.t("Restart the TV"), T.t("Restart TamilCastPlay")};
         final String[] acts = {"sleep", "wake", "power", "reboot", "restartapp"};
-        new AlertDialog.Builder(this).setTitle(T.t("Power")).setItems(items, (d, w) -> {
+        new UiDialog(this).setTitle(T.t("Power")).setItems(items, (d, w) -> {
             if (acts[w].equals("reboot")) {
-                new AlertDialog.Builder(this).setTitle(T.t("Restart the TV") + "?")
+                new UiDialog(this).setTitle(T.t("Restart the TV") + "?")
                         .setPositiveButton(T.t("OK"), (d2, w2) -> call("/power", m("do", "reboot"), null))
                         .setNegativeButton(T.t("Cancel"), null).show();
             } else call("/power", m("do", acts[w]), null);
@@ -773,7 +773,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
     /** Lets TVs on the Wi-Fi browse this phone's videos and music (Network folders on the TV). */
     private void shareDialog() {
         final boolean on = Store.getBool("share_fs", false);
-        new AlertDialog.Builder(this).setTitle(T.t("Share this phone"))
+        new UiDialog(this).setTitle(T.t("Share this phone"))
                 .setMessage(T.t("The TV can open this phone's videos and music in “Network folders” and play them — no copying. Read-only; turn it off any time."))
                 .setPositiveButton(on ? T.t("Turn off") : T.t("Turn on"), (d, w) -> {
                     if (!on) {
@@ -949,7 +949,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
                 main.post(() -> {
                     screenBusy = false;
                     if (bm != null) screenImg.setImageBitmap(bm);
-                    else screenInfo.setText(T.t("To see the TV screen, turn on the 🔌 Full remote (ADB) on the TV."));
+                    else screenInfo.setText(UiKit.noEmoji(T.t("To see the TV screen, turn on the 🔌 Full remote (ADB) on the TV.")));
                     main.postDelayed(this::screenTick, 800);
                 });
             } catch (Exception e) {
@@ -1028,7 +1028,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
         final EditText e = new EditText(this);
         e.setText("IPTV");
         e.setSingleLine(true);
-        new AlertDialog.Builder(this).setTitle(T.t("Playlist name")).setView(e)
+        new UiDialog(this).setTitle(T.t("Playlist name")).setView(e)
                 .setPositiveButton(T.t("Save"), (d, w) -> call("/savequeue", m("playlist", e.getText().toString()), null))
                 .setNegativeButton(T.t("Cancel"), null).show();
     }
@@ -1150,7 +1150,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
             final EditText q = new EditText(this);
             q.setSingleLine(true);
             q.setText(SubSearch.cleanTitle(S.optString("title")));
-            new AlertDialog.Builder(this).setTitle("🔎 " + T.t("Find subtitles online…")).setView(q)
+            new UiDialog(this).setTitle("🔎 " + T.t("Find subtitles online…")).setView(q)
                     .setPositiveButton(T.t("Search"), (d, w) -> {
                         toast("🔎 …");
                         call("/subsearch", m("q", q.getText().toString().trim()), r -> {
@@ -1161,7 +1161,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
                             }
                             String[] n = new String[hits.length()];
                             for (int i = 0; i < n.length; i++) n[i] = hits.optString(i);
-                            new AlertDialog.Builder(this).setTitle(T.t("Subtitles")).setItems(n,
+                            new UiDialog(this).setTitle(T.t("Subtitles")).setItems(n,
                                     (d2, w2) -> call("/subpick", m("i", String.valueOf(w2)), null)).show();
                         });
                     }).setNegativeButton(T.t("Cancel"), null).show();
@@ -1208,7 +1208,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
             names[i] = t.optJSONObject(i).optString("name");
             if (t.optJSONObject(i).optInt("id") == S.optInt(selKey)) sel = i;
         }
-        new AlertDialog.Builder(this).setSingleChoiceItems(names, sel, (d, w) -> {
+        new UiDialog(this).setSingleChoiceItems(names, sel, (d, w) -> {
             d.dismiss();
             cmd(command, String.valueOf(t.optJSONObject(w).optInt("id")));
         }).show();
@@ -1226,7 +1226,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
             names[i] = a.optJSONArray(i).optString(1);
             if (a.optJSONArray(i).optString(0).equals(cur)) sel = i;
         }
-        new AlertDialog.Builder(this).setTitle(title).setSingleChoiceItems(names, sel, (d, w) -> {
+        new UiDialog(this).setTitle(title).setSingleChoiceItems(names, sel, (d, w) -> {
             d.dismiss();
             cmd(command, a.optJSONArray(w).optString(0));
         }).show();
@@ -1304,7 +1304,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
         cacheBtn = full(pb, btn("", false, v -> pickCache()));
         nightBtn = full(pb, btn("🗣", true, v -> {
             String[] n = {PlayerActivity.dialogName(0), PlayerActivity.dialogName(1), PlayerActivity.dialogName(2), PlayerActivity.dialogName(3)};
-            new AlertDialog.Builder(this).setTitle("🗣 " + T.t("Clear dialogue (quiet voices, loud music)"))
+            new UiDialog(this).setTitle("🗣 " + T.t("Clear dialogue (quiet voices, loud music)"))
                     .setSingleChoiceItems(n, S.optInt("dialog"), (d, w) -> {
                         d.dismiss();
                         cmd("dialog", String.valueOf(w));
@@ -1315,7 +1315,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
         qualBtn = full(pb, btn("📶", false, v -> {
             final int[] qs = {0, 1080, 720, 480, 360};
             String[] names = {T.t("Best"), "1080p", "720p", "480p", "360p (" + T.t("saves most data") + ")"};
-            new AlertDialog.Builder(this).setTitle(T.t("Streaming quality: "))
+            new UiDialog(this).setTitle(T.t("Streaming quality: "))
                     .setItems(names, (d, w) -> cmd("quality", String.valueOf(qs[w]))).show();
         }));
         label(pb, "ℹ IPTV / HLS / DASH streams use the lower quality. Torrents: picks the matching file when a torrent has several.");
@@ -1331,7 +1331,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
         String[] n = new String[a.length()];
         for (int i = 0; i < n.length; i++) n[i] = a.optString(i);
         JSONObject e = S.optJSONObject("eq");
-        new AlertDialog.Builder(this).setTitle(T.t("Equalizer preset"))
+        new UiDialog(this).setTitle(T.t("Equalizer preset"))
                 .setSingleChoiceItems(n, e == null ? -1 : e.optInt("preset", -1), (d, w) -> {
                     d.dismiss();
                     cmd("eq_preset", String.valueOf(w));
@@ -1343,7 +1343,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
         final JSONArray a = opts.optJSONArray("speeds");
         String[] n = new String[a.length()];
         for (int i = 0; i < n.length; i++) n[i] = a.optDouble(i) + "x";
-        new AlertDialog.Builder(this).setTitle(T.t("Playback speed")).setItems(n, (d, w) -> cmd("rate", String.valueOf(a.optDouble(w)))).show();
+        new UiDialog(this).setTitle(T.t("Playback speed")).setItems(n, (d, w) -> cmd("rate", String.valueOf(a.optDouble(w)))).show();
     }
 
     private void pickSleep() {
@@ -1354,7 +1354,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
             int mm = a.optInt(i);
             n[i] = mm == 0 ? T.t("Off") : mm < 0 ? T.t("At the end of this video") : mm + T.t(" minutes");
         }
-        new AlertDialog.Builder(this).setTitle(T.t("Sleep timer")).setItems(n, (d, w) -> cmd("sleep", String.valueOf(a.optInt(w)))).show();
+        new UiDialog(this).setTitle(T.t("Sleep timer")).setItems(n, (d, w) -> cmd("sleep", String.valueOf(a.optInt(w)))).show();
     }
 
     private void pickCache() {
@@ -1362,7 +1362,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
         final JSONArray a = opts.optJSONArray("caches");
         String[] n = new String[a.length()];
         for (int i = 0; i < n.length; i++) n[i] = (a.optInt(i) / 1000f) + T.t(" seconds");
-        new AlertDialog.Builder(this).setTitle(T.t("Network buffer")).setItems(n, (d, w) -> cmd("cache", String.valueOf(a.optInt(w)))).show();
+        new UiDialog(this).setTitle(T.t("Network buffer")).setItems(n, (d, w) -> cmd("cache", String.valueOf(a.optInt(w)))).show();
     }
 
     // =====================================================================
@@ -1408,7 +1408,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
             String[] n = new String[a == null ? 0 : a.length()];
             for (int i = 0; i < n.length; i++) n[i] = (a.optJSONObject(i).optBoolean("done") ? "✅ " : "⬇ ")
                     + a.optJSONObject(i).optString("name") + "\n" + a.optJSONObject(i).optString("state");
-            new AlertDialog.Builder(this).setTitle("⬇ " + T.t("Downloads"))
+            new UiDialog(this).setTitle("⬇ " + T.t("Downloads"))
                     .setItems(n, (d, w) -> call("/dlcancel", m("src", a.optJSONObject(w).optString("src"), "del", "0"), null))
                     .setNeutralButton(T.t("night only") + ": " + T.t(r.optBoolean("night") ? "On" : "Off"),
                             (d, w) -> call("/dlnight", m("v", r.optBoolean("night") ? "0" : "1"), null))
@@ -1432,8 +1432,8 @@ public class NativeRemoteActivity extends AppCompatActivity {
         final TextView cacheInfo = label(tc, "");
         full(tc, btn("🧲 " + T.t("Torrent storage: ") + "…", false, v -> call("/torrentcache", null, r -> {
             final double gb = r.optLong("bytes") / 1073741824.0;
-            cacheInfo.setText(String.format(Locale.US, "💾 %.2f GB", gb));
-            new AlertDialog.Builder(this).setTitle(String.format(Locale.US, "🧲 %s%.2f GB", T.t("Torrent storage: "), gb))
+            cacheInfo.setText(UiKit.noEmoji(String.format(Locale.US, "💾 %.2f GB", gb)));
+            new UiDialog(this).setTitle(String.format(Locale.US, "🧲 %s%.2f GB", T.t("Torrent storage: "), gb))
                     .setItems(new String[]{"🗑 Delete saved torrents (keep my kept movies)", "🗑 Delete everything (also kept movies)"},
                             (d, w) -> call("/torrentcache", m("do", w == 0 ? "clear" : "all"), null)).show();
         })));
@@ -1538,7 +1538,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
         full(tvs, btn("🎨 " + T.t("Theme"), false, v -> {
             final String[] codes = {"dark", "light", "system"};
             String[] names = {T.t("Dark"), T.t("Light"), T.t("Follow system")};
-            new AlertDialog.Builder(this).setTitle(T.t("Theme")).setItems(names, (d, w) -> cmd("apptheme", codes[w])).show();
+            new UiDialog(this).setTitle(T.t("Theme")).setItems(names, (d, w) -> cmd("apptheme", codes[w])).show();
         }));
         final EditText dn = field(tvs, T.t("Device name (shown in the phone app)"), false);
         full(tvs, btn(T.t("Save"), false, v -> {
@@ -1548,7 +1548,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
         full(tvs, btn("📊 " + T.t("My TV") + " · " + T.t("storage, memory, speed test"), true, v -> myTv()));
         full(tvs, btn("🎨 " + T.t("TV colours (palette)"), false, v -> {
             String[] names = Palette.NAMES;
-            new AlertDialog.Builder(this).setTitle(T.t("Palette")).setItems(names, (d, w) -> cmd("palette", String.valueOf(w))).show();
+            new UiDialog(this).setTitle(T.t("Palette")).setItems(names, (d, w) -> cmd("palette", String.valueOf(w))).show();
         }));
         full(tvs, btn("🎨 " + T.t("This phone app's colours"), false, v -> Palette.show(this)));
         full(tvs, btn("🌐 Web version", false, v -> startActivity(new Intent(this, RemoteWebActivity.class)
@@ -1580,10 +1580,10 @@ public class NativeRemoteActivity extends AppCompatActivity {
                     final JSONArray a = r.optJSONArray("apps");
                     String[] n = new String[a.length()];
                     for (int i = 0; i < n.length; i++) n[i] = a.optJSONObject(i).optString("mem") + "   " + a.optJSONObject(i).optString("label");
-                    new AlertDialog.Builder(this).setTitle("📋 " + T.t("Running apps") + " · " + T.t("tap to stop"))
+                    new UiDialog(this).setTitle("📋 " + T.t("Running apps") + " · " + T.t("tap to stop"))
                             .setItems(n, (d, w) -> call("/tvstop", m("name", a.optJSONObject(w).optString("name")), null)).show();
                 })));
-        final AlertDialog dlg = new AlertDialog.Builder(this).setTitle("📊 " + T.t("My TV")).setView(sv)
+        final AlertDialog dlg = new UiDialog(this).setTitle("📊 " + T.t("My TV")).setView(sv)
                 .setPositiveButton(T.t("Close"), null).create();
         final Runnable[] upd = new Runnable[1];
         upd[0] = () -> {
@@ -1629,11 +1629,11 @@ public class NativeRemoteActivity extends AppCompatActivity {
                 rw.setOnLongClickListener(v -> {
                     String[] acts = {"✏ " + T.t("Rename playlist"), "🔄 " + T.t("Update channels from link"),
                             "🩺 " + T.t("Check channels (find ones that don't work)"), "🗑 " + T.t("Remove channels that don't work")};
-                    new AlertDialog.Builder(this).setTitle(name).setItems(acts, (d, w) -> {
+                    new UiDialog(this).setTitle(name).setItems(acts, (d, w) -> {
                         if (w == 0) {
                             final EditText e = new EditText(this);
                             e.setText(name);
-                            new AlertDialog.Builder(this).setTitle(T.t("Rename playlist")).setView(e)
+                            new UiDialog(this).setTitle(T.t("Rename playlist")).setView(e)
                                     .setPositiveButton(T.t("Save"), (d2, w2) -> call("/rename", m("playlist", name, "name", e.getText().toString()), r2 -> {
                                         toast(r2.optString("msg"));
                                         loadLists();
@@ -1677,7 +1677,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
     /** Multi-choice with "Select all" (doesn't close) and a confirm step. */
     private void multiDelete(String title, String[] names, final OnPick onDelete) {
         final boolean[] checked = new boolean[names.length];
-        final AlertDialog d = new AlertDialog.Builder(this).setTitle(title)
+        final AlertDialog d = new UiDialog(this).setTitle(title)
                 .setMultiChoiceItems(names, checked, (dd, w, on) -> checked[w] = on)
                 .setNeutralButton(T.t("Select all"), null)
                 .setPositiveButton(T.t("Delete"), null)
@@ -1699,7 +1699,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
                     toast(T.t("Nothing selected"));
                     return;
                 }
-                new AlertDialog.Builder(this).setTitle(T.t("Delete ") + n + T.t("?"))
+                new UiDialog(this).setTitle(T.t("Delete ") + n + T.t("?"))
                         .setMessage(T.t("This cannot be undone."))
                         .setPositiveButton(T.t("Delete"), (a1, b1) -> {
                             d.dismiss();
@@ -1771,7 +1771,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
                 }
             }
         });
-        final AlertDialog dlg = new AlertDialog.Builder(this).setTitle("📂 " + name).setView(box)
+        final AlertDialog dlg = new UiDialog(this).setTitle("📂 " + name).setView(box)
                 .setNeutralButton("🗑 " + T.t("Select & delete…"), null)
                 .setPositiveButton(T.t("Close"), null).create();
         lv.setOnItemClickListener((pa, v, pos, id) -> {
@@ -1789,7 +1789,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
             if (list) acts.add("📥 " + T.t("Load all channels"));
             acts.add("🗑 " + T.t("Delete"));
             final boolean isList = list;
-            new AlertDialog.Builder(this).setTitle(titles.get(pos)).setItems(acts.toArray(new String[0]), (d, w) -> {
+            new UiDialog(this).setTitle(titles.get(pos)).setItems(acts.toArray(new String[0]), (d, w) -> {
                 if (w == 0) {
                     call("/playlist", m("playlist", name, "idx", String.valueOf(i)), null);
                     dlg.dismiss();
@@ -1803,7 +1803,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
                     eu.setText(u);
                     eb.addView(et);
                     eb.addView(eu);
-                    new AlertDialog.Builder(this).setTitle(T.t("Edit name / link")).setView(eb)
+                    new UiDialog(this).setTitle(T.t("Edit name / link")).setView(eb)
                             .setPositiveButton(T.t("Save"), (d2, w2) -> call("/edit", m("playlist", name, "idx", String.valueOf(i),
                                     "title", et.getText().toString(), "url", eu.getText().toString()), r2 -> {
                                 idx.clear();
@@ -1862,6 +1862,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
     // updating the screen from /state
     // =====================================================================
     private void setIf(TextView v, String s) {
+        s = UiKit.noEmoji(s);
         if (v != null && !s.contentEquals(v.getText())) v.setText(s);
     }
 

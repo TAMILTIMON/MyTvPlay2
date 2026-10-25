@@ -623,7 +623,7 @@ public final class TvInfo {
             String v = Store.getStr(k, "");
             if (!v.isEmpty()) s.append(v).append('\n');
         }
-        return s.toString().trim();
+        return UiKit.noEmoji(s.toString()).trim();
     }
 
     public static JSONObject json(Context c) {

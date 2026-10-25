@@ -229,41 +229,94 @@ public final class UiKit {
         return g;
     }
 
-    // ================================================================== emoji → Lucide icon for list rows
+    // ================================================================== emoji → Lucide icon
     private static final String[][] EMOJI_ICON = {
-            {"📁", "folder"}, {"📂", "folder-open"}, {"📊", "gauge"}, {"🎬", "film"}, {"🖧", "network"}, {"🌐", "search"},
-            {"🕘", "clock"}, {"🎵", "list-music"}, {"▶", "play"}, {"★", "star"}, {"✓", "check"}, {"🧲", "magnet"},
-            {"🔍", "search"}, {"🗑", "trash"}, {"🔄", "refresh-cw"}, {"🩺", "gauge"}, {"🔓", "lock"}, {"🔒", "lock"},
-            {"🎮", "gamepad-2"}, {"📱", "smartphone"}, {"⏰", "clock"}, {"⬇", "download"}, {"💾", "hard-drive"},
-            {"🏠", "house"}, {"⬆", "chevron-up"}, {"🖥", "monitor"}, {"✏", "settings"}, {"＋", "plus"}, {"🎞", "film"}};
+            {"👨", "users"}, {"👶", "users"}, {"🧑", "users"}, {"📁", "folder"}, {"📂", "folder-open"}, {"📊", "gauge"},
+            {"🎬", "film"}, {"🖧", "network"}, {"🌐", "languages"}, {"🕘", "clock"}, {"🎵", "list-music"}, {"★", "star"},
+            {"⭐", "star"}, {"☆", "star"}, {"✓", "check"}, {"✅", "check"}, {"🧲", "magnet"}, {"🔍", "search"},
+            {"🔎", "search"}, {"🗑", "trash"}, {"🔄", "refresh-cw"}, {"🩺", "gauge"}, {"🔓", "lock"}, {"🔒", "lock"},
+            {"🔐", "lock"}, {"🎮", "gamepad-2"}, {"📱", "smartphone"}, {"⏰", "clock"}, {"⏱", "clock"}, {"⬇", "download"},
+            {"📥", "download"}, {"💾", "hard-drive"}, {"🏠", "house"}, {"⌂", "house"}, {"⬆", "cloud-download"},
+            {"🖥", "monitor"}, {"✏", "settings"}, {"＋", "plus"}, {"🎞", "film"}, {"🎨", "palette"}, {"📺", "tv"},
+            {"🖼", "image"}, {"📐", "layout-grid"}, {"🎚", "sliders-horizontal"}, {"🔊", "volume-2"}, {"🔉", "volume-1"},
+            {"🔇", "volume-x"}, {"💬", "captions"}, {"🔤", "languages"}, {"⚙", "settings"}, {"🔌", "server"},
+            {"🧹", "trash"}, {"ℹ", "info"}, {"🔖", "bookmark"}, {"📸", "camera"}, {"🌙", "moon"}, {"🕶", "moon"},
+            {"☀", "sun"}, {"📶", "wifi"}, {"⏩", "skip-forward"}, {"⏭", "skip-forward"}, {"⏪", "skip-back"},
+            {"⏮", "skip-back"}, {"🔁", "repeat"}, {"🔂", "repeat-1"}, {"🔀", "shuffle"}, {"🗣", "mic"}, {"📋", "list"},
+            {"📡", "cast"}, {"🚀", "sparkles"}, {"⧉", "layers"}, {"⋮", "menu"}, {"☰", "menu"}, {"▶", "play"},
+            {"⏯", "circle-play"}, {"⏹", "circle-stop"}, {"✕", "x"}, {"❌", "x"}, {"⚠", "info"}, {"♻", "refresh-cw"},
+            {"⌨", "keyboard"}, {"🎧", "audio-lines"}, {"🔔", "info"}, {"📲", "smartphone"}, {"⛶", "monitor"}, {"⬅", "arrow-left"}, {"🔑", "lock"}, {"🧠", "cpu"}, {"🌡", "gauge"}, {"➡", "chevron-right"}};
 
-    /** Shows a row's leading emoji as a Lucide icon instead (keeps the text). */
-    public static void iconize(TextView tv, int color) {
-        String t = tv.getText().toString();
-        for (String[] e : EMOJI_ICON) {
-            if (t.startsWith(e[0])) {
-                tv.setText(t.substring(e[0].length()).replaceFirst("^[\\s\\uFE0F]+", ""));
-                tv.setCompoundDrawablesWithIntrinsicBounds(new Icon(tv.getContext(), e[1], 22, color), null, null, null);
-                tv.setCompoundDrawablePadding(Ui.dp(tv.getContext(), 14));
-                return;
-            }
-        }
-        tv.setCompoundDrawablesWithIntrinsicBounds(null, null, null, null);
+    /** Lucide icon for a text that starts with an emoji, or null. */
+    public static String iconFor(String t) {
+        if (t == null) return null;
+        t = t.trim();
+        for (String[] e : EMOJI_ICON) if (t.startsWith(e[0])) return e[1];
+        return null;
     }
 
-    /** Removes emoji / pictographs from a label ("🔊 Volume" → "Volume"). */
-    public static String noEmoji(String s) {
-        if (s == null) return "";
+    /** Shows a row's leading emoji as a Lucide icon and removes any other emoji. */
+    public static void iconize(TextView tv, int color) {
+        String t = tv.getText().toString();
+        String ic = iconFor(t);
+        tv.setText(noEmoji(t));
+        if (ic != null) {
+            tv.setCompoundDrawablesWithIntrinsicBounds(new Icon(tv.getContext(), ic, 22, color), null, null, null);
+            tv.setCompoundDrawablePadding(Ui.dp(tv.getContext(), 14));
+        } else {
+            tv.setCompoundDrawablesWithIntrinsicBounds(null, null, null, null);
+        }
+    }
+
+    // typographic symbols that stay: arrows, ticks, stars, play marks, bullets
+    private static final String KEEP = "→←↑↓✓✔✕★▶◀▲▼❚●○•·×–—…";
+
+    /** Removes emoji / pictographs ("🔊 Volume" → "Volume"), keeps normal symbols like → ✓ ★. */
+    public static String noEmoji(CharSequence cs) {
+        if (cs == null) return "";
+        String s = cs.toString();
         StringBuilder b = new StringBuilder();
         for (int i = 0; i < s.length(); ) {
             int cp = s.codePointAt(i);
+            boolean keep = KEEP.indexOf(cp) >= 0;
             int type = Character.getType(cp);
-            boolean emoji = cp > 0xFFFF || type == Character.OTHER_SYMBOL || cp == 0xFE0F || cp == 0x200D
-                    || (cp >= 0x2190 && cp <= 0x21FF) || (cp >= 0x2300 && cp <= 0x23FF) || (cp >= 0x25A0 && cp <= 0x27BF);
+            boolean emoji = !keep && (cp > 0xFFFF || type == Character.OTHER_SYMBOL || cp == 0xFE0F || cp == 0x200D
+                    || cp == 0x20E3 || (cp >= 0x2190 && cp <= 0x21FF && cp > 0x2199) || cp == 0x2328 || cp == 0x23CF
+                    || (cp >= 0x23E9 && cp <= 0x23FA));
             if (!emoji) b.appendCodePoint(cp);
             i += Character.charCount(cp);
         }
-        return b.toString().replaceAll("\\s{2,}", " ").trim();
+        return b.toString().replaceAll("[ \\t]{2,}", " ").replaceAll("(?m)^ +", "").trim();
+    }
+
+    public static android.widget.Toast makeToast(Context c, CharSequence text, int dur) {
+        return UiKit.makeToast(c, noEmoji(text), dur);
+    }
+
+    /** Round Lucide button for dark overlays (TV player): white icon, glass circle. */
+    public static ImageView darkButton(final Context c, String iconName, int sizeDp, boolean primary, View.OnClickListener l) {
+        ImageView b = roundButton(c, iconName, sizeDp, primary, l);
+        b.setImageDrawable(new Icon(c, iconName, Math.round(sizeDp * 0.46f), Color.WHITE));
+        StateListDrawable sl = new StateListDrawable();
+        GradientDrawable on = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{Ui.ACCENT, Ui.ACCENT2});
+        on.setShape(GradientDrawable.OVAL);
+        on.setStroke(Ui.dp(c, 2), Color.WHITE);
+        GradientDrawable off;
+        if (primary) off = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{Ui.ACCENT, Ui.ACCENT3});
+        else {
+            off = new GradientDrawable();
+            off.setColor(0x33FFFFFF);
+            off.setStroke(Ui.dp(c, 1), 0x33FFFFFF);
+        }
+        off.setShape(GradientDrawable.OVAL);
+        sl.addState(new int[]{android.R.attr.state_focused}, on);
+        sl.addState(new int[]{android.R.attr.state_pressed}, on);
+        sl.addState(new int[]{}, off);
+        b.setBackground(sl);
+        b.setOnFocusChangeListener((v, f) -> {
+            if (Ui.tvMode) v.animate().scaleX(f ? 1.15f : 1f).scaleY(f ? 1.15f : 1f).setDuration(120).start();
+        });
+        return b;
     }
 
     // ================================================================== level colour (green → yellow → red)

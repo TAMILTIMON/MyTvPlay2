@@ -89,14 +89,16 @@ public class BrowserActivity extends AppCompatActivity {
         int p = Ui.dp(this, 8);
         tb.setPadding(p, p + Ui.dp(this, tv ? 4 : 18), p, p);
         tb.setBackground(Ui.background());
-        tb.addView(small("←", v -> { if (web.canGoBack()) web.goBack(); }));
+        tb.addView(small("⬅", v -> { if (web.canGoBack()) web.goBack(); }));
         final boolean narrow = getResources().getConfiguration().screenWidthDp < 600;
-        if (!narrow) tb.addView(small("→", v -> { if (web.canGoForward()) web.goForward(); }));
+        if (!narrow) tb.addView(small("➡", v -> { if (web.canGoForward()) web.goForward(); }));
         tb.addView(small("🏠", v -> Ui.goHome(this, tv)));
-        if (!narrow) tb.addView(small("⌂", v -> home()));
+        if (!narrow) tb.addView(small("🔍", v -> home()));
         bar = new EditText(this);
         bar.setSingleLine(true);
         bar.setHint(T.t("Search or type a link"));
+        bar.setCompoundDrawablesWithIntrinsicBounds(new UiKit.Icon(this, "search", 18, Ui.DIM), null, null, null);
+        bar.setCompoundDrawablePadding(Ui.dp(this, 8));
         bar.setTextColor(Ui.TEXT);
         bar.setHintTextColor(Ui.DIM);
         bar.setTextSize(15);
@@ -204,7 +206,7 @@ public class BrowserActivity extends AppCompatActivity {
         });
         web.setDownloadListener((url, ua, cd, mime, len) -> {
             if (isPlayable(url, mime)) offer(url, android.webkit.URLUtil.guessFileName(url, cd, mime));
-            else Toast.makeText(this, T.t("Downloads are not supported — only videos, songs and torrents"), Toast.LENGTH_LONG).show();
+            else UiKit.makeToast(this, T.t("Downloads are not supported — only videos, songs and torrents"), Toast.LENGTH_LONG).show();
         });
         web.setOnLongClickListener(v -> {
             WebView.HitTestResult h = web.getHitTestResult();
@@ -232,7 +234,7 @@ public class BrowserActivity extends AppCompatActivity {
         bar.setText(w.getUrl() == null || w.getUrl().startsWith("data:") ? "" : w.getUrl());
         found.clear();
         updateVideos();
-        tabsBtn.setText("⧉" + tabs.size());
+        tabsBtn.setText(String.valueOf(tabs.size()));
         w.requestFocus();
     }
 
@@ -243,7 +245,7 @@ public class BrowserActivity extends AppCompatActivity {
         switchTo(w);
         if (url == null) home();
         else go(url);
-        tabsBtn.setText("⧉" + tabs.size());
+        tabsBtn.setText(String.valueOf(tabs.size()));
     }
 
     private void closeTab(WebView w) {
@@ -257,7 +259,7 @@ public class BrowserActivity extends AppCompatActivity {
         if (w == web) switchTo(tabs.get(Math.max(0, i - 1)));
         else webBox.removeView(w);
         w.destroy();
-        tabsBtn.setText("⧉" + tabs.size());
+        tabsBtn.setText(String.valueOf(tabs.size()));
     }
 
     private void showTabs() {
@@ -267,12 +269,12 @@ public class BrowserActivity extends AppCompatActivity {
             n.add((w == web ? "▶ " : "") + (t == null || t.isEmpty() || t.startsWith("data:") ? T.t("New tab") : t));
         }
         n.add("＋ " + T.t("New tab"));
-        new AlertDialog.Builder(this).setTitle("⧉ " + T.t("Tabs") + " · " + tabs.size())
+        new UiDialog(this).setTitle("⧉ " + T.t("Tabs") + " · " + tabs.size())
                 .setItems(n.toArray(new String[0]), (d, w) -> {
                     if (w == tabs.size()) newTab(null);
                     else {
                         final WebView tw = tabs.get(w);
-                        new AlertDialog.Builder(this).setTitle(n.get(w))
+                        new UiDialog(this).setTitle(n.get(w))
                                 .setItems(new String[]{"↗ " + T.t("Open"), "✕ " + T.t("Close tab")}, (d2, w2) -> {
                                     if (w2 == 0) switchTo(tw);
                                     else closeTab(tw);
@@ -310,12 +312,12 @@ public class BrowserActivity extends AppCompatActivity {
     private void showHistory() {
         final List<String[]> h = history(300);
         if (h.isEmpty()) {
-            Toast.makeText(this, T.t("No history yet"), Toast.LENGTH_SHORT).show();
+            UiKit.makeToast(this, T.t("No history yet"), Toast.LENGTH_SHORT).show();
             return;
         }
         String[] n = new String[h.size()];
         for (int i = 0; i < n.length; i++) n[i] = h.get(i)[0] + "\n" + h.get(i)[1];
-        new AlertDialog.Builder(this).setTitle("🕘 " + T.t("History"))
+        new UiDialog(this).setTitle("🕘 " + T.t("History"))
                 .setItems(n, (d, w) -> web.loadUrl(h.get(w)[1]))
                 .setNeutralButton("🗑 " + T.t("Clear history"), (d, w) -> Store.putStr("bhist", "[]"))
                 .setPositiveButton(T.t("Close"), null).show();
@@ -325,7 +327,7 @@ public class BrowserActivity extends AppCompatActivity {
         final String[] items = {T.t("History"), T.t("Cached pictures and files"), T.t("Cookies and site data (logs you out of sites)"),
                 T.t("Close all tabs")};
         final boolean[] on = {true, true, false, false};
-        new AlertDialog.Builder(this).setTitle("🧹 " + T.t("Clear browsing data"))
+        new UiDialog(this).setTitle("🧹 " + T.t("Clear browsing data"))
                 .setMultiChoiceItems(items, on, (d, w, c) -> on[w] = c)
                 .setPositiveButton(T.t("Clear"), (d, w) -> {
                     if (on[0]) {
@@ -345,7 +347,7 @@ public class BrowserActivity extends AppCompatActivity {
                         while (tabs.size() > 1) closeTab(tabs.get(tabs.size() - 1));
                         home();
                     }
-                    Toast.makeText(this, "🧹 ✅", Toast.LENGTH_SHORT).show();
+                    UiKit.makeToast(this, "🧹 ✅", Toast.LENGTH_SHORT).show();
                 }).setNegativeButton(T.t("Cancel"), null).show();
     }
 
@@ -356,7 +358,7 @@ public class BrowserActivity extends AppCompatActivity {
                 "🖥 " + T.t("Desktop site") + ": " + T.t(desk ? "On" : "Off"),
                 "🕶 " + T.t("Private (no history)") + ": " + T.t(priv ? "On" : "Off"),
                 "🔄 " + T.t("Reload"), "🏠 " + T.t("Go to Home")};
-        new AlertDialog.Builder(this).setItems(items, (d, w) -> {
+        new UiDialog(this).setItems(items, (d, w) -> {
             switch (w) {
                 case 0: newTab(null); break;
                 case 1: showTabs(); break;
@@ -443,7 +445,7 @@ public class BrowserActivity extends AppCompatActivity {
         h.append("<p>").append(T.t("Videos found on a page appear under 🎬. Long-press any link to play it."))
                 .append(tv ? " " + T.t("Remote: arrows move the pointer, OK clicks, Menu opens the address bar.") : "")
                 .append("</p></body></html>");
-        web.loadDataWithBaseURL("https://tamilcastplay.local/", h.toString(), "text/html", "utf-8", null);
+        web.loadDataWithBaseURL("https://tamilcastplay.local/", UiKit.noEmoji(h.toString()), "text/html", "utf-8", null);
         bar.setText("");
     }
 
@@ -487,18 +489,18 @@ public class BrowserActivity extends AppCompatActivity {
     }
 
     private void updateVideos() {
-        videosBtn.setText("🎬 " + found.size());
+        videosBtn.setText(String.valueOf(found.size()));
     }
 
     private void showVideos() {
         if (found.isEmpty()) {
-            Toast.makeText(this, T.t("No videos found on this page yet. Start the video on the page first."), Toast.LENGTH_LONG).show();
+            UiKit.makeToast(this, T.t("No videos found on this page yet. Start the video on the page first."), Toast.LENGTH_LONG).show();
             return;
         }
         final List<String> us = new ArrayList<>(found.keySet());
         String[] names = new String[us.size()];
         for (int i = 0; i < names.length; i++) names[i] = found.get(us.get(i));
-        new AlertDialog.Builder(this).setTitle(T.t("Videos on this page"))
+        new UiDialog(this).setTitle(T.t("Videos on this page"))
                 .setItems(names, (d, w) -> offer(us.get(w), found.get(us.get(w)))).show();
     }
 
@@ -518,11 +520,11 @@ public class BrowserActivity extends AppCompatActivity {
             // magnet / .torrent found: play now or keep for later
             labels.add("⬇ " + T.t("Download for later") + (tv ? "" : " (" + T.t("on the TV") + ")"));
             acts.add(() -> {
-                if (tv) Toast.makeText(this, TorrentDownloads.add(this, url), Toast.LENGTH_LONG).show();
+                if (tv) UiKit.makeToast(this, TorrentDownloads.add(this, url), Toast.LENGTH_LONG).show();
                 else {
                     final String tvIp = Store.getStr("last_tv", "");
                     if (tvIp.isEmpty()) {
-                        Toast.makeText(this, TorrentDownloads.add(this, url), Toast.LENGTH_LONG).show();
+                        UiKit.makeToast(this, TorrentDownloads.add(this, url), Toast.LENGTH_LONG).show();
                         return;
                     }
                     new Thread(() -> {
@@ -535,7 +537,7 @@ public class BrowserActivity extends AppCompatActivity {
                             m = T.t("Cannot reach the TV");
                         }
                         final String m2 = m;
-                        main.post(() -> Toast.makeText(this, m2, Toast.LENGTH_LONG).show());
+                        main.post(() -> UiKit.makeToast(this, m2, Toast.LENGTH_LONG).show());
                     }).start();
                 }
             });
@@ -563,11 +565,11 @@ public class BrowserActivity extends AppCompatActivity {
         labels.add(T.t("💾 Save to playlist “From browser”"));
         acts.add(() -> {
             Store.add(T.t("From browser"), new Store.Item(t, withHeaders(url), ""));
-            Toast.makeText(this, T.t("Saved"), Toast.LENGTH_SHORT).show();
+            UiKit.makeToast(this, T.t("Saved"), Toast.LENGTH_SHORT).show();
         });
         labels.add(T.t("Open link here"));
         acts.add(() -> web.loadUrl(url));
-        new AlertDialog.Builder(this).setTitle((Formats.isTorrent(url) ? "🧲 " + T.t("Torrent found — play or download?") + "\n" : "") + t)
+        new UiDialog(this).setTitle((Formats.isTorrent(url) ? "🧲 " + T.t("Torrent found — play or download?") + "\n" : "") + t)
                 .setItems(labels.toArray(new String[0]), (d, w) -> acts.get(w).run()).show();
     }
 
@@ -587,7 +589,7 @@ public class BrowserActivity extends AppCompatActivity {
                 msg = T.t("Cannot reach the TV");
             }
             final String m = msg;
-            main.post(() -> Toast.makeText(this, m, Toast.LENGTH_LONG).show());
+            main.post(() -> UiKit.makeToast(this, m, Toast.LENGTH_LONG).show());
         }).start();
     }
 
@@ -620,16 +622,16 @@ public class BrowserActivity extends AppCompatActivity {
         final boolean canAdd = cur != null && cur.startsWith("http");
         if (canAdd) names.add("⭐ " + T.t("Add this page"));
         for (String[] b : l) names.add(b[0]);
-        new AlertDialog.Builder(this).setTitle(T.t("Bookmarks"))
+        new UiDialog(this).setTitle(T.t("Bookmarks"))
                 .setItems(names.toArray(new String[0]), (d, w) -> {
                     if (canAdd && w == 0) {
                         l.add(0, new String[]{web.getTitle() == null ? cur : web.getTitle(), cur});
                         saveBookmarks(l);
-                        Toast.makeText(this, T.t("Saved"), Toast.LENGTH_SHORT).show();
+                        UiKit.makeToast(this, T.t("Saved"), Toast.LENGTH_SHORT).show();
                         return;
                     }
                     final String[] b = l.get(w - (canAdd ? 1 : 0));
-                    new AlertDialog.Builder(this).setTitle(b[0])
+                    new UiDialog(this).setTitle(b[0])
                             .setItems(new String[]{T.t("Open"), T.t("Remove")}, (d2, w2) -> {
                                 if (w2 == 0) web.loadUrl(b[1]);
                                 else {

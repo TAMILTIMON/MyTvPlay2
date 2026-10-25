@@ -98,7 +98,7 @@ public final class Palette {
                 "▭  " + T.t("Cards"),
                 "▬  " + T.t("Top / bottom bars"),
                 "↺  " + T.t("Reset custom colours")};
-        new AlertDialog.Builder(a).setTitle("🎨  " + T.t("Colours & style")).setItems(items, (d, w) -> {
+        new UiDialog(a).setTitle("🎨  " + T.t("Colours & style")).setItems(items, (d, w) -> {
             switch (w) {
                 case 0: pickPalette(a); break;
                 case 1: pickColor(a, "c_acc", T.t("Main colour (buttons, highlights)")); break;
@@ -158,7 +158,7 @@ public final class Palette {
             lp.setMargins(0, Ui.dp(a, 4), 0, Ui.dp(a, 4));
             box.addView(row, lp);
         }
-        dlg[0] = new AlertDialog.Builder(a).setTitle("🎨  " + T.t("Palette")).setView(sv)
+        dlg[0] = new UiDialog(a).setTitle("🎨  " + T.t("Palette")).setView(sv)
                 .setNegativeButton(T.t("Close"), null).show();
     }
 
@@ -205,7 +205,7 @@ public final class Palette {
             lp.setMargins(Ui.dp(a, 6), Ui.dp(a, 6), Ui.dp(a, 6), Ui.dp(a, 6));
             row.addView(v, lp);
         }
-        dlg[0] = new AlertDialog.Builder(a).setTitle(title).setView(sv)
+        dlg[0] = new UiDialog(a).setTitle(title).setView(sv)
                 .setNeutralButton(T.t("Default"), (d, w) -> {
                     Store.putInt(key, 0);
                     a.recreate();

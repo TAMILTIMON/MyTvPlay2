@@ -35,6 +35,24 @@ public final class T {
     }
 
     static {
+        TA.put("More", "மேலும்");
+        HI.put("More", "और");
+        TA.put("Scan again", "மீண்டும் தேடு");
+        HI.put("Scan again", "फिर खोजें");
+        TA.put("find TVs on this Wi-Fi", "இந்த Wi-Fi இல் டிவிகளைத் தேடு");
+        HI.put("find TVs on this Wi-Fi", "इस Wi-Fi पर टीवी खोजें");
+        TA.put("Enter TV address", "டிவி முகவரி");
+        HI.put("Enter TV address", "टीवी का पता");
+        TA.put("type the TV's IP", "டிவி IP-ஐ எழுது");
+        HI.put("type the TV's IP", "टीवी का IP लिखें");
+        TA.put("Browser", "உலாவி");
+        HI.put("Browser", "ब्राउज़र");
+        TA.put("search & send videos to TV", "தேடி டிவிக்கு அனுப்பு");
+        HI.put("search & send videos to TV", "खोजें और टीवी पर भेजें");
+        TA.put("Use this phone", "இந்த போனைப் பயன்படுத்து");
+        HI.put("Use this phone", "यह फ़ोन इस्तेमाल करें");
+        TA.put("as a player", "பிளேயராக");
+        HI.put("as a player", "प्लेयर की तरह");
         TA.put("Phone volume buttons", "போன் ஒலி பொத்தான்கள்");
         HI.put("Phone volume buttons", "फ़ोन वॉल्यूम बटन");
         TA.put("TV volume", "டிவி ஒலி");

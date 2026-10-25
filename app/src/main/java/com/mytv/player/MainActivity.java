@@ -84,7 +84,7 @@ public class MainActivity extends AppCompatActivity {
                 Remote.play(this, one, 0);
             });
             card.setOnLongClickListener(v -> {
-                new androidx.appcompat.app.AlertDialog.Builder(this).setTitle(x.t)
+                new UiDialog(this).setTitle(x.t)
                         .setItems(new String[]{T.t("Remove from Continue watching")}, (d, wh) -> {
                             Store.removeHistory(x.u);
                             buildWatch();
@@ -112,7 +112,7 @@ public class MainActivity extends AppCompatActivity {
     /** Multi-select dialog with a "Select all" button that doesn't close the dialog. */
     private void multiSelect(String title, final String[] names, final OnDelete onDelete) {
         final boolean[] checked = new boolean[names.length];
-        final androidx.appcompat.app.AlertDialog d = new androidx.appcompat.app.AlertDialog.Builder(this).setTitle(title)
+        final androidx.appcompat.app.AlertDialog d = new UiDialog(this).setTitle(title)
                 .setMultiChoiceItems(names, checked, (dd, w, on) -> checked[w] = on)
                 .setNeutralButton(T.t("Select all"), null)
                 .setPositiveButton(T.t("Delete"), null)
@@ -132,12 +132,12 @@ public class MainActivity extends AppCompatActivity {
                 int n = 0;
                 for (boolean c : checked) if (c) n++;
                 if (n == 0) {
-                    android.widget.Toast.makeText(this,T.t("Nothing selected"),
+                    UiKit.makeToast(this,T.t("Nothing selected"),
                             android.widget.Toast.LENGTH_SHORT).show();
                     return;
                 }
                 final int count = n;
-                new androidx.appcompat.app.AlertDialog.Builder(this)
+                new UiDialog(this)
                         .setTitle(T.t("Delete ") + count + T.t("?"))
                         .setMessage(T.t("This cannot be undone."))
                         .setPositiveButton(T.t("Delete"), (a, b) -> {
@@ -158,7 +158,7 @@ public class MainActivity extends AppCompatActivity {
             List<String> del = new ArrayList<>();
             for (int i = 0; i < checked.length; i++) if (checked[i]) del.add(names.get(i));
             int n = Store.delPlaylists(del);
-            android.widget.Toast.makeText(this, n + T.t(" deleted"), android.widget.Toast.LENGTH_SHORT).show();
+            UiKit.makeToast(this, n + T.t(" deleted"), android.widget.Toast.LENGTH_SHORT).show();
             refresh();
         });
     }
@@ -179,7 +179,7 @@ public class MainActivity extends AppCompatActivity {
             for (int i = 0; i < checked.length; i++) if (checked[i]) del.add(idx.get(i));
             int n = Store.delMany(pl, del);
             filter = "";
-            android.widget.Toast.makeText(this, n + T.t(" deleted"), android.widget.Toast.LENGTH_SHORT).show();
+            UiKit.makeToast(this, n + T.t(" deleted"), android.widget.Toast.LENGTH_SHORT).show();
             refresh();
         });
     }
@@ -193,7 +193,7 @@ public class MainActivity extends AppCompatActivity {
         final Store.Item it = items.get(i);
         String[] acts = {"✏ " + T.t("Edit name / link"), (Store.isFav(it.u) ? "☆ " : "★ ") + T.t("Favourite"),
                 "⬆ " + T.t("Move up"), "🗑 " + T.t("Delete")};
-        new androidx.appcompat.app.AlertDialog.Builder(this).setTitle(it.t).setItems(acts, (d, w) -> {
+        new UiDialog(this).setTitle(it.t).setItems(acts, (d, w) -> {
             if (w == 0) {
                 LinearLayout box = new LinearLayout(this);
                 box.setOrientation(LinearLayout.VERTICAL);
@@ -204,7 +204,7 @@ public class MainActivity extends AppCompatActivity {
                 u.setText(it.u);
                 box.addView(t);
                 box.addView(u);
-                new androidx.appcompat.app.AlertDialog.Builder(this).setTitle(T.t("Edit name / link")).setView(box)
+                new UiDialog(this).setTitle(T.t("Edit name / link")).setView(box)
                         .setPositiveButton(T.t("Save"), (d2, w2) -> {
                             Store.setItem(pl, i, new Store.Item(t.getText().toString(), u.getText().toString(), it.s, it.g, it.l));
                             refresh();
@@ -226,10 +226,10 @@ public class MainActivity extends AppCompatActivity {
         final List<TorrentDownloads.Dl> l = TorrentDownloads.all();
         String[] n = new String[l.size()];
         for (int i = 0; i < n.length; i++) n[i] = (l.get(i).done ? "✅ " : "⬇ ") + l.get(i).name + "\n     " + l.get(i).state;
-        new androidx.appcompat.app.AlertDialog.Builder(this).setTitle("⬇ " + T.t("Downloads"))
+        new UiDialog(this).setTitle("⬇ " + T.t("Downloads"))
                 .setItems(n, (d, w) -> {
                     final TorrentDownloads.Dl x = l.get(w);
-                    new androidx.appcompat.app.AlertDialog.Builder(this).setTitle(x.name)
+                    new UiDialog(this).setTitle(x.name)
                             .setItems(new String[]{"🗑 " + T.t("Remove from list (keep files)"), "🗑 " + T.t("Remove and delete files")},
                                     (d2, w2) -> {
                                         TorrentDownloads.cancel(x.src, w2 == 1);
@@ -250,7 +250,7 @@ public class MainActivity extends AppCompatActivity {
         final android.widget.EditText e = new android.widget.EditText(this);
         e.setSingleLine(true);
         e.setHint(T.t("Channel / video name"));
-        new androidx.appcompat.app.AlertDialog.Builder(this).setTitle("🔍").setView(e)
+        new UiDialog(this).setTitle("🔍").setView(e)
                 .setPositiveButton(T.t("Search"), (d, w) -> {
                     filter = e.getText().toString().trim();
                     refresh();
@@ -290,10 +290,9 @@ public class MainActivity extends AppCompatActivity {
         // top bar: logo · title … theme · settings (corner)
         LinearLayout top = new LinearLayout(this);
         top.setGravity(Gravity.CENTER_VERTICAL);
-        TextView logo = Ui.text(this, 22, 0xFFFFFFFF, true);
-        logo.setText("▶");
-        logo.setGravity(Gravity.CENTER);
+        android.widget.FrameLayout logo = new android.widget.FrameLayout(this);
         logo.setBackground(Ui.gradient(this, 14));
+        logo.addView(UiKit.icon(this, "play", 24, 0xFFFFFFFF), new android.widget.FrameLayout.LayoutParams(Ui.dp(this, 48), Ui.dp(this, 48), Gravity.CENTER));
         top.addView(logo, new LinearLayout.LayoutParams(Ui.dp(this, 48), Ui.dp(this, 48)));
         LinearLayout titles = new LinearLayout(this);
         titles.setOrientation(LinearLayout.VERTICAL);
@@ -306,14 +305,14 @@ public class MainActivity extends AppCompatActivity {
         top.addView(titles, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
 
         boolean narrow = getResources().getConfiguration().screenWidthDp < 600;
-        Button theme = Ui.button(this, narrow ? (Ui.dark() ? "☀" : "🌙") : Ui.dark() ? T.t("☀ Light") : T.t("🌙 Dark"), false);
+        Button theme = Ui.button(this, narrow ? (Ui.dark() ? "☀" : "🌙") : Ui.dark() ? "☀ " + T.t("Light") : "🌙 " + T.t("Dark"), false);
         theme.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 Store.putStr("theme", Ui.dark() ? "light" : "dark");
                 recreate();
             }
         });
-        Button prof = Ui.button(this, narrow ? Family.current().optString("emoji", "🙂") : Family.label(), false);
+        Button prof = Ui.button(this, narrow ? "👨" : "👨 " + Family.current().optString("name"), false);
         prof.setOnClickListener(v -> Family.choose(this, this::recreate));
         top.addView(prof);
         top.addView(theme);
@@ -416,7 +415,7 @@ public class MainActivity extends AppCompatActivity {
         final String crash = Store.getStr("lastcrash", "");
         if (!crash.isEmpty()) {
             Store.putStr("lastcrash", "");
-            new androidx.appcompat.app.AlertDialog.Builder(this).setTitle("⚠ The app closed unexpectedly last time")
+            new UiDialog(this).setTitle("⚠ The app closed unexpectedly last time")
                     .setMessage("Please send this to the developer:\n\n" + crash.substring(0, Math.min(900, crash.length())))
                     .setPositiveButton("OK", null)
                     .setNeutralButton("Copy", (d, w) -> {
@@ -435,7 +434,7 @@ public class MainActivity extends AppCompatActivity {
             addTile((Family.appAllowed(a.pkg) ? "" : "🔒 ") + a.name, AppsHub.icon(this, a.pkg), tv, v -> {
                 Family.Ok go = () -> {
                     String m = AppsHub.launch(this, a.pkg);
-                    if (!a.installed) android.widget.Toast.makeText(this, m, android.widget.Toast.LENGTH_LONG).show();
+                    if (!a.installed) UiKit.makeToast(this, m, android.widget.Toast.LENGTH_LONG).show();
                 };
                 if (Family.appAllowed(a.pkg)) go.run();
                 else Family.askPin(this, T.t("This app is locked for the kids profile."), go);
@@ -491,7 +490,7 @@ public class MainActivity extends AppCompatActivity {
             names[i] = a.name + (a.installed ? "" : T.t("   (not installed – tap tile to get it)"));
             checked[i] = chosen.contains(a.pkg);
         }
-        new androidx.appcompat.app.AlertDialog.Builder(this).setTitle(T.t("Apps on the home screen"))
+        new UiDialog(this).setTitle(T.t("Apps on the home screen"))
                 .setMultiChoiceItems(names, checked, (d, w, on) -> {
                     String p = all.get(w).pkg;
                     if (on && !chosen.contains(p)) chosen.add(p);
@@ -512,7 +511,7 @@ public class MainActivity extends AppCompatActivity {
         else sb.append("📱  Control from your phone: install this same app on the phone (it finds this TV by itself), "
                 + "or open  http://").append(Net.ip()).append(":").append(RemoteService.PORT).append("  in a browser.");
 
-        info.setText(sb.toString());
+        info.setText(UiKit.noEmoji(sb.toString()));
     }
 
     private void refresh() {
@@ -587,9 +586,9 @@ public class MainActivity extends AppCompatActivity {
                 actions.add(() -> {
                     if (ChannelScanner.hasResult(pl)) {
                         int n = ChannelScanner.removeDead(pl);
-                        android.widget.Toast.makeText(this, n + " " + T.t("removed"), android.widget.Toast.LENGTH_LONG).show();
+                        UiKit.makeToast(this, n + " " + T.t("removed"), android.widget.Toast.LENGTH_LONG).show();
                     } else {
-                        android.widget.Toast.makeText(this, ChannelScanner.start(this, pl), android.widget.Toast.LENGTH_LONG).show();
+                        UiKit.makeToast(this, ChannelScanner.start(this, pl), android.widget.Toast.LENGTH_LONG).show();
                     }
                     refresh();
                 });
@@ -597,7 +596,7 @@ public class MainActivity extends AppCompatActivity {
             if (!Store.getStr("plsrc_" + pl, "").isEmpty()) {
                 rows.add("🔄   " + T.t("Update channels from link"));
                 actions.add(() -> {
-                    android.widget.Toast.makeText(this, "…", android.widget.Toast.LENGTH_SHORT).show();
+                    UiKit.makeToast(this, "…", android.widget.Toast.LENGTH_SHORT).show();
                     new Thread(() -> {
                         String msg;
                         try {
@@ -611,7 +610,7 @@ public class MainActivity extends AppCompatActivity {
                             msg = T.t("Cannot reach the TV").replace("TV", "link");
                         }
                         final String m2 = msg;
-                        runOnUiThread(() -> android.widget.Toast.makeText(this, m2, android.widget.Toast.LENGTH_LONG).show());
+                        runOnUiThread(() -> UiKit.makeToast(this, m2, android.widget.Toast.LENGTH_LONG).show());
                     }).start();
                 });
             }
@@ -620,7 +619,7 @@ public class MainActivity extends AppCompatActivity {
                 final android.widget.EditText e = new android.widget.EditText(this);
                 e.setText(pl);
                 e.setSingleLine(true);
-                new androidx.appcompat.app.AlertDialog.Builder(this).setTitle(T.t("Rename playlist")).setView(e)
+                new UiDialog(this).setTitle(T.t("Rename playlist")).setView(e)
                         .setPositiveButton(T.t("Save"), (d, w) -> {
                             if (Store.renamePlaylist(pl, e.getText().toString())) current = e.getText().toString().trim();
                             refresh();

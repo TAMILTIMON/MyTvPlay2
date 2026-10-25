@@ -136,7 +136,7 @@ public class NetworkActivity extends AppCompatActivity {
         cur = null;
         stack.clear();
         pending.clear();
-        header.setText("🖧 " + T.t("Network folders"));
+        header.setText(UiKit.noEmoji("🖧 " + T.t("Network folders")));
         info.setText(T.t("PCs, NAS and phones on this Wi-Fi — SMB, FTP, FTPS, SFTP, NFS, WebDAV, DLNA. Long-press a saved server to edit or remove it."));
         browser.discoverNetworkShares();
         phones.clear();
@@ -175,7 +175,7 @@ public class NetworkActivity extends AppCompatActivity {
         final Uri u = Uri.parse(uri);
         final String ip = u.getHost();
         final String path = u.getQueryParameter("p") == null ? "" : u.getQueryParameter("p");
-        header.setText("📱 " + (path.isEmpty() ? ip : new java.io.File(path).getName()));
+        header.setText(UiKit.noEmoji("📱 " + (path.isEmpty() ? ip : new java.io.File(path).getName())));
         info.setText("…");
         render(true);
         new Thread(() -> {
@@ -207,7 +207,7 @@ public class NetworkActivity extends AppCompatActivity {
                     render(false);
                 });
             } catch (final Exception e) {
-                main.post(() -> info.setText("⚠ " + e.getMessage()));
+                main.post(() -> info.setText(UiKit.noEmoji("⚠ " + e.getMessage())));
             }
         }).start();
     }
@@ -268,8 +268,8 @@ public class NetworkActivity extends AppCompatActivity {
     private void browse(String uri) {
         cur = uri;
         pending.clear();
-        header.setText("🖧 " + Uri.decode(Uri.parse(uri.replaceAll("//[^@/]*@", "//")).getLastPathSegment() == null
-                ? Uri.parse(uri).getHost() : Uri.parse(uri).getLastPathSegment()));
+        header.setText(UiKit.noEmoji("🖧 " + Uri.decode(Uri.parse(uri.replaceAll("//[^@/]*@", "//")).getLastPathSegment() == null
+                ? Uri.parse(uri).getHost() : Uri.parse(uri).getLastPathSegment())));
         info.setText("…");
         render(true);
         browser.browse(Uri.parse(uri), MediaBrowser.Flag.NoSlavesAutodetect);
@@ -342,7 +342,7 @@ public class NetworkActivity extends AppCompatActivity {
         pass.setHint(T.t("Password (optional)"));
         pass.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
         name.setHint(T.t("Name (e.g. Living-room PC)"));
-        protoBtn.setOnClickListener(v -> new AlertDialog.Builder(this).setTitle(T.t("Type"))
+        protoBtn.setOnClickListener(v -> new UiDialog(this).setTitle(T.t("Type"))
                 .setItems(PROTO_NAME, (d, w) -> {
                     proto[0] = w;
                     protoBtn.setText(PROTO_NAME[w]);
@@ -361,7 +361,7 @@ public class NetworkActivity extends AppCompatActivity {
                 user.setText(up[0]);
                 if (up.length > 1) pass.setText(up[1]);
             }
-            name.setText(existing.title.replace("💾  ", ""));
+            name.setText(UiKit.noEmoji(existing.title.replace("💾  ", "")));
         }
         box.addView(protoBtn);
         box.addView(host);
@@ -372,7 +372,7 @@ public class NetworkActivity extends AppCompatActivity {
         box.addView(name);
         android.widget.ScrollView sv = new android.widget.ScrollView(this);
         sv.addView(box);
-        AlertDialog.Builder bd = new AlertDialog.Builder(this).setTitle("🖧 " + T.t("Network server")).setView(sv)
+        AlertDialog.Builder bd = new UiDialog(this).setTitle("🖧 " + T.t("Network server")).setView(sv)
                 .setPositiveButton(T.t("Save"), (d, w) -> {
                     String h = host.getText().toString().trim().replace("\\", "/").replaceAll("^[a-z]+:/+", "").replaceAll("^/+", "");
                     if (h.isEmpty()) return;

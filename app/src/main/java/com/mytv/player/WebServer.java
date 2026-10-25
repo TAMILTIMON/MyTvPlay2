@@ -44,7 +44,7 @@ public class WebServer extends NanoHTTPD {
                 final String pin = Pair.pin();
                 Remote.MAIN.post(new Runnable() {
                     public void run() {
-                        android.widget.Toast.makeText(ctx, "📱 A phone is connecting — PIN: " + pin,
+                        UiKit.makeToast(ctx, "📱 A phone is connecting — PIN: " + pin,
                                 android.widget.Toast.LENGTH_LONG).show();
                     }
                 });
@@ -458,7 +458,7 @@ public class WebServer extends NanoHTTPD {
                             String e = AdbClient.connect(ctx, true);
                             Store.putBool("adb_on", e == null);
                             final String m2 = e == null ? "✅ Full remote is ON" : e;
-                            Remote.MAIN.post(() -> android.widget.Toast.makeText(ctx, m2, android.widget.Toast.LENGTH_LONG).show());
+                            Remote.MAIN.post(() -> UiKit.makeToast(ctx, m2, android.widget.Toast.LENGTH_LONG).show());
                         }).start();
                         return msg("On the TV: press “Allow” (tick “Always allow”) if it asks");
                     }

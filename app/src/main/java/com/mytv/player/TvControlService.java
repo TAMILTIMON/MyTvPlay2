@@ -208,7 +208,7 @@ public class TvControlService extends Service {
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         int f = PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0);
         b.setSmallIcon(android.R.drawable.ic_media_play)
-                .setContentTitle(title.isEmpty() ? "📺 " + name : title)
+                .setContentTitle(UiKit.noEmoji(title.isEmpty() ? "📺 " + name : title))
                 .setContentText(sub.isEmpty() ? "TamilCastPlay" : sub)
                 .setContentIntent(PendingIntent.getActivity(this, 1, open, f))
                 .setOngoing(true)

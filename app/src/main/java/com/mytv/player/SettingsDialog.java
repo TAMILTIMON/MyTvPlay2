@@ -20,7 +20,7 @@ public final class SettingsDialog {
     }
 
     private static void choose(Activity a, String title, String[] items, int sel, final IntCb cb) {
-        new AlertDialog.Builder(a).setTitle(title).setSingleChoiceItems(items, sel, new DialogInterface.OnClickListener() {
+        new UiDialog(a).setTitle(title).setSingleChoiceItems(items, sel, new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface d, int w) {
                 d.dismiss();
@@ -72,7 +72,7 @@ public final class SettingsDialog {
                 T.t("📱  Use as remote for another TV…"),
                 "👨‍👩‍👧  " + T.t("Profiles & kids lock") + ": " + Family.label(),
                 T.t("ℹ  Phone remote address: http://") + Net.ip() + ":" + RemoteService.PORT};
-        new AlertDialog.Builder(a).setTitle(T.t("⚙  Settings")).setItems(items, new DialogInterface.OnClickListener() {
+        new UiDialog(a).setTitle(T.t("⚙  Settings")).setItems(items, new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface d, int w) {
                 if (w == 0) {
@@ -107,7 +107,7 @@ public final class SettingsDialog {
                         final EditText e = new EditText(a);
                         e.setText(Discovery.deviceName(a));
                         e.setInputType(InputType.TYPE_CLASS_TEXT);
-                        new AlertDialog.Builder(a).setTitle(T.t("Device name (shown in the phone app)")).setView(e)
+                        new UiDialog(a).setTitle(T.t("Device name (shown in the phone app)")).setView(e)
                                 .setPositiveButton(T.t("Save"), new DialogInterface.OnClickListener() {
                                     public void onClick(DialogInterface d2, int w2) {
                                         Store.putStr("devname", e.getText().toString().trim());
@@ -207,7 +207,7 @@ public final class SettingsDialog {
                         break;
                     case 17:
                         if (SessionWatcher.available(a)) {
-                            android.widget.Toast.makeText(a, "✅ " + T.t("On"), android.widget.Toast.LENGTH_SHORT).show();
+                            UiKit.makeToast(a, "✅ " + T.t("On"), android.widget.Toast.LENGTH_SHORT).show();
                             break;
                         }
                         if (((android.app.ActivityManager) a.getSystemService(android.content.Context.ACTIVITY_SERVICE)).isLowRamDevice()) {
@@ -217,10 +217,10 @@ public final class SettingsDialog {
                         if (AdbClient.enabled()) {
                             new Thread(() -> {
                                 final String e = SessionWatcher.enableViaAdb(a);
-                                a.runOnUiThread(() -> android.widget.Toast.makeText(a, e == null ? "✅" : e, android.widget.Toast.LENGTH_LONG).show());
+                                a.runOnUiThread(() -> UiKit.makeToast(a, e == null ? "✅" : e, android.widget.Toast.LENGTH_LONG).show());
                             }).start();
                         } else if (!Perms.launchFirst(a, new Intent[]{new Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")})) {
-                            android.widget.Toast.makeText(a, T.t("Turn on the 🔌 Full remote (ADB) first — then this switches on by itself"),
+                            UiKit.makeToast(a, T.t("Turn on the 🔌 Full remote (ADB) first — then this switches on by itself"),
                                     android.widget.Toast.LENGTH_LONG).show();
                         }
                         break;
@@ -235,7 +235,7 @@ public final class SettingsDialog {
                         backupMenu(a);
                         break;
                     case 21:
-                        new AlertDialog.Builder(a).setTitle("🧲  " + T.t("Torrent storage: "))
+                        new UiDialog(a).setTitle("🧲  " + T.t("Torrent storage: "))
                                 .setItems(new String[]{"🗑 Delete saved torrents (keep my kept movies)", "🗑 Delete everything (also kept movies)"},
                                         (d2, w2) -> new Thread(() -> TorrentEngine.get(a).clearCache(w2 == 1)).start()).show();
                         break;
@@ -259,13 +259,13 @@ public final class SettingsDialog {
                 + "\n\n1. TV Settings → Device Preferences → About → press “Build” 7 times (Developer options on)."
                 + "\n2. Settings → Device Preferences → Developer options → turn on USB debugging / Network debugging."
                 + "\n3. Press Connect. When the TV asks “Allow debugging?”, tick “Always allow” and press OK.";
-        new AlertDialog.Builder(a).setTitle("🔌  " + T.t("Full remote for every app (ADB)")).setMessage(steps)
+        new UiDialog(a).setTitle("🔌  " + T.t("Full remote for every app (ADB)")).setMessage(steps)
                 .setPositiveButton(T.t("Connect"), (d, w) -> {
-                    android.widget.Toast.makeText(a, "…", android.widget.Toast.LENGTH_SHORT).show();
+                    UiKit.makeToast(a, "…", android.widget.Toast.LENGTH_SHORT).show();
                     new Thread(() -> {
                         final String e = AdbClient.connect(a, true);
                         Store.putBool("adb_on", e == null);
-                        a.runOnUiThread(() -> android.widget.Toast.makeText(a, e == null ? "✅ " + T.t("Full remote for every app (ADB)") + ": ON" : e,
+                        a.runOnUiThread(() -> UiKit.makeToast(a, e == null ? "✅ " + T.t("Full remote for every app (ADB)") + ": ON" : e,
                                 android.widget.Toast.LENGTH_LONG).show());
                     }).start();
                 })
@@ -276,7 +276,7 @@ public final class SettingsDialog {
     static void backupMenu(final Activity a) {
         String[] items = {"💾 " + T.t("Save backup to the TV's Download folder"), "♻ " + T.t("Restore from a backup file"),
                 "📱 " + T.t("Tip: the phone app can save / restore backups too (Playlist tab)")};
-        new AlertDialog.Builder(a).setTitle("💾  " + T.t("Backup & restore")).setItems(items, (d, w) -> {
+        new UiDialog(a).setTitle("💾  " + T.t("Backup & restore")).setItems(items, (d, w) -> {
             if (w == 0) {
                 new Thread(() -> {
                     String m;
@@ -286,20 +286,20 @@ public final class SettingsDialog {
                         m = e.getMessage();
                     }
                     final String m2 = m;
-                    a.runOnUiThread(() -> android.widget.Toast.makeText(a, m2, android.widget.Toast.LENGTH_LONG).show());
+                    a.runOnUiThread(() -> UiKit.makeToast(a, m2, android.widget.Toast.LENGTH_LONG).show());
                 }).start();
             } else if (w == 1) {
                 final java.util.List<java.io.File> fs = Backup.findBackups(a);
                 if (fs.isEmpty()) {
-                    android.widget.Toast.makeText(a, T.t("No backup file found (Download folder or USB). Allow all-files access if it's on USB."),
+                    UiKit.makeToast(a, T.t("No backup file found (Download folder or USB). Allow all-files access if it's on USB."),
                             android.widget.Toast.LENGTH_LONG).show();
                     return;
                 }
                 String[] n = new String[fs.size()];
                 for (int i = 0; i < n.length; i++) n[i] = fs.get(i).getName() + "  ·  " + fs.get(i).getParent();
-                new AlertDialog.Builder(a).setTitle(T.t("Restore from a backup file")).setItems(n, (d2, w2) -> {
+                new UiDialog(a).setTitle(T.t("Restore from a backup file")).setItems(n, (d2, w2) -> {
                     String m = Backup.restoreFile(fs.get(w2));
-                    android.widget.Toast.makeText(a, m, android.widget.Toast.LENGTH_LONG).show();
+                    UiKit.makeToast(a, m, android.widget.Toast.LENGTH_LONG).show();
                     a.recreate();
                 }).show();
             }
@@ -323,7 +323,7 @@ public final class SettingsDialog {
     static void pinMenu(final Activity a) {
         String[] items = {
                 T.t("Ask for PIN: ") + (Pair.enabled() ? "ON" : "OFF"),T.t("New PIN (forget all paired phones)")};
-        new AlertDialog.Builder(a).setTitle("🔐  PIN: " + Pair.pin())
+        new UiDialog(a).setTitle("🔐  PIN: " + Pair.pin())
                 .setMessage(T.t("Phones must enter this PIN once before they can control this device."))
                 .setItems(items, new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface d, int w) {
@@ -359,7 +359,7 @@ public final class SettingsDialog {
             }
         });
         box.addView(eq);
-        new AlertDialog.Builder(a).setTitle(T.t("🎚  Equalizer  (◀ ▶ band · ▲ ▼ level)")).setView(box)
+        new UiDialog(a).setTitle(T.t("🎚  Equalizer  (◀ ▶ band · ▲ ▼ level)")).setView(box)
                 .setPositiveButton(T.t("Done"), null)
                 .setNeutralButton(T.t("Reset"), new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface d, int w) {

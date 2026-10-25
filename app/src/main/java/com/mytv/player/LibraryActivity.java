@@ -68,18 +68,18 @@ public class LibraryActivity extends AppCompatActivity {
         top.setGravity(Gravity.CENTER_VERTICAL);
         top.addView(btn("🏠", false, v -> Ui.goHome(this, true)));
         TextView h = Ui.text(this, 22, Ui.TEXT, true);
-        h.setText("  🎬 " + T.t("Library"));
+        h.setText(UiKit.noEmoji("  🎬 " + T.t("Library")));
         top.addView(h, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
         sortBtn = btn("", false, v -> {
             String[] n = {T.t("Recently added"), T.t("Name"), T.t("Biggest first")};
-            new AlertDialog.Builder(this).setTitle(T.t("Sort")).setItems(n, (d, w) -> {
+            new UiDialog(this).setTitle(T.t("Sort")).setItems(n, (d, w) -> {
                 sort = w;
                 apply();
             }).show();
         });
         filterBtn = btn("", false, v -> {
             String[] n = {T.t("All"), T.t("Not watched"), T.t("Watched"), T.t("Added in the last 30 days")};
-            new AlertDialog.Builder(this).setTitle(T.t("Show")).setItems(n, (d, w) -> {
+            new UiDialog(this).setTitle(T.t("Show")).setItems(n, (d, w) -> {
                 filter = w;
                 apply();
             }).show();
@@ -127,7 +127,7 @@ public class LibraryActivity extends AppCompatActivity {
 
     // ------------------------------------------------------------ finding movies
     private void scan() {
-        status.setText("🔎 " + T.t("Looking for movies…"));
+        status.setText(UiKit.noEmoji("🔎 " + T.t("Looking for movies…")));
         ex.execute(() -> {
             LinkedHashMap<String, Movie> found = new LinkedHashMap<>();
             for (Store.Item it : Store.items("Downloads")) if (it.u.startsWith("/")) add(found, new File(it.u));
@@ -263,7 +263,7 @@ public class LibraryActivity extends AppCompatActivity {
                         + TvInfo.gb(m.size) + "   ·   " + new java.text.SimpleDateFormat("d MMM yyyy", Locale.getDefault()).format(new java.util.Date(m.added))
                         + (w ? "   ·   ✓ " + T.t("Watched") : "") + "\n\n"
                         + (info.optString("overview").isEmpty() ? m.name : info.optString("overview"));
-                new AlertDialog.Builder(this)
+                new UiDialog(this)
                         .setTitle("🎬 " + info.optString("title", m.title) + (info.optString("year").isEmpty() ? "" : " (" + info.optString("year") + ")"))
                         .setMessage(msg)
                         .setPositiveButton(pos > 5000 ? "▶ " + T.t("Resume") + " " + Net.fmtTime(pos) : "▶ " + T.t("Play"), (d, x) -> {
@@ -284,7 +284,7 @@ public class LibraryActivity extends AppCompatActivity {
         final EditText e = new EditText(this);
         e.setText(Store.getStr("tmdb_key", ""));
         e.setHint("TMDB API key");
-        new AlertDialog.Builder(this).setTitle("🔑 " + T.t("Movie posters & info"))
+        new UiDialog(this).setTitle("🔑 " + T.t("Movie posters & info"))
                 .setMessage(T.t("Without a key, posters are pictures from the video. For real posters, ratings and stories add a free key from themoviedb.org → Settings → API."))
                 .setView(e)
                 .setPositiveButton(T.t("Save"), (d, w) -> {

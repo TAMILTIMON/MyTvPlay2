@@ -50,7 +50,7 @@ public class TvInfoActivity extends AppCompatActivity {
         home.setOnClickListener(v -> Ui.goHome(this, true));
         top.addView(home);
         TextView h = Ui.text(this, 24, Ui.TEXT, true);
-        h.setText("  📊 " + T.t("My TV"));
+        h.setText(UiKit.noEmoji("  📊 " + T.t("My TV")));
         top.addView(h);
         root.addView(top);
 
@@ -79,8 +79,8 @@ public class TvInfoActivity extends AppCompatActivity {
         root.addView(report, lp);
         TextView note = Ui.text(this, 12, Ui.DIM, false);
         note.setPadding(0, Ui.dp(this, 10), 0, 0);
-        note.setText(T.t("RAM speed and CPU speed are measured by a short test (Android does not report them). "
-                + "“Free up memory” closes background apps; with the 🔌 ADB full remote it can stop any app."));
+        note.setText(UiKit.noEmoji(T.t("RAM speed and CPU speed are measured by a short test (Android does not report them). "
+                + "“Free up memory” closes background apps; with the 🔌 ADB full remote it can stop any app.")));
         root.addView(note);
         setContentView(sv);
         refresh();
@@ -107,7 +107,7 @@ public class TvInfoActivity extends AppCompatActivity {
 
     private void run(final Job j) {
         if (TvInfo.busy()) {
-            Toast.makeText(this, T.t("A test is already running"), Toast.LENGTH_SHORT).show();
+            UiKit.makeToast(this, T.t("A test is already running"), Toast.LENGTH_SHORT).show();
             return;
         }
         line.setText("…");
@@ -129,7 +129,7 @@ public class TvInfoActivity extends AppCompatActivity {
 
     private void runningApps() {
         if (!AdbClient.enabled()) {
-            new AlertDialog.Builder(this).setTitle("📋 " + T.t("Running apps"))
+            new UiDialog(this).setTitle("📋 " + T.t("Running apps"))
                     .setMessage(T.t("Android only lets an app see other running apps through ADB. Turn on the 🔌 Full remote (ADB) first."))
                     .setPositiveButton("🔌 " + T.t("Full remote for every app (ADB)"), (d, w) -> SettingsDialog.adbSetup(this))
                     .setNegativeButton(T.t("Close"), null).show();
@@ -147,7 +147,7 @@ public class TvInfoActivity extends AppCompatActivity {
                         names[i] = TvInfo.gb(l.get(i).rss) + "   " + AppsHub.label(this, pkg)
                                 + (l.get(i).name.contains(":") ? " (" + l.get(i).name.split(":")[1] + ")" : "");
                     }
-                    new AlertDialog.Builder(this).setTitle("📋 " + T.t("Running apps") + " · " + T.t("tap to stop"))
+                    new UiDialog(this).setTitle("📋 " + T.t("Running apps") + " · " + T.t("tap to stop"))
                             .setItems(names, (d, w) -> run(() -> TvInfo.forceStop(this, l.get(w).name)))
                             .setNeutralButton("🧹 " + T.t("Free up memory"), (d, w) -> run(() -> TvInfo.clean(this)))
                             .setNegativeButton(T.t("Close"), null).show();

@@ -219,7 +219,7 @@ public class FileBrowserActivity extends AppCompatActivity {
             try {
                 startActivity(new Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION));
             } catch (Exception e2) {
-                Toast.makeText(this, "This TV has no settings page for it. Use the adb command shown on screen.",
+                UiKit.makeToast(this, "This TV has no settings page for it. Use the adb command shown on screen.",
                         Toast.LENGTH_LONG).show();
             }
         }

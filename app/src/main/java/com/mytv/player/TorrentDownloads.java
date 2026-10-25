@@ -222,7 +222,7 @@ public final class TorrentDownloads {
         }
         d.th = null;
         save();
-        Remote.MAIN.post(() -> android.widget.Toast.makeText(app, "✅ Downloaded: " + d.name + " — see the Downloads playlist",
+        Remote.MAIN.post(() -> UiKit.makeToast(app, "✅ Downloaded: " + d.name + " — see the Downloads playlist",
                 android.widget.Toast.LENGTH_LONG).show());
     }
 

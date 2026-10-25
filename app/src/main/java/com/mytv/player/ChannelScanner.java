@@ -58,7 +58,7 @@ public final class ChannelScanner {
             } catch (InterruptedException ignored) {
             }
             running = false;
-            Remote.MAIN.post(() -> android.widget.Toast.makeText(ctx, status() + " — open the playlist to remove them",
+            Remote.MAIN.post(() -> UiKit.makeToast(ctx, status() + " — open the playlist to remove them",
                     android.widget.Toast.LENGTH_LONG).show());
         }).start();
         return "Checking " + total + " channels in the background…";

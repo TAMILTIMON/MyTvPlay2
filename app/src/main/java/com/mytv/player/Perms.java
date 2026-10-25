@@ -33,7 +33,7 @@ public final class Perms {
                 + "\n\n" + T.t("If the screen does not open, go to:") + "\n"
                 + "⚙ Settings → Device Preferences → Accessibility → TamilCastPlay phone remote → ON\n"
                 + "(" + T.t("some TVs: Settings → System → Accessibility, or Settings → Apps → Special app access") + ")";
-        new AlertDialog.Builder(a)
+        new UiDialog(a)
                 .setTitle("🎮  " + T.t("Control the whole TV from the phone"))
                 .setMessage(steps)
                 .setPositiveButton(T.t("Allow"), (d, w) -> {
@@ -73,7 +73,7 @@ public final class Perms {
                 i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 a.startActivity(i);
                 if (Settings.ACTION_SETTINGS.equals(i.getAction()) || cls.endsWith("MainSettings")) {
-                    android.widget.Toast.makeText(a, T.t("Device Preferences → Accessibility → TamilCastPlay phone remote → ON"),
+                    UiKit.makeToast(a, T.t("Device Preferences → Accessibility → TamilCastPlay phone remote → ON"),
                             android.widget.Toast.LENGTH_LONG).show();
                 }
                 return true;
@@ -88,7 +88,7 @@ public final class Perms {
         final String cmd = "adb shell settings put secure enabled_accessibility_services "
                 + a.getPackageName() + "/" + TvAccess.class.getName()
                 + "\nadb shell settings put secure accessibility_enabled 1";
-        new AlertDialog.Builder(a).setTitle(T.t("Other ways"))
+        new UiDialog(a).setTitle(T.t("Other ways"))
                 .setMessage(T.t("Your TV may hide the Accessibility screen. Turn it on once with adb (from a PC, or a phone app such as “Remote ADB Shell” / “Bugjaeger”):")
                         + "\n\n" + cmd + "\n\n"
                         + T.t("TV volume and ⏯ already work without it. Inside TamilCastPlay the phone remote always works."))
@@ -118,7 +118,7 @@ public final class Perms {
     }
 
     public static void askOverlay(final Activity a) {
-        new AlertDialog.Builder(a)
+        new UiDialog(a)
                 .setTitle(T.t("📱  Allow the phone to start videos"))
                 .setMessage("So your phone can play videos on this TV even when TamilCastPlay is closed, "
                         + "allow “Display over other apps”.\n\nOn the next screen choose TamilCastPlay and switch it ON, "
@@ -154,7 +154,7 @@ public final class Perms {
 
     /** Some TVs hide these screens: explain the manual path. */
     private static void help(Activity a, String what) {
-        new AlertDialog.Builder(a).setTitle(T.t("Open it in TV Settings"))
+        new UiDialog(a).setTitle(T.t("Open it in TV Settings"))
                 .setMessage("This TV has no direct shortcut. Go to:\n\nSettings → Apps → Special app access → "
                         + what + " → TamilCastPlay → ON\n\nIf your TV doesn't have that option, everything still works "
                         + "while TamilCastPlay is open on the TV.\n\nadb: adb shell appops set " + a.getPackageName() + " "

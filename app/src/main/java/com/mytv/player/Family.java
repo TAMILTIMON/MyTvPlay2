@@ -119,20 +119,20 @@ public final class Family {
         final EditText e = new EditText(a);
         e.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_PASSWORD);
         e.setHint("••••");
-        new AlertDialog.Builder(a).setTitle("🔒 " + (pin.isEmpty() ? T.t("Choose a parents' PIN (4 digits)") : T.t("Parents' PIN")))
+        new UiDialog(a).setTitle("🔒 " + (pin.isEmpty() ? T.t("Choose a parents' PIN (4 digits)") : T.t("Parents' PIN")))
                 .setMessage(why)
                 .setView(e)
                 .setPositiveButton(T.t("OK"), (d, w) -> {
                     String v = e.getText().toString().trim();
                     if (pin.isEmpty()) {
                         if (v.length() < 4) {
-                            Toast.makeText(a, T.t("Use at least 4 digits"), Toast.LENGTH_LONG).show();
+                            UiKit.makeToast(a, T.t("Use at least 4 digits"), Toast.LENGTH_LONG).show();
                             return;
                         }
                         Store.putStr("kids_pin", v);
                         ok.run();
                     } else if (v.equals(pin)) ok.run();
-                    else Toast.makeText(a, T.t("Wrong PIN"), Toast.LENGTH_LONG).show();
+                    else UiKit.makeToast(a, T.t("Wrong PIN"), Toast.LENGTH_LONG).show();
                 })
                 .setNegativeButton(T.t("Cancel"), null).show();
     }
@@ -149,7 +149,7 @@ public final class Family {
         }
         n[l.size()] = "＋  " + T.t("Add profile");
         n[l.size() + 1] = "⚙  " + T.t("Manage profiles & kids lock");
-        new AlertDialog.Builder(a).setTitle("👨‍👩‍👧  " + T.t("Who's watching?")).setItems(n, (d, w) -> {
+        new UiDialog(a).setTitle("👨‍👩‍👧  " + T.t("Who's watching?")).setItems(n, (d, w) -> {
             if (w < l.size()) {
                 final JSONObject target = l.get(w);
                 Ok sw = () -> {
@@ -175,9 +175,9 @@ public final class Family {
         final EditText name = new EditText(a);
         name.setHint(T.t("Name"));
         name.setText(existing == null ? "" : existing.optString("name"));
-        new AlertDialog.Builder(a).setTitle(existing == null ? T.t("Add profile") : T.t("Edit profile")).setView(name)
-                .setPositiveButton(T.t("Next"), (d, w) -> new AlertDialog.Builder(a).setTitle(T.t("Picture"))
-                        .setItems(EMOJI, (d2, w2) -> new AlertDialog.Builder(a).setTitle(T.t("Is this a kids profile?"))
+        new UiDialog(a).setTitle(existing == null ? T.t("Add profile") : T.t("Edit profile")).setView(name)
+                .setPositiveButton(T.t("Next"), (d, w) -> new UiDialog(a).setTitle(T.t("Picture"))
+                        .setItems(EMOJI, (d2, w2) -> new UiDialog(a).setTitle(T.t("Is this a kids profile?"))
                                 .setItems(new String[]{"👶 " + T.t("Yes — kids lock applies"), "🧑 " + T.t("No")}, (d3, w3) -> {
                                     List<JSONObject> l = profiles();
                                     try {
@@ -209,11 +209,11 @@ public final class Family {
         int lim = Store.getInt("kids_min", 0);
         n.add("⏰  " + T.t("Daily screen time (kids)") + ": " + (lim <= 0 ? T.t("No limit") : lim + " min"));
         n.add("🔑  " + T.t("Change parents' PIN"));
-        new AlertDialog.Builder(a).setTitle("⚙ " + T.t("Manage profiles & kids lock"))
+        new UiDialog(a).setTitle("⚙ " + T.t("Manage profiles & kids lock"))
                 .setItems(n.toArray(new String[0]), (d, w) -> {
                     if (w < l.size()) {
                         final JSONObject p = l.get(w);
-                        new AlertDialog.Builder(a).setTitle(p.optString("name"))
+                        new UiDialog(a).setTitle(p.optString("name"))
                                 .setItems(new String[]{"✏ " + T.t("Edit profile"), "🗑 " + T.t("Delete")}, (d2, w2) -> {
                                     if (w2 == 0) edit(a, p, after);
                                     else if (!"0".equals(p.optString("id"))) {
@@ -223,7 +223,7 @@ public final class Family {
                                         save(keep);
                                         if (Store.profile().equals(p.optString("id"))) Store.putStr("profile", "0");
                                         if (after != null) after.run();
-                                    } else Toast.makeText(a, T.t("The first profile can't be deleted"), Toast.LENGTH_LONG).show();
+                                    } else UiKit.makeToast(a, T.t("The first profile can't be deleted"), Toast.LENGTH_LONG).show();
                                 }).show();
                     } else if (w == l.size()) pickSet(a, "locked_pl", Store.names(), Store.names());
                     else if (w == l.size() + 1) {
@@ -238,7 +238,7 @@ public final class Family {
                         final int[] v = {0, 30, 60, 90, 120, 180, 240};
                         String[] vn = new String[v.length];
                         for (int i = 0; i < v.length; i++) vn[i] = v[i] == 0 ? T.t("No limit") : v[i] + " " + T.t(" minutes").trim();
-                        new AlertDialog.Builder(a).setTitle("⏰ " + T.t("Daily screen time (kids)"))
+                        new UiDialog(a).setTitle("⏰ " + T.t("Daily screen time (kids)"))
                                 .setItems(vn, (d2, w2) -> Store.putInt("kids_min", v[w2])).show();
                     } else {
                         askPin(a, T.t("Enter the current PIN"), () -> {
@@ -253,7 +253,7 @@ public final class Family {
         final Set<String> cur = set(key);
         final boolean[] on = new boolean[values.size()];
         for (int i = 0; i < on.length; i++) on[i] = cur.contains(values.get(i));
-        new AlertDialog.Builder(a).setTitle(T.t("Locked for the kids profile"))
+        new UiDialog(a).setTitle(T.t("Locked for the kids profile"))
                 .setMultiChoiceItems(names.toArray(new String[0]), on, (d, w, c) -> on[w] = c)
                 .setPositiveButton(T.t("Save"), (d, w) -> {
                     JSONArray out = new JSONArray();
