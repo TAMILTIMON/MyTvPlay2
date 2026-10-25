@@ -583,6 +583,13 @@ public class NativeRemoteActivity extends AppCompatActivity {
         rc.addView(iconRow(new String[]{"volume-1", "volume-x", "volume-2", "circle-play", "keyboard"},
                 new Runnable[]{() -> key("vol_down"), () -> key("vol_mute"), () -> key("vol_up"),
                         () -> key("media_playpause"), this::typeDialog}, 44));
+        volKeysBtn = btn("", false, v -> {
+            Store.putInt("phone_vol", (Store.getInt("phone_vol", 0) + 1) % 3);
+            updateVolKeysBtn();
+        });
+        volKeysBtn.setTextSize(13);
+        full(rc, volKeysBtn);
+        updateVolKeysBtn();
         accessHint = Ui.text(this, 12, Ui.DIM, false);
         accessHint.setText(T.t("To control other apps, turn on TV Settings > Accessibility > TamilCastPlay"));
         accessHint.setVisibility(View.GONE);
@@ -671,6 +678,37 @@ public class NativeRemoteActivity extends AppCompatActivity {
         okt.setClickable(false);
         pad.addView(okt, new FrameLayout.LayoutParams(ok, ok, Gravity.CENTER));
         return pad;
+    }
+
+    private Button volKeysBtn;
+
+    private void updateVolKeysBtn() {
+        int m = Store.getInt("phone_vol", 0);
+        volKeysBtn.setText(T.t("Phone volume buttons") + ": " + T.t(m == 0 ? "TV volume" : m == 1 ? "Player volume" : "Off"));
+        volKeysBtn.setCompoundDrawablesWithIntrinsicBounds(new UiKit.Icon(this, m == 2 ? "volume-x" : "volume-2", 16, Ui.TEXT), null, null, null);
+    }
+
+    /** The phone's own volume buttons control the TV while the remote is open. */
+    @Override
+    public boolean dispatchKeyEvent(android.view.KeyEvent e) {
+        int code = e.getKeyCode(), m = Store.getInt("phone_vol", 0);
+        if (m != 2 && (code == android.view.KeyEvent.KEYCODE_VOLUME_UP || code == android.view.KeyEvent.KEYCODE_VOLUME_DOWN)) {
+            if (e.getAction() == android.view.KeyEvent.ACTION_DOWN) {
+                boolean up = code == android.view.KeyEvent.KEYCODE_VOLUME_UP;
+                if (m == 0) key(up ? "vol_up" : "vol_down");
+                else {
+                    int v = Math.max(0, Math.min(200, S.optInt("vol", 100) + (up ? 10 : -10)));
+                    try {
+                        S.put("vol", v);
+                    } catch (Exception ignored) {
+                    }
+                    volSlider.setValue(v);
+                    cmd("vol", String.valueOf(v));
+                }
+            }
+            return true;
+        }
+        return super.dispatchKeyEvent(e);
     }
 
     private void setPadMode(int m) {

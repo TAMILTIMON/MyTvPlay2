@@ -24,7 +24,9 @@ public class TvControlService extends Service {
     private static final String CH = "tvcontrol";
     private static final int ID = 7;
     static final String A_TOGGLE = "tcp.toggle", A_STOP = "tcp.stop", A_REW = "tcp.rew", A_FF = "tcp.ff",
-            A_NEXT = "tcp.next", A_CLOSE = "tcp.close";
+            A_NEXT = "tcp.next", A_CLOSE = "tcp.close", A_VOLUP = "tcp.volup", A_VOLDOWN = "tcp.voldown",
+            A_MUTE = "tcp.mute", A_POWER = "tcp.power";
+    private android.media.session.MediaSession session;
 
     private String ip = "", name = "TV", title = "", sub = "";
     private boolean playing, running;
@@ -32,7 +34,7 @@ public class TvControlService extends Service {
     private final ExecutorService io = Executors.newSingleThreadExecutor();
 
     public static void start(Context c, String ip, String name) {
-        if (Ui.isTv(c) || !Store.getBool("notif_remote", true)) return;
+        if (Ui.isTv(c)) return;
         try {
             Intent i = new Intent(c, TvControlService.class).putExtra("ip", ip).putExtra("name", name);
             if (Build.VERSION.SDK_INT >= 26) c.startForegroundService(i);
@@ -64,6 +66,10 @@ public class TvControlService extends Service {
                 case A_REW: c = "jump"; v = "-10000"; break;
                 case A_FF: c = "jump"; v = "10000"; break;
                 case A_NEXT: c = "next"; break;
+                case A_VOLUP: sendKey("vol_up"); break;
+                case A_VOLDOWN: sendKey("vol_down"); break;
+                case A_MUTE: sendKey("vol_mute"); break;
+                case A_POWER: sendKey("power"); break;
                 default: break;
             }
             if (c != null) send(c, v);
@@ -74,6 +80,68 @@ public class TvControlService extends Service {
             main.post(poll);
         }
         return START_STICKY;
+    }
+
+    /** TV keys (volume, power) for the widget and the phone's volume buttons. */
+    private void sendKey(final String k) {
+        final String target = ip;
+        io.execute(() -> {
+            try {
+                HashMap<String, String> p = new HashMap<>();
+                if ("power".equals(k)) {
+                    p.put("do", "power");
+                    TvClient.post(target, "/power", p);
+                } else {
+                    p.put("k", k);
+                    TvClient.post(target, "/key", p);
+                }
+            } catch (Exception ignored) {
+            }
+        });
+    }
+
+    /** Phone volume buttons control the TV even with the screen locked (like Chromecast). */
+    private void ensureSession() {
+        if (session != null || Build.VERSION.SDK_INT < 21) return;
+        try {
+            session = new android.media.session.MediaSession(this, "TamilCastPlayRemote");
+            session.setPlaybackToRemote(new android.media.VolumeProvider(android.media.VolumeProvider.VOLUME_CONTROL_RELATIVE, 100, 50) {
+                @Override
+                public void onAdjustVolume(int direction) {
+                    if (Store.getInt("phone_vol", 0) == 2) return;
+                    if (direction > 0) sendKey("vol_up");
+                    else if (direction < 0) sendKey("vol_down");
+                }
+            });
+            session.setCallback(new android.media.session.MediaSession.Callback() {
+                public void onPlay() { send("toggle", ""); }
+                public void onPause() { send("toggle", ""); }
+                public void onSkipToNext() { send("next", ""); }
+                public void onSkipToPrevious() { send("prev", ""); }
+                public void onFastForward() { send("jump", "10000"); }
+                public void onRewind() { send("jump", "-10000"); }
+                public void onStop() { send("stop", ""); }
+            });
+            session.setActive(true);
+        } catch (Throwable ignored) {
+            session = null;
+        }
+    }
+
+    private void updateSession() {
+        if (session == null) return;
+        try {
+            session.setPlaybackState(new android.media.session.PlaybackState.Builder()
+                    .setState(playing ? android.media.session.PlaybackState.STATE_PLAYING : android.media.session.PlaybackState.STATE_PAUSED, 0, 1)
+                    .setActions(android.media.session.PlaybackState.ACTION_PLAY | android.media.session.PlaybackState.ACTION_PAUSE
+                            | android.media.session.PlaybackState.ACTION_PLAY_PAUSE | android.media.session.PlaybackState.ACTION_SKIP_TO_NEXT
+                            | android.media.session.PlaybackState.ACTION_SKIP_TO_PREVIOUS | android.media.session.PlaybackState.ACTION_FAST_FORWARD
+                            | android.media.session.PlaybackState.ACTION_REWIND | android.media.session.PlaybackState.ACTION_STOP).build());
+            session.setMetadata(new android.media.MediaMetadata.Builder()
+                    .putString(android.media.MediaMetadata.METADATA_KEY_TITLE, title.isEmpty() ? "TamilCastPlay" : title)
+                    .putString(android.media.MediaMetadata.METADATA_KEY_ARTIST, sub).build());
+        } catch (Throwable ignored) {
+        }
     }
 
     private void send(final String c, final String v) {
@@ -124,6 +192,9 @@ public class TvControlService extends Service {
 
     @SuppressWarnings("deprecation")
     private void showNotification() {
+        ensureSession();
+        updateSession();
+        TvWidget.update(this, title.isEmpty() ? "📺 " + name : title, sub.isEmpty() ? name : sub, playing);
         NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         Notification.Builder b;
         if (Build.VERSION.SDK_INT >= 26) {
@@ -149,7 +220,8 @@ public class TvControlService extends Service {
                 .addAction(android.R.drawable.ic_media_ff, "+10s", pi(A_FF, 13))
                 .addAction(android.R.drawable.ic_media_next, "Next", pi(A_NEXT, 14))
                 .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Stop", pi(A_STOP, 15))
-                .setStyle(new Notification.MediaStyle().setShowActionsInCompactView(0, 1, 2))
+                .setStyle(session != null ? new Notification.MediaStyle().setShowActionsInCompactView(0, 1, 2)
+                        .setMediaSession(session.getSessionToken()) : new Notification.MediaStyle().setShowActionsInCompactView(0, 1, 2))
                 .setDeleteIntent(pi(A_CLOSE, 16));
         Notification n = b.build();
         try {
@@ -163,6 +235,10 @@ public class TvControlService extends Service {
     @Override
     public void onDestroy() {
         running = false;
+        if (session != null) try {
+            session.release();
+        } catch (Throwable ignored) {
+        }
         main.removeCallbacksAndMessages(null);
         io.shutdownNow();
         super.onDestroy();

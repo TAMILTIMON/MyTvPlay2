@@ -154,6 +154,7 @@ public class PlayerActivity extends AppCompatActivity {
             return;
         }
         Remote.player = this;
+        startSession();
         handleIntent(getIntent());
     }
 
@@ -256,6 +257,10 @@ public class PlayerActivity extends AppCompatActivity {
             }
         });
         previewEx.shutdown();
+        if (msess != null) try {
+            msess.release();
+        } catch (Throwable ignored) {
+        }
         handler.removeCallbacksAndMessages(null);
         if (Remote.player == this) Remote.player = null;
         resolveToken++;
@@ -821,6 +826,58 @@ public class PlayerActivity extends AppCompatActivity {
         infoView.setText(sb.toString());
     }
 
+    // ---- media session: Google Assistant ("pause", "next", "rewind 30 seconds") and remote media keys
+    private android.media.session.MediaSession msess;
+    private String sessTitle = "";
+    private long sessLen = -1;
+
+    private void startSession() {
+        try {
+            msess = new android.media.session.MediaSession(this, "TamilCastPlayPlayer");
+            msess.setCallback(new android.media.session.MediaSession.Callback() {
+                public void onPlay() { if (mp != null) mp.play(); }
+                public void onPause() { if (mp != null) mp.pause(); }
+                public void onSkipToNext() { next(); }
+                public void onSkipToPrevious() { prev(); }
+                public void onStop() { finish(); }
+                public void onSeekTo(long p) { seekTo(p); }
+                public void onFastForward() { seekBy(30000); }
+                public void onRewind() { seekBy(-30000); }
+            });
+            msess.setActive(true);
+        } catch (Throwable ignored) {
+            msess = null;
+        }
+    }
+
+    private void updateSession() {
+        if (msess == null || mp == null) return;
+        try {
+            int st = mp.isPlaying() ? android.media.session.PlaybackState.STATE_PLAYING
+                    : loadingView.getVisibility() == View.VISIBLE ? android.media.session.PlaybackState.STATE_BUFFERING
+                    : android.media.session.PlaybackState.STATE_PAUSED;
+            msess.setPlaybackState(new android.media.session.PlaybackState.Builder()
+                    .setState(st, Math.max(0, mp.getTime()), rate)
+                    .setActions(android.media.session.PlaybackState.ACTION_PLAY | android.media.session.PlaybackState.ACTION_PAUSE
+                            | android.media.session.PlaybackState.ACTION_PLAY_PAUSE | android.media.session.PlaybackState.ACTION_SEEK_TO
+                            | android.media.session.PlaybackState.ACTION_SKIP_TO_NEXT | android.media.session.PlaybackState.ACTION_SKIP_TO_PREVIOUS
+                            | android.media.session.PlaybackState.ACTION_FAST_FORWARD | android.media.session.PlaybackState.ACTION_REWIND
+                            | android.media.session.PlaybackState.ACTION_STOP).build());
+            Store.Item it = current();
+            String t = it == null ? "" : it.t;
+            long len = Math.max(0, mp.getLength());
+            if (!t.equals(sessTitle) || len != sessLen) {
+                sessTitle = t;
+                sessLen = len;
+                msess.setMetadata(new android.media.MediaMetadata.Builder()
+                        .putString(android.media.MediaMetadata.METADATA_KEY_TITLE, t)
+                        .putString(android.media.MediaMetadata.METADATA_KEY_ARTIST, "TamilCastPlay")
+                        .putLong(android.media.MediaMetadata.METADATA_KEY_DURATION, len).build());
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
     private int tickN = 0;
 
     // ---- "Skip intro" and "Next episode in …" (Netflix style)
@@ -857,6 +914,7 @@ public class PlayerActivity extends AppCompatActivity {
     private void onTick() {
         tickN++;
         updateChip();
+        if (tickN % 2 == 0) updateSession();
         if (overlayVisible && tickN % 2 == 0) updateOverlay();
         if (loadingView.getVisibility() == View.VISIBLE && torrentUsed && mp != null && !mp.isPlaying()) {
             String ts = TorrentEngine.get(this).shortStatus();

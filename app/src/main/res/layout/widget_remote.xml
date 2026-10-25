@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:background="@drawable/widget_bg" android:orientation="vertical" android:padding="12dp">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:gravity="center_vertical" android:orientation="horizontal">
+        <ImageView android:layout_width="20dp" android:layout_height="20dp" android:src="@drawable/lc_tv" android:contentDescription="TV" />
+        <TextView android:id="@+id/w_title" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:layout_marginStart="8dp" android:ellipsize="end" android:singleLine="true"
+            android:text="TamilCastPlay" android:textColor="#FFFFFFFF" android:textSize="14sp" android:textStyle="bold" />
+    </LinearLayout>
+    <TextView android:id="@+id/w_sub" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginStart="28dp" android:ellipsize="end" android:singleLine="true"
+        android:text="Tap ▶ to connect" android:textColor="#B3FFFFFF" android:textSize="11sp" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"
+        android:gravity="center" android:orientation="horizontal">
+        <ImageButton android:id="@+id/w_rew" android:layout_width="40dp" android:layout_height="40dp"
+            android:layout_marginStart="4dp" android:layout_marginEnd="4dp" android:background="@drawable/widget_btn"
+            android:src="@drawable/lc_rotate_ccw" android:scaleType="center" android:contentDescription="w_rew" />
+        <ImageButton android:id="@+id/w_play" android:layout_width="52dp" android:layout_height="52dp"
+            android:layout_marginStart="4dp" android:layout_marginEnd="4dp" android:background="@drawable/widget_btn_main"
+            android:src="@drawable/lc_play" android:scaleType="center" android:contentDescription="w_play" />
+        <ImageButton android:id="@+id/w_ff" android:layout_width="40dp" android:layout_height="40dp"
+            android:layout_marginStart="4dp" android:layout_marginEnd="4dp" android:background="@drawable/widget_btn"
+            android:src="@drawable/lc_rotate_cw" android:scaleType="center" android:contentDescription="w_ff" />
+        <ImageButton android:id="@+id/w_vdown" android:layout_width="40dp" android:layout_height="40dp"
+            android:layout_marginStart="4dp" android:layout_marginEnd="4dp" android:background="@drawable/widget_btn"
+            android:src="@drawable/lc_volume_1" android:scaleType="center" android:contentDescription="w_vdown" />
+        <ImageButton android:id="@+id/w_mute" android:layout_width="40dp" android:layout_height="40dp"
+            android:layout_marginStart="4dp" android:layout_marginEnd="4dp" android:background="@drawable/widget_btn"
+            android:src="@drawable/lc_volume_x" android:scaleType="center" android:contentDescription="w_mute" />
+        <ImageButton android:id="@+id/w_vup" android:layout_width="40dp" android:layout_height="40dp"
+            android:layout_marginStart="4dp" android:layout_marginEnd="4dp" android:background="@drawable/widget_btn"
+            android:src="@drawable/lc_volume_2" android:scaleType="center" android:contentDescription="w_vup" />
+        <ImageButton android:id="@+id/w_power" android:layout_width="40dp" android:layout_height="40dp"
+            android:layout_marginStart="4dp" android:layout_marginEnd="4dp" android:background="@drawable/widget_btn"
+            android:src="@drawable/lc_power" android:scaleType="center" android:contentDescription="w_power" />
+    </LinearLayout>
+</LinearLayout>

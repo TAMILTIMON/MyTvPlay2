@@ -1,3 +1,19 @@
+TAMILCASTPLAY 2.5 — phone volume buttons, widget, Google Assistant
+==================================================================
+* Phone volume buttons control the TV while the remote is open. Choose under the
+  remote: "Phone volume buttons: TV volume / Player volume / Off".
+  With the TV notification active they also work on the lock screen / in other apps
+  (Android "remote volume", like Chromecast; a few phones limit this).
+* Home-screen widget (long-press the phone home screen > Widgets > TamilCastPlay):
+  title, ±10 s, play/pause, TV volume − / mute / +, power. Tap the title to open the remote.
+* Google Assistant (no Google sign-in needed; only the spoken words reach the app):
+  "Hey Google, play Sun TV on TamilCastPlay" -> finds the channel / video in your
+  playlists (favourites first) and plays it with its playlist.
+  "Hey Google, play TamilCastPlay" -> continues the last video.
+  While TamilCastPlay plays on the TV: "Hey Google, pause / resume / next / previous /
+  rewind 30 seconds / stop" (the player now reports to Android as a media player,
+  which also makes remote media keys work better).
+
 TAMILCASTPLAY 2.4 — new design
 ==============================
 Phone app + browser page, same layout:

@@ -35,6 +35,12 @@ public final class T {
     }
 
     static {
+        TA.put("Phone volume buttons", "போன் ஒலி பொத்தான்கள்");
+        HI.put("Phone volume buttons", "फ़ोन वॉल्यूम बटन");
+        TA.put("TV volume", "டிவி ஒலி");
+        HI.put("TV volume", "टीवी आवाज़");
+        TA.put("Player volume", "பிளேயர் ஒலி");
+        HI.put("Player volume", "प्लेयर आवाज़");
         TA.put("Board", "பலகை");
         HI.put("Board", "बोर्ड");
         TA.put("Channels & queue", "சேனல்கள் & வரிசை");

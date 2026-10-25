@@ -229,6 +229,32 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+        <!-- home-screen widget (phone) -->
+        <receiver
+            android:name=".TvWidget"
+            android:exported="true"
+            android:label="TamilCastPlay remote">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info" />
+        </receiver>
+
+        <!-- "Hey Google, play … on TamilCastPlay" -->
+        <activity
+            android:name=".VoiceSearchActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.media.action.MEDIA_PLAY_FROM_SEARCH" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
         <receiver
             android:name=".BootReceiver"
             android:exported="true">
