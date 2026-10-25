@@ -1,3 +1,26 @@
+TAMILCASTPLAY 2.4 — new design
+==============================
+Phone app + browser page, same layout:
+* Opening animation.
+* Mini player at the top: title + play/pause; the arrow opens / closes the timeline
+  and controls (prev, -10 s, +10 s, next, stop, bookmarks, screenshot, audio only,
+  repeat, shuffle).
+* Remote card: D-pad or Touchpad (swipe = arrows, tap = OK, hold = back, like
+  Google TV). Volume (left) and brightness (right) are vertical swipe sliders that
+  go green → yellow → red. Keys: back, home, recent apps, player menu, POWER,
+  TV volume, play/pause for any app, keyboard.
+* Board: tiles that open their own panel (slides up, close with ✕ or Back):
+  Live TV screen, Channels & queue, Apps, Cast, Audio & subtitles, Picture & sound,
+  Playlists, My TV, Share this phone, Power, Colours, Switch TV.
+* Live TV screen: see the TV on the phone (~1 picture / s) with a touchpad under it
+  (needs the 🔌 Full remote ADB; protected apps like Netflix show black).
+* Power: sleep / screen off, wake, power key, restart the TV, restart the app.
+* Professional Lucide icons everywhere (ISC licence, see assets/LICENSE-lucide.txt).
+Network folders (TV)
+* Add a server with type + port: SMB, FTP, FTPS, SFTP, NFS, HTTP/WebDAV.
+* Phones with "Share this phone" on appear automatically: the TV browses the phone's
+  videos / music and plays them directly (read-only, turn off any time).
+
 TAMILCASTPLAY 2.3.2 — other apps' videos on low-RAM TVs
 =======================================================
 Low-memory TVs (adb shell getprop ro.config.low_ram = true) block notification access

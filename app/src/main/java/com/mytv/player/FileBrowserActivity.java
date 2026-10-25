@@ -57,6 +57,7 @@ public class FileBrowserActivity extends AppCompatActivity {
             @Override
             public View getView(int position, View convertView, ViewGroup parent) {
                 TextView t = (TextView) super.getView(position, convertView, parent);
+                UiKit.iconize(t, Ui.ACCENT);
                 t.setTextSize(20);
                 t.setTextColor(Ui.TEXT);
                 t.setPadding(dp(18), dp(14), dp(18), dp(14));

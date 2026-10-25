@@ -70,6 +70,7 @@ public class NetworkActivity extends AppCompatActivity {
             @Override
             public View getView(int p, View cv, ViewGroup parent) {
                 TextView t = (TextView) super.getView(p, cv, parent);
+                UiKit.iconize(t, Ui.ACCENT);
                 t.setTextColor(Ui.TEXT);
                 t.setTextSize(18);
                 t.setPadding(Ui.dp(NetworkActivity.this, 16), Ui.dp(NetworkActivity.this, 12), Ui.dp(NetworkActivity.this, 16),
@@ -136,9 +137,79 @@ public class NetworkActivity extends AppCompatActivity {
         stack.clear();
         pending.clear();
         header.setText("🖧 " + T.t("Network folders"));
-        info.setText(T.t("PCs and NAS on this Wi-Fi (Windows file sharing / SMB, DLNA). Long-press a saved server to edit or remove it."));
+        info.setText(T.t("PCs, NAS and phones on this Wi-Fi — SMB, FTP, FTPS, SFTP, NFS, WebDAV, DLNA. Long-press a saved server to edit or remove it."));
         browser.discoverNetworkShares();
+        phones.clear();
+        Discovery.scan(new Discovery.Listener() {
+            public void onFound(Discovery.Device d) {
+                new Thread(() -> {
+                    try {
+                        org.json.JSONObject o = new org.json.JSONObject(new String(Net.fetch("http://" + d.ip + ":"
+                                + RemoteService.PORT + "/ping", 4096).data, "UTF-8"));
+                        if (!o.optBoolean("share")) return;
+                        main.post(() -> {
+                            Entry e = new Entry();
+                            e.title = "📱  " + d.name + "   ·   " + T.t("phone / device storage");
+                            e.uri = "phone://" + d.ip + "/";
+                            e.dir = true;
+                            phones.add(e);
+                            if (cur == null) render(true);
+                        });
+                    } catch (Exception ignored) {
+                    }
+                }).start();
+            }
+
+            public void onDone() {
+            }
+        });
         render(true);
+    }
+
+    private final List<Entry> phones = new ArrayList<>();
+
+    /** Lists a folder of a phone that shares its storage (TamilCastPlay on the phone). */
+    private void browsePhone(final String uri) {
+        cur = uri;
+        pending.clear();
+        final Uri u = Uri.parse(uri);
+        final String ip = u.getHost();
+        final String path = u.getQueryParameter("p") == null ? "" : u.getQueryParameter("p");
+        header.setText("📱 " + (path.isEmpty() ? ip : new java.io.File(path).getName()));
+        info.setText("…");
+        render(true);
+        new Thread(() -> {
+            try {
+                org.json.JSONObject o = new org.json.JSONObject(new String(Net.fetch("http://" + ip + ":" + RemoteService.PORT
+                        + "/fs/list?p=" + Uri.encode(path), 2_000_000).data, "UTF-8"));
+                final List<Entry> l = new ArrayList<>();
+                org.json.JSONArray ds = o.optJSONArray("dirs"), fs = o.optJSONArray("files");
+                if (ds != null) for (int i = 0; i < ds.length(); i++) {
+                    Entry e = new Entry();
+                    e.title = ds.getJSONObject(i).optString("n");
+                    e.uri = "phone://" + ip + "/?p=" + Uri.encode(ds.getJSONObject(i).optString("p"));
+                    e.dir = true;
+                    l.add(e);
+                }
+                if (fs != null) for (int i = 0; i < fs.length(); i++) {
+                    String n = fs.getJSONObject(i).optString("n");
+                    if (Formats.isSub(n)) continue;
+                    Entry e = new Entry();
+                    e.title = n;
+                    e.uri = "http://" + ip + ":" + RemoteService.PORT + "/fs/file/" + Uri.encode(n) + "?p="
+                            + Uri.encode(fs.getJSONObject(i).optString("p"));
+                    l.add(e);
+                }
+                main.post(() -> {
+                    if (!uri.equals(cur)) return;
+                    pending.clear();
+                    pending.addAll(l);
+                    render(false);
+                });
+            } catch (final Exception e) {
+                main.post(() -> info.setText("⚠ " + e.getMessage()));
+            }
+        }).start();
     }
 
     private Entry action(String title, Runnable r) {
@@ -163,6 +234,7 @@ public class NetworkActivity extends AppCompatActivity {
                 e.dir = true;
                 entries.add(e);
             }
+            entries.addAll(phones);
             for (Entry e : pending) {
                 if (!e.dir) continue;
                 Entry c = new Entry();
@@ -210,7 +282,8 @@ public class NetworkActivity extends AppCompatActivity {
         }
         if (e.dir) {
             if (cur != null) stack.add(cur);
-            browse(withLogin(e.uri));
+            if (e.uri.startsWith("phone://")) browsePhone(e.uri);
+            else browse(withLogin(e.uri));
             return;
         }
         // play this file and the rest of the folder after it
@@ -227,7 +300,11 @@ public class NetworkActivity extends AppCompatActivity {
 
     private void up() {
         if (stack.isEmpty()) start();
-        else browse(stack.remove(stack.size() - 1));
+        else {
+            String u = stack.remove(stack.size() - 1);
+            if (u.startsWith("phone://")) browsePhone(u);
+            else browse(u);
+        }
     }
 
     /** Found shares get the saved login of the same host. */
@@ -244,19 +321,40 @@ public class NetworkActivity extends AppCompatActivity {
         return uri;
     }
 
+    private static final String[] PROTO = {"smb", "ftp", "ftps", "sftp", "nfs", "http", "https"};
+    private static final String[] PROTO_NAME = {"SMB (Windows sharing / NAS)", "FTP", "FTPS (secure FTP)", "SFTP (SSH)",
+            "NFS", "HTTP / WebDAV", "HTTPS / WebDAV"};
+    private static final int[] PORT = {445, 21, 990, 22, 2049, 80, 443};
+
     private void editServer(final Entry existing) {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
         box.setPadding(Ui.dp(this, 20), 0, Ui.dp(this, 20), 0);
-        final EditText addr = new EditText(this), user = new EditText(this), pass = new EditText(this), name = new EditText(this);
-        addr.setHint("192.168.1.10/Movies   or   \\\\PC\\Movies");
+        final int[] proto = {0};
+        final android.widget.Button protoBtn = Ui.button(this, PROTO_NAME[0], true);
+        final EditText host = new EditText(this), port = new EditText(this), path = new EditText(this),
+                user = new EditText(this), pass = new EditText(this), name = new EditText(this);
+        host.setHint(T.t("Address — e.g. 192.168.1.10 or nas.local"));
+        port.setHint(T.t("Port (empty = default)"));
+        port.setInputType(InputType.TYPE_CLASS_NUMBER);
+        path.setHint(T.t("Folder — e.g. Movies (optional)"));
         user.setHint(T.t("Username (optional)"));
         pass.setHint(T.t("Password (optional)"));
         pass.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
         name.setHint(T.t("Name (e.g. Living-room PC)"));
+        protoBtn.setOnClickListener(v -> new AlertDialog.Builder(this).setTitle(T.t("Type"))
+                .setItems(PROTO_NAME, (d, w) -> {
+                    proto[0] = w;
+                    protoBtn.setText(PROTO_NAME[w]);
+                    port.setHint(T.t("Port (empty = default)") + " · " + PORT[w]);
+                }).show());
         if (existing != null) {
             Uri u = Uri.parse(existing.uri);
-            addr.setText((u.getHost() == null ? "" : u.getHost()) + (u.getPath() == null ? "" : u.getPath()));
+            for (int i = 0; i < PROTO.length; i++) if (PROTO[i].equals(u.getScheme())) proto[0] = i;
+            protoBtn.setText(PROTO_NAME[proto[0]]);
+            host.setText(u.getHost());
+            if (u.getPort() > 0) port.setText(String.valueOf(u.getPort()));
+            path.setText(u.getPath() == null ? "" : u.getPath().replaceAll("^/|/$", ""));
             String ui = u.getUserInfo();
             if (ui != null) {
                 String[] up = ui.split(":", 2);
@@ -265,26 +363,37 @@ public class NetworkActivity extends AppCompatActivity {
             }
             name.setText(existing.title.replace("💾  ", ""));
         }
-        box.addView(addr);
+        box.addView(protoBtn);
+        box.addView(host);
+        box.addView(port);
+        box.addView(path);
         box.addView(user);
         box.addView(pass);
         box.addView(name);
-        AlertDialog.Builder bd = new AlertDialog.Builder(this).setTitle("🖧 " + T.t("Network server")).setView(box)
+        android.widget.ScrollView sv = new android.widget.ScrollView(this);
+        sv.addView(box);
+        AlertDialog.Builder bd = new AlertDialog.Builder(this).setTitle("🖧 " + T.t("Network server")).setView(sv)
                 .setPositiveButton(T.t("Save"), (d, w) -> {
-                    String a = addr.getText().toString().trim().replace("\\", "/").replaceAll("^(smb:)?/+", "");
-                    if (a.isEmpty()) return;
+                    String h = host.getText().toString().trim().replace("\\", "/").replaceAll("^[a-z]+:/+", "").replaceAll("^/+", "");
+                    if (h.isEmpty()) return;
+                    String folder = path.getText().toString().trim().replace("\\", "/").replaceAll("^/+|/+$", "");
+                    if (h.contains("/")) {          // "PC/Movies" typed in the address field
+                        folder = h.substring(h.indexOf('/') + 1) + (folder.isEmpty() ? "" : "/" + folder);
+                        h = h.substring(0, h.indexOf('/'));
+                    }
                     String login = user.getText().toString().trim().isEmpty() ? ""
                             : Uri.encode(user.getText().toString().trim()) + (pass.getText().toString().isEmpty() ? ""
                             : ":" + Uri.encode(pass.getText().toString())) + "@";
-                    String url = "smb://" + login + a + (a.endsWith("/") ? "" : "/");
-                    JSONArray s = servers(), out = new JSONArray();
-                    for (int i = 0; i < s.length(); i++) {
-                        if (existing != null && s.optJSONObject(i).optString("url").equals(existing.uri)) continue;
-                        out.put(s.optJSONObject(i));
+                    String pt = port.getText().toString().trim();
+                    String url = PROTO[proto[0]] + "://" + login + h + (pt.isEmpty() ? "" : ":" + pt) + "/" + (folder.isEmpty() ? "" : folder + "/");
+                    JSONArray srv = servers(), out = new JSONArray();
+                    for (int i = 0; i < srv.length(); i++) {
+                        if (existing != null && srv.optJSONObject(i).optString("url").equals(existing.uri)) continue;
+                        out.put(srv.optJSONObject(i));
                     }
                     try {
-                        out.put(new JSONObject().put("name", name.getText().toString().trim().isEmpty() ? a : name.getText().toString().trim())
-                                .put("url", url));
+                        out.put(new JSONObject().put("name", name.getText().toString().trim().isEmpty() ? h + (folder.isEmpty() ? "" : "/" + folder)
+                                : name.getText().toString().trim()).put("url", url));
                     } catch (Exception ignored) {
                     }
                     Store.putStr("smb_servers", out.toString());
@@ -292,8 +401,8 @@ public class NetworkActivity extends AppCompatActivity {
                 })
                 .setNegativeButton(T.t("Cancel"), null);
         if (existing != null && existing.title.startsWith("💾")) bd.setNeutralButton(T.t("Remove"), (d, w) -> {
-            JSONArray s = servers(), out = new JSONArray();
-            for (int i = 0; i < s.length(); i++) if (!s.optJSONObject(i).optString("url").equals(existing.uri)) out.put(s.optJSONObject(i));
+            JSONArray srv = servers(), out = new JSONArray();
+            for (int i = 0; i < srv.length(); i++) if (!srv.optJSONObject(i).optString("url").equals(existing.uri)) out.put(srv.optJSONObject(i));
             Store.putStr("smb_servers", out.toString());
             render(false);
         });

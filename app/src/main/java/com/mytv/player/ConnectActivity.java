@@ -127,6 +127,7 @@ public class ConnectActivity extends AppCompatActivity {
                 + T.t("(it runs in the background after the first start)."));
         root.addView(tip);
         setContentView(sv);
+        UiKit.splash(this);
         RemoteService.start(this);
     }
 

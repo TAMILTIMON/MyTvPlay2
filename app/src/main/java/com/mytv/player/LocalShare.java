@@ -61,6 +61,10 @@ public final class LocalShare {
         }
     }
 
+    public static synchronized void keepAwakePublic(Context c) {
+        if (wake == null || !wake.isHeld()) keepAwake(c);
+    }
+
     public static synchronized void releaseLocks() {
         try {
             if (wake != null && wake.isHeld()) wake.release();

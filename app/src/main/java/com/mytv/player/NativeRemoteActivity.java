@@ -76,7 +76,8 @@ public class NativeRemoteActivity extends AppCompatActivity {
     private long brTouch;
     private TextView npTitle, npSub, tLeft, tRight, volLabel, torLine, adLabel, sdLabel, zoomLabel, devLine;
     private SeekBar seek, vol, zoom;
-    private Button playBtn, repBtn, shufBtn, audioBtn, subBtn, fitBtn, aspBtn, sizeBtn, encBtn, presetBtn,
+    private ImageView playBtn;
+    private Button repBtn, shufBtn, audioBtn, subBtn, fitBtn, aspBtn, sizeBtn, encBtn, presetBtn,
             rateBtn, sleepBtn, hwBtn, cacheBtn;
     private CheckBox subBg, eqOn;
     private EqView eq;
@@ -102,7 +103,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
         LinearLayout top = new LinearLayout(this);
         top.setGravity(Gravity.CENTER_VERTICAL);
         top.setPadding(dp(10), dp(10), dp(10), dp(8));
-        top.addView(icon("🏠", v -> Ui.goHome(this, false)));
+        top.addView(UiKit.roundButton(this, "house", 42, false, v -> Ui.goHome(this, false)));
         LinearLayout tt = new LinearLayout(this);
         tt.setOrientation(LinearLayout.VERTICAL);
         tt.setPadding(dp(10), 0, dp(6), 0);
@@ -116,56 +117,36 @@ public class NativeRemoteActivity extends AppCompatActivity {
         tt.addView(h);
         tt.addView(devLine);
         top.addView(tt, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
-        top.addView(icon("📺", v -> {
+        top.addView(UiKit.roundButton(this, "tv", 42, false, v -> {
             startActivity(new Intent(this, ConnectActivity.class).putExtra("no_auto", true)
                     .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP));
             finish();
         }));
-        top.addView(icon(Ui.dark() ? "☀" : "🌙", v -> {
+        top.addView(UiKit.roundButton(this, Ui.dark() ? "sun" : "moon", 42, false, v -> {
             Store.putStr("theme", Ui.dark() ? "light" : "dark");
             recreate();
         }));
         root.addView(top);
 
-        // ---- pages
-        content = new FrameLayout(this);
-        root.addView(content, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
-        pages[0] = scroll(buildRemote());
+        top.setBackground(Ui.card(this, Ui.BAR, 0, 0));
+        FrameLayout stage = new FrameLayout(this);
+        root.addView(stage, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
+        stage.addView(scroll(buildMain()), new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+        // panels that open from the board
+        pages[0] = scroll(buildQueuePage());
         pages[1] = scroll(buildTracks());
         pages[2] = scroll(buildPicture());
         pages[3] = scroll(buildCast());
         pages[4] = scroll(buildLibrary());
-        for (View p : pages) {
-            p.setVisibility(View.GONE);
-            content.addView(p, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        }
-
-        // ---- bottom tabs (always on one line, never cover content)
-        LinearLayout nav = new LinearLayout(this);
-        nav.setPadding(dp(6), dp(6), dp(6), dp(6));
-        nav.setBackground(Ui.card(this, Ui.BAR, Ui.STROKE, 0));
-        top.setBackground(Ui.card(this, Ui.BAR, 0, 0));
-        String[] ic = {"🎮", "💬", "🎚", "📡", "📚"};
-        String[] lb = {T.t("Remote"), T.t("Subtitles"), T.t("Equalizer"), "Cast", T.t("Playlist")};
-        for (int i = 0; i < 5; i++) {
-            final int k = i;
-            Button nb = new Button(this);
-            nb.setAllCaps(false);
-            nb.setText(ic[i] + "\n" + lb[i]);
-            nb.setTextSize(11);
-            nb.setSingleLine(false);
-            nb.setMaxLines(2);
-            nb.setEllipsize(TextUtils.TruncateAt.END);
-            nb.setPadding(0, dp(4), 0, dp(4));
-            nb.setMinHeight(0);
-            nb.setMinimumHeight(0);
-            nb.setOnClickListener(v -> showTab(k));
-            navBtns[i] = nb;
-            nav.addView(nb, new LinearLayout.LayoutParams(0, dp(56), 1));
-        }
-        root.addView(nav);
+        appsPage = scroll(buildAppsPage());
+        screenPage = buildScreenPage();
+        buildSheet(stage);
         setContentView(root);
-        showTab(0);
+        UiKit.splash(this);
+        loadApps();
+        loadHistory();
+        poll();
         RemoteService.start(this);
         TvControlService.start(this, ip, tvName);
     }
@@ -198,20 +179,14 @@ public class NativeRemoteActivity extends AppCompatActivity {
     }
 
     private void showTab(int k) {
-        curTab = k;
-        for (int i = 0; i < 5; i++) {
-            pages[i].setVisibility(i == k ? View.VISIBLE : View.GONE);
-            boolean on = i == k;
-            navBtns[i].setBackground(on ? Ui.gradient(this, 18) : new GradientDrawable());
-            navBtns[i].setTextColor(on ? Color.WHITE : Ui.DIM);
-        }
-        hideKeyboard();
         if (k == 0) {
-            loadApps();
-            loadHistory();
+            closeSheet();
+            return;
         }
+        String[] titles = {"", T.t("Audio & subtitles"), T.t("Picture & sound"), T.t("Cast"), T.t("Playlists")};
+        String[] icons = {"", "captions", "sliders-horizontal", "cast", "list-video"};
+        openSheet(pages[k], titles[k], icons[k]);
         if (k == 4) loadLists();
-        poll();
     }
 
     private void hideKeyboard() {
@@ -237,9 +212,9 @@ public class NativeRemoteActivity extends AppCompatActivity {
         c.setOrientation(LinearLayout.VERTICAL);
         c.setPadding(dp(14), dp(12), dp(14), dp(14));
         c.setBackground(Ui.card(this, Ui.SOLID, Ui.STROKE, 18));
-        if (title != null) {
+        if (title != null && !UiKit.noEmoji(title).isEmpty()) {
             TextView t = Ui.text(this, 11, Ui.DIM, true);
-            t.setText(title.toUpperCase(Locale.ROOT));
+            t.setText(UiKit.noEmoji(title).toUpperCase(Locale.ROOT));
             t.setLetterSpacing(0.12f);
             t.setPadding(0, 0, 0, dp(8));
             c.addView(t);
@@ -252,7 +227,8 @@ public class NativeRemoteActivity extends AppCompatActivity {
     }
 
     private Button btn(String label, boolean primary, View.OnClickListener l) {
-        Button b = Ui.button(this, label, primary);
+        String clean = UiKit.noEmoji(label);
+        Button b = Ui.button(this, clean.isEmpty() ? label : clean, primary);
         b.setTextSize(14);
         b.setPadding(dp(8), dp(6), dp(8), dp(6));
         b.setSingleLine(true);
@@ -430,7 +406,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
 
     @Override
     public void onBackPressed() {
-        if (curTab != 0) showTab(0);
+        if (sheetOpen) closeSheet();
         else super.onBackPressed();
     }
 
@@ -466,20 +442,55 @@ public class NativeRemoteActivity extends AppCompatActivity {
     // =====================================================================
     // TAB 1: remote
     // =====================================================================
-    private View buildRemote() {
+    // =====================================================================
+    // MAIN SCREEN: mini player · remote · board
+    // =====================================================================
+    private LinearLayout expandBox;
+    private ImageView expandBtn, artIcon;
+    private UiKit.PillSlider volSlider, brSlider;
+    private FrameLayout padBox;
+    private View dpadView, touchView;
+    private Button padD, padT;
+    private TextView queueSub, shareSub;
+
+    private View buildMain() {
         LinearLayout p = page();
-        LinearLayout np = card(p, T.t("Now playing"));
-        npTitle = Ui.text(this, 17, Ui.TEXT, true);
+
+        // ---- mini player (tap the arrow to open / close the timeline)
+        LinearLayout np = card(p, null);
+        LinearLayout head = new LinearLayout(this);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        FrameLayout art = new FrameLayout(this);
+        art.setBackground(Ui.gradient(this, 16));
+        artIcon = UiKit.icon(this, "clapperboard", 24, Color.WHITE);
+        art.addView(artIcon, new FrameLayout.LayoutParams(dp(52), dp(52), Gravity.CENTER));
+        head.addView(art, new LinearLayout.LayoutParams(dp(52), dp(52)));
+        LinearLayout tcol = new LinearLayout(this);
+        tcol.setOrientation(LinearLayout.VERTICAL);
+        tcol.setPadding(dp(12), 0, dp(8), 0);
+        npTitle = Ui.text(this, 16, Ui.TEXT, true);
         npTitle.setSingleLine(true);
         npTitle.setEllipsize(TextUtils.TruncateAt.END);
-        np.addView(npTitle);
-        npSub = Ui.text(this, 13, Ui.DIM, false);
+        npSub = Ui.text(this, 12, Ui.DIM, false);
         npSub.setSingleLine(true);
         npSub.setEllipsize(TextUtils.TruncateAt.END);
-        np.addView(npSub);
-        seek = bar(np, 1000);
+        tcol.addView(npTitle);
+        tcol.addView(npSub);
+        head.addView(tcol, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        playBtn = UiKit.roundButton(this, "play", 52, true, v -> cmd("toggle", ""));
+        head.addView(playBtn);
+        expandBtn = UiKit.roundButton(this, "chevron-down", 40, false, v -> toggleExpand());
+        ((LinearLayout.LayoutParams) expandBtn.getLayoutParams()).setMargins(dp(8), 0, 0, 0);
+        head.addView(expandBtn);
+        np.addView(head);
+        head.setOnClickListener(v -> toggleExpand());
+
+        expandBox = new LinearLayout(this);
+        expandBox.setOrientation(LinearLayout.VERTICAL);
+        expandBox.setPadding(0, dp(8), 0, 0);
+        seek = bar(expandBox, 1000);
         seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            public void onProgressChanged(SeekBar s, int v, boolean user) {
+            public void onProgressChanged(SeekBar sb, int v, boolean user) {
                 if (user) {
                     seekTouch = System.currentTimeMillis();
                     long len = S.optLong("len");
@@ -487,190 +498,351 @@ public class NativeRemoteActivity extends AppCompatActivity {
                 }
             }
 
-            public void onStartTrackingTouch(SeekBar s) {
+            public void onStartTrackingTouch(SeekBar sb) {
                 seekTouch = System.currentTimeMillis();
             }
 
-            public void onStopTrackingTouch(SeekBar s) {
+            public void onStopTrackingTouch(SeekBar sb) {
                 seekTouch = System.currentTimeMillis();
                 long len = S.optLong("len");
-                if (len > 0) cmd("seek", String.valueOf(len * s.getProgress() / 1000));
+                if (len > 0) cmd("seek", String.valueOf(len * sb.getProgress() / 1000));
             }
         });
         LinearLayout times = new LinearLayout(this);
-        tLeft = Ui.text(this, 13, Ui.DIM, false);
-        tRight = Ui.text(this, 13, Ui.DIM, false);
+        tLeft = Ui.text(this, 12, Ui.DIM, false);
+        tRight = Ui.text(this, 12, Ui.DIM, false);
         times.addView(tLeft, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
         times.addView(tRight);
-        np.addView(times);
-
-        LinearLayout ctl = new LinearLayout(this);
-        ctl.setGravity(Gravity.CENTER);
-        ctl.setPadding(0, dp(8), 0, dp(4));
-        String[] lab = {"⏮", "↺", "▶", "↻", "⏭"};
-        for (int i = 0; i < 5; i++) {
-            final int k = i;
-            int size = i == 2 ? 62 : 46;
-            Button b = Ui.iconButton(this, lab[i], size, i == 2);
-            if (i != 2) {
-                b.setTextColor(Ui.TEXT);
-                GradientDrawable g = new GradientDrawable();
-                g.setShape(GradientDrawable.OVAL);
-                g.setColor(Ui.CARD);
-                g.setStroke(dp(1), Ui.STROKE);
-                b.setBackground(g);
-            }
-            b.setOnClickListener(v -> {
-                if (k == 0) cmd("prev", "");
-                else if (k == 1) cmd("jump", "-10000");
-                else if (k == 2) cmd("toggle", "");
-                else if (k == 3) cmd("jump", "10000");
-                else cmd("next", "");
-            });
-            if (i == 2) playBtn = b;
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(size), dp(size));
-            lp.setMargins(dp(5), 0, dp(5), 0);
-            ctl.addView(b, lp);
-        }
-        np.addView(ctl);
-        row(np, btn("−30s", false, v -> cmd("jump", "-30000")), btn("⏹", false, v -> cmd("stop", "")),
-                btn("+30s", false, v -> cmd("jump", "30000")));
-        row(np, btn("🔖", false, v -> cmd("bmadd", "")), btn("🔖…", false, v -> {
-                    JSONArray bm = S.optJSONArray("bookmarks");
-                    if (bm == null || bm.length() == 0) {
-                        toast("🔖 —");
-                        return;
-                    }
-                    String[] n = new String[bm.length()];
-                    for (int i = 0; i < n.length; i++) n[i] = "⏱ " + Net.fmtTime(bm.optJSONObject(i).optLong("t"));
-                    new AlertDialog.Builder(this).setTitle("🔖").setItems(n, (d, w) -> cmd("bmjump", String.valueOf(w))).show();
-                }), btn("📸", false, v -> cmd("screenshot", "")),
-                btn("🎵", false, v -> cmd("audioonly", "")));
-        repBtn = btn("🔁", false, v -> cmd("repeat", ""));
-        shufBtn = btn("🔀", false, v -> cmd("shuffle", ""));
-        row(np, repBtn, shufBtn);
-        otherBtn = full(np, btn("📺 " + T.t("Show other apps' videos on the remote"), false,
+        expandBox.addView(times);
+        expandBox.addView(iconRow(new String[]{"skip-back", "rotate-ccw", "rotate-cw", "skip-forward", "circle-stop"},
+                new Runnable[]{() -> cmd("prev", ""), () -> cmd("jump", "-10000"), () -> cmd("jump", "10000"),
+                        () -> cmd("next", ""), () -> cmd("stop", "")}, 48));
+        expandBox.addView(iconRow(new String[]{"bookmark-plus", "bookmark", "camera", "audio-lines", "rotate-ccw"},
+                new Runnable[]{() -> cmd("bmadd", ""), this::bookmarkList, () -> cmd("screenshot", ""),
+                        () -> cmd("audioonly", ""), () -> cmd("jump", "-30000")}, 42));
+        repBtn = btn("", false, v -> cmd("repeat", ""));
+        shufBtn = btn("", false, v -> cmd("shuffle", ""));
+        repBtn.setCompoundDrawablesWithIntrinsicBounds(new UiKit.Icon(this, "repeat", 16, Ui.TEXT), null, null, null);
+        shufBtn.setCompoundDrawablesWithIntrinsicBounds(new UiKit.Icon(this, "shuffle", 16, Ui.TEXT), null, null, null);
+        row(expandBox, repBtn, shufBtn);
+        expandBox.setVisibility(Store.getBool("np_open", false) ? View.VISIBLE : View.GONE);
+        np.addView(expandBox);
+        otherBtn = full(np, btn(T.t("Show other apps' videos on the remote"), false,
                 v -> call("/otherallow", null, r -> toast(r.optString("msg")))));
+        otherBtn.setCompoundDrawablesWithIntrinsicBounds(new UiKit.Icon(this, "monitor-play", 18, Ui.TEXT), null, null, null);
         otherBtn.setVisibility(View.GONE);
         torLine = Ui.text(this, 12, Ui.DIM, false);
         torLine.setVisibility(View.GONE);
         np.addView(torLine);
 
-        // continue watching
+        // ---- remote: D-pad / touchpad, volume + brightness sliders, keys
+        LinearLayout rc = card(p, null);
+        LinearLayout rh = new LinearLayout(this);
+        rh.setGravity(Gravity.CENTER_VERTICAL);
+        TextView rt = Ui.text(this, 11, Ui.DIM, true);
+        rt.setText(T.t("Remote").toUpperCase(Locale.ROOT));
+        rt.setLetterSpacing(0.12f);
+        rh.addView(rt, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        padD = btn("D-pad", true, v -> setPadMode(0));
+        padT = btn("Touchpad", false, v -> setPadMode(1));
+        rh.addView(padD, new LinearLayout.LayoutParams(dp(96), dp(36)));
+        LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(dp(110), dp(36));
+        tlp.setMargins(dp(6), 0, 0, 0);
+        rh.addView(padT, tlp);
+        rc.addView(rh);
+
+        LinearLayout body = new LinearLayout(this);
+        body.setGravity(Gravity.CENTER);
+        body.setPadding(0, dp(12), 0, dp(6));
+        volSlider = new UiKit.PillSlider(this, "volume-2", 0, 200, true);
+        volSlider.setListener((v, done) -> {
+            volTouch = System.currentTimeMillis();
+            if (done) cmd("vol", String.valueOf(v));
+        });
+        body.addView(volSlider, new LinearLayout.LayoutParams(dp(54), dp(236)));
+        padBox = new FrameLayout(this);
+        int pw = Math.min(dp(236), (int) (getResources().getDisplayMetrics().widthPixels * 0.56f));
+        dpadView = buildDpad(pw);
+        touchView = new UiKit.TouchPad(this, this::key);
+        padBox.addView(dpadView, new FrameLayout.LayoutParams(pw, pw, Gravity.CENTER));
+        padBox.addView(touchView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, pw, Gravity.CENTER));
+        LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(0, pw, 1);
+        plp.setMargins(dp(10), 0, dp(10), 0);
+        body.addView(padBox, plp);
+        brSlider = new UiKit.PillSlider(this, "sun", 10, 150, true);
+        brSlider.setListener((v, done) -> {
+            brTouch = System.currentTimeMillis();
+            if (done) cmd("bright", String.valueOf(v));
+        });
+        body.addView(brSlider, new LinearLayout.LayoutParams(dp(54), dp(236)));
+        rc.addView(body);
+        setPadMode(Store.getInt("padmode", 0));
+
+        rc.addView(iconRow(new String[]{"arrow-left", "house", "layers", "menu", "power"},
+                new Runnable[]{() -> key("back"), () -> key("home"), () -> key("recents"), () -> cmd("menu", ""), this::powerMenu}, 50));
+        rc.addView(iconRow(new String[]{"volume-1", "volume-x", "volume-2", "circle-play", "keyboard"},
+                new Runnable[]{() -> key("vol_down"), () -> key("vol_mute"), () -> key("vol_up"),
+                        () -> key("media_playpause"), this::typeDialog}, 44));
+        accessHint = Ui.text(this, 12, Ui.DIM, false);
+        accessHint.setText(T.t("To control other apps, turn on TV Settings > Accessibility > TamilCastPlay"));
+        accessHint.setVisibility(View.GONE);
+        rc.addView(accessHint);
+        adbBtn = full(rc, btn(T.t("Full remote for every app (ADB)"), true, v -> new AlertDialog.Builder(this)
+                .setTitle(T.t("Full remote for every app (ADB)"))
+                .setMessage(T.t("Makes the phone remote work in EVERY app (YouTube, Netflix, settings) by pressing real keys.")
+                        + "\n\n1. TV: Settings → Device Preferences → About → press “Build” 7 times."
+                        + "\n2. Developer options → USB / Network debugging ON."
+                        + "\n3. Press Connect, then tick “Always allow” on the TV.")
+                .setPositiveButton(T.t("Connect"), (dd, ww) -> cmd("adbsetup", ""))
+                .setNegativeButton(T.t("Cancel"), null).show()));
+        adbBtn.setVisibility(View.GONE);
+
+        // ---- board: one tile per feature, each opens its own panel
+        TextView bl = Ui.text(this, 11, Ui.DIM, true);
+        bl.setText(T.t("Board").toUpperCase(Locale.ROOT));
+        bl.setLetterSpacing(0.12f);
+        bl.setPadding(dp(6), dp(14), 0, dp(4));
+        p.addView(bl);
+        View tQueue = UiKit.tile(this, "list-video", T.t("Channels & queue"), "—", 0xFF8B5CF6, v -> openSheet(pages[0], T.t("Channels & queue"), "list-video"));
+        queueSub = (TextView) tQueue.findViewWithTag("sub");
+        View tShare = UiKit.tile(this, "smartphone", T.t("Share this phone"), "", 0xFF14B8A6, v -> shareDialog());
+        shareSub = (TextView) tShare.findViewWithTag("sub");
+        p.addView(UiKit.grid(this, 3,
+                UiKit.tile(this, "monitor-play", T.t("Live TV screen"), T.t("see the TV here"), 0xFFEC4899, v -> openScreen()),
+                tQueue,
+                UiKit.tile(this, "layout-grid", T.t("Apps"), "Netflix, YouTube…", 0xFFF97316, v -> openSheet(appsPage, T.t("Apps"), "layout-grid")),
+                UiKit.tile(this, "cast", T.t("Cast"), T.t("phone videos, links"), 0xFF3B82F6, v -> showTab(3)),
+                UiKit.tile(this, "captions", T.t("Audio & subtitles"), T.t("tracks, delay, online"), 0xFF22C55E, v -> showTab(1)),
+                UiKit.tile(this, "sliders-horizontal", T.t("Picture & sound"), T.t("fit, EQ, dialogue"), 0xFFEAB308, v -> showTab(2)),
+                UiKit.tile(this, "library", T.t("Playlists"), T.t("IPTV, saved links"), 0xFF6366F1, v -> showTab(4)),
+                UiKit.tile(this, "gauge", T.t("My TV"), T.t("storage, speed"), 0xFF06B6D4, v -> myTv()),
+                tShare,
+                UiKit.tile(this, "power", T.t("Power"), T.t("sleep, restart"), 0xFFEF4444, v -> powerMenu()),
+                UiKit.tile(this, "palette", T.t("Colours"), T.t("theme & palette"), 0xFFD946EF, v -> Palette.show(this)),
+                UiKit.tile(this, "tv", T.t("Switch TV"), tvName, 0xFF64748B, v -> {
+                    startActivity(new Intent(this, ConnectActivity.class).putExtra("no_auto", true).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP));
+                    finish();
+                })));
+        updateShareSub();
+        return p;
+    }
+
+    /** Row of round Lucide buttons, evenly spread. */
+    private LinearLayout iconRow(String[] icons, final Runnable[] acts, int size) {
+        LinearLayout r = new LinearLayout(this);
+        r.setGravity(Gravity.CENTER);
+        r.setPadding(0, dp(6), 0, dp(4));
+        for (int i = 0; i < icons.length; i++) {
+            final int k = i;
+            ImageView b = UiKit.roundButton(this, icons[i], size, false, v -> acts[k].run());
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(size), dp(size));
+            lp.setMargins(dp(6), 0, dp(6), 0);
+            r.addView(b, lp);
+        }
+        return r;
+    }
+
+    private View buildDpad(int w) {
+        FrameLayout pad = new FrameLayout(this);
+        GradientDrawable circ = new GradientDrawable();
+        circ.setShape(GradientDrawable.OVAL);
+        circ.setColor(Ui.dark() ? 0x14FFFFFF : 0x0A1B1530);
+        circ.setStroke(dp(1), Ui.STROKE);
+        pad.setBackground(circ);
+        int a = (int) (w / 4.2f);
+        String[][] arrows = {{"chevron-up", "up"}, {"chevron-down", "down"}, {"chevron-left", "left"}, {"chevron-right", "right"}};
+        int[] grav = {Gravity.TOP | Gravity.CENTER_HORIZONTAL, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL,
+                Gravity.START | Gravity.CENTER_VERTICAL, Gravity.END | Gravity.CENTER_VERTICAL};
+        for (int i = 0; i < 4; i++) {
+            final String k = arrows[i][1];
+            ImageView b = UiKit.roundButton(this, arrows[i][0], Math.round(a / getResources().getDisplayMetrics().density), false, v -> key(k));
+            b.setBackground(new GradientDrawable());
+            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(a, a, grav[i]);
+            lp.setMargins(dp(6), dp(6), dp(6), dp(6));
+            pad.addView(b, lp);
+        }
+        int ok = (int) (w * 0.38f);
+        ImageView okb = UiKit.roundButton(this, "circle-play", Math.round(ok / getResources().getDisplayMetrics().density), true, v -> key("ok"));
+        okb.setImageDrawable(null);
+        pad.addView(okb, new FrameLayout.LayoutParams(ok, ok, Gravity.CENTER));
+        TextView okt = Ui.text(this, 18, Color.WHITE, true);
+        okt.setText("OK");
+        okt.setGravity(Gravity.CENTER);
+        okt.setClickable(false);
+        pad.addView(okt, new FrameLayout.LayoutParams(ok, ok, Gravity.CENTER));
+        return pad;
+    }
+
+    private void setPadMode(int m) {
+        Store.putInt("padmode", m);
+        dpadView.setVisibility(m == 0 ? View.VISIBLE : View.GONE);
+        touchView.setVisibility(m == 1 ? View.VISIBLE : View.GONE);
+        padD.setBackground(m == 0 ? Ui.gradient(this, 18) : Ui.card(this, Ui.CARD, Ui.STROKE, 18));
+        padT.setBackground(m == 1 ? Ui.gradient(this, 18) : Ui.card(this, Ui.CARD, Ui.STROKE, 18));
+        padD.setTextColor(m == 0 ? Color.WHITE : Ui.TEXT);
+        padT.setTextColor(m == 1 ? Color.WHITE : Ui.TEXT);
+    }
+
+    private void toggleExpand() {
+        boolean open = expandBox.getVisibility() != View.VISIBLE;
+        Store.putBool("np_open", open);
+        expandBox.setVisibility(open ? View.VISIBLE : View.GONE);
+        if (open) {
+            expandBox.setAlpha(0f);
+            expandBox.animate().alpha(1f).setDuration(200).start();
+        }
+        expandBtn.animate().rotation(open ? 180 : 0).setDuration(200).start();
+    }
+
+    private void bookmarkList() {
+        JSONArray bm = S.optJSONArray("bookmarks");
+        if (bm == null || bm.length() == 0) {
+            toast(T.t("No bookmarks yet"));
+            return;
+        }
+        String[] n = new String[bm.length()];
+        for (int i = 0; i < n.length; i++) n[i] = "⏱ " + Net.fmtTime(bm.optJSONObject(i).optLong("t"));
+        new AlertDialog.Builder(this).setTitle(T.t("Bookmarks")).setItems(n, (d, w) -> cmd("bmjump", String.valueOf(w))).show();
+    }
+
+    private void typeDialog() {
+        final EditText e = new EditText(this);
+        e.setHint(T.t("Type text on the TV (search boxes)"));
+        e.setSingleLine(true);
+        new AlertDialog.Builder(this).setTitle(T.t("Type text on the TV (search boxes)")).setView(e)
+                .setPositiveButton(T.t("Send text"), (d, w) -> {
+                    if (!e.getText().toString().isEmpty()) call("/type", m("text", e.getText().toString()), r -> toast(r.optString("msg")));
+                }).setNegativeButton(T.t("Cancel"), null).show();
+        e.requestFocus();
+    }
+
+    private void powerMenu() {
+        String[] items = {T.t("Sleep / screen off"), T.t("Wake up"), T.t("Power key"), T.t("Restart the TV"), T.t("Restart TamilCastPlay")};
+        final String[] acts = {"sleep", "wake", "power", "reboot", "restartapp"};
+        new AlertDialog.Builder(this).setTitle(T.t("Power")).setItems(items, (d, w) -> {
+            if (acts[w].equals("reboot")) {
+                new AlertDialog.Builder(this).setTitle(T.t("Restart the TV") + "?")
+                        .setPositiveButton(T.t("OK"), (d2, w2) -> call("/power", m("do", "reboot"), null))
+                        .setNegativeButton(T.t("Cancel"), null).show();
+            } else call("/power", m("do", acts[w]), null);
+        }).show();
+    }
+
+    private void updateShareSub() {
+        shareSub.setText(Store.getBool("share_fs", false) ? "✓ " + T.t("TV can see its videos") : T.t("let the TV play phone videos"));
+    }
+
+    /** Lets TVs on the Wi-Fi browse this phone's videos and music (Network folders on the TV). */
+    private void shareDialog() {
+        final boolean on = Store.getBool("share_fs", false);
+        new AlertDialog.Builder(this).setTitle(T.t("Share this phone"))
+                .setMessage(T.t("The TV can open this phone's videos and music in “Network folders” and play them — no copying. Read-only; turn it off any time."))
+                .setPositiveButton(on ? T.t("Turn off") : T.t("Turn on"), (d, w) -> {
+                    if (!on) {
+                        if (android.os.Build.VERSION.SDK_INT >= 33) {
+                            requestPermissions(new String[]{android.Manifest.permission.READ_MEDIA_VIDEO,
+                                    android.Manifest.permission.READ_MEDIA_AUDIO}, 31);
+                        } else if (android.os.Build.VERSION.SDK_INT >= 23) {
+                            requestPermissions(new String[]{android.Manifest.permission.READ_EXTERNAL_STORAGE}, 31);
+                        }
+                    }
+                    Store.putBool("share_fs", !on);
+                    updateShareSub();
+                    toast(Store.getBool("share_fs", false) ? "✓" : T.t("Sharing off"));
+                }).setNegativeButton(T.t("Close"), null).show();
+    }
+
+    // =====================================================================
+    // panels (bottom sheet)
+    // =====================================================================
+    private FrameLayout sheet, sheetBody;
+    private LinearLayout sheetPanel;
+    private TextView sheetTitle;
+    private ImageView sheetIcon;
+    private boolean sheetOpen;
+    private View appsPage, screenPage, sheetView;
+
+    private void buildSheet(FrameLayout stage) {
+        sheet = new FrameLayout(this);
+        sheet.setBackgroundColor(0x99000000);
+        sheet.setVisibility(View.GONE);
+        sheet.setOnClickListener(v -> closeSheet());
+        sheetPanel = new LinearLayout(this);
+        sheetPanel.setOrientation(LinearLayout.VERTICAL);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(Ui.BG);
+        float r = dp(26);
+        bg.setCornerRadii(new float[]{r, r, r, r, 0, 0, 0, 0});
+        sheetPanel.setBackground(bg);
+        sheetPanel.setClickable(true);
+        sheetPanel.setElevation(dp(16));
+        View handle = new View(this);
+        handle.setBackground(Ui.card(this, Ui.STROKE, 0, 3));
+        LinearLayout.LayoutParams hl = new LinearLayout.LayoutParams(dp(44), dp(5));
+        hl.gravity = Gravity.CENTER_HORIZONTAL;
+        hl.setMargins(0, dp(10), 0, dp(4));
+        sheetPanel.addView(handle, hl);
+        LinearLayout th = new LinearLayout(this);
+        th.setGravity(Gravity.CENTER_VERTICAL);
+        th.setPadding(dp(16), dp(4), dp(10), dp(4));
+        sheetIcon = UiKit.icon(this, "layout-grid", 22, Ui.ACCENT);
+        th.addView(sheetIcon, new LinearLayout.LayoutParams(dp(32), dp(32)));
+        sheetTitle = Ui.text(this, 18, Ui.TEXT, true);
+        sheetTitle.setPadding(dp(8), 0, 0, 0);
+        th.addView(sheetTitle, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        th.addView(UiKit.roundButton(this, "x", 40, false, v -> closeSheet()));
+        sheetPanel.addView(th);
+        sheetBody = new FrameLayout(this);
+        sheetPanel.addView(sheetBody, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
+        int h = (int) (getResources().getDisplayMetrics().heightPixels * 0.86f);
+        sheet.addView(sheetPanel, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, h, Gravity.BOTTOM));
+        stage.addView(sheet, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+    }
+
+    private void openSheet(View page, String title, String icon) {
+        hideKeyboard();
+        if (page.getParent() != null) ((ViewGroup) page.getParent()).removeView(page);
+        sheetBody.removeAllViews();
+        sheetBody.addView(page, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        sheetView = page;
+        sheetTitle.setText(title);
+        sheetIcon.setImageDrawable(new UiKit.Icon(this, icon, 22, Ui.ACCENT));
+        sheet.setVisibility(View.VISIBLE);
+        sheet.setAlpha(0f);
+        sheet.animate().alpha(1f).setDuration(180).start();
+        sheetPanel.setTranslationY(getResources().getDisplayMetrics().heightPixels);
+        sheetPanel.animate().translationY(0).setDuration(280).setInterpolator(new android.view.animation.DecelerateInterpolator()).start();
+        sheetOpen = true;
+        if (page == pages[0]) loadHistory();
+        if (page == appsPage) loadApps();
+        poll();
+    }
+
+    private void closeSheet() {
+        if (!sheetOpen) return;
+        sheetOpen = false;
+        hideKeyboard();
+        sheetPanel.animate().translationY(sheetPanel.getHeight()).setDuration(220).start();
+        sheet.animate().alpha(0f).setDuration(220).withEndAction(() -> {
+            sheet.setVisibility(View.GONE);
+            sheetBody.removeAllViews();
+            sheetView = null;
+        }).start();
+    }
+
+    private View buildQueuePage() {
+        LinearLayout p = page();
         LinearLayout cw = card(p, T.t("Continue watching"));
         HorizontalScrollView hs = new HorizontalScrollView(this);
         hs.setHorizontalScrollBarEnabled(false);
         cwBox = new LinearLayout(this);
         hs.addView(cwBox);
         cw.addView(hs);
-        cw.setTag("cw");
         cw.setVisibility(View.GONE);
-
-        // D-pad
-        LinearLayout dc = card(p, T.t("Remote"));
-        int w = Math.min(dp(250), (int) (getResources().getDisplayMetrics().widthPixels * 0.68f));
-        FrameLayout pad = new FrameLayout(this);
-        GradientDrawable circ = new GradientDrawable();
-        circ.setShape(GradientDrawable.OVAL);
-        circ.setColor(Ui.dark() ? 0xFF221B3A : 0xFFF0ECFA);
-        circ.setStroke(dp(1), Ui.STROKE);
-        pad.setBackground(circ);
-        int a = w / 4;
-        addPad(pad, "▲", a, Gravity.TOP | Gravity.CENTER_HORIZONTAL, "up", false);
-        addPad(pad, "▼", a, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL, "down", false);
-        addPad(pad, "◀", a, Gravity.START | Gravity.CENTER_VERTICAL, "left", false);
-        addPad(pad, "▶", a, Gravity.END | Gravity.CENTER_VERTICAL, "right", false);
-        addPad(pad, "OK", (int) (w * 0.38f), Gravity.CENTER, "ok", true);
-        LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(w, w);
-        plp.gravity = Gravity.CENTER_HORIZONTAL;
-        plp.setMargins(0, dp(4), 0, dp(8));
-        dc.addView(pad, plp);
-        row(dc, btn("↩", false, v -> key("back")), btn("⌂", false, v -> key("home")), btn("▢", false, v -> key("recents")),
-                btn("⚙", false, v -> cmd("menu", "")));
-        // TV's own volume and play/pause for any app (Netflix, YouTube…)
-        row(dc, btn("🔉", false, v -> key("vol_down")), btn("🔇", false, v -> key("vol_mute")),
-                btn("🔊", false, v -> key("vol_up")), btn("⏯", false, v -> key("media_playpause")));
-        accessHint = Ui.text(this, 12, Ui.DIM, false);
-        accessHint.setText("ℹ " + T.t("To control other apps, turn on TV Settings > Accessibility > TamilCastPlay"));
-        accessHint.setVisibility(View.GONE);
-        dc.addView(accessHint);
-        adbBtn = full(dc, btn("🔌 " + T.t("Full remote for every app (ADB)"), true, v -> {
-            new AlertDialog.Builder(this).setTitle("🔌 " + T.t("Full remote for every app (ADB)"))
-                    .setMessage(T.t("Makes the phone remote work in EVERY app (YouTube, Netflix, settings) by pressing real keys.")
-                            + "\n\n1. TV: Settings → Device Preferences → About → press “Build” 7 times."
-                            + "\n2. Settings → Device Preferences → Developer options → USB / Network debugging ON."
-                            + "\n3. Press Connect, then on the TV tick “Always allow” and press OK.")
-                    .setPositiveButton(T.t("Connect"), (dd, ww) -> cmd("adbsetup", ""))
-                    .setNegativeButton(T.t("Cancel"), null).show();
-        }));
-        final EditText typeBox = field(dc, "⌨ " + T.t("Type text on the TV (search boxes)"), false);
-        full(dc, btn("⌨ " + T.t("Send text"), false, v -> {
-            String tx = typeBox.getText().toString();
-            if (tx.isEmpty()) return;
-            call("/type", m("text", tx), r -> toast(r.optString("msg")));
-            typeBox.setText("");
-            hideKeyboard();
-        }));
-
-        // volume
-        LinearLayout vc = card(p, T.t("Volume"));
-        volLabel = Ui.text(this, 14, Ui.TEXT, true);
-        vc.addView(volLabel);
-        vol = bar(vc, 200);
-        vol.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            public void onProgressChanged(SeekBar s, int v, boolean user) {
-                if (user) {
-                    volTouch = System.currentTimeMillis();
-                    volLabel.setText(v + "%");
-                }
-            }
-
-            public void onStartTrackingTouch(SeekBar s) {
-                volTouch = System.currentTimeMillis();
-            }
-
-            public void onStopTrackingTouch(SeekBar s) {
-                volTouch = System.currentTimeMillis();
-                cmd("vol", String.valueOf(s.getProgress() / 5 * 5));
-            }
-        });
-        row(vc, btn("🔇", false, v -> cmd("mute", "")), btn("50", false, v -> cmd("vol", "50")),
-                btn("100", false, v -> cmd("vol", "100")), btn("150", false, v -> cmd("vol", "150")),
-                btn("200", true, v -> cmd("vol", "200")));
-        // brightness of the picture on the TV
-        brLabel = Ui.text(this, 14, Ui.TEXT, true);
-        brLabel.setPadding(0, dp(10), 0, 0);
-        vc.addView(brLabel);
-        bright = bar(vc, 140);
-        bright.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            public void onProgressChanged(SeekBar s, int v, boolean user) {
-                if (user) {
-                    brTouch = System.currentTimeMillis();
-                    brLabel.setText("☀ " + (v + 10) + "%" + (v + 10 > 100 ? "  (boost)" : ""));
-                }
-            }
-
-            public void onStartTrackingTouch(SeekBar s) {
-                brTouch = System.currentTimeMillis();
-            }
-
-            public void onStopTrackingTouch(SeekBar s) {
-                brTouch = System.currentTimeMillis();
-                cmd("bright", String.valueOf((s.getProgress() + 10) / 5 * 5));
-            }
-        });
-        row(vc, btn("☀ 50", false, v -> cmd("bright", "50")), btn("☀ 75", false, v -> cmd("bright", "75")),
-                btn("☀ 100", false, v -> cmd("bright", "100")), btn("☀ 125", false, v -> cmd("bright", "125")));
-
-        // apps
-        LinearLayout ac = card(p, "Apps");
-        appsBox = new LinearLayout(this);
-        appsBox.setOrientation(LinearLayout.VERTICAL);
-        ac.addView(appsBox);
-
-        // queue
-        LinearLayout qc = card(p, T.t("Playlist"));
-        qSearch = field(qc, "🔍 " + T.t("Search channel / name"), false);
+        LinearLayout qc = card(p, T.t("Channels & queue"));
+        qSearch = field(qc, T.t("Search channel / name"), false);
+        qSearch.setCompoundDrawablesWithIntrinsicBounds(new UiKit.Icon(this, "search", 18, Ui.DIM), null, null, null);
+        qSearch.setCompoundDrawablePadding(dp(8));
         qSearch.addTextChangedListener(new TextWatcher() {
             public void beforeTextChanged(CharSequence c, int a1, int b1, int d) { }
             public void onTextChanged(CharSequence c, int a1, int b1, int d) { }
@@ -679,11 +851,76 @@ public class NativeRemoteActivity extends AppCompatActivity {
                 main.postDelayed(qRun, 350);
             }
         });
-        full(qc, btn("💾 " + T.t("Save") + " → " + T.t("Playlist"), false, v -> saveQueue()));
+        Button sv = full(qc, btn(T.t("Save") + " → " + T.t("Playlist"), false, v -> saveQueue()));
+        sv.setCompoundDrawablesWithIntrinsicBounds(new UiKit.Icon(this, "download", 16, Ui.TEXT), null, null, null);
         queueBox = new LinearLayout(this);
         queueBox.setOrientation(LinearLayout.VERTICAL);
         qc.addView(queueBox);
         return p;
+    }
+
+    private View buildAppsPage() {
+        LinearLayout p = page();
+        LinearLayout ac = card(p, null);
+        appsBox = new LinearLayout(this);
+        appsBox.setOrientation(LinearLayout.VERTICAL);
+        ac.addView(appsBox);
+        return p;
+    }
+
+    // ---- live TV screen + touchpad under it
+    private ImageView screenImg;
+    private TextView screenInfo;
+    private boolean screenBusy;
+
+    private View buildScreenPage() {
+        LinearLayout p = page();
+        screenImg = new ImageView(this);
+        screenImg.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        screenImg.setBackground(Ui.card(this, 0xFF000000, Ui.STROKE, 16));
+        screenImg.setAdjustViewBounds(true);
+        int w = getResources().getDisplayMetrics().widthPixels - dp(24);
+        p.addView(screenImg, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, w * 9 / 16));
+        screenInfo = Ui.text(this, 12, Ui.DIM, false);
+        screenInfo.setPadding(dp(4), dp(6), 0, dp(6));
+        screenInfo.setText(T.t("Updates about once a second. Netflix / Prime may show black (protected)."));
+        p.addView(screenInfo);
+        UiKit.TouchPad tp = new UiKit.TouchPad(this, k -> {
+            key(k);
+            main.postDelayed(this::screenTick, 350);
+        });
+        p.addView(tp, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(200)));
+        p.addView(iconRow(new String[]{"arrow-left", "house", "circle-play", "volume-1", "volume-2"},
+                new Runnable[]{() -> key("back"), () -> key("home"), () -> key("media_playpause"), () -> key("vol_down"),
+                        () -> key("vol_up")}, 46));
+        return scroll(p);
+    }
+
+    private void openScreen() {
+        openSheet(screenPage, T.t("Live TV screen"), "monitor-play");
+        screenTick();
+    }
+
+    private void screenTick() {
+        if (!sheetOpen || sheetView != screenPage || screenBusy) return;
+        screenBusy = true;
+        io.execute(() -> {
+            try {
+                byte[] b = TvClient.bytes(ip, "/screen.jpg?w=720");
+                final android.graphics.Bitmap bm = b == null ? null : BitmapFactory.decodeByteArray(b, 0, b.length);
+                main.post(() -> {
+                    screenBusy = false;
+                    if (bm != null) screenImg.setImageBitmap(bm);
+                    else screenInfo.setText(T.t("To see the TV screen, turn on the 🔌 Full remote (ADB) on the TV."));
+                    main.postDelayed(this::screenTick, 800);
+                });
+            } catch (Exception e) {
+                main.post(() -> {
+                    screenBusy = false;
+                    main.postDelayed(this::screenTick, 1500);
+                });
+            }
+        });
     }
 
     private void addPad(FrameLayout pad, String t, int size, int gravity, final String k, boolean primary) {
@@ -1605,7 +1842,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
         boolean p = S.optBoolean("player");
         String dev = S.optString("device", tvName);
         setIf(devLine, dev + " · " + ip);
-        setIf(npTitle, p ? S.optString("title") : "—");
+        setIf(npTitle, p ? S.optString("title") : T.t("Nothing playing"));
         String sub = "";
         if (p) {
             sub = (S.optInt("count") > 1 ? (S.optInt("idx") + 1) + " / " + S.optInt("count") + "  ·  " : "")
@@ -1614,7 +1851,9 @@ public class NativeRemoteActivity extends AppCompatActivity {
             if (!ld.isEmpty()) sub += "  ·  " + ld.split("\n")[0];
         }
         setIf(npSub, sub);
-        setIf(playBtn, p && S.optBoolean("playing") ? "❚❚" : "▶");
+        UiKit.setIcon(this, playBtn, p && S.optBoolean("playing") ? "pause" : "play", 24, Color.WHITE);
+        UiKit.setIcon(this, artIcon, S.optJSONObject("other") != null ? "tv" : p ? "clapperboard" : "tv-minimal", 24, Color.WHITE);
+        if (queueSub != null) setIf(queueSub, S.optInt("count") > 0 ? S.optInt("count") + " · " + T.t("tap to see") : "—");
         long pos = S.optLong("pos"), len = S.optLong("len");
         if (System.currentTimeMillis() - seekTouch > 2500) {
             seek.setProgress(len > 0 ? (int) (1000 * pos / len) : 0);
@@ -1622,13 +1861,10 @@ public class NativeRemoteActivity extends AppCompatActivity {
         }
         setIf(tRight, len > 0 ? Net.fmtTime(len) : "");
         int v = S.optInt("vol", 100);
-        if (System.currentTimeMillis() - volTouch > 2500) {
-            vol.setProgress(v);
-            setIf(volLabel, (S.optBoolean("muted") ? "🔇 " : "🔊 ") + v + "%" + (v > 100 ? T.t(" (boost)") : ""));
-        }
+        if (System.currentTimeMillis() - volTouch > 2500) volSlider.setValue(v);
         int rm = S.optInt("repeat");
-        setIf(repBtn, (rm == 1 ? "🔂 " : "🔁 ") + T.t("Repeat: ") + T.t(rm == 1 ? "One" : rm == 2 ? "All" : "Off"));
-        setIf(shufBtn, "🔀 " + T.t("Shuffle: ") + T.t(S.optBoolean("shuffle") ? "On" : "Off"));
+        setIf(repBtn, "  " + T.t("Repeat: ") + T.t(rm == 1 ? "One" : rm == 2 ? "All" : "Off"));
+        setIf(shufBtn, "  " + T.t("Shuffle: ") + T.t(S.optBoolean("shuffle") ? "On" : "Off"));
         JSONObject t = S.optJSONObject("torrent");
         String ts = "";
         if (t != null && t.optBoolean("active")) {
@@ -1642,11 +1878,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
         renderQueue();
         accessHint.setVisibility(S.optBoolean("access", true) ? View.GONE : View.VISIBLE);
         adbBtn.setVisibility(S.optBoolean("adb", true) ? View.GONE : View.VISIBLE);
-        if (System.currentTimeMillis() - brTouch > 2500) {
-            int bv = S.optInt("bright", 100);
-            bright.setProgress(bv - 10);
-            setIf(brLabel, "☀ " + T.t("Brightness: ") + bv + "%" + (bv > 100 ? "  (boost)" : ""));
-        }
+        if (System.currentTimeMillis() - brTouch > 2500) brSlider.setValue(S.optInt("bright", 100));
         int qv = S.optInt("quality", 0);
         setIf(qualBtn, "📶  " + T.t("Streaming quality: ") + (qv == 0 ? T.t("Best") : qv + "p"));
 

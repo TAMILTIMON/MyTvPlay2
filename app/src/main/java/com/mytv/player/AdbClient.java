@@ -243,6 +243,35 @@ public final class AdbClient {
         }
     }
 
+    /** Runs a command and returns its raw output bytes (used for screenshots). */
+    public static synchronized byte[] execBytes(Context c, String cmd) throws Exception {
+        String err = connect(c, false);
+        if (err != null) throw new Exception(err);
+        int local = nextId++;
+        java.io.ByteArrayOutputStream outp = new java.io.ByteArrayOutputStream();
+        try {
+            send(OPEN, local, 0, ("exec:" + cmd + "\u0000").getBytes("UTF-8"));
+            int remote = 0;
+            long until = System.currentTimeMillis() + 10000;
+            while (System.currentTimeMillis() < until) {
+                Msg m = recv();
+                if (m.a1 != local) continue;
+                if (m.cmd == OKAY) remote = m.a0;
+                else if (m.cmd == WRTE) {
+                    outp.write(m.data);
+                    send(OKAY, local, m.a0, null);
+                } else if (m.cmd == CLSE) {
+                    send(CLSE, local, m.a0 != 0 ? m.a0 : remote, null);
+                    break;
+                }
+            }
+            return outp.toByteArray();
+        } catch (Exception e) {
+            close();
+            throw e;
+        }
+    }
+
     /** Presses a key anywhere on the TV. Returns null when done. */
     public static String key(Context c, int keyCode) {
         try {

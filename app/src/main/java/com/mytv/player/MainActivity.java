@@ -380,6 +380,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public View getView(int position, View convertView, ViewGroup parent) {
                 TextView t = (TextView) super.getView(position, convertView, parent);
+                UiKit.iconize(t, Ui.ACCENT);
                 t.setTextSize(Ui.isTv(MainActivity.this) ? 21 : 17);
                 t.setTextColor(Ui.TEXT);
                 t.setPadding(Ui.dp(MainActivity.this, 20), Ui.dp(MainActivity.this, 16),
@@ -403,6 +404,7 @@ public class MainActivity extends AppCompatActivity {
         root.addView(listView, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
         setContentView(root);
         listView.requestFocus();
+        UiKit.splash(this);
         refresh();
         updateInfo();
         Perms.firstRun(this);

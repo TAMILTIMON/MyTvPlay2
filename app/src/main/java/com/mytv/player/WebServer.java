@@ -32,6 +32,7 @@ public class WebServer extends NanoHTTPD {
             String uri = s.getUri();
             if (uri.startsWith("/torrent/")) return torrent(s, uri);
             if (uri.startsWith("/local/")) return local(s, uri);   // random ids, needed by the TV player
+            if (uri.startsWith("/fs/")) return phoneFiles(s, uri);  // "let the TV see this phone's videos"
 
             Map<String, String> files = new HashMap<>();
             if (Method.POST.equals(s.getMethod())) s.parseBody(files);
@@ -292,7 +293,51 @@ public class WebServer extends NanoHTTPD {
 
                 case "/ping":
                     return json(new JSONObject().put("app", "mytvplayer").put("name", Discovery.deviceName(ctx))
-                            .put("tv", Ui.isTv(ctx)).put("ip", Net.ip()).toString());
+                            .put("tv", Ui.isTv(ctx)).put("ip", Net.ip()).put("share", Store.getBool("share_fs", false)).toString());
+
+                case "/screen.jpg": {
+                    try {
+                        byte[] jp = TvScreen.jpeg(ctx, Math.max(320, Math.min(1280, parseIntOr(val(p, "w"), 720))));
+                        Response r = newFixedLengthResponse(Response.Status.OK, "image/jpeg", new java.io.ByteArrayInputStream(jp), jp.length);
+                        r.addHeader("Cache-Control", "no-store");
+                        return r;
+                    } catch (Exception e) {
+                        return newFixedLengthResponse(Response.Status.SERVICE_UNAVAILABLE, "text/plain", String.valueOf(e.getMessage()));
+                    }
+                }
+
+                case "/power": {
+                    String d = val(p, "do");
+                    if ("restartapp".equals(d)) {
+                        Remote.MAIN.postDelayed(() -> {
+                            android.content.Intent i = new android.content.Intent(ctx, MainActivity.class)
+                                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK | android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                            ctx.startActivity(i);
+                            System.exit(0);
+                        }, 400);
+                        return msg("Restarting TamilCastPlay…");
+                    }
+                    if (!AdbClient.enabled()) return fail("Power controls need the 🔌 Full remote (ADB) on the TV");
+                    String e = null;
+                    switch (d) {
+                        case "sleep": e = AdbClient.key(ctx, 223); break;      // screen off / standby
+                        case "wake": e = AdbClient.key(ctx, 224); break;
+                        case "power": e = AdbClient.key(ctx, 26); break;
+                        case "reboot":
+                            try {
+                                AdbClient.shell(ctx, "svc power reboot || reboot");
+                            } catch (Exception ex) {
+                                // the connection drops when the TV restarts: that's expected
+                            }
+                            return msg("Restarting the TV…");
+                        default: return fail("Unknown power action");
+                    }
+                    return e == null ? msg("✅") : fail(e);
+                }
+
+                case "/sharefs":
+                    Store.putBool("share_fs", "1".equals(val(p, "v")));
+                    return msg(Store.getBool("share_fs", false) ? "TVs can now see this device's videos" : "Sharing off");
 
                 case "/devices": {
                     org.json.JSONArray a = new org.json.JSONArray();
@@ -561,6 +606,83 @@ public class WebServer extends NanoHTTPD {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    private static int parseIntOr(String v, int d) {
+        try {
+            return Integer.parseInt(v);
+        } catch (Exception e) {
+            return d;
+        }
+    }
+
+    /** Folder roots this device shares (only when "share_fs" is on). */
+    private static List<File> shareRoots() {
+        List<File> l = new java.util.ArrayList<>();
+        l.add(android.os.Environment.getExternalStorageDirectory());
+        File[] st = new File("/storage").listFiles();
+        if (st != null) for (File f : st) if (!f.getName().equals("self") && !f.getName().equals("emulated")) l.add(f);
+        return l;
+    }
+
+    private static boolean insideShare(File f) {
+        try {
+            String c = f.getCanonicalPath();
+            for (File r : shareRoots()) if (c.startsWith(r.getCanonicalPath())) return true;
+        } catch (Exception ignored) {
+        }
+        return false;
+    }
+
+    /** /fs/list?p=…  and  /fs/file/<name>?p=…  — read-only, videos / music only. */
+    private Response phoneFiles(IHTTPSession s, String uri) throws Exception {
+        if (!Store.getBool("share_fs", false)) return newFixedLengthResponse(Response.Status.FORBIDDEN, "text/plain", "Sharing is off");
+        @SuppressWarnings("deprecation") Map<String, String> p = s.getParms();
+        String path = val(p, "p");
+        if (uri.startsWith("/fs/list")) {
+            org.json.JSONArray dirs = new org.json.JSONArray(), fls = new org.json.JSONArray();
+            if (path.isEmpty()) {
+                for (File r : shareRoots()) dirs.put(new JSONObject().put("n", r.getAbsolutePath()).put("p", r.getAbsolutePath()));
+            } else {
+                File d = new File(path);
+                if (!insideShare(d)) return fail("Not shared");
+                File[] k = d.listFiles();
+                if (k != null) {
+                    java.util.Arrays.sort(k, (a, b) -> a.getName().compareToIgnoreCase(b.getName()));
+                    for (File f : k) {
+                        if (f.getName().startsWith(".") || f.getName().equals("Android")) continue;
+                        if (f.isDirectory()) dirs.put(new JSONObject().put("n", f.getName()).put("p", f.getAbsolutePath()));
+                        else if (Formats.isMedia(f.getName()) || Formats.isSub(f.getName()))
+                            fls.put(new JSONObject().put("n", f.getName()).put("p", f.getAbsolutePath()).put("s", f.length()));
+                    }
+                }
+            }
+            return json(new JSONObject().put("ok", true).put("dirs", dirs).put("files", fls).toString());
+        }
+        File f = new File(path);
+        if (!insideShare(f) || !f.isFile()) return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "");
+        long size = f.length(), start = 0, end = size - 1;
+        String range = s.getHeaders().get("range");
+        boolean partial = false;
+        if (range != null && range.startsWith("bytes=")) {
+            String rr = range.substring(6).split(",")[0];
+            int dash = rr.indexOf('-');
+            String a = rr.substring(0, Math.max(0, dash)).trim(), b = dash >= 0 ? rr.substring(dash + 1).trim() : "";
+            if (a.isEmpty()) start = Math.max(0, size - Long.parseLong(b));
+            else {
+                start = Long.parseLong(a);
+                if (!b.isEmpty()) end = Math.min(Long.parseLong(b), size - 1);
+            }
+            partial = true;
+        }
+        java.io.FileInputStream in = new java.io.FileInputStream(f);
+        in.getChannel().position(start);
+        Response r = newFixedLengthResponse(partial ? Response.Status.PARTIAL_CONTENT : Response.Status.OK,
+                Formats.mime(f.getName()), in, end - start + 1);
+        r.addHeader("Accept-Ranges", "bytes");
+        if (partial) r.addHeader("Content-Range", "bytes " + start + "-" + end + "/" + size);
+        LocalShare.keepAwakePublic(ctx);
+        return r;
     }
 
     private static java.util.Set<Integer> ints(String csv) {
