@@ -351,7 +351,26 @@ public class PlayerActivity extends AppCompatActivity {
     private static final String[][] CTL_ICON = {{"⏮", "skip-back"}, {"↺", "rotate-ccw"}, {"⏯", "play"}, {"↻", "rotate-cw"},
             {"⏭", "skip-forward"}, {"📺", "list-video"}, {"🔊", "volume-2"}, {"💬", "captions"}, {"⛶", "monitor"},
             {"🎚", "sliders-horizontal"}, {"🔁", "repeat"}, {"🔀", "shuffle"}, {"☰", "menu"}, {"⌂", "house"},
-            {"⚙", "settings"}, {"🔄", "refresh-cw"}, {"🔒", "lock"}};
+            {"⚙", "settings"}, {"🔄", "refresh-cw"}, {"🔒", "lock"}, {"📡", "cast"}};
+
+    /** Phone: hand the video (and the rest of the list) over to the TV at the same second. */
+    private void playOnTv() {
+        if (queue.isEmpty() || index < 0) return;
+        final List<Store.Item> items = new ArrayList<>(queue);
+        final int i = index;
+        final long at = mp == null ? 0 : Math.max(0, mp.getTime());
+        if (mp != null) mp.pause();
+        savePosition();
+        osd(T.t("Sending to the TV…"));
+        new Thread(() -> {
+            final String r = PhoneMedia.sendToTv(this, items, i, at);
+            handler.post(() -> {
+                UiKit.makeToast(this, r, android.widget.Toast.LENGTH_LONG).show();
+                if (r.equals(T.t("Playing on the TV"))) finish();
+                else if (mp != null) mp.play();
+            });
+        }).start();
+    }
 
     /** Round Lucide button on the player overlay. */
     private ImageView ctl(LinearLayout row, String label, float size, boolean primary, View.OnClickListener l) {
@@ -418,6 +437,7 @@ public class PlayerActivity extends AppCompatActivity {
         if (!Ui.isTv(this)) {
             ctl(topBar, "🔄", 52, false, v -> command("rotate", "", ""));
             ctl(topBar, "🔒", 52, false, v -> command("lock", "1", ""));
+            ctl(topBar, "📡", 52, false, v -> playOnTv());   // continue this video on the TV
         }
         ctl(topBar, "⌂", 52, false, new View.OnClickListener() {
             public void onClick(View v) {

@@ -7,6 +7,7 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- Lets the phone remote open the player even when the app is in the background. -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
@@ -98,6 +99,20 @@
         <activity
             android:name=".NetworkActivity"
             android:exported="false" />
+
+        <activity
+            android:name=".PhoneLibraryActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".MusicActivity"
+            android:exported="false"
+            android:launchMode="singleTop" />
+
+        <service
+            android:name=".MusicService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
 
         <!-- "Share" any link / video / song / .torrent from another phone app -> play on the TV -->
         <activity

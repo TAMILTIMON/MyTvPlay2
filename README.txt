@@ -1,3 +1,19 @@
+TAMILCASTPLAY 3.0 — Videos & Music on the phone
+==============================================
+Phone app: new board tiles "Videos" and "Music" (also on the first screen).
+* Finds every video / song on the phone (internal storage, SD card, WhatsApp,
+  Telegram, downloads …) through Android's media library. Search, sort, folder chips.
+* Videos: thumbnail grid with duration; tap = play on the phone (gestures, subtitles,
+  everything of the player). Small cast icon on each video = play it on the TV.
+  Inside the phone player: new cast button in the top bar = continue on the TV at the
+  SAME second (the rest of the list follows).
+* Music: list with album art; tap = new music player — round album art in a glass ring
+  that turns while playing, shuffle / previous / play / next / repeat (one / all),
+  seek bar, "Up next" queue. Keeps playing in the background with notification and
+  lock-screen controls; pauses for calls and when headphones are unplugged.
+  Mini player at the bottom of the music list. Cast icon = continue on the TV.
+* Android asks once for permission to read videos / music.
+
 TAMILCASTPLAY 2.9.2 — YouTube from the assistant really opens / plays
 =====================================================================
 * Android blocks apps in the background from opening other apps, so "play … on YouTube"

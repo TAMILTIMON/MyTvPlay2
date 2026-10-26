@@ -35,6 +35,46 @@ public final class T {
     }
 
     static {
+        TA.put("Videos", "வீடியோக்கள்");
+        HI.put("Videos", "वीडियो");
+        TA.put("Music", "இசை");
+        HI.put("Music", "संगीत");
+        TA.put("on this phone", "இந்த போனில்");
+        HI.put("on this phone", "इस फ़ोन पर");
+        TA.put("Music on this phone", "இந்த போனில் உள்ள இசை");
+        HI.put("Music on this phone", "इस फ़ोन का संगीत");
+        TA.put("Videos on this phone", "இந்த போனில் உள்ள வீடியோக்கள்");
+        HI.put("Videos on this phone", "इस फ़ोन के वीडियो");
+        TA.put("Search songs or artists", "பாடல் அல்லது கலைஞர் தேடு");
+        HI.put("Search songs or artists", "गाने या कलाकार खोजें");
+        TA.put("Search videos", "வீடியோ தேடு");
+        HI.put("Search videos", "वीडियो खोजें");
+        TA.put("Searching this phone…", "இந்த போனில் தேடுகிறது…");
+        HI.put("Searching this phone…", "इस फ़ोन में खोज रहा है…");
+        TA.put("songs", "பாடல்கள்");
+        HI.put("songs", "गाने");
+        TA.put("videos", "வீடியோக்கள்");
+        HI.put("videos", "वीडियो");
+        TA.put("tap to play here · cast icon = play on TV", "இங்கே இயக்க தட்டவும் · cast ஐகான் = டிவியில் இயக்கு");
+        HI.put("tap to play here · cast icon = play on TV", "यहाँ चलाने के लिए टैप · cast आइकन = टीवी पर");
+        TA.put("No music found on this phone.", "இந்த போனில் இசை இல்லை.");
+        HI.put("No music found on this phone.", "इस फ़ोन पर संगीत नहीं मिला।");
+        TA.put("No videos found on this phone.", "இந்த போனில் வீடியோ இல்லை.");
+        HI.put("No videos found on this phone.", "इस फ़ोन पर वीडियो नहीं मिले।");
+        TA.put("Allow access to find the videos and music on this phone.", "இந்த போனின் வீடியோ, இசையைக் கண்டறிய அனுமதி தேவை.");
+        HI.put("Allow access to find the videos and music on this phone.", "इस फ़ोन के वीडियो और संगीत खोजने की अनुमति दें।");
+        TA.put("Artist", "கலைஞர்");
+        HI.put("Artist", "कलाकार");
+        TA.put("Up next", "அடுத்து");
+        HI.put("Up next", "आगे");
+        TA.put("Sending to the TV…", "டிவிக்கு அனுப்புகிறது…");
+        HI.put("Sending to the TV…", "टीवी पर भेज रहा है…");
+        TA.put("Playing on the TV", "டிவியில் இயங்குகிறது");
+        HI.put("Playing on the TV", "टीवी पर चल रहा है");
+        TA.put("Connect to a TV first (Switch TV)", "முதலில் டிவியை இணைக்கவும் (டிவி மாற்று)");
+        HI.put("Connect to a TV first (Switch TV)", "पहले टीवी जोड़ें (टीवी बदलें)");
+        TA.put("Sort", "வரிசை");
+        HI.put("Sort", "क्रम");
         TA.put("Download finished — now playing from storage (smooth)", "பதிவிறக்கம் முடிந்தது — இப்போது சேமிப்பிலிருந்து இயங்குகிறது");
         HI.put("Download finished — now playing from storage (smooth)", "डाउनलोड पूरा — अब स्टोरेज से चल रहा है");
         TA.put("Continuing…", "தொடர்கிறது…");

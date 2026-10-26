@@ -99,7 +99,11 @@ public class ConnectActivity extends AppCompatActivity {
                 UiKit.tile(this, "search", T.t("Browser"), T.t("search & send videos to TV"), 0xFF22C55E,
                         v -> startActivity(new Intent(ConnectActivity.this, BrowserActivity.class))),
                 UiKit.tile(this, "smartphone", T.t("Use this phone"), T.t("as a player"), 0xFFF97316,
-                        v -> startActivity(new Intent(ConnectActivity.this, MainActivity.class).putExtra(MainActivity.EXTRA_PLAYER_HOME, true)))));
+                        v -> startActivity(new Intent(ConnectActivity.this, MainActivity.class).putExtra(MainActivity.EXTRA_PLAYER_HOME, true))),
+                UiKit.tile(this, "film", T.t("Videos"), T.t("on this phone"), 0xFF0EA5E9,
+                        v -> startActivity(new Intent(ConnectActivity.this, PhoneLibraryActivity.class))),
+                UiKit.tile(this, "list-music", T.t("Music"), T.t("on this phone"), 0xFFD946EF,
+                        v -> startActivity(new Intent(ConnectActivity.this, PhoneLibraryActivity.class).putExtra(PhoneLibraryActivity.EXTRA_AUDIO, true)))));
         if (false) {
         Button rescan = Ui.button(this, T.t("Scan again"), true);
         rescan.setOnClickListener(new View.OnClickListener() {
