@@ -73,6 +73,9 @@ public class PhoneLibraryActivity extends AppCompatActivity {
         TextView h = Ui.text(this, 21, Ui.TEXT, true);
         h.setText("  " + T.t(audio ? "Music on this phone" : "Videos on this phone"));
         top.addView(h, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        top.addView(UiKit.roundButton(this, "layout-grid", 42, false, v -> pickView()));
+        View g1 = new View(this);
+        top.addView(g1, new LinearLayout.LayoutParams(dp(8), 1));
         top.addView(UiKit.roundButton(this, "sliders-horizontal", 42, false, v -> pickSort()));
         root.addView(top);
 
@@ -106,10 +109,8 @@ public class PhoneLibraryActivity extends AppCompatActivity {
         status.setPadding(dp(4), dp(6), 0, dp(6));
         root.addView(status);
 
-        final GridView grid = new GridView(this);
-        grid.setNumColumns(audio ? 1 : 2);
-        grid.setHorizontalSpacing(dp(10));
-        grid.setVerticalSpacing(dp(audio ? 4 : 12));
+        grid = new GridView(this);
+        mode = Store.getInt(audio ? "lib_view_a" : "lib_view_v", 1);
         grid.setSelector(new android.graphics.drawable.ColorDrawable(0));
         grid.setClipToPadding(false);
         grid.setPadding(0, 0, 0, dp(audio ? 96 : 20));
@@ -117,11 +118,11 @@ public class PhoneLibraryActivity extends AppCompatActivity {
             public int getCount() { return shown.size(); }
             public Object getItem(int p) { return shown.get(p); }
             public long getItemId(int p) { return p; }
-            public View getView(int p, View cv, ViewGroup parent) { return audio ? row(p, cv) : tile(p, cv, grid); }
+            public View getView(int p, View cv, ViewGroup parent) { return cell(p, cv); }
         };
         grid.setAdapter(ad);
-        grid.setOnItemClickListener((pa, v, pos, id) -> open(pos));
         root.addView(grid, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
+        applyMode();
 
         if (audio) buildMini(frame);
         setContentView(frame);
@@ -204,119 +205,277 @@ public class PhoneLibraryActivity extends AppCompatActivity {
         if (sort == 1) Collections.sort(shown, (a, b) -> a.title.compareToIgnoreCase(b.title));
         else if (sort == 2) Collections.sort(shown, audio ? (a, b) -> a.sub.compareToIgnoreCase(b.sub) : (a, b) -> Long.compare(b.size, a.size));
         status.setText(all.isEmpty() ? T.t(audio ? "No music found on this phone." : "No videos found on this phone.")
-                : shown.size() + " " + T.t(audio ? "songs" : "videos") + "  ·  " + T.t("tap to play here · cast icon = play on TV"));
+                : shown.size() + " " + T.t(audio ? "songs" : "videos") + "  ·  " + T.t("tap = play here · cast icon = TV · hold = details"));
         ad.notifyDataSetChanged();
+    }
+
+    // ------------------------------------------------------------------ view modes (like Windows Explorer)
+    private GridView grid;
+    private int mode;
+    private static final String[] MODE_NAME = {"Extra large icons", "Large icons", "Medium icons", "Small icons", "List", "Details",
+            "Tiles", "Content"};
+    private static final String[] MODE_ICON = {"square", "grid-2x2", "grid-3x3", "layout-grid", "list", "table", "layout-list", "rows-3"};
+    private static final int[] MODE_COLS = {1, 2, 3, 4, 1, 1, 2, 1};
+
+    private void pickView() {
+        final android.widget.ListAdapter la = new android.widget.ArrayAdapter<String>(this, android.R.layout.select_dialog_item, MODE_NAME) {
+            @Override
+            public View getView(int p, View cv, ViewGroup parent) {
+                TextView t = (TextView) super.getView(p, cv, parent);
+                t.setText(T.t(MODE_NAME[p]) + (p == mode ? "   ✓" : ""));
+                t.setCompoundDrawablesWithIntrinsicBounds(new UiKit.Icon(PhoneLibraryActivity.this, MODE_ICON[p], 20,
+                        p == mode ? Ui.ACCENT : Ui.TEXT), null, null, null);
+                t.setCompoundDrawablePadding(dp(16));
+                return t;
+            }
+        };
+        new androidx.appcompat.app.AlertDialog.Builder(this).setTitle(T.t("View")).setAdapter(la, (d, w) -> {
+            mode = w;
+            Store.putInt(audio ? "lib_view_a" : "lib_view_v", w);
+            applyMode();
+        }).show();
+    }
+
+    private void applyMode() {
+        int cols = MODE_COLS[mode];
+        grid.setNumColumns(cols);
+        boolean cards = mode <= 3 || mode == 6;
+        grid.setHorizontalSpacing(dp(cards ? 10 : 0));
+        grid.setVerticalSpacing(dp(cards ? (mode == 3 ? 8 : 12) : 2));
+        grid.setAdapter(ad);   // rebuild cells for the new layout
+    }
+
+    private int cellWidth() {
+        int cols = MODE_COLS[mode];
+        int w = getResources().getDisplayMetrics().widthPixels - dp(28);
+        return (w - dp(mode <= 3 || mode == 6 ? 10 : 0) * (cols - 1)) / cols;
     }
 
     // ------------------------------------------------------------------ cells
     private void loadArt(final ImageView iv, final PhoneMedia.M m) {
         iv.setTag(m.uri.toString());
         Bitmap c = PhoneMedia.cached(m);
-        iv.setImageBitmap(c);
-        if (c == null) {
-            iv.setImageDrawable(new UiKit.Icon(this, audio ? "list-music" : "film", 26, 0xCCFFFFFF));
-            ex.execute(() -> {
-                final Bitmap b = PhoneMedia.art(this, m, audio);
-                if (b != null) main.post(() -> {
-                    if (m.uri.toString().equals(iv.getTag())) iv.setImageBitmap(b);
-                });
+        if (c != null) {
+            iv.setImageBitmap(c);
+            return;
+        }
+        iv.setImageDrawable(PhoneMedia.placeholder(this, m, audio));
+        ex.execute(() -> {
+            final Bitmap b = PhoneMedia.art(this, m, audio);
+            if (b != null) main.post(() -> {
+                if (m.uri.toString().equals(iv.getTag())) iv.setImageBitmap(b);
             });
-        }
+        });
     }
 
-    private ImageView castIcon(final int pos) {
-        ImageView c = UiKit.darkButton(this, "cast", 36, false, v -> toTv(pos));
-        return c;
+    private ImageView cover(int radius) {
+        ImageView iv = new ImageView(this);
+        iv.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        iv.setBackground(Ui.card(this, 0xFF1F1A2E, 0, radius));
+        iv.setClipToOutline(true);
+        return iv;
     }
 
-    private View tile(int p, View cv, GridView grid) {
-        LinearLayout t = (LinearLayout) cv;
-        if (t == null) {
-            t = new LinearLayout(this);
-            t.setOrientation(LinearLayout.VERTICAL);
-            FrameLayout pic = new FrameLayout(this);
-            ImageView iv = new ImageView(this);
-            iv.setScaleType(ImageView.ScaleType.CENTER_CROP);
-            iv.setBackground(Ui.gradient(this, 16));
-            iv.setClipToOutline(true);
-            pic.addView(iv, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-            TextView d = Ui.text(this, 11, Color.WHITE, true);
-            d.setPadding(dp(6), dp(2), dp(6), dp(2));
-            d.setBackground(Ui.card(this, 0xB3000000, 0, 8));
-            FrameLayout.LayoutParams dl = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.START);
-            dl.setMargins(dp(8), 0, 0, dp(8));
-            pic.addView(d, dl);
-            FrameLayout.LayoutParams cl = new FrameLayout.LayoutParams(dp(36), dp(36), Gravity.TOP | Gravity.END);
-            cl.setMargins(0, dp(6), dp(6), 0);
-            pic.addView(new View(this), cl);   // cast icon placeholder (set per position)
-            int w = (getResources().getDisplayMetrics().widthPixels - dp(38)) / 2;
-            t.addView(pic, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, w * 9 / 16));
-            TextView n = Ui.text(this, 13, Ui.TEXT, true);
-            n.setMaxLines(2);
-            n.setEllipsize(android.text.TextUtils.TruncateAt.END);
-            n.setPadding(dp(2), dp(6), dp(2), 0);
-            t.addView(n);
-            TextView f = Ui.text(this, 11, Ui.DIM, false);
-            f.setSingleLine(true);
-            t.addView(f);
-        }
-        PhoneMedia.M m = shown.get(p);
-        FrameLayout pic = (FrameLayout) t.getChildAt(0);
-        loadArt((ImageView) pic.getChildAt(0), m);
-        ((TextView) pic.getChildAt(1)).setText(Net.fmtTime(m.dur));
-        View old = pic.getChildAt(2);
-        ImageView cast = castIcon(p);
-        pic.removeView(old);
-        pic.addView(cast, old.getLayoutParams());
-        ((TextView) t.getChildAt(1)).setText(m.title);
-        ((TextView) t.getChildAt(2)).setText(m.folder + "  ·  " + TvInfo.gb(m.size));
-        // the tile handles its own tap (a button inside a list cell blocks the list's item tap)
-        t.setOnClickListener(v -> open(p));
-        t.setBackground(Ui.focusCard(this, 16));
+    private TextView line(int sp, int color, boolean bold, int maxLines) {
+        TextView t = Ui.text(this, sp, color, bold);
+        t.setMaxLines(maxLines);
+        t.setEllipsize(android.text.TextUtils.TruncateAt.END);
         return t;
     }
 
-    private View row(int p, View cv) {
-        LinearLayout r = (LinearLayout) cv;
-        if (r == null) {
-            r = new LinearLayout(this);
-            r.setGravity(Gravity.CENTER_VERTICAL);
-            r.setPadding(dp(4), dp(8), dp(4), dp(8));
-            ImageView a = new ImageView(this);
-            a.setScaleType(ImageView.ScaleType.CENTER_CROP);
-            a.setBackground(Ui.gradient(this, 12));
-            a.setClipToOutline(true);
-            r.addView(a, new LinearLayout.LayoutParams(dp(52), dp(52)));
-            LinearLayout col = new LinearLayout(this);
-            col.setOrientation(LinearLayout.VERTICAL);
-            col.setPadding(dp(12), 0, dp(8), 0);
-            TextView t = Ui.text(this, 15, Ui.TEXT, true);
-            t.setSingleLine(true);
-            t.setEllipsize(android.text.TextUtils.TruncateAt.END);
-            TextView s = Ui.text(this, 12, Ui.DIM, false);
-            s.setSingleLine(true);
-            s.setEllipsize(android.text.TextUtils.TruncateAt.END);
-            col.addView(t);
-            col.addView(s);
-            r.addView(col, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
-            r.addView(new View(this), new LinearLayout.LayoutParams(dp(36), dp(36)));
+    private View cell(final int p, View cv) {
+        if (cv != null && Integer.valueOf(mode).equals(cv.getTag(R.id.w_title))) {
+            bind(p, cv);
+            return cv;
         }
-        PhoneMedia.M m = shown.get(p);
-        loadArt((ImageView) r.getChildAt(0), m);
-        LinearLayout col = (LinearLayout) r.getChildAt(1);
-        boolean cur = MusicService.current() != null && MusicService.current().id == m.id;
-        ((TextView) col.getChildAt(0)).setText(m.title);
-        ((TextView) col.getChildAt(0)).setTextColor(cur ? Ui.ACCENT : Ui.TEXT);
-        ((TextView) col.getChildAt(1)).setText(m.sub + "  ·  " + Net.fmtTime(m.dur));
-        View old = r.getChildAt(2);
-        ImageView cast = UiKit.roundButton(this, "cast", 36, false, v -> toTv(p));
-        r.removeView(old);
-        r.addView(cast, new LinearLayout.LayoutParams(dp(36), dp(36)));
-        // tap the row = play here on the phone (the cast icon alone sends to the TV)
-        r.setOnClickListener(v -> open(p));
-        r.setBackground(Ui.focusCard(this, 14));
+        View v;
+        if (mode <= 3) v = makeCard();
+        else if (mode == 6) v = makeTile();
+        else v = makeRow();
+        v.setTag(R.id.w_title, mode);
+        bind(p, v);
+        return v;
+    }
+
+    /** Card: big cover (square for songs, 16:9 for videos), duration badge, cast button, title, artist. */
+    private View makeCard() {
+        LinearLayout t = new LinearLayout(this);
+        t.setOrientation(LinearLayout.VERTICAL);
+        t.setPadding(0, 0, 0, dp(6));
+        FrameLayout pic = new FrameLayout(this);
+        int w = cellWidth();
+        int h = audio ? w : w * 9 / 16;
+        pic.addView(cover(mode == 3 ? 12 : 18), new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        TextView d = Ui.text(this, mode >= 2 ? 10 : 11, Color.WHITE, true);
+        d.setPadding(dp(6), dp(2), dp(6), dp(2));
+        d.setBackground(Ui.card(this, 0xB3000000, 0, 8));
+        FrameLayout.LayoutParams dl = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM | Gravity.START);
+        dl.setMargins(dp(7), 0, 0, dp(7));
+        pic.addView(d, dl);
+        int cs = mode >= 2 ? 30 : 36;
+        FrameLayout.LayoutParams cl = new FrameLayout.LayoutParams(dp(cs), dp(cs), Gravity.TOP | Gravity.END);
+        cl.setMargins(0, dp(6), dp(6), 0);
+        pic.addView(new View(this), cl);
+        t.addView(pic, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, h));
+        TextView n = line(mode == 0 ? 16 : mode >= 2 ? 12 : 14, Ui.TEXT, true, mode == 3 ? 1 : 2);
+        n.setPadding(dp(3), dp(7), dp(3), 0);
+        t.addView(n);
+        TextView s = line(mode >= 2 ? 10 : 12, Ui.DIM, false, 1);
+        s.setPadding(dp(3), 0, dp(3), 0);
+        if (mode == 3) s.setVisibility(View.GONE);
+        t.addView(s);
+        return t;
+    }
+
+    /** Tile: cover on the left, text on the right, in a rounded card. */
+    private View makeTile() {
+        LinearLayout r = new LinearLayout(this);
+        r.setGravity(Gravity.CENTER_VERTICAL);
+        r.setPadding(dp(8), dp(8), dp(8), dp(8));
+        r.addView(cover(14), new LinearLayout.LayoutParams(dp(64), audio ? dp(64) : dp(40)));
+        LinearLayout col = new LinearLayout(this);
+        col.setOrientation(LinearLayout.VERTICAL);
+        col.setPadding(dp(10), 0, dp(4), 0);
+        col.addView(line(13, Ui.TEXT, true, 2));
+        col.addView(line(11, Ui.DIM, false, 1));
+        col.addView(line(11, Ui.DIM, false, 1));
+        r.addView(col, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        r.addView(new View(this), new LinearLayout.LayoutParams(1, 1));   // (no cast button in tiles: long-press menu)
         return r;
+    }
+
+    /** List / Details / Content rows. */
+    private View makeRow() {
+        LinearLayout r = new LinearLayout(this);
+        r.setGravity(Gravity.CENTER_VERTICAL);
+        r.setPadding(dp(6), dp(mode == 7 ? 10 : 8), dp(4), dp(mode == 7 ? 10 : 8));
+        int as = mode == 7 ? 84 : mode == 5 ? 40 : 52;
+        r.addView(cover(mode == 7 ? 14 : 10), new LinearLayout.LayoutParams(dp(as), audio || mode != 7 ? dp(as) : dp(as) * 9 / 16));
+        LinearLayout col = new LinearLayout(this);
+        col.setOrientation(LinearLayout.VERTICAL);
+        col.setPadding(dp(12), 0, dp(8), 0);
+        col.addView(line(mode == 5 ? 14 : 15, Ui.TEXT, true, mode == 7 ? 2 : 1));
+        col.addView(line(12, Ui.DIM, false, 1));
+        TextView third = line(11, Ui.DIM, false, 1);
+        third.setVisibility(mode == 7 ? View.VISIBLE : View.GONE);
+        col.addView(third);
+        r.addView(col, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        if (mode == 5) {
+            // Details: right column with duration / size / date
+            LinearLayout right = new LinearLayout(this);
+            right.setOrientation(LinearLayout.VERTICAL);
+            right.setGravity(Gravity.END);
+            right.addView(line(12, Ui.TEXT, true, 1));
+            right.addView(line(11, Ui.DIM, false, 1));
+            right.addView(line(11, Ui.DIM, false, 1));
+            r.addView(right);
+        }
+        r.addView(new View(this), new LinearLayout.LayoutParams(dp(36), dp(36)));
+        return r;
+    }
+
+    private String date(long ms) {
+        return new java.text.SimpleDateFormat("d MMM yyyy", java.util.Locale.getDefault()).format(new java.util.Date(ms));
+    }
+
+    private void bind(final int p, View v) {
+        final PhoneMedia.M m = shown.get(p);
+        boolean cur = audio && MusicService.current() != null && MusicService.current().id == m.id;
+        if (mode <= 3) {
+            LinearLayout t = (LinearLayout) v;
+            FrameLayout pic = (FrameLayout) t.getChildAt(0);
+            loadArt((ImageView) pic.getChildAt(0), m);
+            ((TextView) pic.getChildAt(1)).setText(Net.fmtTime(m.dur));
+            View old = pic.getChildAt(2);
+            ImageView cast = UiKit.darkButton(this, "cast", mode >= 2 ? 30 : 36, false, x -> toTv(p));
+            pic.removeView(old);
+            pic.addView(cast, old.getLayoutParams());
+            TextView n = (TextView) t.getChildAt(1);
+            n.setText(m.title);
+            n.setTextColor(cur ? Ui.ACCENT : Ui.TEXT);
+            ((TextView) t.getChildAt(2)).setText(audio ? m.sub : m.folder + "  ·  " + TvInfo.gb(m.size));
+        } else if (mode == 6) {
+            LinearLayout r = (LinearLayout) v;
+            loadArt((ImageView) r.getChildAt(0), m);
+            LinearLayout col = (LinearLayout) r.getChildAt(1);
+            ((TextView) col.getChildAt(0)).setText(m.title);
+            ((TextView) col.getChildAt(0)).setTextColor(cur ? Ui.ACCENT : Ui.TEXT);
+            ((TextView) col.getChildAt(1)).setText(audio ? m.sub : m.folder);
+            ((TextView) col.getChildAt(2)).setText(Net.fmtTime(m.dur) + "  ·  " + TvInfo.gb(m.size));
+            r.setBackground(Ui.card(this, Ui.SOLID, Ui.STROKE, 16));
+        } else {
+            LinearLayout r = (LinearLayout) v;
+            loadArt((ImageView) r.getChildAt(0), m);
+            LinearLayout col = (LinearLayout) r.getChildAt(1);
+            ((TextView) col.getChildAt(0)).setText(m.title);
+            ((TextView) col.getChildAt(0)).setTextColor(cur ? Ui.ACCENT : Ui.TEXT);
+            String sub = audio ? m.sub : m.folder;
+            ((TextView) col.getChildAt(1)).setText(mode == 5 ? sub : sub + "  ·  " + Net.fmtTime(m.dur));
+            ((TextView) col.getChildAt(2)).setText(Net.fmtTime(m.dur) + "  ·  " + TvInfo.gb(m.size) + "  ·  " + date(m.added));
+            int castAt = 2;
+            if (mode == 5) {
+                LinearLayout right = (LinearLayout) r.getChildAt(2);
+                ((TextView) right.getChildAt(0)).setText(Net.fmtTime(m.dur));
+                ((TextView) right.getChildAt(1)).setText(TvInfo.gb(m.size));
+                ((TextView) right.getChildAt(2)).setText(date(m.added));
+                castAt = 3;
+            }
+            View old = r.getChildAt(castAt);
+            r.removeView(old);
+            r.addView(UiKit.roundButton(this, "cast", 36, false, x -> toTv(p)), new LinearLayout.LayoutParams(dp(36), dp(36)));
+        }
+        // the cell handles its own taps (a button inside a cell blocks the list's tap)
+        v.setOnClickListener(x -> open(p));
+        v.setOnLongClickListener(x -> {
+            details(m, p);
+            return true;
+        });
+        if (mode != 6) v.setBackground(Ui.focusCard(this, 16));
+    }
+
+    // ------------------------------------------------------------------ details sheet
+    private void details(final PhoneMedia.M m, final int p) {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(20), dp(8), dp(20), dp(4));
+        final ImageView big = cover(20);
+        int w = getResources().getDisplayMetrics().widthPixels - dp(100);
+        box.addView(big, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, audio ? Math.min(w, dp(300)) : w * 9 / 16));
+        loadArt(big, m);
+        TextView t = line(18, Ui.TEXT, true, 3);
+        t.setText(m.title);
+        t.setPadding(0, dp(12), 0, dp(6));
+        box.addView(t);
+        final LinearLayout table = new LinearLayout(this);
+        table.setOrientation(LinearLayout.VERTICAL);
+        box.addView(table);
+        TextView wait = line(12, Ui.DIM, false, 1);
+        wait.setText("…");
+        table.addView(wait);
+        android.widget.ScrollView sv = new android.widget.ScrollView(this);
+        sv.addView(box);
+        new UiDialog(this).setView(sv)
+                .setPositiveButton(T.t("Play here"), (d, x) -> open(p))
+                .setNeutralButton(T.t("Play on the TV"), (d, x) -> toTv(p))
+                .setNegativeButton(T.t("Close"), null).show();
+        ex.execute(() -> {
+            final java.util.LinkedHashMap<String, String> info = PhoneMedia.details(this, m, audio);
+            main.post(() -> {
+                table.removeAllViews();
+                for (java.util.Map.Entry<String, String> e : info.entrySet()) {
+                    LinearLayout row = new LinearLayout(this);
+                    row.setPadding(0, dp(5), 0, dp(5));
+                    TextView k = line(13, Ui.DIM, false, 1);
+                    k.setText(e.getKey());
+                    row.addView(k, new LinearLayout.LayoutParams(dp(96), ViewGroup.LayoutParams.WRAP_CONTENT));
+                    TextView val = line(13, Ui.TEXT, false, 3);
+                    val.setText(e.getValue());
+                    row.addView(val, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+                    table.addView(row);
+                }
+            });
+        });
     }
 
     // ------------------------------------------------------------------ actions

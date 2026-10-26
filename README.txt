@@ -1,3 +1,17 @@
+TAMILCASTPLAY 3.2 — card style + view modes for phone Videos / Music
+====================================================================
+* View button (grid icon, top right) like Windows Explorer: Extra large icons, Large
+  icons, Medium icons, Small icons, List, Details, Tiles, Content. Remembered separately
+  for Music and Videos. Default: Large icons (cards).
+* Cards: big cover (square for songs, 16:9 for videos), duration badge, cast button,
+  title and artist / folder.
+* Real covers: the picture stored inside the song file (MP3 / M4A / FLAC) is used when
+  Android has none; songs without any cover get a colourful card with the first letter.
+* Hold any song or video (or the cast-less tile) = Details sheet: big cover, artist,
+  album, composer, year, genre, track, duration, bitrate, sample rate, format, size,
+  folder, date added, file name; video: resolution (4K / 1080p / 720p …) and frame rate.
+  Buttons: Play here · Play on the TV.
+
 TAMILCASTPLAY 3.1 — new browser + Shield ad blocker, phone music fix
 ====================================================================
 FIXED: in Videos / Music on the phone, tapping a song or video now plays it HERE on the

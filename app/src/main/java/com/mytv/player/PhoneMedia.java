@@ -104,9 +104,129 @@ public final class PhoneMedia {
             }
         } catch (Throwable ignored) {
         }
+        if (b == null && audio) b = embedded(c, m);       // the cover stored inside the song file
         if (b != null) ART.put(k, b);
         else NONE.put(k, true);
         return b;
+    }
+
+    /** Cover picture embedded in an MP3 / M4A / FLAC file. */
+    static Bitmap embedded(Context c, M m) {
+        android.media.MediaMetadataRetriever r = new android.media.MediaMetadataRetriever();
+        try {
+            r.setDataSource(c, m.uri);
+            byte[] pic = r.getEmbeddedPicture();
+            if (pic == null) return null;
+            BitmapFactory.Options o = new BitmapFactory.Options();
+            o.inJustDecodeBounds = true;
+            BitmapFactory.decodeByteArray(pic, 0, pic.length, o);
+            int s = 1;
+            while (o.outWidth / (s * 2) >= 480) s *= 2;
+            o = new BitmapFactory.Options();
+            o.inSampleSize = s;
+            return BitmapFactory.decodeByteArray(pic, 0, pic.length, o);
+        } catch (Throwable e) {
+            return null;
+        } finally {
+            try {
+                r.release();
+            } catch (Throwable ignored) {
+            }
+        }
+    }
+
+    /** Colourful card with the first letter, for songs / videos without a picture. */
+    public static android.graphics.drawable.Drawable placeholder(Context c, M m, boolean audio) {
+        final int[][] cols = {{0xFF8B5CF6, 0xFFEC4899}, {0xFF0EA5E9, 0xFF6366F1}, {0xFF10B981, 0xFF0EA5E9}, {0xFFF97316, 0xFFEF4444},
+                {0xFFEAB308, 0xFFF97316}, {0xFF14B8A6, 0xFF8B5CF6}, {0xFFD946EF, 0xFF6366F1}, {0xFF22C55E, 0xFFEAB308}};
+        final int[] g = cols[Math.abs(m.title.hashCode()) % cols.length];
+        final String letter = m.title.trim().isEmpty() ? "♪" : m.title.trim().substring(0, 1).toUpperCase(java.util.Locale.ROOT);
+        final UiKit.Icon note = new UiKit.Icon(c, audio ? "list-music" : "film", 18, 0xCCFFFFFF);
+        return new android.graphics.drawable.Drawable() {
+            final android.graphics.Paint p = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+
+            public void draw(android.graphics.Canvas cv) {
+                android.graphics.Rect b = getBounds();
+                p.setShader(new android.graphics.LinearGradient(b.left, b.top, b.right, b.bottom, g[0], g[1],
+                        android.graphics.Shader.TileMode.CLAMP));
+                cv.drawRect(b, p);
+                p.setShader(null);
+                p.setColor(0xF2FFFFFF);
+                p.setTextAlign(android.graphics.Paint.Align.CENTER);
+                p.setFakeBoldText(true);
+                p.setTextSize(Math.min(b.width(), b.height()) * 0.42f);
+                android.graphics.Paint.FontMetrics fm = p.getFontMetrics();
+                cv.drawText(letter, b.exactCenterX(), b.exactCenterY() - (fm.ascent + fm.descent) / 2, p);
+                int is = Math.max(16, Math.min(b.width(), b.height()) / 6);
+                note.setBounds(b.right - is - is / 2, b.bottom - is - is / 2, b.right - is / 2, b.bottom - is / 2);
+                note.draw(cv);
+            }
+
+            public void setAlpha(int a) {
+                p.setAlpha(a);
+            }
+
+            public void setColorFilter(android.graphics.ColorFilter f) {
+                p.setColorFilter(f);
+            }
+
+            public int getOpacity() {
+                return android.graphics.PixelFormat.OPAQUE;
+            }
+        };
+    }
+
+    /** Everything known about a song / video (for the details sheet). Background thread. */
+    public static java.util.LinkedHashMap<String, String> details(Context c, M m, boolean audio) {
+        java.util.LinkedHashMap<String, String> d = new java.util.LinkedHashMap<>();
+        android.media.MediaMetadataRetriever r = new android.media.MediaMetadataRetriever();
+        try {
+            r.setDataSource(c, m.uri);
+            if (audio) {
+                put(d, T.t("Artist"), r.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_ARTIST));
+                put(d, T.t("Album"), r.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_ALBUM));
+                put(d, T.t("Composer"), r.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_COMPOSER));
+                put(d, T.t("Year"), r.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_YEAR));
+                put(d, T.t("Genre"), r.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_GENRE));
+                put(d, T.t("Track"), r.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_CD_TRACK_NUMBER));
+            } else {
+                String w = r.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH);
+                String h = r.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT);
+                if (w != null && h != null) put(d, T.t("Resolution"), w + " × " + h + "  (" + quality(Integer.parseInt(h), Integer.parseInt(w)) + ")");
+                if (Build.VERSION.SDK_INT >= 23) {
+                    String fps = r.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_CAPTURE_FRAMERATE);
+                    if (fps != null) put(d, T.t("Frame rate"), fps + " fps");
+                }
+            }
+            put(d, T.t("Duration"), Net.fmtTime(m.dur));
+            String br = r.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_BITRATE);
+            if (br != null) put(d, T.t("Bitrate"), (Long.parseLong(br) / 1000) + " kbps");
+            if (audio && Build.VERSION.SDK_INT >= 31) {
+                String sr = r.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_SAMPLERATE);
+                if (sr != null) put(d, T.t("Sample rate"), (Integer.parseInt(sr) / 1000f) + " kHz");
+            }
+            put(d, T.t("Format"), c.getContentResolver().getType(m.uri));
+        } catch (Throwable ignored) {
+        } finally {
+            try {
+                r.release();
+            } catch (Throwable ignored) {
+            }
+        }
+        put(d, T.t("Size"), TvInfo.gb(m.size));
+        put(d, T.t("Folder"), m.folder);
+        put(d, T.t("Added"), new java.text.SimpleDateFormat("d MMM yyyy, HH:mm", java.util.Locale.getDefault()).format(new java.util.Date(m.added)));
+        put(d, T.t("File"), LocalShare.displayName(c, m.uri));
+        return d;
+    }
+
+    private static String quality(int h, int w) {
+        int s = Math.min(h, w) == 0 ? Math.max(h, w) : Math.min(h, w);
+        return s >= 2000 ? "4K" : s >= 1000 ? "1080p" : s >= 700 ? "720p" : s >= 470 ? "480p" : s + "p";
+    }
+
+    private static void put(java.util.Map<String, String> d, String k, String v) {
+        if (v != null && !v.trim().isEmpty() && !"null".equals(v)) d.put(k, v.trim());
     }
 
     // ------------------------------------------------------------------ hand over to the TV
