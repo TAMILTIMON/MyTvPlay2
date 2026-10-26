@@ -73,6 +73,14 @@ public class PhoneLibraryActivity extends AppCompatActivity {
         TextView h = Ui.text(this, 21, Ui.TEXT, true);
         h.setText("  " + T.t(audio ? "Music on this phone" : "Videos on this phone"));
         top.addView(h, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        if (audio) {
+            ImageView fx = UiKit.roundButton(this, "wand-sparkles", 42, false,
+                    v -> startActivity(new android.content.Intent(this, ToolsActivity.class)));
+            fx.setContentDescription(T.t("Features"));
+            top.addView(fx);
+            View g0 = new View(this);
+            top.addView(g0, new LinearLayout.LayoutParams(dp(8), 1));
+        }
         top.addView(UiKit.roundButton(this, "layout-grid", 42, false, v -> pickView()));
         View g1 = new View(this);
         top.addView(g1, new LinearLayout.LayoutParams(dp(8), 1));
@@ -105,6 +113,12 @@ public class PhoneLibraryActivity extends AppCompatActivity {
         chips = new LinearLayout(this);
         hs.addView(chips);
         root.addView(hs);
+        if (audio) {
+            crumb = new LinearLayout(this);
+            crumb.setGravity(Gravity.CENTER_VERTICAL);
+            crumb.setPadding(0, dp(8), 0, 0);
+            root.addView(crumb);
+        }
         status = Ui.text(this, 12, Ui.DIM, false);
         status.setPadding(dp(4), dp(6), 0, dp(6));
         root.addView(status);
@@ -161,7 +175,98 @@ public class PhoneLibraryActivity extends AppCompatActivity {
         });
     }
 
+    // music: Songs · Albums · Artists · Genres · Folders · Playlists
+    private int tab = 0;
+    private String groupKey, plName;
+    private static final String[] TABS = {"Songs", "Albums", "Artists", "Genres", "Folders", "Playlists"};
+    private static final String[] TAB_ICON = {"list-music", "library", "users", "audio-lines", "folder", "list-video"};
+    private LinearLayout crumb;
+
+    private void buildTabs() {
+        chips.removeAllViews();
+        for (int i = 0; i < TABS.length; i++) {
+            final int k = i;
+            Button c = Ui.button(this, T.t(TABS[i]), i == tab);
+            c.setTextSize(13);
+            c.setAllCaps(false);
+            c.setCompoundDrawablesWithIntrinsicBounds(new UiKit.Icon(this, TAB_ICON[i], 16, i == tab ? Color.WHITE : Ui.TEXT), null, null, null);
+            c.setCompoundDrawablePadding(dp(6));
+            c.setOnClickListener(v -> {
+                tab = k;
+                groupKey = null;
+                plName = null;
+                buildTabs();
+                apply();
+            });
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(38));
+            lp.setMargins(0, 0, dp(8), 0);
+            chips.addView(c, lp);
+        }
+    }
+
+    /** "‹ Name" with Shuffle · Play all (· playlist menu) when inside a group / playlist, or on the Songs tab. */
+    private void buildCrumb() {
+        if (crumb == null) return;
+        crumb.removeAllViews();
+        boolean inside = groupKey != null || plName != null;
+        crumb.setVisibility(inside || tab == 0 ? View.VISIBLE : View.GONE);
+        if (inside) {
+            crumb.addView(UiKit.roundButton(this, "arrow-left", 36, false, v -> {
+                groupKey = null;
+                plName = null;
+                apply();
+            }));
+            TextView t = Ui.text(this, 15, Ui.TEXT, true);
+            t.setText("  " + (plName != null ? plName : groupKey));
+            t.setSingleLine(true);
+            t.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            crumb.addView(t, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        } else crumb.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1));
+        crumb.addView(UiKit.roundButton(this, "shuffle", 38, false, v -> playAll(true)));
+        crumb.addView(new View(this), new LinearLayout.LayoutParams(dp(8), 1));
+        crumb.addView(UiKit.roundButton(this, "play", 38, true, v -> playAll(false)));
+        if (plName != null && MusicLib.playlistNames().contains(plName)) {
+            crumb.addView(new View(this), new LinearLayout.LayoutParams(dp(8), 1));
+            crumb.addView(UiKit.roundButton(this, "ellipsis-vertical", 38, false, v -> playlistMenu(plName)));
+        }
+    }
+
+    private void playAll(boolean shuffle) {
+        List<PhoneMedia.M> songs = new ArrayList<>();
+        for (PhoneMedia.M m : shown) if (m.groupKey == null) songs.add(m);
+        if (songs.isEmpty()) return;
+        MusicService.shuffle = shuffle;
+        Store.putBool("m_shuffle", shuffle);
+        MusicService.play(this, songs, shuffle ? new java.util.Random().nextInt(songs.size()) : 0);
+        startActivity(new android.content.Intent(this, MusicActivity.class));
+    }
+
+    private void playlistMenu(final String name) {
+        String[] o = {"✏  " + T.t("Rename playlist"), "🗑  " + T.t("Delete playlist"), "＋  " + T.t("Add to queue")};
+        new UiDialog(this).setTitle(name).setItems(o, (d, w) -> {
+            if (w == 0) {
+                final EditText e = new EditText(this);
+                e.setText(name);
+                new UiDialog(this).setTitle(T.t("Rename playlist")).setView(e).setPositiveButton(T.t("Save"), (d2, w2) -> {
+                    if (MusicLib.rename(name, e.getText().toString())) plName = e.getText().toString().trim();
+                    apply();
+                }).setNegativeButton(T.t("Cancel"), null).show();
+            } else if (w == 1) {
+                new UiDialog(this).setTitle(T.t("Delete playlist") + "?").setMessage(name + "\n\n" + T.t("The songs stay on the phone."))
+                        .setPositiveButton(T.t("Delete"), (d2, w2) -> {
+                            MusicLib.delete(name);
+                            plName = null;
+                            apply();
+                        }).setNegativeButton(T.t("Cancel"), null).show();
+            } else MusicService.addToQueue(this, MusicLib.resolve(MusicLib.songs(name), all));
+        }).show();
+    }
+
     private void buildChips() {
+        if (audio) {
+            buildTabs();
+            return;
+        }
         chips.removeAllViews();
         Map<String, Integer> f = new LinkedHashMap<>();
         for (PhoneMedia.M m : all) if (!m.folder.isEmpty()) f.put(m.folder, (f.containsKey(m.folder) ? f.get(m.folder) : 0) + 1);
@@ -195,7 +300,65 @@ public class PhoneLibraryActivity extends AppCompatActivity {
         }).show();
     }
 
+    private boolean match(PhoneMedia.M m) {
+        return query.isEmpty() || m.title.toLowerCase(Locale.ROOT).contains(query) || m.sub.toLowerCase(Locale.ROOT).contains(query)
+                || m.albumName.toLowerCase(Locale.ROOT).contains(query);
+    }
+
+    private void applyMusic() {
+        shown.clear();
+        String hint;
+        if (tab == 5) {
+            if (plName == null) {
+                List<String> names = new ArrayList<>();
+                names.add(MusicLib.FAV);
+                names.add(MusicLib.RECENT);
+                names.add(MusicLib.MOST);
+                names.addAll(MusicLib.playlistNames());
+                for (String n : names) {
+                    if (!query.isEmpty() && !n.toLowerCase(Locale.ROOT).contains(query)) continue;
+                    shown.add(PhoneMedia.group(n, n, MusicLib.resolve(MusicLib.songs(n), all)));
+                }
+                PhoneMedia.M add = PhoneMedia.group("+new", "＋ " + T.t("New playlist"), new ArrayList<PhoneMedia.M>());
+                add.sub = T.t("tap to create");
+                shown.add(add);
+                hint = T.t("hold a playlist for more");
+            } else {
+                for (PhoneMedia.M m : MusicLib.resolve(MusicLib.songs(plName), all)) if (match(m)) shown.add(m);
+                hint = T.t("hold a song: remove, move up / down, add to playlist…");
+            }
+        } else if (tab >= 1) {
+            LinkedHashMap<String, List<PhoneMedia.M>> g = MusicLib.group(all, tab - 1);
+            if (groupKey == null) {
+                for (Map.Entry<String, List<PhoneMedia.M>> e : g.entrySet()) {
+                    if (!query.isEmpty() && !e.getKey().toLowerCase(Locale.ROOT).contains(query)) continue;
+                    shown.add(PhoneMedia.group(e.getKey(), e.getKey(), e.getValue()));
+                }
+                hint = T.t("tap to open · hold for play / add to playlist");
+            } else {
+                List<PhoneMedia.M> l = g.get(groupKey);
+                if (l != null) for (PhoneMedia.M m : l) if (match(m)) shown.add(m);
+                hint = T.t("tap = play here · hold = more");
+            }
+        } else {
+            for (PhoneMedia.M m : all) if (match(m)) shown.add(m);
+            hint = T.t("tap = play here · cast icon = TV · hold = more");
+        }
+        boolean songs = !shown.isEmpty() && shown.get(0).groupKey == null;
+        if (songs && plName == null) {
+            if (sort == 1) Collections.sort(shown, (a, b) -> a.title.compareToIgnoreCase(b.title));
+            else if (sort == 2) Collections.sort(shown, (a, b) -> a.sub.compareToIgnoreCase(b.sub));
+        }
+        status.setText(all.isEmpty() ? T.t("No music found on this phone.") : shown.size() + "  ·  " + hint);
+        buildCrumb();
+        ad.notifyDataSetChanged();
+    }
+
     private void apply() {
+        if (audio) {
+            applyMusic();
+            return;
+        }
         shown.clear();
         for (PhoneMedia.M m : all) {
             if (!folder.isEmpty() && !folder.equals(m.folder)) continue;
@@ -386,7 +549,7 @@ public class PhoneLibraryActivity extends AppCompatActivity {
             LinearLayout t = (LinearLayout) v;
             FrameLayout pic = (FrameLayout) t.getChildAt(0);
             loadArt((ImageView) pic.getChildAt(0), m);
-            ((TextView) pic.getChildAt(1)).setText(Net.fmtTime(m.dur));
+            ((TextView) pic.getChildAt(1)).setText(m.groupKey != null ? m.count + " ♪" : Net.fmtTime(m.dur));
             View old = pic.getChildAt(2);
             ImageView cast = UiKit.darkButton(this, "cast", mode >= 2 ? 30 : 36, false, x -> toTv(p));
             pic.removeView(old);
@@ -428,10 +591,59 @@ public class PhoneLibraryActivity extends AppCompatActivity {
         // the cell handles its own taps (a button inside a cell blocks the list's tap)
         v.setOnClickListener(x -> open(p));
         v.setOnLongClickListener(x -> {
-            details(m, p);
+            if (!audio) details(m, p);
+            else if (m.groupKey != null) groupMenu(m);
+            else {
+                int inPl = plName == null ? -1 : MusicLib.songs(plName).indexOf(m.uri.toString());
+                MusicDialogs.songActions(this, m, plName, inPl, this::apply, mm -> details(mm, p));
+            }
             return true;
         });
         if (mode != 6) v.setBackground(Ui.focusCard(this, 16));
+    }
+
+    /** Hold an album / artist / genre / folder / playlist card. */
+    private void groupMenu(final PhoneMedia.M g) {
+        if ("+new".equals(g.groupKey)) return;
+        final List<PhoneMedia.M> songs = tab == 5 ? MusicLib.resolve(MusicLib.songs(g.groupKey), all)
+                : MusicLib.group(all, tab - 1).get(g.groupKey);
+        final boolean own = tab == 5 && MusicLib.playlistNames().contains(g.groupKey);
+        if (songs == null || songs.isEmpty()) {
+            if (own) playlistMenu(g.groupKey);
+            return;
+        }
+        List<String> o = new ArrayList<>();
+        o.add("▶  " + T.t("Play"));
+        o.add("🔀  " + T.t("Shuffle"));
+        o.add("⏭  " + T.t("Play next"));
+        o.add("＋  " + T.t("Add to queue"));
+        o.add("🎵  " + T.t("Add to playlist…"));
+        o.add("📺  " + T.t("Play on the TV"));
+        if (own) o.add("✏  " + T.t("Rename / delete playlist"));
+        new UiDialog(this).setTitle(g.title).setItems(o.toArray(new String[0]), (d, w) -> {
+            switch (w) {
+                case 0:
+                case 1:
+                    MusicService.shuffle = w == 1;
+                    Store.putBool("m_shuffle", w == 1);
+                    MusicService.play(this, songs, w == 1 ? new java.util.Random().nextInt(songs.size()) : 0);
+                    startActivity(new android.content.Intent(this, MusicActivity.class));
+                    break;
+                case 2: MusicService.playNext(this, songs); break;
+                case 3: MusicService.addToQueue(this, songs); break;
+                case 4: MusicDialogs.addToPlaylist(this, MusicDialogs.uris(songs), this::apply); break;
+                case 5: {
+                    final List<Store.Item> items = new ArrayList<>();
+                    for (PhoneMedia.M m : songs) items.add(m.item());
+                    ex.execute(() -> {
+                        final String r = PhoneMedia.sendToTv(this, items, 0, 0);
+                        main.post(() -> UiKit.makeToast(this, r, android.widget.Toast.LENGTH_LONG).show());
+                    });
+                    break;
+                }
+                default: playlistMenu(g.groupKey);
+            }
+        }).show();
     }
 
     // ------------------------------------------------------------------ details sheet
@@ -480,8 +692,28 @@ public class PhoneLibraryActivity extends AppCompatActivity {
 
     // ------------------------------------------------------------------ actions
     private void open(int pos) {
+        PhoneMedia.M g = shown.get(pos);
+        if (audio && g.groupKey != null) {
+            if ("+new".equals(g.groupKey)) {
+                MusicDialogs.newPlaylist(this, n -> {
+                    plName = n;
+                    apply();
+                    UiKit.makeToast(this, T.t("Hold songs in any tab → Add to playlist"), android.widget.Toast.LENGTH_LONG).show();
+                });
+            } else if (tab == 5) plName = g.groupKey;
+            else groupKey = g.groupKey;
+            apply();
+            return;
+        }
         if (audio) {
-            MusicService.play(this, shown, pos);
+            List<PhoneMedia.M> songs = new ArrayList<>();
+            int start = 0;
+            for (int i = 0; i < shown.size(); i++) {
+                if (shown.get(i).groupKey != null) continue;
+                if (i == pos) start = songs.size();
+                songs.add(shown.get(i));
+            }
+            MusicService.play(this, songs, start);
             startActivity(new android.content.Intent(this, MusicActivity.class));
             return;
         }

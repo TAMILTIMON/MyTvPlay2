@@ -121,12 +121,31 @@ public final class UiKit {
     }
 
     // ================================================================== round icon button
+    // spoken names of icon buttons (TalkBack / screen readers)
+    private static final String[][] SPOKEN = {{"play", "Play"}, {"pause", "Pause"}, {"skip-back", "Previous"}, {"skip-forward", "Next"},
+            {"shuffle", "Shuffle"}, {"repeat", "Repeat"}, {"repeat-1", "Repeat one"}, {"rotate-ccw", "Back 10 seconds"},
+            {"rotate-cw", "Forward 10 seconds"}, {"undo-2", "Back 30 seconds"}, {"cast", "Play on the TV"}, {"heart", "Favourite"},
+            {"mic-vocal", "Lyrics"}, {"sliders-horizontal", "Equalizer"}, {"ellipsis-vertical", "More options"}, {"chevron-down", "Close"},
+            {"x", "Close"}, {"arrow-left", "Back"}, {"house", "Home"}, {"layers", "Recent apps"}, {"menu", "Menu"}, {"power", "Power"},
+            {"volume-1", "TV volume down"}, {"volume-2", "TV volume up"}, {"volume-x", "Mute"}, {"keyboard", "Keyboard"}, {"mic", "Voice"},
+            {"search", "Search"}, {"settings", "Settings"}, {"tv", "TV"}, {"list-music", "Queue"}, {"circle-stop", "Stop"},
+            {"camera", "Screenshot"}, {"bookmark-plus", "Bookmark this scene"}, {"bookmark", "Bookmarks"}, {"audio-lines", "Audio only"},
+            {"circle-play", "Play or pause"}, {"layout-grid", "View"}, {"check", "Done"}, {"sun", "Light theme"}, {"moon", "Dark theme"},
+            {"chevron-up", "Up"}, {"chevron-left", "Left"}, {"chevron-right", "Right"}, {"lock", "Lock"}, {"monitor", "Picture"},
+            {"captions", "Subtitles"}, {"list-video", "Channels"}};
+
+    public static String spoken(String icon) {
+        for (String[] p : SPOKEN) if (p[0].equals(icon)) return T.t(p[1]);
+        return icon.replace('-', ' ');
+    }
+
     /** Circle button with a Lucide icon. primary = accent gradient. */
     public static ImageView roundButton(final Context c, String iconName, int sizeDp, boolean primary, View.OnClickListener l) {
         final ImageView b = new ImageView(c);
         int ic = primary ? Color.WHITE : Ui.TEXT;
         b.setImageDrawable(new Icon(c, iconName, Math.round(sizeDp * 0.46f), ic));
         b.setScaleType(ImageView.ScaleType.CENTER);
+        b.setContentDescription(spoken(iconName));
         StateListDrawable sl = new StateListDrawable();
         GradientDrawable on = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{Ui.ACCENT, Ui.ACCENT2});
         on.setShape(GradientDrawable.OVAL);

@@ -94,6 +94,111 @@ public class MusicService extends Service implements MediaPlayer.OnCompletionLis
         }
     }
 
+    // ---- speed / sleep timer / queue editing
+    public static float speed = 1f;
+    public static long sleepAt;          // 0 = off
+    public static boolean sleepAfterSong;
+
+    public static void setSpeed(float sp) {
+        speed = sp;
+        MusicService s = inst;
+        if (s != null && s.prepared && Build.VERSION.SDK_INT >= 23) {
+            try {
+                boolean was = s.mp.isPlaying();
+                s.mp.setPlaybackParams(s.mp.getPlaybackParams().setSpeed(sp));
+                if (!was) s.mp.pause();
+            } catch (Exception ignored) {
+            }
+        }
+        if (s != null) s.changed();
+    }
+
+    /** minutes > 0 = stop after that time, 0 = off, -1 = at the end of this song. */
+    public static void sleep(int minutes) {
+        sleepAfterSong = minutes < 0;
+        sleepAt = minutes > 0 ? System.currentTimeMillis() + minutes * 60000L : 0;
+        MusicService s = inst;
+        if (s != null) {
+            s.main.removeCallbacks(s.sleepCheck);
+            if (sleepAt > 0) s.main.postDelayed(s.sleepCheck, 1000);
+            s.changed();
+        }
+    }
+
+    private final Runnable sleepCheck = new Runnable() {
+        public void run() {
+            if (sleepAt == 0) return;
+            if (System.currentTimeMillis() >= sleepAt) {
+                sleepAt = 0;
+                fadeAndPause();
+            } else main.postDelayed(this, 1000);
+        }
+    };
+
+    /** Gentle fade out over 3 s, then pause. */
+    private void fadeAndPause() {
+        final float[] v = {1f};
+        final float[] bal = MusicFx.balance();
+        main.post(new Runnable() {
+            public void run() {
+                v[0] -= 0.1f;
+                if (mp != null) mp.setVolume(Math.max(0, v[0]) * bal[0], Math.max(0, v[0]) * bal[1]);
+                if (v[0] > 0) main.postDelayed(this, 300);
+                else {
+                    pause();
+                    if (mp != null) mp.setVolume(bal[0], bal[1]);
+                }
+            }
+        });
+    }
+
+    public static void playNext(Context c, List<PhoneMedia.M> songs) {
+        if (inst == null || queue.isEmpty()) {
+            play(c, songs, 0);
+            return;
+        }
+        queue.addAll(Math.min(queue.size(), index + 1), songs);
+        inst.changed();
+    }
+
+    public static void addToQueue(Context c, List<PhoneMedia.M> songs) {
+        if (inst == null || queue.isEmpty()) {
+            play(c, songs, 0);
+            return;
+        }
+        queue.addAll(songs);
+        inst.changed();
+    }
+
+    public static void removeFromQueue(int i) {
+        if (i < 0 || i >= queue.size() || i == index) return;
+        queue.remove(i);
+        if (i < index) index--;
+        if (inst != null) inst.changed();
+    }
+
+    public static void moveInQueue(int from, int to) {
+        if (from < 0 || to < 0 || from >= queue.size() || to >= queue.size()) return;
+        PhoneMedia.M m = queue.remove(from);
+        queue.add(to, m);
+        if (index == from) index = to;
+        else if (from < index && to >= index) index--;
+        else if (from > index && to <= index) index++;
+        if (inst != null) inst.changed();
+    }
+
+    public static void refreshBalance() {
+        MusicService s = inst;
+        if (s != null && s.mp != null) {
+            float[] b = MusicFx.balance();
+            s.mp.setVolume(b[0], b[1]);
+        }
+    }
+
+    public static void refresh() {
+        if (inst != null) inst.changed();
+    }
+
     public static void seek(long ms) {
         MusicService s = inst;
         if (s != null && s.prepared) s.mp.seekTo((int) ms);
@@ -128,6 +233,7 @@ public class MusicService extends Service implements MediaPlayer.OnCompletionLis
         inst = this;
         Store.init(this);
         shuffle = Store.getBool("m_shuffle", false);
+        speed = Store.getFloat("m_speed", 1f);
         repeat = Store.getInt("m_repeat", 0);
         am = (AudioManager) getSystemService(AUDIO_SERVICE);
         session = new MediaSession(this, "ZHPlayMusic");
@@ -177,7 +283,9 @@ public class MusicService extends Service implements MediaPlayer.OnCompletionLis
                         .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build());
                 mp.setOnCompletionListener(this);
                 mp.setOnErrorListener((p, w, e) -> {
-                    main.postDelayed(() -> next(false), 600);
+                    PhoneMedia.M bad = current();
+                    error(bad);
+                    main.postDelayed(() -> next(false), 1200);
                     return true;
                 });
             }
@@ -185,12 +293,23 @@ public class MusicService extends Service implements MediaPlayer.OnCompletionLis
             mp.setDataSource(this, m.uri);
             mp.setOnPreparedListener(p -> {
                 prepared = true;
+                MusicFx.attach(p.getAudioSessionId());
+                float[] bal = MusicFx.balance();
+                p.setVolume(bal[0], bal[1]);
+                if (Build.VERSION.SDK_INT >= 23 && speed != 1f) {
+                    try {
+                        p.setPlaybackParams(p.getPlaybackParams().setSpeed(speed));
+                    } catch (Exception ignored) {
+                    }
+                }
                 if (focus()) p.start();
+                MusicLib.played(m.uri.toString());
                 changed();
             });
             mp.prepareAsync();
         } catch (Exception e) {
-            main.postDelayed(() -> next(false), 600);
+            error(m);
+            main.postDelayed(() -> next(false), 1200);
         }
         art = null;
         new Thread(() -> {
@@ -198,6 +317,13 @@ public class MusicService extends Service implements MediaPlayer.OnCompletionLis
             main.post(this::changed);
         }).start();
         changed();
+    }
+
+    /** Unsupported / damaged / deleted file: say so instead of silently skipping. */
+    private void error(PhoneMedia.M m) {
+        final String name = m == null ? "" : m.title;
+        main.post(() -> UiKit.makeToast(this, T.t("Can't play") + " “" + name + "”: "
+                + T.t("the file is unsupported, damaged or was deleted. Playing the next song."), android.widget.Toast.LENGTH_LONG).show());
     }
 
     private boolean focus() {
@@ -270,6 +396,11 @@ public class MusicService extends Service implements MediaPlayer.OnCompletionLis
 
     @Override
     public void onCompletion(MediaPlayer p) {
+        if (sleepAfterSong) {
+            sleepAfterSong = false;
+            pause();
+            return;
+        }
         if (repeat == 2) playIndex(index);
         else next(false);
     }
@@ -355,6 +486,7 @@ public class MusicService extends Service implements MediaPlayer.OnCompletionLis
         } catch (Exception ignored) {
         }
         if (mp != null) mp.release();
+        MusicFx.release();
         if (session != null) session.release();
         if (Build.VERSION.SDK_INT >= 26 && focusReq != null) am.abandonAudioFocusRequest(focusReq);
         super.onDestroy();

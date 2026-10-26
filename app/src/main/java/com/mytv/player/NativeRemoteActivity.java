@@ -685,6 +685,8 @@ public class NativeRemoteActivity extends AppCompatActivity {
         shareSub = (TextView) tShare.findViewWithTag("sub");
         p.addView(UiKit.grid(this, 3,
                 UiKit.tile(this, "sparkles", T.t("AI assistant"), T.t("Tamil · English · Tanglish"), 0xFF8B5CF6, v -> openAi()),
+                UiKit.tile(this, "wand-sparkles", T.t("Features"), T.t("EQ, cutter, karaoke…"), 0xFFF43F5E,
+                        v -> startActivity(new Intent(this, ToolsActivity.class))),
                 UiKit.tile(this, "film", T.t("Videos"), T.t("on this phone"), 0xFF0EA5E9,
                         v -> startActivity(new Intent(this, PhoneLibraryActivity.class))),
                 UiKit.tile(this, "list-music", T.t("Music"), T.t("on this phone"), 0xFFD946EF,

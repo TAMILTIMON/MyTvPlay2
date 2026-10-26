@@ -1,18 +1,51 @@
-ZH PLAY 3.4 — separate TV and Mobile apps (Play Protect friendly)
-=================================================================
-Every build now makes two variants from the same code:
-  ZHPlay-tv-…apk      → install on the TV  (everything: remote for every app, ADB,
-                         notification access, boot start, USB files, self-update)
-  ZHPlay-mobile-…apk  → install on phones  (no accessibility service, no notification
-                         access, no "display over other apps", no all-files access, no
-                         "close other apps", no boot start, no package installer)
-Those TV-only permissions are what Google Play Protect blocks in apps from outside the
-Play Store. Same app ID + key: each installs over the old app and keeps all data.
-Phone updates: "Check for updates" opens the download in the browser; tap the file to
-install. TV updates install directly as before.
-Which file: TV → ZHPlay-tv-armeabi-v7a-release.apk (or -universal-)
-            phone → ZHPlay-mobile-universal-release.apk (or -arm64-v8a-)
-If Play Protect still warns: "More details" → "Install anyway".
+ZH PLAY 3.6 — Poweramp-style equalizer + Features menu (phone music)
+====================================================================
+Equalizer (Music → Now playing → Equalizer, or Features → Equalizer)
+* Tabs like Poweramp: Equalizer · Tone · Effects. ON/OFF, presets (20 built-in incl.
+  Tamil melody, Kuthu / Folk, Car, Headphones, Podcast…) + your own saved presets.
+* 10 bands 31 Hz – 16 kHz (±15 dB) + preamp (±12 dB), glowing sliders (double-tap = 0),
+  response curve over a LIVE spectrum (the moving bars — Android asks for the
+  "microphone" permission for this; nothing is recorded).
+* Tone: big Bass and Treble knobs (−100…+100 %), bass boost, left/right balance.
+* Effects: limiter (no distortion from strong boosts), stereo width, loudness, reverb
+  (rooms / halls / plate), tempo 0.5×–2×.
+* Android 9+: real 10-band engine (DynamicsProcessing) with preamp + limiter.
+  Older phones: the basic equalizer (bands mapped automatically).
+Features menu (✨ button in Music, ⋮ in Now playing, board tile "Features")
+* Video → Audio: MP4 / MKV soundtrack → M4A (copied without quality loss when AAC).
+* Cutter: waveform, drag start / end handles, ±0.1 s, play preview, "start/end = here",
+  fade in / out.
+* Splitter: markers on the waveform ("Split here", every 1 / 5 min, into 2 / 3).
+* Merger: add songs, reorder, join.
+* Karaoke maker: removes the centre vocal, keeps panned instruments and (optionally)
+  bass & drums; strength 0–100 %; 30 s preview.
+* MP3 stays MP3 for cut / split / merge (frame-exact, no quality loss, correct length
+  header). Other results are M4A (AAC) — Android has no MP3 encoder.
+* Results are saved in Music / ZH Play (appear in Music → Folders).
+
+ZH PLAY 3.5 — complete music player (phone)
+==========================================
+(Built on 3.3 — the 3.4 TV/Mobile split was removed; one APK as before.)
+Library tabs: Songs · Albums · Artists · Genres · Folders · Playlists (all 8 view modes).
+  Inside an album / artist / … / playlist: ‹ back, Shuffle, Play all.
+Playlists: + New playlist, add songs (hold a song or a whole album → Add to playlist…),
+  remove, move up / down, rename, delete. Built-in: ♥ Favourites, Recently played,
+  Most played.
+Hold a song: Play next · Add to queue · Add to playlist · ♥ · Remove / Move (in a
+  playlist) · Edit song info · Details · Play on the TV.
+Now playing: ♥, Equalizer, Lyrics, Play on TV, ⋮ (speed, sleep timer, add to playlist,
+  edit info). Hold a song in "Up next": play now, move, remove, add to playlist.
+Equalizer: on/off, 12 presets (incl. Tamil melody, Kuthu / Folk, Vocal), 5 bands
+  (bass … treble), bass boost, surround (3D), loudness, left/right balance. Saved.
+Lyrics: synced lines highlighted while the song plays (LRCLIB, free); saved for
+  offline. Plain lyrics when only those exist.
+Sleep timer: 5–90 min with a gentle fade-out, or "at the end of this song".
+Speed: 0.5× – 2× (audiobooks, lectures).
+Edit song info: title / artist / album / genre, saved in ZH Play (file not changed).
+Bluetooth: works with headphones / car / speakers incl. their buttons; pauses when they
+  disconnect. Background + lock screen as before. Fully offline (lyrics need internet once).
+Accessibility: all icon buttons are named for TalkBack; text follows the phone font size.
+Errors: "Can't play … unsupported, damaged or deleted — playing the next song."
 
 ZH PLAY 3.3 — new name and logo (was TamilCastPlay)
 ==================================================

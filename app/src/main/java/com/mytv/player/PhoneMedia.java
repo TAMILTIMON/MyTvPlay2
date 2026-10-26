@@ -26,6 +26,10 @@ public final class PhoneMedia {
         public long id, dur, size, added, album;
         public Uri uri;
         public String title, sub, folder;
+        public String artist = "", albumName = "", genre = "", bucket = "";
+        /** set for an album / artist / genre / folder / playlist card (not a song) */
+        public String groupKey;
+        public int count;
 
         public Store.Item item() {
             return new Store.Item(title, uri.toString(), "");
@@ -36,9 +40,18 @@ public final class PhoneMedia {
         List<M> out = new ArrayList<>();
         Uri base = audio ? MediaStore.Audio.Media.EXTERNAL_CONTENT_URI : MediaStore.Video.Media.EXTERNAL_CONTENT_URI;
         String[] cols = audio
+                ? (Build.VERSION.SDK_INT >= 30
                 ? new String[]{MediaStore.Audio.Media._ID, MediaStore.Audio.Media.TITLE, MediaStore.Audio.Media.ARTIST,
                 MediaStore.Audio.Media.DURATION, MediaStore.Audio.Media.SIZE, MediaStore.Audio.Media.DATE_ADDED,
-                MediaStore.Audio.Media.ALBUM_ID, MediaStore.Audio.Media.ALBUM}
+                MediaStore.Audio.Media.ALBUM_ID, MediaStore.Audio.Media.ALBUM, MediaStore.Audio.Media.BUCKET_DISPLAY_NAME,
+                MediaStore.Audio.Media.GENRE}
+                : Build.VERSION.SDK_INT >= 29
+                ? new String[]{MediaStore.Audio.Media._ID, MediaStore.Audio.Media.TITLE, MediaStore.Audio.Media.ARTIST,
+                MediaStore.Audio.Media.DURATION, MediaStore.Audio.Media.SIZE, MediaStore.Audio.Media.DATE_ADDED,
+                MediaStore.Audio.Media.ALBUM_ID, MediaStore.Audio.Media.ALBUM, MediaStore.Audio.Media.BUCKET_DISPLAY_NAME}
+                : new String[]{MediaStore.Audio.Media._ID, MediaStore.Audio.Media.TITLE, MediaStore.Audio.Media.ARTIST,
+                MediaStore.Audio.Media.DURATION, MediaStore.Audio.Media.SIZE, MediaStore.Audio.Media.DATE_ADDED,
+                MediaStore.Audio.Media.ALBUM_ID, MediaStore.Audio.Media.ALBUM})
                 : new String[]{MediaStore.Video.Media._ID, MediaStore.Video.Media.TITLE, MediaStore.Video.Media.BUCKET_DISPLAY_NAME,
                 MediaStore.Video.Media.DURATION, MediaStore.Video.Media.SIZE, MediaStore.Video.Media.DATE_ADDED,
                 MediaStore.Video.Media.DISPLAY_NAME};
@@ -55,8 +68,13 @@ public final class PhoneMedia {
                 m.added = cur.getLong(5) * 1000;
                 if (audio) {
                     String artist = cur.getString(2);
-                    m.sub = artist == null || artist.startsWith("<") ? (cur.getString(7) == null ? "" : cur.getString(7)) : artist;
+                    m.artist = artist == null || artist.startsWith("<") ? "" : artist;
+                    m.albumName = cur.getString(7) == null || cur.getString(7).startsWith("<") ? "" : cur.getString(7);
+                    m.sub = !m.artist.isEmpty() ? m.artist : m.albumName;
                     m.album = cur.getLong(6);
+                    if (cur.getColumnCount() > 8 && cur.getString(8) != null) m.bucket = cur.getString(8);
+                    if (cur.getColumnCount() > 9 && cur.getString(9) != null) m.genre = cur.getString(9);
+                    MusicLib.applyEdits(m);
                     m.folder = m.sub;
                 } else {
                     m.folder = cur.getString(2) == null ? "" : cur.getString(2);
@@ -78,6 +96,21 @@ public final class PhoneMedia {
         }
     };
     private static final Map<String, Boolean> NONE = new HashMap<>();
+
+    /** A card standing for a group of songs (cover = its first song). */
+    public static M group(String key, String title, List<M> songs) {
+        M g = new M();
+        g.groupKey = key;
+        g.title = title;
+        g.count = songs.size();
+        g.sub = songs.size() + " " + T.t("songs");
+        g.folder = g.sub;
+        g.uri = songs.isEmpty() ? Uri.parse("zh://empty/" + key) : songs.get(0).uri;
+        g.album = songs.isEmpty() ? 0 : songs.get(0).album;
+        for (M m : songs) g.dur += m.dur;
+        g.id = -Math.abs(key.hashCode());
+        return g;
+    }
 
     public static Bitmap cached(M m) {
         return ART.get(m.uri.toString());

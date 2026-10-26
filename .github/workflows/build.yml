@@ -71,5 +71,5 @@ jobs:
           tag_name: v${{ env.VCODE }}
           name: ZH Play build ${{ env.VCODE }}
           body: Automatic build from commit ${{ github.sha }}
-          files: app/build/outputs/apk/*/release/*.apk
+          files: app/build/outputs/apk/release/*.apk
           make_latest: true

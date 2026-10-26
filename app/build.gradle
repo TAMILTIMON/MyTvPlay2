@@ -10,22 +10,8 @@ android {
         applicationId 'com.tamil.castplay'
         minSdk 21
         targetSdk 34
-        versionCode = (System.getenv('VCODE') ?: '33').toInteger()
-        versionName = '3.4' + (System.getenv('VCODE') ? '.' + System.getenv('VCODE') : '')
-    }
-
-    // Two variants from the same code:
-    //   tv     = everything (remote for every app, ADB, notification access, boot start, USB files …)
-    //   mobile = the phone app WITHOUT the TV-only power permissions, so Google Play Protect lets it install
-    // Same app ID and key: either one installs over the old app and keeps all data.
-    flavorDimensions = ['device']
-    productFlavors {
-        tv {
-            dimension 'device'
-        }
-        mobile {
-            dimension 'device'
-        }
+        versionCode = (System.getenv('VCODE') ?: '34').toInteger()
+        versionName = '3.6' + (System.getenv('VCODE') ? '.' + System.getenv('VCODE') : '')
     }
 
     // One APK per CPU type keeps the download small. "universal" works on every TV.

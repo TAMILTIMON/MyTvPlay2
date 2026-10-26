@@ -5,6 +5,7 @@ import android.animation.ValueAnimator;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
+import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -70,18 +71,28 @@ public class MusicActivity extends AppCompatActivity {
         top.addView(UiKit.darkButton(this, "chevron-down", 44, false, v -> finish()));
         View sp = new View(this);
         top.addView(sp, new LinearLayout.LayoutParams(0, 1, 1));
-        top.addView(UiKit.darkButton(this, "cast", 44, false, v -> toTv()));
-        View gap = new View(this);
-        top.addView(gap, new LinearLayout.LayoutParams(dp(10), 1));
-        top.addView(UiKit.darkButton(this, "list-music", 44, false, v -> sv.smoothScrollTo(0, queueTitle.getTop())));
+        heartBtn = topBtn(top, "heart", v -> {
+            PhoneMedia.M m = MusicService.current();
+            if (m == null) return;
+            MusicLib.setFav(m.uri.toString(), !MusicLib.isFav(m.uri.toString()));
+            render();
+        });
+        topBtn(top, "sliders-horizontal", v -> MusicDialogs.equalizer(this));
+        lyrBtn = topBtn(top, "mic-vocal", v -> toggleLyrics());
+        topBtn(top, "cast", v -> toTv());
+        topBtn(top, "ellipsis-vertical", v -> more());
         p.addView(top);
 
         title = Ui.text(this, 28, Color.WHITE, true);
+        title.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 26);
         title.setPadding(0, dp(22), 0, 0);
         title.setMaxLines(2);
         artist = Ui.text(this, 15, 0xB3FFFFFF, false);
         p.addView(title);
         p.addView(artist);
+        extra = Ui.text(this, 12, 0xFFF0ABFC, true);
+        extra.setPadding(0, dp(4), 0, 0);
+        p.addView(extra);
 
         // round art inside a glass ring
         int ringSize = Math.min((int) (getResources().getDisplayMetrics().widthPixels * 0.78f), dp(330));
@@ -111,7 +122,20 @@ public class MusicActivity extends AppCompatActivity {
         disc.addView(ringTime, rtl);
         LinearLayout.LayoutParams dl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ringSize);
         dl.setMargins(0, dp(26), 0, dp(20));
-        p.addView(disc, dl);
+        FrameLayout stage = new FrameLayout(this);
+        stage.addView(disc, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ringSize));
+        lyrScroll = new ScrollView(this);
+        lyrScroll.setVerticalScrollBarEnabled(false);
+        lyrBox = new LinearLayout(this);
+        lyrBox.setOrientation(LinearLayout.VERTICAL);
+        lyrBox.setGravity(Gravity.CENTER_HORIZONTAL);
+        lyrBox.setPadding(dp(8), ringSize / 3, dp(8), ringSize / 3);
+        lyrScroll.addView(lyrBox);
+        lyrScroll.setVisibility(View.GONE);
+        lyrScroll.setBackground(Ui.card(this, 0x33000000, 0x22FFFFFF, 22));
+        stage.addView(lyrScroll, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ringSize));
+        p.addView(stage, dl);
+        discView = disc;
         spin = ObjectAnimator.ofFloat(art, "rotation", 0f, 360f);
         spin.setDuration(24000);
         spin.setRepeatCount(ValueAnimator.INFINITE);
@@ -175,6 +199,141 @@ public class MusicActivity extends AppCompatActivity {
         setContentView(root);
     }
 
+    private ImageView heartBtn, lyrBtn;
+    private TextView extra;
+    private ScrollView lyrScroll;
+    private LinearLayout lyrBox;
+    private View discView;
+    private boolean lyricsOn;
+    private List<MusicLib.Line> lines = new ArrayList<>();
+    private long lyrFor = -1;
+    private int lyrLine = -2;
+
+    private ImageView topBtn(LinearLayout top, String ic, View.OnClickListener l) {
+        ImageView b = UiKit.darkButton(this, ic, 42, false, l);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(42), dp(42));
+        lp.setMargins(dp(6), 0, 0, 0);
+        top.addView(b, lp);
+        return b;
+    }
+
+    private void toggleLyrics() {
+        lyricsOn = !lyricsOn;
+        lyrScroll.setVisibility(lyricsOn ? View.VISIBLE : View.GONE);
+        discView.setVisibility(lyricsOn ? View.INVISIBLE : View.VISIBLE);
+        lyrBtn.setAlpha(lyricsOn ? 1f : 0.7f);
+        if (lyricsOn) loadLyrics();
+    }
+
+    private void loadLyrics() {
+        final PhoneMedia.M m = MusicService.current();
+        if (m == null || m.id == lyrFor) return;
+        lyrFor = m.id;
+        lyrLine = -2;
+        lines = new ArrayList<>();
+        lyrBox.removeAllViews();
+        lyrBox.addView(lyrText(T.t("Looking for lyrics…"), false));
+        new Thread(() -> {
+            final List<MusicLib.Line> l = MusicLib.lyrics(m);
+            main.post(() -> {
+                if (MusicService.current() == null || MusicService.current().id != m.id) return;
+                lines = l;
+                lyrBox.removeAllViews();
+                if (l.isEmpty()) {
+                    lyrBox.addView(lyrText(T.t("No lyrics found for this song."), false));
+                    lyrBox.addView(lyrText(T.t("Tip: correct the title / artist with Edit song info, then try again."), false));
+                    return;
+                }
+                for (MusicLib.Line x : l) lyrBox.addView(lyrText(x.text.isEmpty() ? "♪" : x.text, false));
+            });
+        }).start();
+    }
+
+    private TextView lyrText(String t, boolean big) {
+        TextView v = Ui.text(this, big ? 20 : 16, big ? Color.WHITE : 0x99FFFFFF, big);
+        v.setText(t);
+        v.setGravity(Gravity.CENTER);
+        v.setPadding(0, dp(7), 0, dp(7));
+        return v;
+    }
+
+    /** Highlight the line being sung and keep it in the middle. */
+    private void syncLyrics() {
+        if (!lyricsOn || lines.isEmpty()) return;
+        int i = MusicLib.lineAt(lines, MusicService.pos());
+        if (i == lyrLine || i < 0 || i >= lyrBox.getChildCount()) return;
+        if (lyrLine >= 0 && lyrLine < lyrBox.getChildCount()) {
+            TextView o = (TextView) lyrBox.getChildAt(lyrLine);
+            o.setTextColor(0x99FFFFFF);
+            o.setTextSize(16);
+            o.setTypeface(null, android.graphics.Typeface.NORMAL);
+        }
+        lyrLine = i;
+        TextView c = (TextView) lyrBox.getChildAt(i);
+        c.setTextColor(Color.WHITE);
+        c.setTextSize(20);
+        c.setTypeface(null, android.graphics.Typeface.BOLD);
+        lyrScroll.smoothScrollTo(0, Math.max(0, c.getTop() - lyrScroll.getHeight() / 2 + c.getHeight() / 2));
+    }
+
+    private void more() {
+        final PhoneMedia.M m = MusicService.current();
+        if (m == null) return;
+        String sl = MusicDialogs.sleepLabel();
+        String[] o = {"⏱  " + T.t("Playback speed") + ": " + MusicService.speed + "×",
+                "🌙  " + T.t("Sleep timer") + (sl.isEmpty() ? "" : ": " + sl),
+                "🎚  " + T.t("Equalizer"),
+                "🎵  " + T.t("Add to playlist…"),
+                "✏  " + T.t("Edit song info"),
+                "🗣  " + T.t("Lyrics"),
+                "📺  " + T.t("Play on the TV"),
+                "🚀  " + T.t("Features") + " — " + T.t("cutter, karaoke, merger…")};
+        new UiDialog(this).setTitle(m.title).setItems(o, (d, w) -> {
+            switch (w) {
+                case 0: MusicDialogs.speed(this, this::render); break;
+                case 1: MusicDialogs.sleep(this, this::render); break;
+                case 2: MusicDialogs.equalizer(this); break;
+                case 7: startActivity(new Intent(this, ToolsActivity.class)); break;
+                case 3: {
+                    List<String> u = new ArrayList<>();
+                    u.add(m.uri.toString());
+                    MusicDialogs.addToPlaylist(this, u, this::render);
+                    break;
+                }
+                case 4: MusicDialogs.editInfo(this, m, () -> {
+                    lyrFor = -1;
+                    shownIndex = -2;
+                    render();
+                }); break;
+                case 5: toggleLyrics(); break;
+                default: toTv();
+            }
+        }).show();
+    }
+
+    private void queueMenu(final int i) {
+        final PhoneMedia.M m = MusicService.queue.get(i);
+        String[] o = {"▶  " + T.t("Play now"), "⬆  " + T.t("Move up"), "⬇  " + T.t("Move down"), "🗑  " + T.t("Remove from queue"),
+                "🎵  " + T.t("Add to playlist…"), (MusicLib.isFav(m.uri.toString()) ? "☆  " + T.t("Remove from favourites") : "★  " + T.t("Add to favourites"))};
+        new UiDialog(this).setTitle(m.title).setItems(o, (d, w) -> {
+            switch (w) {
+                case 0: MusicService.play(this, MusicService.queue, i); break;
+                case 1: MusicService.moveInQueue(i, i - 1); break;
+                case 2: MusicService.moveInQueue(i, i + 1); break;
+                case 3: MusicService.removeFromQueue(i); break;
+                case 4: {
+                    List<String> u = new ArrayList<>();
+                    u.add(m.uri.toString());
+                    MusicDialogs.addToPlaylist(this, u, null);
+                    break;
+                }
+                default: MusicLib.setFav(m.uri.toString(), !MusicLib.isFav(m.uri.toString()));
+            }
+            shownIndex = -2;
+            render();
+        }).show();
+    }
+
     private ImageView add(LinearLayout row, String ic, int size, boolean primary, View.OnClickListener l) {
         ImageView b = UiKit.darkButton(this, ic, size, primary, l);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(size), dp(size));
@@ -190,7 +349,14 @@ public class MusicActivity extends AppCompatActivity {
             return;
         }
         title.setText(m.title);
-        artist.setText(m.sub);
+        artist.setText(m.albumName.isEmpty() || m.albumName.equals(m.sub) ? m.sub : m.sub + "  ·  " + m.albumName);
+        boolean fav = MusicLib.isFav(m.uri.toString());
+        heartBtn.setImageDrawable(new UiKit.Icon(this, "heart", 19, fav ? 0xFFFF4D6D : Color.WHITE));
+        heartBtn.setContentDescription(T.t(fav ? "Remove from favourites" : "Add to favourites"));
+        String sl = MusicDialogs.sleepLabel();
+        extra.setText((MusicService.speed != 1f ? MusicService.speed + "×   " : "") + (sl.isEmpty() ? "" : T.t("Sleep") + " " + sl));
+        extra.setVisibility(extra.getText().length() > 0 ? View.VISIBLE : View.GONE);
+        if (lyricsOn && m.id != lyrFor) loadLyrics();
         Bitmap b = PhoneMedia.cached(m);
         art.setImageBitmap(b);
         if (b == null) art.setImageDrawable(new UiKit.Icon(this, "list-music", 64, Color.WHITE));
@@ -215,13 +381,18 @@ public class MusicActivity extends AppCompatActivity {
         }
         tLen.setText(Net.fmtTime(len));
         ringTime.setText(Net.fmtTime(Math.max(0, len - pos)));
+        syncLyrics();
+        if (MusicService.sleepAt > 0 && extra != null) {
+            String sl = MusicDialogs.sleepLabel();
+            extra.setText((MusicService.speed != 1f ? MusicService.speed + "×   " : "") + T.t("Sleep") + " " + sl);
+        }
     }
 
     private void renderQueue() {
         shownIndex = MusicService.index;
         queueBox.removeAllViews();
         final List<PhoneMedia.M> q = MusicService.queue;
-        int from = Math.max(0, MusicService.index), to = Math.min(q.size(), from + 200);
+        int from = Math.max(0, MusicService.index), to = Math.min(q.size(), from + 300);
         for (int i = from; i < to; i++) {
             final int k = i;
             final PhoneMedia.M m = q.get(i);
@@ -251,6 +422,10 @@ public class MusicActivity extends AppCompatActivity {
             d.setText(Net.fmtTime(m.dur));
             r.addView(d);
             r.setOnClickListener(v -> MusicService.play(this, q, k));
+            r.setOnLongClickListener(v -> {
+                queueMenu(k);
+                return true;
+            });
             queueBox.addView(r);
             Bitmap c = PhoneMedia.cached(m);
             if (c != null) a.setImageBitmap(c);
