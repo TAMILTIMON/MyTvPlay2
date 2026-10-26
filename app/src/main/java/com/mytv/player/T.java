@@ -35,6 +35,10 @@ public final class T {
     }
 
     static {
+        TA.put("Play here on this phone", "இந்த போனிலேயே இயக்கு");
+        HI.put("Play here on this phone", "इसी फ़ोन पर चलाएँ");
+        TA.put("Play on the TV", "டிவியில் இயக்கு");
+        HI.put("Play on the TV", "टीवी पर चलाएँ");
         TA.put("Videos", "வீடியோக்கள்");
         HI.put("Videos", "वीडियो");
         TA.put("Music", "இசை");

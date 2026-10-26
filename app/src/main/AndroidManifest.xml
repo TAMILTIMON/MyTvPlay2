@@ -119,7 +119,7 @@
             android:name=".ShareActivity"
             android:excludeFromRecents="true"
             android:exported="true"
-            android:label="Play on TV"
+            android:label="TamilCastPlay"
             android:theme="@style/ShareTheme">
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />

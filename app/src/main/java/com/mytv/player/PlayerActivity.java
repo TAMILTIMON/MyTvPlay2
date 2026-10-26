@@ -168,6 +168,25 @@ public class PlayerActivity extends AppCompatActivity {
     }
 
     private void handleIntent(Intent in) {
+        // phone: a song opened from a file manager / WhatsApp → the music player (background play, lock screen)
+        if (!Ui.isTv(this) && Intent.ACTION_VIEW.equals(in.getAction()) && in.getData() != null) {
+            Uri u = in.getData();
+            String type = in.getType() == null ? "" : in.getType();
+            String name = "content".equals(u.getScheme()) ? LocalShare.displayName(this, u) : String.valueOf(u.getLastPathSegment());
+            if ((type.startsWith("audio/") || Formats.isAudio(name)) && !"http".equals(u.getScheme()) && !"https".equals(u.getScheme())) {
+                PhoneMedia.M m = new PhoneMedia.M();
+                m.uri = u;
+                m.title = name == null ? "Audio" : name.replaceAll("\\.[^.]+$", "");
+                m.sub = "";
+                m.folder = "";
+                List<PhoneMedia.M> one = new ArrayList<>();
+                one.add(m);
+                MusicService.play(this, one, 0);
+                startActivity(new Intent(this, MusicActivity.class));
+                finish();
+                return;
+            }
+        }
         ArrayList<Store.Item> list = null;
         int start = in.getIntExtra(EXTRA_INDEX, 0);
         if (in.getBooleanExtra(EXTRA_HANDOFF, false)) {
@@ -391,6 +410,7 @@ public class PlayerActivity extends AppCompatActivity {
         videoLayout = new VLCVideoLayout(this);
         root.addView(videoLayout, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER));
+        buildAudioView();
         dimView = new View(this);
         dimView.setBackgroundColor(Color.BLACK);
         dimView.setAlpha(0f);
@@ -942,6 +962,7 @@ public class PlayerActivity extends AppCompatActivity {
     private void onTick() {
         tickN++;
         updateChip();
+        if (tickN % 2 == 0) updateAudioView();
         if (mp != null && mp.isPlaying()) {
             long tnow = mp.getTime();
             if (tnow > 0) lastGoodTime = tnow;
@@ -1122,6 +1143,106 @@ public class PlayerActivity extends AppCompatActivity {
 
     static String dialogName(int l) {
         return T.t(l == 1 ? "Light boost" : l == 2 ? "Medium boost" : l == 3 ? "Strong boost" : "Off");
+    }
+
+    // ---- audio: spinning disc with the cover (instead of a black screen)
+    private FrameLayout audioView;
+    private ImageView avArt;
+    private TextView avTitle, avSub;
+    private android.animation.ObjectAnimator avSpin;
+    private String avFor = "";
+
+    private void buildAudioView() {
+        audioView = new FrameLayout(this);
+        audioView.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{(Ui.ACCENT & 0x00FFFFFF) | 0xCC000000, 0xFF120A1E, 0xFF07050C}));
+        LinearLayout col = new LinearLayout(this);
+        col.setOrientation(LinearLayout.VERTICAL);
+        col.setGravity(Gravity.CENTER_HORIZONTAL);
+        int short_ = Math.min(getResources().getDisplayMetrics().widthPixels, getResources().getDisplayMetrics().heightPixels);
+        int ring = Math.min((int) (short_ * 0.62f), dp(320));
+        FrameLayout disc = new FrameLayout(this);
+        View r = new View(this);
+        GradientDrawable rg = new GradientDrawable();
+        rg.setShape(GradientDrawable.OVAL);
+        rg.setColor(0x14FFFFFF);
+        rg.setStroke(dp(1), 0x40FFFFFF);
+        r.setBackground(rg);
+        disc.addView(r, new FrameLayout.LayoutParams(ring, ring, Gravity.CENTER));
+        avArt = new ImageView(this);
+        avArt.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        GradientDrawable ab = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{Ui.ACCENT, Ui.ACCENT2});
+        ab.setShape(GradientDrawable.OVAL);
+        avArt.setBackground(ab);
+        avArt.setClipToOutline(true);
+        avArt.setElevation(dp(12));
+        int a = (int) (ring * 0.66f);
+        disc.addView(avArt, new FrameLayout.LayoutParams(a, a, Gravity.CENTER));
+        col.addView(disc, new LinearLayout.LayoutParams(ring, ring));
+        avTitle = text(24, Color.WHITE);
+        avTitle.setTypeface(avTitle.getTypeface(), android.graphics.Typeface.BOLD);
+        avTitle.setGravity(Gravity.CENTER);
+        avTitle.setMaxLines(2);
+        avTitle.setPadding(dp(24), dp(22), dp(24), 0);
+        avSub = text(14, 0xB3FFFFFF);
+        avSub.setGravity(Gravity.CENTER);
+        col.addView(avTitle);
+        col.addView(avSub);
+        audioView.addView(col, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER));
+        audioView.setVisibility(View.GONE);
+        root.addView(audioView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        avSpin = android.animation.ObjectAnimator.ofFloat(avArt, "rotation", 0f, 360f);
+        avSpin.setDuration(24000);
+        avSpin.setRepeatCount(android.animation.ValueAnimator.INFINITE);
+        avSpin.setInterpolator(new android.view.animation.LinearInterpolator());
+    }
+
+    /** Shows the disc for songs (by name, or when the file has no picture at all). */
+    private void updateAudioView() {
+        if (audioView == null || mp == null) return;
+        Store.Item it = current();
+        boolean audioItem = it != null && (Formats.isAudio(it.u) || Formats.isAudio(it.t)
+                || (mp.isPlaying() && mp.getLength() > 0 && mp.getVideoTracksCount() == 0 && mp.getTime() > 1500));
+        if (audioOnly) audioItem = true;
+        audioView.setVisibility(audioItem ? View.VISIBLE : View.GONE);
+        if (!audioItem) {
+            if (avSpin.isRunning()) avSpin.pause();
+            return;
+        }
+        if (mp.isPlaying()) {
+            if (!avSpin.isStarted()) avSpin.start();
+            else avSpin.resume();
+        } else if (avSpin.isRunning()) avSpin.pause();
+        if (it != null && !it.u.equals(avFor)) {
+            avFor = it.u;
+            avTitle.setText(it.t.replaceAll("\\.[a-zA-Z0-9]{2,4}$", ""));
+            avSub.setText(it.g);
+            avArt.setImageDrawable(new UiKit.Icon(this, "list-music", 64, Color.WHITE));
+            final String u = it.u;
+            new Thread(() -> {
+                android.media.MediaMetadataRetriever r = new android.media.MediaMetadataRetriever();
+                try {
+                    if (u.startsWith("content://")) r.setDataSource(this, Uri.parse(u));
+                    else if (u.startsWith("/")) r.setDataSource(u);
+                    else return;
+                    byte[] pic = r.getEmbeddedPicture();
+                    final String artist = r.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_ARTIST);
+                    final android.graphics.Bitmap bm = pic == null ? null : android.graphics.BitmapFactory.decodeByteArray(pic, 0, pic.length);
+                    handler.post(() -> {
+                        if (!u.equals(avFor)) return;
+                        if (bm != null) avArt.setImageBitmap(bm);
+                        if (artist != null && !artist.isEmpty()) avSub.setText(artist);
+                    });
+                } catch (Throwable ignored) {
+                } finally {
+                    try {
+                        r.release();
+                    } catch (Throwable ignored) {
+                    }
+                }
+            }).start();
+        }
     }
 
     private boolean timesUpShown;

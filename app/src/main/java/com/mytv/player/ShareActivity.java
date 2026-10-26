@@ -25,7 +25,7 @@ import java.util.regex.Pattern;
 /** Share a link, video, song or .torrent from any app -> "Play on TV". */
 public class ShareActivity extends AppCompatActivity {
     private final Handler main = new Handler(Looper.getMainLooper());
-    private final List<String> urls = new ArrayList<>(), titles = new ArrayList<>();
+    private final List<String> urls = new ArrayList<>(), titles = new ArrayList<>(), localUris = new ArrayList<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -38,8 +38,18 @@ public class ShareActivity extends AppCompatActivity {
             finish();
             return;
         }
-        Ui.isTv(this);
-        findTv();
+        if (Ui.isTv(this)) {
+            playHere();
+            return;
+        }
+        // phone: play here by default; the TV only when chosen
+        String[] opts = {"📱  " + T.t("Play here on this phone"), "📺  " + T.t("Play on the TV")};
+        new UiDialog(this).setTitle(titles.size() == 1 ? titles.get(0) : titles.size() + " " + T.t("files"))
+                .setItems(opts, (d, w) -> {
+                    if (w == 0) playHere();
+                    else findTv();
+                })
+                .setOnCancelListener(d -> finish()).show();
     }
 
     private static final Pattern LINK = Pattern.compile("(magnet:\\?[^\\s]+|https?://[^\\s]+|rtsp://[^\\s]+)");
@@ -57,6 +67,7 @@ public class ShareActivity extends AppCompatActivity {
         for (Uri u : streams) {
             String name = LocalShare.displayName(this, u);
             if ("application/x-bittorrent".equals(in.getType()) && !name.toLowerCase().endsWith(".torrent")) name += ".torrent";
+            localUris.add(u.toString());
             urls.add(LocalShare.share(this, u, name));
             titles.add(name);
         }
@@ -173,8 +184,29 @@ public class ShareActivity extends AppCompatActivity {
     }
 
     private void playHere() {
+        boolean allAudio = !localUris.isEmpty();
+        for (String t : titles) if (!Formats.isAudio(t)) allAudio = false;
+        if (allAudio && !Ui.isTv(this)) {
+            // songs → the music player (background play, lock-screen controls)
+            List<PhoneMedia.M> q = new ArrayList<>();
+            for (int i = 0; i < localUris.size(); i++) {
+                PhoneMedia.M m = new PhoneMedia.M();
+                m.uri = Uri.parse(localUris.get(i));
+                m.title = titles.get(i).replaceAll("\\.[^.]+$", "");
+                m.sub = "";
+                m.folder = "";
+                q.add(m);
+            }
+            MusicService.play(this, q, 0);
+            startActivity(new Intent(this, MusicActivity.class));
+            finish();
+            return;
+        }
         List<Store.Item> items = new ArrayList<>();
-        for (int i = 0; i < urls.size(); i++) items.add(new Store.Item(titles.get(i), urls.get(i), ""));
+        for (int i = 0; i < urls.size(); i++) {
+            String u = i < localUris.size() ? localUris.get(i) : urls.get(i);   // phone: the file itself, not a stream
+            items.add(new Store.Item(titles.get(i), u, ""));
+        }
         Remote.play(this, items, 0);
         finish();
     }

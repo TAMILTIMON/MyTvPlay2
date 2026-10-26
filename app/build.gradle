@@ -10,8 +10,8 @@ android {
         applicationId 'com.tamil.castplay'
         minSdk 21
         targetSdk 34
-        versionCode = (System.getenv('VCODE') ?: '28').toInteger()
-        versionName = '3.0' + (System.getenv('VCODE') ? '.' + System.getenv('VCODE') : '')
+        versionCode = (System.getenv('VCODE') ?: '29').toInteger()
+        versionName = '3.0.1' + (System.getenv('VCODE') ? '.' + System.getenv('VCODE') : '')
     }
 
     // One APK per CPU type keeps the download small. "universal" works on every TV.

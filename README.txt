@@ -1,3 +1,13 @@
+TAMILCASTPLAY 3.0.1 — phone plays on the phone
+==============================================
+* Share → TamilCastPlay (from Gallery, WhatsApp, Files …) now asks:
+  "Play here on this phone" or "Play on the TV". The share entry is named
+  "TamilCastPlay" (was "Play on TV"). Cast to the TV later with the cast button.
+* Songs opened or shared from other apps open the music player (spinning disc,
+  background play, lock-screen controls).
+* Audio played in the video player (phone and TV) shows the spinning disc with the
+  song's cover and artist instead of a black screen.
+
 TAMILCASTPLAY 3.0 — Videos & Music on the phone
 ==============================================
 Phone app: new board tiles "Videos" and "Music" (also on the first screen).
