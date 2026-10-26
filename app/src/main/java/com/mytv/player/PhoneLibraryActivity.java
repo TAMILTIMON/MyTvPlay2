@@ -145,7 +145,7 @@ public class PhoneLibraryActivity extends AppCompatActivity {
     public void onRequestPermissionsResult(int req, String[] p, int[] r) {
         super.onRequestPermissionsResult(req, p, r);
         if (r.length > 0 && r[0] == PackageManager.PERMISSION_GRANTED) load();
-        else status.setText(T.t("Permission needed — allow it in phone Settings > Apps > TamilCastPlay > Permissions."));
+        else status.setText(T.t("Permission needed — allow it in phone Settings > Apps > ZH Play > Permissions."));
     }
 
     private void load() {

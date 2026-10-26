@@ -4,10 +4,10 @@
     android:background="@drawable/widget_bg" android:orientation="vertical" android:padding="12dp">
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
         android:gravity="center_vertical" android:orientation="horizontal">
-        <ImageView android:layout_width="20dp" android:layout_height="20dp" android:src="@drawable/lc_tv" android:contentDescription="TV" />
+        <ImageView android:layout_width="26dp" android:layout_height="26dp" android:src="@drawable/zh_logo" android:background="@drawable/widget_logo_bg" android:padding="2dp" android:contentDescription="ZH Play" />
         <TextView android:id="@+id/w_title" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
             android:layout_marginStart="8dp" android:ellipsize="end" android:singleLine="true"
-            android:text="TamilCastPlay" android:textColor="#FFFFFFFF" android:textSize="14sp" android:textStyle="bold" />
+            android:text="ZH Play" android:textColor="#FFFFFFFF" android:textSize="14sp" android:textStyle="bold" />
     </LinearLayout>
     <TextView android:id="@+id/w_sub" android:layout_width="match_parent" android:layout_height="wrap_content"
         android:layout_marginStart="28dp" android:ellipsize="end" android:singleLine="true"

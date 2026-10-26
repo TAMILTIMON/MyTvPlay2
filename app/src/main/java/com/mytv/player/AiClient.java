@@ -60,7 +60,7 @@ public final class AiClient {
         String k = key();
         if (!k.isEmpty()) c.setRequestProperty("Authorization", "Bearer " + k);
         c.setRequestProperty("HTTP-Referer", "https://github.com/TAMILTIMON/MyTvPlay2");
-        c.setRequestProperty("X-Title", "TamilCastPlay");
+        c.setRequestProperty("X-Title", "ZH Play");
         try (OutputStream o = c.getOutputStream()) {
             o.write(body.toString().getBytes("UTF-8"));
         }

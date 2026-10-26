@@ -881,7 +881,7 @@ public class PlayerActivity extends AppCompatActivity {
 
     private void startSession() {
         try {
-            msess = new android.media.session.MediaSession(this, "TamilCastPlayPlayer");
+            msess = new android.media.session.MediaSession(this, "ZHPlayPlayer");
             msess.setCallback(new android.media.session.MediaSession.Callback() {
                 public void onPlay() { if (mp != null) mp.play(); }
                 public void onPause() { if (mp != null) mp.pause(); }
@@ -919,7 +919,7 @@ public class PlayerActivity extends AppCompatActivity {
                 sessLen = len;
                 msess.setMetadata(new android.media.MediaMetadata.Builder()
                         .putString(android.media.MediaMetadata.METADATA_KEY_TITLE, t)
-                        .putString(android.media.MediaMetadata.METADATA_KEY_ARTIST, "TamilCastPlay")
+                        .putString(android.media.MediaMetadata.METADATA_KEY_ARTIST, "ZH Play")
                         .putLong(android.media.MediaMetadata.METADATA_KEY_DURATION, len).build());
             }
         } catch (Throwable ignored) {
@@ -1275,7 +1275,7 @@ public class PlayerActivity extends AppCompatActivity {
         }).show();
     }
 
-    // ---- screenshot of the current frame (USB drive, else Pictures/TamilCastPlay)
+    // ---- screenshot of the current frame (USB drive, else Pictures/ZH Play)
     private android.view.SurfaceView findSurface(View v) {
         if (v instanceof android.view.SurfaceView && v.getWidth() > 0) return (android.view.SurfaceView) v;
         if (v instanceof ViewGroup) {
@@ -1332,13 +1332,13 @@ public class PlayerActivity extends AppCompatActivity {
 
     private void saveShot(final android.graphics.Bitmap bm) {
         new Thread(() -> {
-            String name = "TamilCastPlay_" + new java.text.SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new java.util.Date()) + ".jpg";
+            String name = "ZHPlay_" + new java.text.SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new java.util.Date()) + ".jpg";
             String where = null;
             try {
                 java.io.File[] st = new java.io.File("/storage").listFiles();
                 if (st != null) for (java.io.File f : st) {
                     if (f.getName().equals("self") || f.getName().equals("emulated") || !f.canWrite()) continue;
-                    java.io.File d = new java.io.File(f, "TamilCastPlay Screenshots");
+                    java.io.File d = new java.io.File(f, "ZH Play Screenshots");
                     //noinspection ResultOfMethodCallIgnored
                     d.mkdirs();
                     java.io.File out = new java.io.File(d, name);
@@ -1352,11 +1352,11 @@ public class PlayerActivity extends AppCompatActivity {
                     android.content.ContentValues cv = new android.content.ContentValues();
                     cv.put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, name);
                     cv.put(android.provider.MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
-                    cv.put(android.provider.MediaStore.Images.Media.RELATIVE_PATH, "Pictures/TamilCastPlay");
+                    cv.put(android.provider.MediaStore.Images.Media.RELATIVE_PATH, "Pictures/ZH Play");
                     Uri u = getContentResolver().insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cv);
                     if (u != null) try (java.io.OutputStream o = getContentResolver().openOutputStream(u)) {
                         bm.compress(android.graphics.Bitmap.CompressFormat.JPEG, 92, o);
-                        where = "Pictures/TamilCastPlay/" + name;
+                        where = "Pictures/ZH Play/" + name;
                     }
                 }
                 if (where == null) {

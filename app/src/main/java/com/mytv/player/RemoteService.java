@@ -64,7 +64,7 @@ public class RemoteService extends Service {
                 b = new Notification.Builder(this);
             }
             Notification n = b.setSmallIcon(android.R.drawable.ic_media_play)
-                    .setContentTitle("TamilCastPlay")
+                    .setContentTitle("ZH Play")
                     .setContentText("Phone remote: http://" + Net.ip() + ":" + PORT)
                     .setOngoing(true)
                     .build();

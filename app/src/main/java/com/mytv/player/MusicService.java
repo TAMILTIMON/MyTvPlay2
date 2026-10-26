@@ -130,7 +130,7 @@ public class MusicService extends Service implements MediaPlayer.OnCompletionLis
         shuffle = Store.getBool("m_shuffle", false);
         repeat = Store.getInt("m_repeat", 0);
         am = (AudioManager) getSystemService(AUDIO_SERVICE);
-        session = new MediaSession(this, "TamilCastPlayMusic");
+        session = new MediaSession(this, "ZHPlayMusic");
         session.setCallback(new MediaSession.Callback() {
             public void onPlay() { resume(); }
             public void onPause() { pause(); }
@@ -323,9 +323,9 @@ public class MusicService extends Service implements MediaPlayer.OnCompletionLis
         PhoneMedia.M m = current();
         int f = PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0);
         b.setSmallIcon(R.drawable.lc_play)
-                .setContentTitle(m == null ? "TamilCastPlay" : m.title)
+                .setContentTitle(m == null ? "ZH Play" : m.title)
                 .setContentText(m == null ? "" : m.sub)
-                .setLargeIcon(art)
+                .setLargeIcon(art != null ? art : android.graphics.BitmapFactory.decodeResource(getResources(), R.drawable.zh_logo))
                 .setOngoing(playing())
                 .setShowWhen(false)
                 .setVisibility(Notification.VISIBILITY_PUBLIC)

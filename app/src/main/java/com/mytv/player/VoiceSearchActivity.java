@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * "Hey Google, play Sun TV on TamilCastPlay": Assistant hands over only the spoken words.
+ * "Hey Google, play Sun TV on ZH Play": Assistant hands over only the spoken words.
  * Finds the best matching channel / video in your playlists and plays it (with its playlist, so CH+ works).
  */
 public class VoiceSearchActivity extends Activity {
@@ -26,7 +26,7 @@ public class VoiceSearchActivity extends Activity {
 
     private void play(String q) {
         if (q.isEmpty()) {
-            // "play TamilCastPlay": continue the last video
+            // "play ZH Play": continue the last video
             List<Store.Watch> h = Store.history();
             if (!h.isEmpty()) {
                 List<Store.Item> one = new java.util.ArrayList<>();

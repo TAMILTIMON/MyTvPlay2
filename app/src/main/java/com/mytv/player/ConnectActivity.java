@@ -49,15 +49,12 @@ public class ConnectActivity extends AppCompatActivity {
 
         LinearLayout top = new LinearLayout(this);
         top.setGravity(Gravity.CENTER_VERTICAL);
-        android.widget.FrameLayout logo = new android.widget.FrameLayout(this);
-        logo.setBackground(Ui.gradient(this, 14));
-        logo.addView(UiKit.icon(this, "play", 22, 0xFFFFFFFF), new android.widget.FrameLayout.LayoutParams(Ui.dp(this, 46), Ui.dp(this, 46), Gravity.CENTER));
-        top.addView(logo, new LinearLayout.LayoutParams(Ui.dp(this, 46), Ui.dp(this, 46)));
+        top.addView(UiKit.logoBadge(this, 50, false), new LinearLayout.LayoutParams(Ui.dp(this, 50), Ui.dp(this, 50)));
         LinearLayout t = new LinearLayout(this);
         t.setOrientation(LinearLayout.VERTICAL);
         t.setPadding(Ui.dp(this, 12), 0, 0, 0);
         TextView h = Ui.text(this, 24, Ui.TEXT, true);
-        h.setText("TamilCastPlay");
+        h.setText("ZH Play");
         TextView s = Ui.text(this, 13, Ui.DIM, false);
         s.setText(T.t("Remote · cast phone videos & songs"));
         t.addView(h);
@@ -136,7 +133,7 @@ public class ConnectActivity extends AppCompatActivity {
         root.addView(self, full());
         }
         TextView tip = Ui.text(this, 13, Ui.DIM, false);
-        tip.setText("\nPhone and TV must be on the same Wi-Fi, and TamilCastPlay must be installed on the TV "
+        tip.setText("\nPhone and TV must be on the same Wi-Fi, and ZH Play must be installed on the TV "
                 + T.t("(it runs in the background after the first start)."));
         root.addView(tip);
         setContentView(sv);
@@ -193,7 +190,7 @@ public class ConnectActivity extends AppCompatActivity {
                         if (id != scanId) return;
                         spinner.setVisibility(View.GONE);
                         status.setText(found.isEmpty()
-                                ? T.t("No TV found. Open TamilCastPlay once on the TV, check both are on the same Wi-Fi, then scan again.")
+                                ? T.t("No TV found. Open ZH Play once on the TV, check both are on the same Wi-Fi, then scan again.")
                                 : found.size() + (found.size() == 1 ? T.t(" device found. Tap to connect.") : T.t(" devices found. Tap one to connect.")));
                     }
                 });
@@ -269,7 +266,7 @@ public class ConnectActivity extends AppCompatActivity {
                     new Thread(() -> {
                         final Discovery.Device dev = Discovery.ping(ip, 2500);
                         main.post(() -> {
-                            if (dev == null) UiKit.makeToast(this, "No TamilCastPlay at " + ip, Toast.LENGTH_LONG).show();
+                            if (dev == null) UiKit.makeToast(this, "No ZH Play at " + ip, Toast.LENGTH_LONG).show();
                             else open(dev.ip, dev.name);
                         });
                     }).start();

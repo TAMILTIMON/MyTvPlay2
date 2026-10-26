@@ -3,7 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<title>TamilCastPlay</title>
+<title>ZH Play</title>
+<link rel="icon" type="image/png" href="/favicon.png">
+<link rel="apple-touch-icon" href="/logo.png">
 <style>
 :root{--acc:#8b5cf6;--acc2:#ec4899;--acc3:#3b82f6;--ok:#22c55e;--bad:#ef4444;--r:18px}
 html[data-theme=dark]{--bg:#0b0913;--bg2:#1c1236;--glass:#17122a;--glass2:#221b3a;--line:rgba(255,255,255,.12);--text:#f3f0ff;--dim:#a59fbd;--field:rgba(0,0,0,.25);--shadow:0 4px 14px rgba(0,0,0,.3)}
@@ -179,6 +181,11 @@ button.ic svg.lc{width:22px;height:22px}
 #scr{width:100%;aspect-ratio:16/9;border-radius:14px;background:#000;object-fit:contain;display:block}
 .pbtn{display:flex;align-items:center;gap:10px;justify-content:flex-start;margin-bottom:8px}
 .pbtn svg{width:20px;height:20px}
+.zh{background:#fff!important;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+.logo.zh{border-radius:14px;padding:3px;overflow:hidden}
+.logo.zh img{width:100%;height:100%;object-fit:contain;display:block}
+#intro .ib.zh{width:124px;height:124px;border-radius:50%;padding:12px;box-sizing:border-box}
+#intro .ib.zh img{width:100%;height:100%;object-fit:contain}
 .lc-in svg{width:1.1em;height:1.1em;vertical-align:-0.18em}
 .only-app,.only-web{display:none}
 .app .only-app{display:block}.web .only-web{display:block}
@@ -186,11 +193,11 @@ label.sw{display:flex;align-items:center;gap:10px;font-size:14px;margin:6px 0}
 </style>
 </head>
 <body class="web">
-<div id="intro"><div class="ib"><span data-ic="play"></span></div><b>TamilCastPlay</b><small>Play · Cast · Control</small></div>
+<div id="intro"><div class="ib zh"><img src="/logo.png" alt="ZH Play"></div><b>ZH Play</b><small>Tamizh Player · Play · Cast · Control</small></div>
 <header>
   <button class="g ic" onclick="goHome()" title="Home"><span data-ic="house"></span></button>
-  <div class="logo"><span data-ic="play"></span></div>
-  <div class="t"><b>TamilCastPlay</b><small id="devname">Connecting…</small></div>
+  <div class="logo zh"><img src="/logo.png" alt="ZH Play"></div>
+  <div class="t"><b>ZH Play</b><small id="devname">Connecting…</small></div>
   <button class="g ic" onclick="openDevices()" title="Switch TV"><span data-ic="tv"></span></button>
   <button class="g ic" onclick="toggleLang()" id="langBtn" title="Language">த</button>
   <button class="g ic" onclick="toggleTheme()" id="themeBtn" title="Theme"><span data-ic="sun"></span></button>
@@ -263,7 +270,7 @@ label.sw{display:flex;align-items:center;gap:10px;font-size:14px;margin:6px 0}
     <div class="btns" style="margin-top:6px"><button class="g" onclick="kbdDis=0;kbdShow(true)"><span data-ic="keyboard"></span> Keyboard</button><button onclick="searchAsk()"><span data-ic="search"></span> Search</button></div>
     <div class="row" id="typerow" style="display:none;margin-top:8px"><input id="typebox" placeholder="Type text on the TV (search boxes)" style="margin:0"><button class="g" onclick="typeText()">Send</button></div>
     <button class="w" id="adbbtn" style="display:none;margin-top:8px" onclick="if(confirm('Full remote for every app (ADB).\n\nTV: Settings > Device Preferences > About > press Build 7 times, then Developer options > USB / Network debugging ON.\n\nConnect now? (tick Always allow on the TV)'))cmd('adbsetup')">Full remote for every app (ADB)</button>
-    <div class="dim" id="acchint" style="display:none;margin-top:8px">ℹ To control other apps, turn on TV Settings &gt; Accessibility &gt; TamilCastPlay</div>
+    <div class="dim" id="acchint" style="display:none;margin-top:8px">ℹ To control other apps, turn on TV Settings &gt; Accessibility &gt; ZH Play</div>
   </div>
 
   <div class="sec board-l">Board</div>
@@ -308,7 +315,7 @@ label.sw{display:flex;align-items:center;gap:10px;font-size:14px;margin:6px 0}
     <button class="g w pbtn" onclick="pw('wake')"><span data-ic="sun"></span> Wake up</button>
     <button class="g w pbtn" onclick="pw('power')"><span data-ic="power"></span> Power key</button>
     <button class="g w pbtn" onclick="if(confirm('Restart the TV?'))pw('reboot')"><span data-ic="refresh-cw"></span> Restart the TV</button>
-    <button class="g w pbtn" onclick="pw('restartapp')"><span data-ic="rotate-ccw"></span> Restart TamilCastPlay</button>
+    <button class="g w pbtn" onclick="pw('restartapp')"><span data-ic="rotate-ccw"></span> Restart ZH Play</button>
     <div class="dim" style="margin-top:8px">Sleep, wake and restart need the Full remote (ADB) on the TV.</div>
   </div>
 </div>
@@ -721,7 +728,7 @@ async function openDevices(){
       e.querySelector('b').textContent=v.name;e.querySelector('.dim').textContent=v.ip+(v.me?' · connected':'');
       e.onclick=()=>{if(v.me){$('devmodal').classList.remove('on');return;}if(APP)MyTV.openTv(v.ip);else location.href='http://'+v.ip+':8080/';};
       box.appendChild(e);});
-    if(d.devices.length<2)box.insertAdjacentHTML('beforeend','<div class="dim">No other TVs found. Install TamilCastPlay on each TV and open it once.</div>');
+    if(d.devices.length<2)box.insertAdjacentHTML('beforeend','<div class="dim">No other TVs found. Install ZH Play on each TV and open it once.</div>');
   }catch(e){$('devlist').textContent='Scan failed';}
 }
 
@@ -910,8 +917,8 @@ const HI={"Now playing":"अभी चल रहा है","Nothing playing":"�
 "Search words or a web address":"खोज शब्द या वेब पता","Title (optional)":"शीर्षक (वैकल्पिक)","Subtitle link (optional)":"सबटाइटल लिंक (वैकल्पिक)","Playlist name":"प्लेलिस्ट का नाम","channels":"चैनल","Search":"खोजें","Show more":"और दिखाएँ","No channel found":"कोई चैनल नहीं मिला",
 "Playlists":"प्लेलिस्ट","Select all":"सभी चुनें","Select none":"कुछ नहीं चुनें","Delete":"मिटाएँ","playlists":"प्लेलिस्ट","Nothing selected":"कुछ नहीं चुना","Select":"चुनें","Delete playlist":"प्लेलिस्ट मिटाएँ","Search channel / name":"चैनल / नाम खोजें","search results":"खोज के नतीजे","Cancel":"रद्द करें",
 "💾 Save as playlist":"💾 प्लेलिस्ट के रूप में सेव करें","search above, or Save as playlist":"ऊपर खोजें, या प्लेलिस्ट के रूप में सेव करें","Channels":"चैनल","Load all channels of this list":"इस सूची के सभी चैनल लोड करें","Loading channels…":"चैनल लोड हो रहे हैं…","Adding…":"जोड़ा जा रहा है…","Added":"जुड़ गया","Saved":"सेव हुआ"};
-Object.assign(HI,{"ℹ To control other apps, turn on TV Settings > Accessibility > TamilCastPlay":"ℹ दूसरे ऐप चलाने के लिए: टीवी सेटिंग्स > Accessibility > TamilCastPlay चालू करें","Type text on the TV (search boxes)":"टीवी पर लिखें (सर्च बॉक्स)","Repeat":"दोहराएँ","Shuffle":"शफ़ल","Off":"बंद","On":"चालू","One":"एक","All":"सभी","This page":"यह पेज","Auto-hide top & bottom bars while scrolling":"स्क्रॉल करते समय ऊपर-नीचे की पट्टियाँ छिपाएँ"});
-Object.assign(TA,{"ℹ To control other apps, turn on TV Settings > Accessibility > TamilCastPlay":"ℹ பிற செயலிகளைக் கட்டுப்படுத்த: டிவி அமைப்புகள் > Accessibility > TamilCastPlay இயக்கவும்","Type text on the TV (search boxes)":"டிவியில் எழுது (தேடல் பெட்டிகள்)","Repeat":"மீண்டும்","Shuffle":"கலக்கு","Off":"அணை","On":"இயக்கு","One":"ஒன்று","All":"அனைத்தும்","This page":"இந்தப் பக்கம்","Auto-hide top & bottom bars while scrolling":"உருட்டும்போது மேல்/கீழ் பட்டிகளை மறை","💾 Save as playlist":"💾 பிளேலிஸ்டாகச் சேமி","search above, or Save as playlist":"மேலே தேடவும், அல்லது பிளேலிஸ்டாகச் சேமிக்கவும்","Channels":"சேனல்கள்","Load all channels of this list":"இந்தப் பட்டியலின் அனைத்து சேனல்களையும் ஏற்று","Loading channels…":"சேனல்கள் ஏற்றப்படுகின்றன…","Adding…":"சேர்க்கிறது…","Added":"சேர்க்கப்பட்டது","Saved":"சேமிக்கப்பட்டது"});
+Object.assign(HI,{"ℹ To control other apps, turn on TV Settings > Accessibility > ZH Play":"ℹ दूसरे ऐप चलाने के लिए: टीवी सेटिंग्स > Accessibility > ZH Play चालू करें","Type text on the TV (search boxes)":"टीवी पर लिखें (सर्च बॉक्स)","Repeat":"दोहराएँ","Shuffle":"शफ़ल","Off":"बंद","On":"चालू","One":"एक","All":"सभी","This page":"यह पेज","Auto-hide top & bottom bars while scrolling":"स्क्रॉल करते समय ऊपर-नीचे की पट्टियाँ छिपाएँ"});
+Object.assign(TA,{"ℹ To control other apps, turn on TV Settings > Accessibility > ZH Play":"ℹ பிற செயலிகளைக் கட்டுப்படுத்த: டிவி அமைப்புகள் > Accessibility > ZH Play இயக்கவும்","Type text on the TV (search boxes)":"டிவியில் எழுது (தேடல் பெட்டிகள்)","Repeat":"மீண்டும்","Shuffle":"கலக்கு","Off":"அணை","On":"இயக்கு","One":"ஒன்று","All":"அனைத்தும்","This page":"இந்தப் பக்கம்","Auto-hide top & bottom bars while scrolling":"உருட்டும்போது மேல்/கீழ் பட்டிகளை மறை","💾 Save as playlist":"💾 பிளேலிஸ்டாகச் சேமி","search above, or Save as playlist":"மேலே தேடவும், அல்லது பிளேலிஸ்டாகச் சேமிக்கவும்","Channels":"சேனல்கள்","Load all channels of this list":"இந்தப் பட்டியலின் அனைத்து சேனல்களையும் ஏற்று","Loading channels…":"சேனல்கள் ஏற்றப்படுகின்றன…","Adding…":"சேர்க்கிறது…","Added":"சேர்க்கப்பட்டது","Saved":"சேமிக்கப்பட்டது"});
 const DICTS={ta:TA,hi:HI};
 let LANG='';try{LANG=localStorage.getItem('lang')||''}catch(e){}
 function D(){return DICTS[LANG]||null;}
@@ -1009,7 +1016,7 @@ document.querySelectorAll('#dpad button').forEach(b=>{const k=b.classList.contai
   ['pointerup','pointerleave','pointercancel'].forEach(ev=>b.addEventListener(ev,stop));});
 
 async function searchAsk(){const q=prompt('Search for (YouTube, the TV, or a channel):','');if(!q)return;
-  const w=prompt('Where?\n1 = YouTube\n2 = the whole TV\n3 = play in TamilCastPlay','1');if(!w)return;
+  const w=prompt('Where?\n1 = YouTube\n2 = the whole TV\n3 = play in ZH Play','1');if(!w)return;
   const r=await post('/search',{q:q,where:w==='2'?'tv':w==='3'?'tcp':'youtube'});toast(r.msg);}
 $('autohide').checked=AUTOHIDE;$('followpal').checked=FOLLOW;
 loadOptions().then(poll);load();loadApps();loadHistory();

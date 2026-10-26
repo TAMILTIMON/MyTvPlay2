@@ -28,7 +28,7 @@ public class TvWidget extends AppWidgetProvider {
         try {
             RemoteViews v = new RemoteViews(c.getPackageName(), R.layout.widget_remote);
             String tv = Store.getStr("last_tv", "");
-            v.setTextViewText(R.id.w_title, title == null || title.isEmpty() ? "TamilCastPlay" : title);
+            v.setTextViewText(R.id.w_title, title == null || title.isEmpty() ? "ZH Play" : title);
             v.setTextViewText(R.id.w_sub, sub != null ? UiKit.noEmoji(sub) : tv.isEmpty() ? "Open the app once to pick your TV" : "Tap ▶ to connect · " + tv);
             v.setImageViewResource(R.id.w_play, playing ? R.drawable.lc_pause : R.drawable.lc_play);
             v.setOnClickPendingIntent(R.id.w_play, act(c, TvControlService.A_TOGGLE, 1));

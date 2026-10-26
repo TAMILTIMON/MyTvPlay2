@@ -290,10 +290,7 @@ public class MainActivity extends AppCompatActivity {
         // top bar: logo · title … theme · settings (corner)
         LinearLayout top = new LinearLayout(this);
         top.setGravity(Gravity.CENTER_VERTICAL);
-        android.widget.FrameLayout logo = new android.widget.FrameLayout(this);
-        logo.setBackground(Ui.gradient(this, 14));
-        logo.addView(UiKit.icon(this, "play", 24, 0xFFFFFFFF), new android.widget.FrameLayout.LayoutParams(Ui.dp(this, 48), Ui.dp(this, 48), Gravity.CENTER));
-        top.addView(logo, new LinearLayout.LayoutParams(Ui.dp(this, 48), Ui.dp(this, 48)));
+        top.addView(UiKit.logoBadge(this, 54, false), new LinearLayout.LayoutParams(Ui.dp(this, 54), Ui.dp(this, 54)));
         LinearLayout titles = new LinearLayout(this);
         titles.setOrientation(LinearLayout.VERTICAL);
         titles.setPadding(Ui.dp(this, 14), 0, 0, 0);
@@ -520,7 +517,7 @@ public class MainActivity extends AppCompatActivity {
         actions.clear();
         rowItem.clear();
         if (current == null) {
-            header.setText("TamilCastPlay");
+            header.setText("ZH Play");
             if (Ui.isTv(this) && !Perms.overlayOk(this)) {
                 rows.add(T.t("🔓   Allow the phone to start videos when this app is closed  (recommended)"));
                 actions.add(() -> Perms.openOverlaySettings(this));

@@ -18,7 +18,7 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
-/** Checks your GitHub releases for a newer TamilCastPlay and installs it (no laptop needed). */
+/** Checks your GitHub releases for a newer ZH Play and installs it (no laptop needed). */
 public final class Updater {
     private Updater() {
     }
@@ -54,7 +54,7 @@ public final class Updater {
         c.setConnectTimeout(8000);
         c.setReadTimeout(10000);
         c.setRequestProperty("Accept", "application/vnd.github+json");
-        c.setRequestProperty("User-Agent", "TamilCastPlay");
+        c.setRequestProperty("User-Agent", "ZH Play");
         if (c.getResponseCode() != 200) throw new Exception("No release found on github.com/" + repo());
         StringBuilder sb = new StringBuilder();
         try (InputStream in = c.getInputStream()) {
@@ -111,7 +111,7 @@ public final class Updater {
     private static void download(final Activity a, final Info i) {
         if (Build.VERSION.SDK_INT >= 26 && !a.getPackageManager().canRequestPackageInstalls()) {
             new UiDialog(a).setTitle(T.t("Allow installing updates"))
-                    .setMessage(T.t("On the next screen switch “Allow from this source” ON for TamilCastPlay, then press Update again."))
+                    .setMessage(T.t("On the next screen switch “Allow from this source” ON for ZH Play, then press Update again."))
                     .setPositiveButton(T.t("Allow"), (d, w) -> Perms.launchFirst(a, new Intent[]{
                             new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + a.getPackageName())),
                             new Intent(Settings.ACTION_SECURITY_SETTINGS)}))
@@ -122,7 +122,7 @@ public final class Updater {
         new Thread(() -> {
             try {
                 File dir = a.getExternalCacheDir() != null ? a.getExternalCacheDir() : a.getCacheDir();
-                File f = new File(dir, "TamilCastPlay-update.apk");
+                File f = new File(dir, "ZHPlay-update.apk");
                 HttpURLConnection c = (HttpURLConnection) new URL(i.url).openConnection();
                 c.setInstanceFollowRedirects(true);
                 c.setConnectTimeout(10000);

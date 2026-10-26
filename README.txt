@@ -1,3 +1,17 @@
+ZH PLAY 3.3 — new name and logo (was TamilCastPlay)
+==================================================
+* The app is now called "ZH Play" everywhere you can see it (launcher, TV home, menus,
+  messages, notifications, share menu, browser page, Google Assistant: "play … on ZH Play").
+* New ZH logo: app icon (Android shaped / round icons), Android TV banner, opening
+  animation, first screen and TV home header, phone widget, notifications, browser page
+  (header, opening animation, browser tab icon). Shown on a white badge so the black
+  "H" stays visible on dark screens.
+* The internal app ID (com.tamil.castplay) and signing key are unchanged on purpose:
+  this update installs over the old app and keeps all playlists, settings, profiles and
+  downloads; auto-update keeps working. Old "TamilCastPlay-backup" files are still found.
+* If your TV / phone still shows the old icon right after updating, restart the launcher
+  or the device once (launchers cache icons).
+
 TAMILCASTPLAY 3.2 — card style + view modes for phone Videos / Music
 ====================================================================
 * View button (grid icon, top right) like Windows Explorer: Extra large icons, Large

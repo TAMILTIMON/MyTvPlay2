@@ -102,7 +102,7 @@ public class ShareActivity extends AppCompatActivity {
         if (isFinishing()) return;
         if (found.isEmpty()) {
             new UiDialog(this).setTitle(T.t("No TV found"))
-                    .setMessage(T.t("Turn on the TV, open TamilCastPlay once, and make sure the phone is on the same Wi-Fi."))
+                    .setMessage(T.t("Turn on the TV, open ZH Play once, and make sure the phone is on the same Wi-Fi."))
                     .setPositiveButton(T.t("Play on this phone"), (d, w) -> playHere())
                     .setNegativeButton(T.t("Close"), null)
                     .setOnDismissListener(d -> finish()).show();

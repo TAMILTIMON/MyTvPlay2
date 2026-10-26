@@ -579,7 +579,7 @@ public final class TvInfo {
 
     public static String forceStop(Context c, String process) {
         String pkg = process.split(":")[0];
-        if (pkg.equals(c.getPackageName())) return "That's TamilCastPlay itself";
+        if (pkg.equals(c.getPackageName())) return "That's ZH Play itself";
         try {
             AdbClient.shell(c, "am force-stop " + pkg);
             return "⏹ Stopped " + AppsHub.label(c, pkg);
@@ -600,12 +600,12 @@ public final class TvInfo {
             s.append("💾 ").append(v.name).append(": ").append(gb(used)).append(" used / ").append(gb(v.total))
                     .append(" · ").append(gb(v.free)).append(" free\n   ").append(bar((double) used / v.total)).append('\n');
         }
-        s.append("   TamilCastPlay torrents: ").append(gb(TorrentEngine.cacheBytes(c))).append("\n\n");
+        s.append("   ZH Play torrents: ").append(gb(TorrentEngine.cacheBytes(c))).append("\n\n");
         long[] r = ram(c);
         s.append("🧠 RAM: ").append(gb(r[0] - r[1])).append(" used / ").append(gb(r[0])).append(" · ")
                 .append(gb(r[1])).append(" free").append(r[3] == 1 ? "  ⚠ LOW" : "").append("\n   ")
                 .append(bar((double) (r[0] - r[1]) / r[0])).append('\n');
-        s.append("   TamilCastPlay uses ").append(gb(appMemory())).append("\n\n");
+        s.append("   ZH Play uses ").append(gb(appMemory())).append("\n\n");
         s.append("⚙ ").append(chip()).append(" · ").append(cores()).append(" cores · ").append(Build.SUPPORTED_ABIS[0]);
         long mx = maxMhz();
         if (mx > 0) s.append(" · up to ").append(mx).append(" MHz");

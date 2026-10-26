@@ -50,7 +50,7 @@ public final class SubSearch {
         HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
         c.setConnectTimeout(8000);
         c.setReadTimeout(12000);
-        c.setRequestProperty("User-Agent", "TamilCastPlay v2");
+        c.setRequestProperty("User-Agent", "ZH Play v2");
         c.setRequestProperty("Accept", "application/json");
         if (key != null) c.setRequestProperty("Api-Key", key);
         int code = c.getResponseCode();
@@ -126,7 +126,7 @@ public final class SubSearch {
             con.setDoOutput(true);
             con.setRequestMethod("POST");
             con.setRequestProperty("Api-Key", Store.getStr("os_key", "").trim());
-            con.setRequestProperty("User-Agent", "TamilCastPlay v2");
+            con.setRequestProperty("User-Agent", "ZH Play v2");
             con.setRequestProperty("Content-Type", "application/json");
             con.setRequestProperty("Accept", "application/json");
             try (OutputStream o = con.getOutputStream()) {

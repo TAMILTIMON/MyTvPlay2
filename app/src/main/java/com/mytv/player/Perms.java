@@ -29,9 +29,9 @@ public final class Perms {
 
     /** Steps + ways to turn on whole-TV control, then opens the best Settings screen this TV has. */
     public static void openAccessSettings(final Activity a) {
-        String steps = T.t("On the next screen choose “TamilCastPlay phone remote” and switch it ON. Then the phone remote works in every app (Home, Netflix, settings…).")
+        String steps = T.t("On the next screen choose “ZH Play phone remote” and switch it ON. Then the phone remote works in every app (Home, Netflix, settings…).")
                 + "\n\n" + T.t("If the screen does not open, go to:") + "\n"
-                + "⚙ Settings → Device Preferences → Accessibility → TamilCastPlay phone remote → ON\n"
+                + "⚙ Settings → Device Preferences → Accessibility → ZH Play phone remote → ON\n"
                 + "(" + T.t("some TVs: Settings → System → Accessibility, or Settings → Apps → Special app access") + ")";
         new UiDialog(a)
                 .setTitle("🎮  " + T.t("Control the whole TV from the phone"))
@@ -73,7 +73,7 @@ public final class Perms {
                 i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 a.startActivity(i);
                 if (Settings.ACTION_SETTINGS.equals(i.getAction()) || cls.endsWith("MainSettings")) {
-                    UiKit.makeToast(a, T.t("Device Preferences → Accessibility → TamilCastPlay phone remote → ON"),
+                    UiKit.makeToast(a, T.t("Device Preferences → Accessibility → ZH Play phone remote → ON"),
                             android.widget.Toast.LENGTH_LONG).show();
                 }
                 return true;
@@ -91,7 +91,7 @@ public final class Perms {
         new UiDialog(a).setTitle(T.t("Other ways"))
                 .setMessage(T.t("Your TV may hide the Accessibility screen. Turn it on once with adb (from a PC, or a phone app such as “Remote ADB Shell” / “Bugjaeger”):")
                         + "\n\n" + cmd + "\n\n"
-                        + T.t("TV volume and ⏯ already work without it. Inside TamilCastPlay the phone remote always works."))
+                        + T.t("TV volume and ⏯ already work without it. Inside ZH Play the phone remote always works."))
                 .setPositiveButton(T.t("OK"), null)
                 .setNeutralButton(T.t("Copy"), (d, w) -> {
                     android.content.ClipboardManager cm = (android.content.ClipboardManager) a.getSystemService(android.content.Context.CLIPBOARD_SERVICE);
@@ -120,8 +120,8 @@ public final class Perms {
     public static void askOverlay(final Activity a) {
         new UiDialog(a)
                 .setTitle(T.t("📱  Allow the phone to start videos"))
-                .setMessage("So your phone can play videos on this TV even when TamilCastPlay is closed, "
-                        + "allow “Display over other apps”.\n\nOn the next screen choose TamilCastPlay and switch it ON, "
+                .setMessage("So your phone can play videos on this TV even when ZH Play is closed, "
+                        + "allow “Display over other apps”.\n\nOn the next screen choose ZH Play and switch it ON, "
                         + "then press Back.")
                 .setPositiveButton(T.t("Allow"), new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface d, int w) {
@@ -156,8 +156,8 @@ public final class Perms {
     private static void help(Activity a, String what) {
         new UiDialog(a).setTitle(T.t("Open it in TV Settings"))
                 .setMessage("This TV has no direct shortcut. Go to:\n\nSettings → Apps → Special app access → "
-                        + what + " → TamilCastPlay → ON\n\nIf your TV doesn't have that option, everything still works "
-                        + "while TamilCastPlay is open on the TV.\n\nadb: adb shell appops set " + a.getPackageName() + " "
+                        + what + " → ZH Play → ON\n\nIf your TV doesn't have that option, everything still works "
+                        + "while ZH Play is open on the TV.\n\nadb: adb shell appops set " + a.getPackageName() + " "
                         + ("All files access".equals(what) ? "MANAGE_EXTERNAL_STORAGE" : "SYSTEM_ALERT_WINDOW") + " allow")
                 .setPositiveButton(T.t("OK"), null).show();
     }

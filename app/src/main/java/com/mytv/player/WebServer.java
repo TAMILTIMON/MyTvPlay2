@@ -33,6 +33,16 @@ public class WebServer extends NanoHTTPD {
             if (uri.startsWith("/torrent/")) return torrent(s, uri);
             if (uri.startsWith("/local/")) return local(s, uri);   // random ids, needed by the TV player
             if (uri.startsWith("/fs/")) return phoneFiles(s, uri);  // "let the TV see this phone's videos"
+            if (uri.equals("/logo.png") || uri.equals("/favicon.png")) {   // ZH Play logo for the web page
+                try {
+                    InputStream in = ctx.getAssets().open(uri.substring(1));
+                    Response r = newChunkedResponse(Response.Status.OK, "image/png", in);
+                    r.addHeader("Cache-Control", "max-age=86400");
+                    return r;
+                } catch (Exception e) {
+                    return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "");
+                }
+            }
 
             Map<String, String> files = new HashMap<>();
             if (Method.POST.equals(s.getMethod())) s.parseBody(files);
@@ -206,7 +216,7 @@ public class WebServer extends NanoHTTPD {
                             ctx.getSystemService(Context.ACTIVITY_SERVICE)).isLowRamDevice()) {
                         return fail("This TV is a low-memory model: turn on the 🔌 Full remote (ADB) — then other apps' videos show here");
                     }
-                    if (!AdbClient.enabled()) return fail("Turn on the 🔌 Full remote (ADB) first, or TV Settings > Notification access > TamilCastPlay");
+                    if (!AdbClient.enabled()) return fail("Turn on the 🔌 Full remote (ADB) first, or TV Settings > Notification access > ZH Play");
                     String e = SessionWatcher.enableViaAdb(ctx);
                     return e == null ? msg("✅ The remote now shows videos from other apps") : fail(e);
                 }
@@ -336,7 +346,7 @@ public class WebServer extends NanoHTTPD {
                     }
                     Remote.play(ctx, Collections.singletonList(it), 0);
                     if (App.visible == 0 && !Perms.overlayOk(ctx)) {
-                        return msg("Sent — if the TV doesn't start, open TamilCastPlay on the TV once, or allow “Display over other apps” in its ⚙ Settings");
+                        return msg("Sent — if the TV doesn't start, open ZH Play on the TV once, or allow “Display over other apps” in its ⚙ Settings");
                     }
                     return msg(Formats.isTorrent(u) ? "Starting torrent on the TV… (getting info can take a minute)"
                             : "Playing on the TV");
@@ -366,7 +376,7 @@ public class WebServer extends NanoHTTPD {
                             ctx.startActivity(i);
                             System.exit(0);
                         }, 400);
-                        return msg("Restarting TamilCastPlay…");
+                        return msg("Restarting ZH Play…");
                     }
                     if (!AdbClient.enabled()) return fail("Power controls need the 🔌 Full remote (ADB) on the TV");
                     String e = null;
@@ -456,7 +466,7 @@ public class WebServer extends NanoHTTPD {
                         return msg("Opening " + AppsHub.label(ctx, pkg));
                     }
                     if (App.visible == 0 && !Perms.overlayOk(ctx)) {
-                        return fail("Open TamilCastPlay on the TV first, or allow “Display over other apps” in its ⚙ Settings");
+                        return fail("Open ZH Play on the TV first, or allow “Display over other apps” in its ⚙ Settings");
                     }
                     String r = Remote.call(new Callable<String>() {
                         public String call() {
@@ -494,7 +504,7 @@ public class WebServer extends NanoHTTPD {
                     bi.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                     ctx.startActivity(bi);
                     return msg(App.visible == 0 && !Perms.overlayOk(ctx)
-                            ? "Sent — open TamilCastPlay on the TV if the browser doesn't appear" : "Opening the browser on the TV");
+                            ? "Sent — open ZH Play on the TV if the browser doesn't appear" : "Opening the browser on the TV");
                 }
 
                 case "/state":
@@ -773,7 +783,7 @@ public class WebServer extends NanoHTTPD {
         if (items.size() == 1) Store.addRecent(items.get(0));
         Remote.play(ctx, items, 0);
         if (App.visible == 0 && !Perms.overlayOk(ctx)) {
-            return "Sent — if the TV doesn't start, open TamilCastPlay on the TV once, or allow “Display over other apps” in its ⚙ Settings";
+            return "Sent — if the TV doesn't start, open ZH Play on the TV once, or allow “Display over other apps” in its ⚙ Settings";
         }
         return Formats.isTorrent(items.get(0).u) ? "Starting torrent on the TV… (can take a minute)" : "Playing on the TV";
     }

@@ -844,7 +844,7 @@ public class BrowserActivity extends AppCompatActivity {
                 .append(";background:").append(card).append(";border:1px solid ").append(line).append(";margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}")
                 .append(".r a small{display:block;color:").append(dim).append(";font-size:12px}p{color:").append(dim).append(";font-size:13px;text-align:center;margin-top:26px}")
                 .append("</style></head><body><div class=wrap>")
-                .append("<div class=logo><i></i><b>TamilCastPlay</b></div>")
+                .append("<div class=logo><i></i><b>ZH Play</b></div>")
                 .append("<form onsubmit=\"location.href='https://www.google.com/search?q='+encodeURIComponent(q.value);return false\">")
                 .append("<input id=q placeholder='").append(esc(T.t("Search Google or type a web address"))).append("'><button>")
                 .append(esc(T.t("Search"))).append("</button></form>");

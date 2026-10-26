@@ -161,7 +161,7 @@ public final class Remote {
     }
 
     public static String needAccess() {
-        return "To control other apps, turn on TV Settings > Accessibility > TamilCastPlay (⚙ Settings in the app opens it)";
+        return "To control other apps, turn on TV Settings > Accessibility > ZH Play (⚙ Settings in the app opens it)";
     }
 
     public static String type(Context ctx, String text) {
@@ -198,7 +198,7 @@ public final class Remote {
                 } catch (Exception ignored) {
                 }
             }
-            return "Open TamilCastPlay on the TV first";
+            return "Open ZH Play on the TV first";
         }
     }
 }

@@ -8,7 +8,7 @@ import android.net.Uri;
 import java.util.List;
 import java.util.Locale;
 
-/** Voice / text search sent from the phone: YouTube, the TV's own search, or a channel in TamilCastPlay. */
+/** Voice / text search sent from the phone: YouTube, the TV's own search, or a channel in ZH Play. */
 public final class TvSearch {
     private TvSearch() {
     }
@@ -29,7 +29,7 @@ public final class TvSearch {
         return "'" + s.replace("'", "'\\''") + "'";
     }
 
-    /** May TamilCastPlay open another app right now? (Android blocks this from the background.) */
+    /** May ZH Play open another app right now? (Android blocks this from the background.) */
     private static boolean canStartDirectly(Context c) {
         if (App.visible > 0) return true;
         return android.os.Build.VERSION.SDK_INT < 29
@@ -49,7 +49,7 @@ public final class TvSearch {
     }
 
     private static final String CANT = "Couldn't open it on the TV. Turn on the Full remote (ADB) in TV Settings, "
-            + "or allow \"Display over other apps\" for TamilCastPlay.";
+            + "or allow \"Display over other apps\" for ZH Play.";
 
     private static String ytPkg(Context c) {
         for (String p : YT) if (AppsHub.installed(c, p)) return p;
@@ -121,7 +121,7 @@ public final class TvSearch {
         return youtube(c, q);
     }
 
-    /** Opens an app even when TamilCastPlay is in the background (through ADB). */
+    /** Opens an app even when ZH Play is in the background (through ADB). */
     public static boolean openAppAdb(Context c, String pkg) {
         if (!AdbClient.enabled()) return false;
         try {

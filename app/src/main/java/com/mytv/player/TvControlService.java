@@ -104,7 +104,7 @@ public class TvControlService extends Service {
     private void ensureSession() {
         if (session != null || Build.VERSION.SDK_INT < 21) return;
         try {
-            session = new android.media.session.MediaSession(this, "TamilCastPlayRemote");
+            session = new android.media.session.MediaSession(this, "ZHPlayRemote");
             session.setPlaybackToRemote(new android.media.VolumeProvider(android.media.VolumeProvider.VOLUME_CONTROL_RELATIVE, 100, 50) {
                 @Override
                 public void onAdjustVolume(int direction) {
@@ -138,7 +138,7 @@ public class TvControlService extends Service {
                             | android.media.session.PlaybackState.ACTION_SKIP_TO_PREVIOUS | android.media.session.PlaybackState.ACTION_FAST_FORWARD
                             | android.media.session.PlaybackState.ACTION_REWIND | android.media.session.PlaybackState.ACTION_STOP).build());
             session.setMetadata(new android.media.MediaMetadata.Builder()
-                    .putString(android.media.MediaMetadata.METADATA_KEY_TITLE, title.isEmpty() ? "TamilCastPlay" : title)
+                    .putString(android.media.MediaMetadata.METADATA_KEY_TITLE, title.isEmpty() ? "ZH Play" : title)
                     .putString(android.media.MediaMetadata.METADATA_KEY_ARTIST, sub).build());
         } catch (Throwable ignored) {
         }
@@ -207,9 +207,10 @@ public class TvControlService extends Service {
                 .putExtra(NativeRemoteActivity.EXTRA_IP, ip).putExtra(NativeRemoteActivity.EXTRA_NAME, name)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         int f = PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0);
+        b.setLargeIcon(android.graphics.BitmapFactory.decodeResource(getResources(), R.drawable.zh_logo));
         b.setSmallIcon(android.R.drawable.ic_media_play)
                 .setContentTitle(UiKit.noEmoji(title.isEmpty() ? "📺 " + name : title))
-                .setContentText(sub.isEmpty() ? "TamilCastPlay" : sub)
+                .setContentText(sub.isEmpty() ? "ZH Play" : sub)
                 .setContentIntent(PendingIntent.getActivity(this, 1, open, f))
                 .setOngoing(true)
                 .setShowWhen(false)

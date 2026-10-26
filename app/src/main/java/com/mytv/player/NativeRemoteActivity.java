@@ -108,7 +108,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
         tt.setOrientation(LinearLayout.VERTICAL);
         tt.setPadding(dp(10), 0, dp(6), 0);
         TextView h = Ui.text(this, 17, Ui.TEXT, true);
-        h.setText("TamilCastPlay");
+        h.setText("ZH Play");
         h.setSingleLine(true);
         devLine = Ui.text(this, 12, Ui.DIM, false);
         devLine.setSingleLine(true);
@@ -660,7 +660,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
         full(rc, volKeysBtn);
         updateVolKeysBtn();
         accessHint = Ui.text(this, 12, Ui.DIM, false);
-        accessHint.setText(T.t("To control other apps, turn on TV Settings > Accessibility > TamilCastPlay"));
+        accessHint.setText(T.t("To control other apps, turn on TV Settings > Accessibility > ZH Play"));
         accessHint.setVisibility(View.GONE);
         rc.addView(accessHint);
         adbBtn = full(rc, btn(T.t("Full remote for every app (ADB)"), true, v -> new UiDialog(this)
@@ -832,7 +832,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
             return;
         }
         String[] opts = {"🚀 " + T.t("Ask the AI assistant"), "▶ " + T.t("Search on YouTube"), "🔍 " + T.t("Search the whole TV"),
-                "📺 " + T.t("Play in TamilCastPlay"), "⌨ " + T.t("Type into the TV")};
+                "📺 " + T.t("Play in ZH Play"), "⌨ " + T.t("Type into the TV")};
         final String[] where = {"ai", "youtube", "tv", "tcp", "type"};
         new UiDialog(this).setTitle("“" + said + "”").setItems(opts, (d, w) -> {
             if (w == 0) {
@@ -1116,7 +1116,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
     }
 
     private void powerMenu() {
-        String[] items = {T.t("Sleep / screen off"), T.t("Wake up"), T.t("Power key"), T.t("Restart the TV"), T.t("Restart TamilCastPlay")};
+        String[] items = {T.t("Sleep / screen off"), T.t("Wake up"), T.t("Power key"), T.t("Restart the TV"), T.t("Restart ZH Play")};
         final String[] acts = {"sleep", "wake", "power", "reboot", "restartapp"};
         new UiDialog(this).setTitle(T.t("Power")).setItems(items, (d, w) -> {
             if (acts[w].equals("reboot")) {

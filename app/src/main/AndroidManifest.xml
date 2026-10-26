@@ -66,8 +66,9 @@
         android:name=".App"
         android:allowBackup="false"
         android:banner="@drawable/banner"
-        android:icon="@drawable/icon"
-        android:label="TamilCastPlay"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="ZH Play"
         android:largeHeap="true"
         android:requestLegacyExternalStorage="true"
         android:theme="@style/AppTheme"
@@ -120,7 +121,7 @@
             android:name=".ShareActivity"
             android:excludeFromRecents="true"
             android:exported="true"
-            android:label="TamilCastPlay"
+            android:label="ZH Play"
             android:theme="@style/ShareTheme">
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
@@ -147,7 +148,7 @@
         <activity
             android:name=".ConnectActivity"
             android:exported="false"
-            android:label="TamilCastPlay Remote" />
+            android:label="ZH Play Remote" />
 
         <activity
             android:name=".NativeRemoteActivity"
@@ -166,7 +167,7 @@
             android:configChanges="orientation|screenSize|keyboardHidden|keyboard|navigation|smallestScreenSize|screenLayout|uiMode"
             android:exported="true"
             android:launchMode="singleTop">
-            <!-- "Open with TamilCastPlay" for video/audio files and streams from other apps -->
+            <!-- "Open with ZH Play" for video/audio files and streams from other apps -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -233,7 +234,7 @@
         <service
             android:name=".MediaWatch"
             android:exported="true"
-            android:label="TamilCastPlay remote"
+            android:label="ZH Play remote"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
             <intent-filter>
                 <action android:name="android.service.notification.NotificationListenerService" />
@@ -254,7 +255,7 @@
         <receiver
             android:name=".TvWidget"
             android:exported="true"
-            android:label="TamilCastPlay remote">
+            android:label="ZH Play remote">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
@@ -263,7 +264,7 @@
                 android:resource="@xml/widget_info" />
         </receiver>
 
-        <!-- "Hey Google, play … on TamilCastPlay" -->
+        <!-- "Hey Google, play … on ZH Play" -->
         <activity
             android:name=".VoiceSearchActivity"
             android:excludeFromRecents="true"

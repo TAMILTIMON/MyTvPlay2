@@ -168,7 +168,7 @@ public class NetworkActivity extends AppCompatActivity {
 
     private final List<Entry> phones = new ArrayList<>();
 
-    /** Lists a folder of a phone that shares its storage (TamilCastPlay on the phone). */
+    /** Lists a folder of a phone that shares its storage (ZH Play on the phone). */
     private void browsePhone(final String uri) {
         cur = uri;
         pending.clear();

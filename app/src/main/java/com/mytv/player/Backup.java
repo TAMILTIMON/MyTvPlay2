@@ -37,7 +37,7 @@ public final class Backup {
     public static String restore(String json) {
         try {
             JSONObject o = new JSONObject(json);
-            if (!"tamilcastplay".equals(o.optString("app"))) return "This is not a TamilCastPlay backup";
+            if (!"tamilcastplay".equals(o.optString("app"))) return "This is not a ZH Play backup";
             JSONArray pls = o.getJSONArray("playlists");
             int n = 0;
             for (int i = 0; i < pls.length(); i++) {
@@ -59,7 +59,7 @@ public final class Backup {
     }
 
     public static String fileName() {
-        return "TamilCastPlay-backup-" + new java.text.SimpleDateFormat("yyyyMMdd-HHmm", Locale.US).format(new java.util.Date()) + ".json";
+        return "ZHPlay-backup-" + new java.text.SimpleDateFormat("yyyyMMdd-HHmm", Locale.US).format(new java.util.Date()) + ".json";
     }
 
     /** Saves into the TV's Download folder. Returns where. */
@@ -101,7 +101,7 @@ public final class Backup {
         for (File d : dirs) {
             File[] k = d.listFiles();
             if (k == null) continue;
-            for (File f : k) if (f.getName().startsWith("TamilCastPlay-backup") && f.getName().endsWith(".json")) out.add(f);
+            for (File f : k) if ((f.getName().startsWith("ZHPlay-backup") || f.getName().startsWith("TamilCastPlay-backup")) && f.getName().endsWith(".json")) out.add(f);
         }
         return out;
     }

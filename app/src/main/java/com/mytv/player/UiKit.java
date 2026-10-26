@@ -154,6 +154,24 @@ public final class UiKit {
         return b;
     }
 
+    /** The ZH Play logo on a white badge (the black "H" stays visible on dark screens too). */
+    public static FrameLayout logoBadge(Context c, int sizeDp, boolean round) {
+        FrameLayout f = new FrameLayout(c);
+        GradientDrawable g = new GradientDrawable();
+        g.setColor(Color.WHITE);
+        if (round) g.setShape(GradientDrawable.OVAL);
+        else g.setCornerRadius(Ui.dp(c, sizeDp * 0.24f));
+        f.setBackground(g);
+        f.setElevation(Ui.dp(c, 3));
+        ImageView iv = new ImageView(c);
+        iv.setImageResource(R.drawable.zh_logo);
+        iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        int pad = Ui.dp(c, sizeDp * (round ? 0.10f : 0.07f));
+        iv.setPadding(pad, pad, pad, pad);
+        f.addView(iv, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        return f;
+    }
+
     /** Red round ✕ for closing panels. */
     public static ImageView closeButton(Context c, View.OnClickListener l) {
         ImageView b = roundButton(c, "x", 40, false, l);
@@ -560,21 +578,17 @@ public final class UiKit {
         rg.setShape(GradientDrawable.OVAL);
         rg.setStroke(Ui.dp(a, 3), (Ui.ACCENT & 0x00FFFFFF) | 0x88000000);
         ring.setBackground(rg);
-        logo.addView(ring, new FrameLayout.LayoutParams(Ui.dp(a, 150), Ui.dp(a, 150), Gravity.CENTER));
-        final FrameLayout bubble = new FrameLayout(a);
-        GradientDrawable bg = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{Ui.ACCENT, Ui.ACCENT2});
-        bg.setCornerRadius(Ui.dp(a, 30));
-        bubble.setBackground(bg);
+        logo.addView(ring, new FrameLayout.LayoutParams(Ui.dp(a, 160), Ui.dp(a, 160), Gravity.CENTER));
+        final FrameLayout bubble = logoBadge(a, 124, true);
         bubble.setElevation(Ui.dp(a, 12));
-        bubble.addView(icon(a, "play", 40, Color.WHITE), new FrameLayout.LayoutParams(Ui.dp(a, 96), Ui.dp(a, 96), Gravity.CENTER));
-        logo.addView(bubble, new FrameLayout.LayoutParams(Ui.dp(a, 96), Ui.dp(a, 96), Gravity.CENTER));
+        logo.addView(bubble, new FrameLayout.LayoutParams(Ui.dp(a, 124), Ui.dp(a, 124), Gravity.CENTER));
         col.addView(logo, new LinearLayout.LayoutParams(Ui.dp(a, 160), Ui.dp(a, 160)));
         final TextView name = Ui.text(a, 26, Ui.TEXT, true);
-        name.setText("TamilCastPlay");
+        name.setText("ZH Play");
         name.setLetterSpacing(0.04f);
         col.addView(name);
         final TextView tag = Ui.text(a, 13, Ui.DIM, false);
-        tag.setText(T.t("Play · Cast · Control"));
+        tag.setText("Tamizh Player  ·  " + T.t("Play · Cast · Control"));
         col.addView(tag);
         s.addView(col, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER));
         root.addView(s, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));

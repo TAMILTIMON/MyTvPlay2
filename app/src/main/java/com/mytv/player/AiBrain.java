@@ -10,7 +10,7 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * "Ask TamilCastPlay": a sentence (Tamil / English / Tanglish) → actions on the TV.
+ * "Ask ZH Play": a sentence (Tamil / English / Tanglish) → actions on the TV.
  * The AI only chooses from the app's existing actions; a keyword backup works without AI.
  */
 public final class AiBrain {
@@ -53,7 +53,7 @@ public final class AiBrain {
     }
 
     private static String system(JSONObject state, List<String> apps, List<String> channels) {
-        return "You control a TV app named TamilCastPlay. The user may write Tamil, English, Hindi or Tanglish "
+        return "You control a TV app named ZH Play. The user may write Tamil, English, Hindi or Tanglish "
                 + "(Tamil written in English letters, e.g. 'Sun TV podu' = play Sun TV, 'volume kammi pannu' = lower volume, "
                 + "'niruthu' = pause, 'adutha' = next).\n"
                 + "Reply with ONLY one JSON object, no other text: {\"say\":\"short friendly reply in the user's language\",\"actions\":[...]}\n"
