@@ -59,7 +59,8 @@ public final class AiBrain {
                 + "Reply with ONLY one JSON object, no other text: {\"say\":\"short friendly reply in the user's language\",\"actions\":[...]}\n"
                 + "Allowed actions (use only these):\n"
                 + "{\"do\":\"play_channel\",\"q\":\"channel or video name\"}\n"
-                + "{\"do\":\"youtube\",\"q\":\"search words\"}\n"
+                + "{\"do\":\"youtube_play\",\"q\":\"what to play\"}  (PLAY the best matching YouTube video now — use for play / podu / poduga / kelu)\n"
+                + "{\"do\":\"youtube\",\"q\":\"search words\"}  (only show YouTube search results — use for search / find / thedu)\n"
                 + "{\"do\":\"search_tv\",\"q\":\"search words\"}\n"
                 + "{\"do\":\"open_app\",\"name\":\"app name\"}\n"
                 + "{\"do\":\"volume\",\"value\":0-200}  (player volume, 100 = normal)\n"
@@ -123,6 +124,7 @@ public final class AiBrain {
             String d = a.optString("do");
             switch (d) {
                 case "play_channel": return msg(tv.post("/search", m("q", a.optString("q"), "where", "tcp")));
+                case "youtube_play": return msg(tv.post("/search", m("q", a.optString("q"), "where", "ytplay")));
                 case "youtube": return msg(tv.post("/search", m("q", a.optString("q"), "where", "youtube")));
                 case "search_tv": return msg(tv.post("/search", m("q", a.optString("q"), "where", "tv")));
                 case "open_app": {
@@ -170,7 +172,9 @@ public final class AiBrain {
     }
 
     private static String msg(JSONObject r) {
-        return r == null ? "" : r.optString("msg", r.optBoolean("ok", true) ? "OK" : "");
+        if (r == null) return "";
+        String m = r.optString("msg", r.optBoolean("ok", true) ? "OK" : "Failed");
+        return r.optBoolean("ok", true) ? m : "⚠ " + m;
     }
 
     // ------------------------------------------------------------------ no-AI backup (Tamil / Tanglish / English)
@@ -178,19 +182,28 @@ public final class AiBrain {
         String t = s.toLowerCase(Locale.ROOT).trim();
         try {
             JSONArray acts = new JSONArray();
-            if (has(t, "volume", "சத்தம்", "sattham", "saththam", "sound", "ஒலி")) {
+            if (t.contains("youtube")) {
+                // "YouTube Ilaiyaraaja songs", "youtube la AR Rahman songs podu", "search youtube cricket"
+                boolean search = has(t, "search", "find", "thedu", "தேடு");
+                String q = (" " + t.replace("youtube", " ") + " ")
+                        .replaceAll("\\s(la|il|le|play|podu|poduga|pannu|search|find|thedu|on|in)(?=\\s)", " ")
+                        .replaceAll("\\s+", " ").trim();
+                acts.put(new JSONObject().put("do", search ? "youtube" : "youtube_play").put("q", q));
+            } else if (has(t, "volume", "சத்தம்", "sattham", "saththam", "sound", "ஒலி")) {
                 boolean down = has(t, "kammi", "kami", "குறை", "korai", "kurai", "down", "less", "low", "decrease");
                 acts.put(new JSONObject().put("do", "volume_step").put("by", down ? -20 : 20));
-            } else if (has(t, "pause", "niruthu", "நிறுத்து", "நிறுத்", "wait")) acts.put(new JSONObject().put("do", "pause"));
-            else if (has(t, "next", "adutha", "அடுத்த")) acts.put(new JSONObject().put("do", "next"));
-            else if (has(t, "previous", "munnadi", "pinnadi", "முந்தைய", "back channel")) acts.put(new JSONObject().put("do", "prev"));
-            else if (has(t, "what did i miss", "recap", "enna aachu", "என்ன ஆச்சு", "summary")) acts.put(new JSONObject().put("do", "recap"));
-            else if (has(t, "resume", "continue", "ஓட்டு", "play")) {
-                String q = t.replaceAll("\\b(play|podu|pannu)\\b", "").trim();
-                if (q.length() > 2 && !q.equals("resume")) acts.put(new JSONObject().put("do", "play_channel").put("q", q));
+            } else if (has(t, "pause", "niruthu", "நிறுத்து", "நிறுத்", "wait")) {
+                acts.put(new JSONObject().put("do", "pause"));
+            } else if (has(t, "next", "adutha", "அடுத்த")) {
+                acts.put(new JSONObject().put("do", "next"));
+            } else if (has(t, "previous", "munnadi", "pinnadi", "முந்தைய", "back channel")) {
+                acts.put(new JSONObject().put("do", "prev"));
+            } else if (has(t, "what did i miss", "recap", "enna aachu", "என்ன ஆச்சு", "summary")) {
+                acts.put(new JSONObject().put("do", "recap"));
+            } else if (has(t, "resume", "continue", "ஓட்டு", "play")) {
+                String q = t.replaceAll("\\b(play|podu|pannu|resume|continue)\\b", "").trim();
+                if (q.length() > 2) acts.put(new JSONObject().put("do", "play_channel").put("q", q));
                 else acts.put(new JSONObject().put("do", "play"));
-            } else if (t.startsWith("youtube ") || t.endsWith(" youtube")) {
-                acts.put(new JSONObject().put("do", "youtube").put("q", t.replace("youtube", "").trim()));
             } else if (has(t, "podu", "போடு", "vai", "வை")) {
                 acts.put(new JSONObject().put("do", "play_channel").put("q", t.replaceAll("(podu|போடு|vai|வை|pannu|பண்ணு)", "").trim()));
             } else return null;

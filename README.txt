@@ -1,3 +1,15 @@
+TAMILCASTPLAY 2.9.2 — YouTube from the assistant really opens / plays
+=====================================================================
+* Android blocks apps in the background from opening other apps, so "play … on YouTube"
+  silently did nothing. Now YouTube (and other apps) are opened through the ADB full
+  remote, which is always allowed — or directly when "Display over other apps" is on.
+  If neither is possible the assistant says so instead of pretending.
+* "YouTube Ilaiyaraaja songs" / "… podu" / "play …" = finds the first matching video and
+  PLAYS it in YouTube. "search youtube …" / "thedu" = shows YouTube's search results.
+* Opening apps from the phone / assistant also works while TamilCastPlay is in the
+  background (ADB).
+* Failed steps are shown with ⚠ and the reason.
+
 TAMILCASTPLAY 2.9.1 — torrent playback fixes
 ============================================
 * A finished torrent movie now plays straight from storage (smooth, no peers, no

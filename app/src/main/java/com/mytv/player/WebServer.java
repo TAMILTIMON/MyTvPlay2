@@ -222,8 +222,9 @@ public class WebServer extends NanoHTTPD {
                         String r = TvSearch.channel(ctx, q);
                         return r != null ? msg(r) : fail("No channel or video found for: " + q);
                     }
-                    if ("tv".equals(where)) return msg(TvSearch.everywhere(ctx, q));
-                    return msg(TvSearch.youtube(ctx, q));
+                    String res = "tv".equals(where) ? TvSearch.everywhere(ctx, q)
+                            : "ytplay".equals(where) ? TvSearch.youtubePlay(ctx, q) : TvSearch.youtube(ctx, q);
+                    return res.startsWith("Couldn't") || res.contains("not installed") ? fail(res) : msg(res);
                 }
 
                 // ---- AI helpers (the AI itself runs on the phone; the TV only shares subtitle text)
@@ -450,6 +451,10 @@ public class WebServer extends NanoHTTPD {
                     final String pkg = val(p, "pkg");
                     if (pkg.isEmpty()) return fail("No app chosen");
                     if (!Family.appAllowed(pkg)) return fail("🔒 Locked for the kids profile");
+                    // in the background Android blocks opening other apps: ADB can always do it
+                    if (App.visible == 0 && AppsHub.installed(ctx, pkg) && TvSearch.openAppAdb(ctx, pkg)) {
+                        return msg("Opening " + AppsHub.label(ctx, pkg));
+                    }
                     if (App.visible == 0 && !Perms.overlayOk(ctx)) {
                         return fail("Open TamilCastPlay on the TV first, or allow “Display over other apps” in its ⚙ Settings");
                     }
