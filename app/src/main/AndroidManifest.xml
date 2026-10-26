@@ -109,6 +109,11 @@
             android:exported="false" />
 
         <activity
+            android:name=".KaraokeActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
+        <activity
             android:name=".ToolsActivity"
             android:exported="false"
             android:screenOrientation="portrait" />

@@ -1,3 +1,22 @@
+ZH PLAY 3.7 — Karaoke master + waveform zoom
+===========================================
+Karaoke master (Features → Karaoke master): replaces the old 30-second tool.
+* The song is read once; three waveforms: ORIGINAL · VOICE (taken out) · MUSIC
+  (karaoke). Voice + Music always add back up to the original.
+* Listen live: Original · Karaoke · Voice only · Mix, and a big "Karaoke ON / OFF" button
+  to compare while it plays. Tap the waveform to jump; −5 s / +5 s.
+* Filters & adjustments, applied live: vocal removal %, vocal range from / to (keeps bass
+  and cymbals in the music), centre focus, music bass / treble EQ, stereo width, guide voice
+  for Mix, volume. Presets: Standard, Strong, Gentle, Male voice, Female voice, Keep backing
+  vocals, Keep bass & drums.
+* Save the WHOLE song as Karaoke, Voice only or Mix (karaoke + quiet guide voice), M4A,
+  in Music / ZH Play.
+* Engine: frequency-domain (FFT) centre extraction — measured on a test mix: centre vocal
+  −73…−94 dB, panned instruments, bass and hi-hat unchanged (0 dB). Real songs: works best
+  on studio stereo mixes; reverb on the voice, mono and live recordings leave some voice —
+  use "Voice only" to check what is taken out.
+Waveform zoom (1×–40×) with scrolling and a time ruler on Karaoke, Cutter and Splitter.
+
 ZH PLAY 3.6 — Poweramp-style equalizer + Features menu (phone music)
 ====================================================================
 Equalizer (Music → Now playing → Equalizer, or Features → Equalizer)

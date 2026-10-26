@@ -89,7 +89,8 @@ public class ToolsActivity extends AppCompatActivity {
                 UiKit.tile(this, "scissors", T.t("Cutter"), T.t("trim with waveform"), 0xFF22C55E, v -> pick(true, this::cutter)),
                 UiKit.tile(this, "split", T.t("Splitter"), T.t("into parts"), 0xFFEAB308, v -> pick(true, this::splitter)),
                 UiKit.tile(this, "combine", T.t("Merger"), T.t("join songs"), 0xFF8B5CF6, v -> merger(new ArrayList<>())),
-                UiKit.tile(this, "mic-vocal", T.t("Karaoke maker"), T.t("remove vocals"), 0xFFEC4899, v -> pick(true, this::karaoke))));
+                UiKit.tile(this, "mic-vocal", T.t("Karaoke master"), T.t("voice / music layers"), 0xFFEC4899, v -> pick(true, m -> startActivity(new Intent(this, KaraokeActivity.class)
+                        .putExtra(KaraokeActivity.EXTRA_URI, m.uri.toString()).putExtra(KaraokeActivity.EXTRA_TITLE, m.title))))));
         TextView n = Ui.text(this, 12, Ui.DIM, false);
         n.setText(T.t("Results are saved in Music / ZH Play and appear in Music → Folders. MP3 stays MP3 when cutting, splitting or merging (no quality loss); other results are M4A (AAC) — Android has no MP3 encoder."));
         n.setPadding(dp(4), dp(14), dp(4), 0);
@@ -214,119 +215,46 @@ public class ToolsActivity extends AppCompatActivity {
         run(T.t("Video → Audio"), p -> AudioTools.toAudio(this, m.uri, m.title, p));
     }
 
-    // ------------------------------------------------------------------ waveform view (cutter / splitter)
-    static final class Wave extends View {
-        float[] peaks;
-        long durMs = 1, selA, selB, play = -1;
-        final List<Long> marks = new ArrayList<>();
-        boolean markers;          // splitter mode
-        Runnable changed;
-        private final Paint pk = new Paint(Paint.ANTI_ALIAS_FLAG), sel = new Paint(Paint.ANTI_ALIAS_FLAG),
-                hd = new Paint(Paint.ANTI_ALIAS_FLAG), ph = new Paint(Paint.ANTI_ALIAS_FLAG), txt = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private int drag = -1;
-
-        Wave(Context c) {
-            super(c);
-            pk.setColor(0x99FFFFFF);
-            sel.setColor((Ui.ACCENT & 0x00FFFFFF) | 0x40000000);
-            hd.setColor(Ui.ACCENT);
-            ph.setColor(0xFFEAB308);
-            txt.setColor(Color.WHITE);
-            txt.setTextSize(Ui.dp(c, 10));
-            setBackground(Ui.card(c, 0xFF15151B, 0x33FFFFFF, 16));
-        }
-
-        float x(long ms) {
-            return ms * (float) getWidth() / Math.max(1, durMs);
-        }
-
-        long ms(float x) {
-            return Math.max(0, Math.min(durMs, (long) (x / Math.max(1, getWidth()) * durMs)));
-        }
-
-        @Override
-        protected void onDraw(Canvas c) {
-            float w = getWidth(), h = getHeight(), mid = h / 2;
-            if (!markers) c.drawRect(x(selA), 0, x(selB), h, sel);
-            if (peaks != null) {
-                float bw = w / peaks.length;
-                for (int i = 0; i < peaks.length; i++) {
-                    float a = Math.max(1.5f, peaks[i] * (h / 2 - 6));
-                    long t = (long) (i * (double) durMs / peaks.length);
-                    pk.setColor(!markers && (t < selA || t > selB) ? 0x40FFFFFF : 0xCCFFFFFF);
-                    c.drawRect(i * bw, mid - a, Math.max(i * bw + 1, (i + 1) * bw - 0.5f), mid + a, pk);
-                }
-            } else {
-                c.drawText(T.t("Reading the sound…"), w / 2 - Ui.dp(getContext(), 50), mid, txt);
-            }
-            float hw = Ui.dp(getContext(), 3);
-            if (!markers) {
-                for (long t : new long[]{selA, selB}) {
-                    c.drawRect(x(t) - hw / 2, 0, x(t) + hw / 2, h, hd);
-                    c.drawRoundRect(new RectF(x(t) - hw * 3, h - hw * 7, x(t) + hw * 3, h), hw * 2, hw * 2, hd);
-                }
-            } else {
-                for (int i = 0; i < marks.size(); i++) {
-                    float mx = x(marks.get(i));
-                    c.drawRect(mx - hw / 2, 0, mx + hw / 2, h, hd);
-                    c.drawText(String.valueOf(i + 1), mx + hw * 2, Ui.dp(getContext(), 12), txt);
-                }
-            }
-            if (play >= 0) c.drawRect(x(play) - 1, 0, x(play) + 1, h, ph);
-        }
-
-        @Override
-        public boolean onTouchEvent(MotionEvent e) {
-            float xx = e.getX();
-            float grab = Ui.dp(getContext(), 24);
-            switch (e.getActionMasked()) {
-                case MotionEvent.ACTION_DOWN:
-                    getParent().requestDisallowInterceptTouchEvent(true);
-                    drag = -1;
-                    if (!markers) {
-                        float da = Math.abs(xx - x(selA)), db = Math.abs(xx - x(selB));
-                        if (Math.min(da, db) < grab * 2) drag = da < db ? 0 : 1;
-                    } else {
-                        for (int i = 0; i < marks.size(); i++) if (Math.abs(xx - x(marks.get(i))) < grab) drag = 10 + i;
-                    }
-                    if (drag < 0) {
-                        play = ms(xx);   // tap = set the play position
-                        if (changed != null) changed.run();
-                        invalidate();
-                    }
-                    return true;
-                case MotionEvent.ACTION_MOVE:
-                    if (drag == 0) selA = Math.min(ms(xx), selB - 200);
-                    else if (drag == 1) selB = Math.max(ms(xx), selA + 200);
-                    else if (drag >= 10 && drag - 10 < marks.size()) marks.set(drag - 10, ms(xx));
-                    if (drag >= 0) {
-                        if (changed != null) changed.run();
-                        invalidate();
-                    }
-                    return true;
-                default:
-                    return true;
-            }
-        }
-    }
-
-    private Wave newWave(final PhoneMedia.M m, boolean markers) {
-        final Wave w = new Wave(this);
+    private WaveView newWave(final PhoneMedia.M m, boolean markers) {
+        final WaveView w = new WaveView(this);
         w.markers = markers;
+        w.selection = !markers;
+        final WaveView.Lane lane = w.lane("", 0xE6FFFFFF);
         w.durMs = Math.max(1, m.dur > 0 ? m.dur : AudioTools.durationUs(this, m.uri) / 1000);
         w.selA = 0;
         w.selB = w.durMs;
+        w.message = T.t("Reading the sound…");
+        w.onSeek = ms -> {
+            if (preview != null && preview.isPlaying()) preview.seekTo((int) ms);   // tap while playing = jump there
+        };
         new Thread(() -> {
             try {
-                final float[] pk = AudioTools.waveform(this, m.uri, 600, null);
+                final float[] pk = AudioTools.waveform(this, m.uri, 4000, null);
                 main.post(() -> {
-                    w.peaks = pk;
+                    lane.peaks = pk;
+                    w.message = null;
                     w.invalidate();
                 });
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                main.post(() -> {
+                    w.message = T.t("Can't read this song");
+                    w.invalidate();
+                });
             }
         }).start();
         return w;
+    }
+
+    /** Zoom slider row under a waveform. */
+    private void zoomRow(WaveView w) {
+        LinearLayout zr = new LinearLayout(this);
+        zr.setGravity(Gravity.CENTER_VERTICAL);
+        zr.addView(UiKit.icon(this, "search", 18, Ui.DIM));
+        TextView zl = Ui.text(this, 12, Ui.DIM, false);
+        zl.setText(" " + T.t("Zoom") + "  ");
+        zr.addView(zl);
+        zr.addView(w.zoomSlider(), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        page.addView(zr);
     }
 
     // ------------------------------------------------------------------ preview playback
@@ -334,7 +262,7 @@ public class ToolsActivity extends AppCompatActivity {
         public void run() {
             if (preview == null || wave == null) return;
             try {
-                wave.play = preview.getCurrentPosition();
+                wave.setPlay(preview.getCurrentPosition());
                 if (!wave.markers && wave.play >= wave.selB) {
                     preview.pause();
                     playBtn.setText(T.t("Play"));
@@ -346,7 +274,7 @@ public class ToolsActivity extends AppCompatActivity {
             main.postDelayed(this, 60);
         }
     };
-    private Wave wave;
+    private WaveView wave;
     private Button playBtn;
 
     private void togglePreview(PhoneMedia.M m) {
@@ -423,22 +351,23 @@ public class ToolsActivity extends AppCompatActivity {
     private void cutter(final PhoneMedia.M m) {
         head(m, T.t("Cutter"), 1);
         wave = newWave(m, false);
-        page.addView(wave, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(170)));
+        page.addView(wave, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(180)));
+        zoomRow(wave);
         final TextView sel = label("");
-        wave.changed = () -> sel.setText(T.t("Start") + " " + fmt(wave.selA) + "   ·   " + T.t("End") + " " + fmt(wave.selB)
+        wave.onChange = () -> sel.setText(T.t("Start") + " " + fmt(wave.selA) + "   ·   " + T.t("End") + " " + fmt(wave.selB)
                 + "   ·   " + T.t("Length") + " " + fmt(wave.selB - wave.selA));
-        wave.changed.run();
+        wave.onChange.run();
         row(btn("−0.1 s", false, v -> nudge(true, -100)), btn("+0.1 s", false, v -> nudge(true, 100)),
                 btn("−0.1 s", false, v -> nudge(false, -100)), btn("+0.1 s", false, v -> nudge(false, 100)));
         label(T.t("Left pair moves the start, right pair the end. Drag the handles on the waveform; tap it to play from there."));
         playBtn = btn(T.t("Play"), false, v -> togglePreview(m));
         row(playBtn, btn(T.t("Start = here"), false, v -> {
             if (wave.play >= 0 && wave.play < wave.selB) wave.selA = wave.play;
-            wave.changed.run();
+            wave.onChange.run();
             wave.invalidate();
         }), btn(T.t("End = here"), false, v -> {
             if (wave.play > wave.selA) wave.selB = wave.play;
-            wave.changed.run();
+            wave.onChange.run();
             wave.invalidate();
         }));
         label(T.t("Fade in / out (re-encodes to M4A)"));
@@ -465,7 +394,7 @@ public class ToolsActivity extends AppCompatActivity {
         if (wave == null) return;
         if (start) wave.selA = Math.max(0, Math.min(wave.selB - 200, wave.selA + ms));
         else wave.selB = Math.min(wave.durMs, Math.max(wave.selA + 200, wave.selB + ms));
-        wave.changed.run();
+        wave.onChange.run();
         wave.invalidate();
     }
 
@@ -477,14 +406,15 @@ public class ToolsActivity extends AppCompatActivity {
     private void splitter(final PhoneMedia.M m) {
         head(m, T.t("Splitter"), 2);
         wave = newWave(m, true);
-        page.addView(wave, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(170)));
+        page.addView(wave, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(180)));
+        zoomRow(wave);
         final TextView info = label("");
         final Runnable upd = () -> {
             java.util.Collections.sort(wave.marks);
             info.setText((wave.marks.size() + 1) + " " + T.t("parts") + "  ·  " + T.t("drag a marker to move it"));
             wave.invalidate();
         };
-        wave.changed = upd;
+        wave.onChange = upd;
         upd.run();
         playBtn = btn(T.t("Play"), false, v -> togglePreview(m));
         row(playBtn, btn(T.t("Split here"), true, v -> {
@@ -579,40 +509,6 @@ public class ToolsActivity extends AppCompatActivity {
         long t = 0;
         for (PhoneMedia.M m : l) t += m.dur;
         return t;
-    }
-
-    // ------------------------------------------------------------------ Karaoke
-    private int strength = 100;
-    private boolean keepBass = true;
-
-    private void karaoke(final PhoneMedia.M m) {
-        head(m, T.t("Karaoke maker"), 4);
-        label(T.t("Removes what is in the centre of the mix — usually the singer — and keeps instruments and bass. Works best on studio songs; some echo of the voice can remain."));
-        final TextView sv = label(T.t("Vocal removal") + ": " + strength + "%");
-        SeekBar sb = new SeekBar(this);
-        sb.setMax(100);
-        sb.setProgress(strength);
-        sb.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            public void onProgressChanged(SeekBar s, int v, boolean u) {
-                strength = v;
-                sv.setText(T.t("Vocal removal") + ": " + v + "%");
-            }
-
-            public void onStartTrackingTouch(SeekBar s) { }
-
-            public void onStopTrackingTouch(SeekBar s) { }
-        });
-        page.addView(sb);
-        final Button kb = btn(T.t("Keep bass & drums") + ": " + T.t(keepBass ? "On" : "Off"), false, null);
-        kb.setOnClickListener(v -> {
-            keepBass = !keepBass;
-            kb.setText(T.t("Keep bass & drums") + ": " + T.t(keepBass ? "On" : "Off"));
-        });
-        row(kb);
-        row(btn("▶ " + T.t("Preview 30 s"), false, v -> run(T.t("Karaoke maker"),
-                        p -> AudioTools.karaoke(this, m.uri, m.title, strength / 100f, keepBass, 30_000_000L, p))),
-                btn("💾 " + T.t("Make karaoke"), true, v -> run(T.t("Karaoke maker"),
-                        p -> AudioTools.karaoke(this, m.uri, m.title, strength / 100f, keepBass, 0, p))));
     }
 
     @Override
