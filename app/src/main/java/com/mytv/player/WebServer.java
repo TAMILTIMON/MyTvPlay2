@@ -791,6 +791,7 @@ public class WebServer extends NanoHTTPD {
         o.put("adb", AdbClient.enabled());
         o.put("scan", ChannelScanner.status());
         o.put("profile", Family.label());
+        o.put("kbd", FastKeys.imeShown(ctx));       // TV keyboard open → phone shows live typing
         boolean tvDark = !"light".equals(Store.getStr("theme", "dark"));
         int[] pc = Palette.resolve(tvDark);
         o.put("pal", new JSONObject().put("i", Palette.index()).put("custom", Palette.hasCustom()).put("dark", tvDark)

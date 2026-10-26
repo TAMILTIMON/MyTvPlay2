@@ -35,6 +35,10 @@ public final class T {
     }
 
     static {
+        TA.put("Type on the TV", "டிவியில் எழுது");
+        HI.put("Type on the TV", "टीवी पर लिखें");
+        TA.put("Letters appear on the TV as you type", "நீங்கள் எழுதும்போது எழுத்துகள் டிவியில் தோன்றும்");
+        HI.put("Letters appear on the TV as you type", "आप लिखेंगे तो अक्षर टीवी पर दिखेंगे");
         TA.put("Connecting…", "இணைக்கிறது…");
         HI.put("Connecting…", "कनेक्ट हो रहा है…");
         TA.put("Could not connect", "இணைக்க முடியவில்லை");

@@ -174,6 +174,8 @@ button.ic svg.lc{width:22px;height:22px}
 .sh:before{content:"";position:absolute;top:6px;left:50%;width:44px;height:5px;margin-left:-22px;border-radius:3px;background:var(--line)}
 .sh .si{color:var(--acc)}.sh .si svg{width:22px;height:22px}
 .sh b{flex:1;font-size:17px}
+.sh button,.xbtn{background:#ef4444!important;color:#fff!important;border:0!important}
+.xbtn svg{stroke:#fff}
 #scr{width:100%;aspect-ratio:16/9;border-radius:14px;background:#000;object-fit:contain;display:block}
 .pbtn{display:flex;align-items:center;gap:10px;justify-content:flex-start;margin-bottom:8px}
 .pbtn svg{width:20px;height:20px}
@@ -196,6 +198,10 @@ label.sw{display:flex;align-items:center;gap:10px;font-size:14px;margin:6px 0}
 
 <!-- ================= HOME: mini player · remote · board ================= -->
 <div id="home">
+  <div class="card" id="livekbd" style="display:none">
+    <div class="sec"><span><span data-ic="keyboard"></span> Type on the TV</span><span><button class="ic" onclick="key('enter')" title="Enter"><span data-ic="check"></span></button> <button class="ic xbtn" onclick="kbdClose()" title="Close"><span data-ic="x"></span></button></span></div>
+    <input id="livein" placeholder="Letters appear on the TV as you type" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="send">
+  </div>
   <div class="card mini">
     <div class="np" onclick="if(event.target.closest('button'))return;toggleNp()">
       <div class="art" id="art"><span data-ic="clapperboard"></span></div>
@@ -619,6 +625,7 @@ function applyPal(){
   else ['--bg','--bg2','--glass','--glass2','--bar','--text','--dim'].forEach(v=>st.removeProperty(v));
 }
 function render(){
+  try{kbdRender();}catch(e){}
   if(!S.player&&S.other){const o=S.other;S.player=true;S.title='📺 '+o.app+' · '+o.title+(o.artist?' — '+o.artist:'');S.pos=o.pos;S.len=o.len;S.playing=o.playing;}
   if($('otherbtn'))$('otherbtn').style.display=S.otherAllowed===false?'block':'none';
   applyPal();
@@ -983,6 +990,17 @@ new MutationObserver(ms=>{ms.forEach(m=>{if(m.type==='characterData')cleanQ.add(
   if(!cleanT)cleanT=requestAnimationFrame(()=>{cleanT=0;const q=[...cleanQ];cleanQ.clear();q.forEach(cleanNode);});})
   .observe(document.body,{childList:true,subtree:true,characterData:true});
 ['alert','confirm','prompt'].forEach(f=>{const o=window[f];window[f]=function(m,d){return o.call(window,stripEmo(String(m==null?'':m)),d);};});
+
+// ---------- live typing (TV keyboard open → type here, letters appear live) ----------
+let liveSent='',kbdOn=false,kbdTyped=0,kbdDis=0,typeQ=Promise.resolve();
+function kbdShow(on){if(on===kbdOn)return;kbdOn=on;$('livekbd').style.display=on?'block':'none';if(on){$('livein').value='';liveSent='';$('livein').focus();}}
+function kbdClose(){kbdDis=Date.now();kbdShow(false);key('back');}
+$('livein').addEventListener('input',()=>{const now=$('livein').value,was=liveSent;liveSent=now;kbdTyped=Date.now();
+  let same=0;while(same<was.length&&same<now.length&&was[same]===now[same])same++;
+  const dels=was.length-same,add=now.slice(same);
+  typeQ=typeQ.then(async()=>{for(let i=0;i<dels;i++)await post('/key',{k:'del'});if(add)await post('/type',{text:add});}).catch(()=>{});});
+$('livein').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();key('enter');}});
+function kbdRender(){if(S.kbd&&!kbdOn&&Date.now()-kbdDis>4000&&curTab==='remote')kbdShow(true);else if(!S.kbd&&kbdOn&&Date.now()-kbdTyped>2500)kbdShow(false);}
 $('autohide').checked=AUTOHIDE;$('followpal').checked=FOLLOW;
 loadOptions().then(poll);load();loadApps();loadHistory();
 </script>

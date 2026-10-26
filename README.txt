@@ -1,3 +1,14 @@
+TAMILCASTPLAY 2.7 — instant keys in every app, live typing, icon fix
+====================================================================
+* Instant keys outside TamilCastPlay (YouTube, Netflix, launcher …): with the 🔌 ADB
+  full remote on, the TV starts a tiny key helper (same method as scrcpy) and presses
+  keys directly — a few milliseconds instead of ~0.5–1 s. Falls back automatically.
+* Live typing like the Google TV remote: when a text box / keyboard opens on the TV,
+  the phone (app and browser page) shows "Type on the TV"; every letter appears on the
+  TV as you type, backspace deletes, ✓ / Enter sends. Close ✕ hides it.
+* Icons: fixed a drawing bug that bent multi-part icons (the ✕ looked like a strange
+  mark). Panel close buttons are now a clear red ✕.
+
 TAMILCASTPLAY 2.6.1 — crash fix
 ===============================
 * FIXED: the app closed whenever a message bubble appeared (volume / brightness

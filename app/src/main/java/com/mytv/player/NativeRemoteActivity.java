@@ -456,6 +456,51 @@ public class NativeRemoteActivity extends AppCompatActivity {
     private View buildMain() {
         LinearLayout p = page();
 
+        // ---- live typing: appears when a text box is open on the TV (like the Google TV remote)
+        kbdCard = card(p, null);
+        LinearLayout kh = new LinearLayout(this);
+        kh.setGravity(Gravity.CENTER_VERTICAL);
+        kh.addView(UiKit.icon(this, "keyboard", 20, Ui.ACCENT), new LinearLayout.LayoutParams(dp(28), dp(28)));
+        TextView kt = Ui.text(this, 14, Ui.TEXT, true);
+        kt.setText(T.t("Type on the TV"));
+        kt.setPadding(dp(8), 0, 0, 0);
+        kh.addView(kt, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        kh.addView(UiKit.roundButton(this, "check", 40, true, v -> sendKey("enter")));
+        ImageView kx = UiKit.closeButton(this, v -> {
+            kbdDismissed = System.currentTimeMillis();
+            showKbd(false);
+            sendKey("back");
+        });
+        ((LinearLayout.LayoutParams) kx.getLayoutParams()).setMargins(dp(8), 0, 0, 0);
+        kh.addView(kx);
+        kbdCard.addView(kh);
+        liveBox = field(kbdCard, T.t("Letters appear on the TV as you type"), false);
+        liveBox.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEND);
+        liveBox.setOnEditorActionListener((v, a, e) -> {
+            sendKey("enter");
+            return true;
+        });
+        liveBox.addTextChangedListener(new TextWatcher() {
+            public void beforeTextChanged(CharSequence c, int a1, int b1, int d) { }
+            public void onTextChanged(CharSequence c, int a1, int b1, int d) { }
+            public void afterTextChanged(Editable e) {
+                if (liveMute) return;
+                final String now = e.toString(), was = liveSent;
+                liveSent = now;
+                kbdTyped = System.currentTimeMillis();
+                typeExec.execute(() -> {
+                    try {
+                        int same = 0;
+                        while (same < was.length() && same < now.length() && was.charAt(same) == now.charAt(same)) same++;
+                        for (int i = 0; i < was.length() - same; i++) TvClient.post(ip, "/key", m("k", "del"));
+                        if (now.length() > same) TvClient.post(ip, "/type", m("text", now.substring(same)));
+                    } catch (Exception ignored) {
+                    }
+                });
+            }
+        });
+        kbdCard.setVisibility(View.GONE);
+
         // ---- mini player (tap the arrow to open / close the timeline)
         LinearLayout np = card(p, null);
         LinearLayout head = new LinearLayout(this);
@@ -711,6 +756,39 @@ public class NativeRemoteActivity extends AppCompatActivity {
         return super.dispatchKeyEvent(e);
     }
 
+    private LinearLayout kbdCard;
+    private EditText liveBox;
+    private String liveSent = "";
+    private boolean liveMute, kbdShown;
+    private long kbdTyped, kbdDismissed;
+    private final java.util.concurrent.ExecutorService typeExec = java.util.concurrent.Executors.newSingleThreadExecutor();
+
+    private void sendKey(final String k) {
+        typeExec.execute(() -> {
+            try {
+                TvClient.post(ip, "/key", m("k", k));
+            } catch (Exception ignored) {
+            }
+        });
+    }
+
+    private void showKbd(boolean on) {
+        if (on == kbdShown) return;
+        kbdShown = on;
+        kbdCard.setVisibility(on ? View.VISIBLE : View.GONE);
+        android.view.inputmethod.InputMethodManager imm =
+                (android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+        if (on) {
+            liveMute = true;
+            liveBox.setText("");
+            liveSent = "";
+            liveMute = false;
+            liveBox.requestFocus();
+            if (imm != null) imm.showSoftInput(liveBox, 0);
+            liveBox.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY);
+        } else if (imm != null) imm.hideSoftInputFromWindow(liveBox.getWindowToken(), 0);
+    }
+
     private void setPadMode(int m) {
         Store.putInt("padmode", m);
         dpadView.setVisibility(m == 0 ? View.VISIBLE : View.GONE);
@@ -828,7 +906,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
         sheetTitle = Ui.text(this, 18, Ui.TEXT, true);
         sheetTitle.setPadding(dp(8), 0, 0, 0);
         th.addView(sheetTitle, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
-        th.addView(UiKit.roundButton(this, "x", 40, false, v -> closeSheet()));
+        th.addView(UiKit.closeButton(this, v -> closeSheet()));
         sheetPanel.addView(th);
         sheetBody = new FrameLayout(this);
         sheetPanel.addView(sheetBody, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
@@ -1916,6 +1994,9 @@ public class NativeRemoteActivity extends AppCompatActivity {
         if (tstat instanceof TextView) setIf((TextView) tstat, ts.isEmpty() ? "—" : ts);
         renderQueue();
         accessHint.setVisibility(S.optBoolean("access", true) ? View.GONE : View.VISIBLE);
+        boolean kb = S.optBoolean("kbd");
+        if (kb && !kbdShown && System.currentTimeMillis() - kbdDismissed > 4000 && !sheetOpen) showKbd(true);
+        else if (!kb && kbdShown && System.currentTimeMillis() - kbdTyped > 2500) showKbd(false);
         adbBtn.setVisibility(S.optBoolean("adb", true) ? View.GONE : View.VISIBLE);
         if (System.currentTimeMillis() - brTouch > 2500) brSlider.setValue(S.optInt("bright", 100));
         int qv = S.optInt("quality", 0);

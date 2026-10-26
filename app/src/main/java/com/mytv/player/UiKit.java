@@ -154,6 +154,18 @@ public final class UiKit {
         return b;
     }
 
+    /** Red round ✕ for closing panels. */
+    public static ImageView closeButton(Context c, View.OnClickListener l) {
+        ImageView b = roundButton(c, "x", 40, false, l);
+        b.setImageDrawable(new Icon(c, "x", 20, Color.WHITE));
+        GradientDrawable g = new GradientDrawable();
+        g.setShape(GradientDrawable.OVAL);
+        g.setColor(0xFFEF4444);
+        b.setBackground(g);
+        b.setElevation(Ui.dp(c, 2));
+        return b;
+    }
+
     public static void setIcon(Context c, ImageView b, String name, int sizeDp, int color) {
         b.setImageDrawable(new Icon(c, name, sizeDp, color));
     }

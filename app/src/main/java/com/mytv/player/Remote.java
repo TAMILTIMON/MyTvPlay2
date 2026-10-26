@@ -70,6 +70,8 @@ public final class Remote {
 
     public static int keyCode(String k) {
         switch (k) {
+            case "del": return KeyEvent.KEYCODE_DEL;
+            case "enter": return KeyEvent.KEYCODE_ENTER;
             case "up": return KeyEvent.KEYCODE_DPAD_UP;
             case "down": return KeyEvent.KEYCODE_DPAD_DOWN;
             case "left": return KeyEvent.KEYCODE_DPAD_LEFT;
@@ -120,6 +122,7 @@ public final class Remote {
         // ADB mode: real key presses that work in every app (YouTube too)
         if (AdbClient.enabled() && !(ours && !k.equals("home") && !k.equals("recents"))) {
             int kc = adbCode(k);
+            if (kc > 0 && FastKeys.key(ctx, kc)) return null;   // instant
             if (kc > 0) {
                 String err = AdbClient.key(ctx, kc);
                 if (err == null) return null;
@@ -151,6 +154,8 @@ public final class Remote {
             case "home": return 3;
             case "recents": return 187;
             case "menu": return 82;
+            case "del": return 67;
+            case "enter": return 66;
             default: return -1;
         }
     }
@@ -167,7 +172,7 @@ public final class Remote {
             } catch (Throwable ignored) {
             }
         }
-        if (AdbClient.enabled() && AdbClient.text(ctx, text) == null) return null;
+        if (AdbClient.enabled() && (FastKeys.text(ctx, text) || AdbClient.text(ctx, text) == null)) return null;
         TvAccess acc = TvAccess.inst;
         if (acc == null) return needAccess();
         return acc.type(text) ? null : "Select a search / text box on the TV first";
