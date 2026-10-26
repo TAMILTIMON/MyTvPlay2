@@ -35,6 +35,14 @@ public final class T {
     }
 
     static {
+        TA.put("Connecting…", "இணைக்கிறது…");
+        HI.put("Connecting…", "कनेक्ट हो रहा है…");
+        TA.put("Could not connect", "இணைக்க முடியவில்லை");
+        HI.put("Could not connect", "कनेक्ट नहीं हो सका");
+        TA.put("Done. The phone remote now works in every app.", "முடிந்தது. போன் ரிமோட் இப்போது எல்லா செயலிகளிலும் வேலை செய்யும்.");
+        HI.put("Done. The phone remote now works in every app.", "हो गया। फ़ोन रिमोट अब हर ऐप में चलेगा।");
+        TA.put("Look at the TV: a box “Allow USB debugging?” appears. Tick “Always allow from this computer” and press OK. (Waiting up to 60 seconds)", "டிவியைப் பாருங்கள்: “Allow USB debugging?” பெட்டி தோன்றும். “Always allow from this computer” டிக் செய்து OK அழுத்தவும். (60 விநாடி வரை காத்திருக்கும்)");
+        HI.put("Look at the TV: a box “Allow USB debugging?” appears. Tick “Always allow from this computer” and press OK. (Waiting up to 60 seconds)", "टीवी देखें: “Allow USB debugging?” बॉक्स आएगा। “Always allow from this computer” टिक करें और OK दबाएँ। (60 सेकंड तक इंतज़ार)");
         TA.put("More", "மேலும்");
         HI.put("More", "और");
         TA.put("Scan again", "மீண்டும் தேடு");

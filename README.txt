@@ -1,3 +1,11 @@
+TAMILCASTPLAY 2.6.1 — crash fix
+===============================
+* FIXED: the app closed whenever a message bubble appeared (volume / brightness
+  sliders on the phone, ADB connect, many others) — "StackOverflowError in
+  UiKit.makeToast". The build now refuses to compile if this ever comes back.
+* ADB connect shows a clear "Look at the TV, press OK on 'Allow USB debugging?'"
+  screen while waiting, then the result.
+
 TAMILCASTPLAY 2.6 — no more emojis, professional icons everywhere
 =================================================================
 * Every menu and dialog (Settings, player menu, Family, Network, Browser …) now shows

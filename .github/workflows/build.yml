@@ -25,6 +25,12 @@ jobs:
       - name: Version number (used by in-app auto-update)
         run: echo "VCODE=$((100 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
 
+      - name: Safety check (no self-calling toast helper)
+        run: |
+          if grep -A2 "Toast makeToast" app/src/main/java/com/mytv/player/UiKit.java | grep -q "UiKit.makeToast"; then
+            echo "::error::UiKit.makeToast calls itself (would crash the app)"; exit 1
+          fi
+
       - name: Prepare signing key
         env:
           KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}

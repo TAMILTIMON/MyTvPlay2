@@ -290,7 +290,7 @@ public final class UiKit {
     }
 
     public static android.widget.Toast makeToast(Context c, CharSequence text, int dur) {
-        return UiKit.makeToast(c, noEmoji(text), dur);
+        return android.widget.Toast.makeText(c, noEmoji(text), dur);   // the real Android toast (never call makeToast here)
     }
 
     /** Round Lucide button for dark overlays (TV player): white icon, glass circle. */

@@ -261,12 +261,24 @@ public final class SettingsDialog {
                 + "\n3. Press Connect. When the TV asks “Allow debugging?”, tick “Always allow” and press OK.";
         new UiDialog(a).setTitle("🔌  " + T.t("Full remote for every app (ADB)")).setMessage(steps)
                 .setPositiveButton(T.t("Connect"), (d, w) -> {
-                    UiKit.makeToast(a, "…", android.widget.Toast.LENGTH_SHORT).show();
+                    // waiting screen: the TV shows "Allow USB debugging?" — press OK there with the remote
+                    final androidx.appcompat.app.AlertDialog wait = new UiDialog(a)
+                            .setTitle(T.t("Connecting…"))
+                            .setMessage(T.t("Look at the TV: a box “Allow USB debugging?” appears. Tick “Always allow from this computer” and press OK. (Waiting up to 60 seconds)"))
+                            .setCancelable(false).create();
+                    wait.show();
                     new Thread(() -> {
                         final String e = AdbClient.connect(a, true);
                         Store.putBool("adb_on", e == null);
-                        a.runOnUiThread(() -> UiKit.makeToast(a, e == null ? "✅ " + T.t("Full remote for every app (ADB)") + ": ON" : e,
-                                android.widget.Toast.LENGTH_LONG).show());
+                        a.runOnUiThread(() -> {
+                            try {
+                                wait.dismiss();
+                            } catch (Exception ignored) {
+                            }
+                            new UiDialog(a).setTitle(e == null ? "✅ " + T.t("Full remote for every app (ADB)") : T.t("Could not connect"))
+                                    .setMessage(e == null ? T.t("Done. The phone remote now works in every app.") : e)
+                                    .setPositiveButton(T.t("OK"), null).show();
+                        });
                     }).start();
                 })
                 .setNeutralButton(T.t("Off"), (d, w) -> Store.putBool("adb_on", false))
