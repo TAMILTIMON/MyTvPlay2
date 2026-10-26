@@ -13,34 +13,43 @@ public final class FastKeys {
     private FastKeys() {
     }
 
-    private static Socket sock;
-    private static BufferedReader in;
-    private static OutputStream out;
+    /** One connection to the key helper; keys and slow questions use different ones (keys never wait). */
+    private static final class Line {
+        Socket sock;
+        BufferedReader in;
+        OutputStream out;
+
+        synchronized String ask(String cmd) {
+            for (int attempt = 0; attempt < 2; attempt++) {
+                try {
+                    if (sock == null || sock.isClosed()) {
+                        sock = new Socket();
+                        sock.connect(new InetSocketAddress("127.0.0.1", KeyInjector.PORT), 250);
+                        sock.setTcpNoDelay(true);
+                        sock.setSoTimeout(3000);
+                        in = new BufferedReader(new InputStreamReader(sock.getInputStream(), "UTF-8"));
+                        out = sock.getOutputStream();
+                    }
+                    out.write((cmd + "\n").getBytes("UTF-8"));
+                    out.flush();
+                    return in.readLine();
+                } catch (Exception e) {
+                    try {
+                        if (sock != null) sock.close();
+                    } catch (Exception ignored) {
+                    }
+                    sock = null;
+                }
+            }
+            return null;
+        }
+    }
+
+    private static final Line KEYS = new Line(), SLOW = new Line();
     private static long lastStart;
 
-    private static synchronized String ask(String cmd) {
-        for (int attempt = 0; attempt < 2; attempt++) {
-            try {
-                if (sock == null || sock.isClosed()) {
-                    sock = new Socket();
-                    sock.connect(new InetSocketAddress("127.0.0.1", KeyInjector.PORT), 250);
-                    sock.setTcpNoDelay(true);
-                    sock.setSoTimeout(3000);
-                    in = new BufferedReader(new InputStreamReader(sock.getInputStream(), "UTF-8"));
-                    out = sock.getOutputStream();
-                }
-                out.write((cmd + "\n").getBytes("UTF-8"));
-                out.flush();
-                return in.readLine();
-            } catch (Exception e) {
-                try {
-                    if (sock != null) sock.close();
-                } catch (Exception ignored) {
-                }
-                sock = null;
-            }
-        }
-        return null;
+    private static String ask(String cmd) {
+        return (cmd.startsWith("key ") || cmd.startsWith("text ") ? KEYS : SLOW).ask(cmd);
     }
 
     /** Starts the key server on the TV (once) through ADB. */
@@ -93,7 +102,13 @@ public final class FastKeys {
         String r = ask("ime");
         if (r == null) {
             ensure(c);
-            return lastIme = false;
+            // key helper not running yet: ask through ADB directly
+            try {
+                String out = AdbClient.shell(c, "dumpsys input_method | grep -E 'mInputShown=true|mIsInputViewShown=true|mWindowVisible=true'");
+                return lastIme = out != null && out.contains("=true");
+            } catch (Exception e) {
+                return lastIme = false;
+            }
         }
         return lastIme = "1".equals(r);
     }

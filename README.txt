@@ -1,3 +1,27 @@
+TAMILCASTPLAY 2.8 — keyboard + voice search
+==========================================
+* Big "Keyboard" and "Voice" buttons under the remote (phone app).
+* Keyboard opens the live typing box any time — needed for apps with their own
+  letter grid (YouTube on TV has its own keyboard, so Android doesn't report it).
+  It still opens by itself when Android's keyboard shows, or (with Accessibility on)
+  when focus lands on a text box.
+* Voice (phone speech recognition, English / தமிழ் / हिन्दी — long-press to change):
+  - a TV text box is open → the words are typed into it,
+  - otherwise choose: Search on YouTube, Search the whole TV (Google TV search),
+    Play in TamilCastPlay (best matching channel / video), Type into the TV.
+* Browser page: Keyboard + Search buttons (voice needs the phone app: browsers only
+  allow the microphone on https pages).
+
+TAMILCASTPLAY 2.7.1 — remote as fast as possible
+================================================
+* Keys travel over one always-open "key line" (TV port 8081) instead of a web request
+  per press — sent instantly, in order (tested: 40 keys in ~21 ms).
+* On the TV, keys and the "is the keyboard open?" check use separate connections to the
+  key helper, so a key never waits behind that check.
+* Slow TV checks (keyboard open, what other apps play) now run in the background; the
+  status the phone asks for is answered instantly.
+* Hold an arrow on the D-pad = repeats (fast scrolling), phone app and browser page.
+
 TAMILCASTPLAY 2.7 — instant keys in every app, live typing, icon fix
 ====================================================================
 * Instant keys outside TamilCastPlay (YouTube, Netflix, launcher …): with the 🔌 ADB

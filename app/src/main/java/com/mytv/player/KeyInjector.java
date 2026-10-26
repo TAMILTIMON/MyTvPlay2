@@ -103,7 +103,8 @@ public final class KeyInjector {
         String l;
         boolean shown = false;
         while ((l = r.readLine()) != null) {
-            if (l.contains("mInputShown=true") || l.contains("mIsInputViewShown=true")) {
+            if (l.contains("mInputShown=true") || l.contains("mIsInputViewShown=true") || l.contains("mWindowVisible=true")
+                    || l.contains("mDecorViewVisible=true")) {
                 shown = true;
                 break;
             }

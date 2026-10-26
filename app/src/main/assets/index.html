@@ -259,8 +259,8 @@ label.sw{display:flex;align-items:center;gap:10px;font-size:14px;margin:6px 0}
       <button class="g ic" onclick="key('vol_mute')" title="Mute"><span data-ic="volume-x"></span></button>
       <button class="g ic" onclick="key('vol_up')" title="TV volume +"><span data-ic="volume-2"></span></button>
       <button class="g ic" onclick="key('media_playpause')" title="Play / pause (any app)"><span data-ic="circle-play"></span></button>
-      <button class="g ic" onclick="$('typerow').style.display=$('typerow').style.display==='flex'?'none':'flex'" title="Keyboard"><span data-ic="keyboard"></span></button>
     </div>
+    <div class="btns" style="margin-top:6px"><button class="g" onclick="kbdDis=0;kbdShow(true)"><span data-ic="keyboard"></span> Keyboard</button><button onclick="searchAsk()"><span data-ic="search"></span> Search</button></div>
     <div class="row" id="typerow" style="display:none;margin-top:8px"><input id="typebox" placeholder="Type text on the TV (search boxes)" style="margin:0"><button class="g" onclick="typeText()">Send</button></div>
     <button class="w" id="adbbtn" style="display:none;margin-top:8px" onclick="if(confirm('Full remote for every app (ADB).\n\nTV: Settings > Device Preferences > About > press Build 7 times, then Developer options > USB / Network debugging ON.\n\nConnect now? (tick Always allow on the TV)'))cmd('adbsetup')">Full remote for every app (ADB)</button>
     <div class="dim" id="acchint" style="display:none;margin-top:8px">ℹ To control other apps, turn on TV Settings &gt; Accessibility &gt; TamilCastPlay</div>
@@ -1001,6 +1001,16 @@ $('livein').addEventListener('input',()=>{const now=$('livein').value,was=liveSe
   typeQ=typeQ.then(async()=>{for(let i=0;i<dels;i++)await post('/key',{k:'del'});if(add)await post('/type',{text:add});}).catch(()=>{});});
 $('livein').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();key('enter');}});
 function kbdRender(){if(S.kbd&&!kbdOn&&Date.now()-kbdDis>4000&&curTab==='remote')kbdShow(true);else if(!S.kbd&&kbdOn&&Date.now()-kbdTyped>2500)kbdShow(false);}
+
+// ---------- D-pad: hold = repeat ----------
+document.querySelectorAll('#dpad button').forEach(b=>{const k=b.classList.contains('u')?'up':b.classList.contains('d')?'down':b.classList.contains('l')?'left':b.classList.contains('r')?'right':null;if(!k)return;
+  b.onclick=null;let t1=0,t2=0;const stop=()=>{clearTimeout(t1);clearInterval(t2);};
+  b.addEventListener('pointerdown',e=>{e.preventDefault();key(k);if(navigator.vibrate)navigator.vibrate(8);t1=setTimeout(()=>{t2=setInterval(()=>key(k),110);},420);});
+  ['pointerup','pointerleave','pointercancel'].forEach(ev=>b.addEventListener(ev,stop));});
+
+async function searchAsk(){const q=prompt('Search for (YouTube, the TV, or a channel):','');if(!q)return;
+  const w=prompt('Where?\n1 = YouTube\n2 = the whole TV\n3 = play in TamilCastPlay','1');if(!w)return;
+  const r=await post('/search',{q:q,where:w==='2'?'tv':w==='3'?'tcp':'youtube'});toast(r.msg);}
 $('autohide').checked=AUTOHIDE;$('followpal').checked=FOLLOW;
 loadOptions().then(poll);load();loadApps();loadHistory();
 </script>

@@ -35,6 +35,24 @@ public final class T {
     }
 
     static {
+        TA.put("Keyboard", "விசைப்பலகை");
+        HI.put("Keyboard", "कीबोर्ड");
+        TA.put("Voice", "குரல்");
+        HI.put("Voice", "आवाज़");
+        TA.put("Voice language", "குரல் மொழி");
+        HI.put("Voice language", "आवाज़ की भाषा");
+        TA.put("Say what to search or type on the TV", "டிவியில் தேட அல்லது எழுத வேண்டியதைச் சொல்லுங்கள்");
+        HI.put("Say what to search or type on the TV", "टीवी पर क्या खोजना या लिखना है, बोलें");
+        TA.put("Voice typing needs the Google app on this phone", "குரல் எழுத்துக்கு இந்த போனில் Google செயலி தேவை");
+        HI.put("Voice typing needs the Google app on this phone", "आवाज़ से लिखने के लिए इस फ़ोन पर Google ऐप चाहिए");
+        TA.put("Search on YouTube", "YouTube-இல் தேடு");
+        HI.put("Search on YouTube", "YouTube पर खोजें");
+        TA.put("Search the whole TV", "முழு டிவியிலும் தேடு");
+        HI.put("Search the whole TV", "पूरे टीवी पर खोजें");
+        TA.put("Play in TamilCastPlay", "TamilCastPlay-இல் இயக்கு");
+        HI.put("Play in TamilCastPlay", "TamilCastPlay में चलाएँ");
+        TA.put("Type into the TV", "டிவியில் எழுது");
+        HI.put("Type into the TV", "टीवी में लिखें");
         TA.put("Type on the TV", "டிவியில் எழுது");
         HI.put("Type on the TV", "टीवी पर लिखें");
         TA.put("Letters appear on the TV as you type", "நீங்கள் எழுதும்போது எழுத்துகள் டிவியில் தோன்றும்");

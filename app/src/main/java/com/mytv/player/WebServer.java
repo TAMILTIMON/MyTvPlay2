@@ -211,6 +211,21 @@ public class WebServer extends NanoHTTPD {
                     return e == null ? msg("✅ The remote now shows videos from other apps") : fail(e);
                 }
 
+                case "/search": {
+                    String q = val(p, "q").trim(), where = val(p, "where");
+                    if (q.isEmpty()) return fail("Say or type something");
+                    if ("type".equals(where)) {
+                        String e = Remote.type(ctx, q);
+                        return e == null ? msg("Typed: " + q) : fail(e);
+                    }
+                    if ("tcp".equals(where)) {
+                        String r = TvSearch.channel(ctx, q);
+                        return r != null ? msg(r) : fail("No channel or video found for: " + q);
+                    }
+                    if ("tv".equals(where)) return msg(TvSearch.everywhere(ctx, q));
+                    return msg(TvSearch.youtube(ctx, q));
+                }
+
                 case "/rename":
                     return Store.renamePlaylist(val(p, "playlist"), val(p, "name")) ? msg("Renamed") : fail("Name already used");
 
@@ -778,9 +793,10 @@ public class WebServer extends NanoHTTPD {
             } catch (Exception ignored) {
             }
         }
+        BgState.wake(ctx);
         if (o == null) {
             o = new JSONObject().put("player", false);
-            JSONObject other = SessionWatcher.info(ctx);
+            JSONObject other = BgState.other;
             if (other != null) o.put("other", other);
         }
         o.put("otherAllowed", SessionWatcher.available(ctx));
@@ -791,7 +807,7 @@ public class WebServer extends NanoHTTPD {
         o.put("adb", AdbClient.enabled());
         o.put("scan", ChannelScanner.status());
         o.put("profile", Family.label());
-        o.put("kbd", FastKeys.imeShown(ctx));       // TV keyboard open → phone shows live typing
+        o.put("kbd", BgState.kbd);                  // TV keyboard open → phone shows live typing (checked in the background)
         boolean tvDark = !"light".equals(Store.getStr("theme", "dark"));
         int[] pc = Palette.resolve(tvDark);
         o.put("pal", new JSONObject().put("i", Palette.index()).put("custom", Palette.hasCustom()).put("dark", tvDark)

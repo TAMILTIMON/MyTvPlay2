@@ -37,6 +37,11 @@ public class VoiceSearchActivity extends Activity {
             Remote.openHome(this);
             return;
         }
+        String found = TvSearch.channel(this, q);
+        if (found != null) {
+            UiKit.makeToast(this, found, Toast.LENGTH_SHORT).show();
+            return;
+        }
         String ql = q.toLowerCase(Locale.ROOT).replaceAll("\\b(channel|tv|play|on|the)\\b", " ").replaceAll("\\s+", " ").trim();
         if (ql.isEmpty()) ql = q.toLowerCase(Locale.ROOT);
         String bestPl = null;

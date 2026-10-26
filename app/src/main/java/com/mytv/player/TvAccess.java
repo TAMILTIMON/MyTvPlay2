@@ -34,8 +34,18 @@ public class TvAccess extends AccessibilityService {
         super.onDestroy();
     }
 
+    /** When focus lands on a text box in any app (e.g. a search field) → the phone opens its keyboard. */
+    public static volatile long editFocusAt;
+
     @Override
     public void onAccessibilityEvent(AccessibilityEvent e) {
+        try {
+            if (e.getEventType() == AccessibilityEvent.TYPE_VIEW_FOCUSED) {
+                AccessibilityNodeInfo n = e.getSource();
+                if (n != null && n.isEditable()) editFocusAt = System.currentTimeMillis();
+            }
+        } catch (Throwable ignored) {
+        }
     }
 
     @Override

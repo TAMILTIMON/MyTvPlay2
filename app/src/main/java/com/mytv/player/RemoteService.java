@@ -43,6 +43,7 @@ public class RemoteService extends Service {
             Discovery.register(this);
             if (Ui.isTv(this) || !Store.getStr("dl_list", "[]").equals("[]")) TorrentDownloads.resumeAll(this);
             if (Ui.isTv(this)) FastKeys.ensure(this);   // fast keys ready before the first press
+            KeyLine.start(this);                        // always-open key line for phones
         } catch (Exception e) {
             server = null;
             running = false;

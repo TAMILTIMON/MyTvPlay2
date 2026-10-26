@@ -339,10 +339,26 @@ public class NativeRemoteActivity extends AppCompatActivity {
         });
     }
 
+    private KeyChannel keys;
+
+    /** Keys go over the always-open key line (instant); web request only if the TV is too old for it. */
     private void key(String k) {
-        call("/key", m("k", k), r -> {
-            if (!r.optBoolean("ok", true)) toast(r.optString("msg"));
+        line().key(k);
+    }
+
+    private KeyChannel line() {
+        if (keys == null) keys = new KeyChannel(ip, line -> {
+            try {
+                if (line.startsWith("k ")) TvClient.post(ip, "/key", m("k", line.substring(2)));
+                else if (line.startsWith("t ")) TvClient.post(ip, "/type", m("text", java.net.URLDecoder.decode(line.substring(2), "UTF-8")));
+            } catch (Exception ignored) {
+            }
         });
+        return keys;
+    }
+
+    private void typeLive(String t) {
+        line().text(t);
     }
 
     private void askPin() {
@@ -401,6 +417,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        if (keys != null) keys.close();
         io.shutdownNow();
     }
 
@@ -488,15 +505,10 @@ public class NativeRemoteActivity extends AppCompatActivity {
                 final String now = e.toString(), was = liveSent;
                 liveSent = now;
                 kbdTyped = System.currentTimeMillis();
-                typeExec.execute(() -> {
-                    try {
-                        int same = 0;
-                        while (same < was.length() && same < now.length() && was.charAt(same) == now.charAt(same)) same++;
-                        for (int i = 0; i < was.length() - same; i++) TvClient.post(ip, "/key", m("k", "del"));
-                        if (now.length() > same) TvClient.post(ip, "/type", m("text", now.substring(same)));
-                    } catch (Exception ignored) {
-                    }
-                });
+                int same = 0;
+                while (same < was.length() && same < now.length() && was.charAt(same) == now.charAt(same)) same++;
+                for (int i = 0; i < was.length() - same; i++) key("del");
+                if (now.length() > same) typeLive(now.substring(same));
             }
         });
         kbdCard.setVisibility(View.GONE);
@@ -628,6 +640,18 @@ public class NativeRemoteActivity extends AppCompatActivity {
         rc.addView(iconRow(new String[]{"volume-1", "volume-x", "volume-2", "circle-play", "keyboard"},
                 new Runnable[]{() -> key("vol_down"), () -> key("vol_mute"), () -> key("vol_up"),
                         () -> key("media_playpause"), this::typeDialog}, 44));
+        Button kbBtn = btn(T.t("Keyboard"), false, v -> {
+            kbdDismissed = 0;
+            showKbd(true);
+        });
+        kbBtn.setCompoundDrawablesWithIntrinsicBounds(new UiKit.Icon(this, "keyboard", 20, Ui.TEXT), null, null, null);
+        voiceBtn = btn("", true, v -> voice());
+        voiceBtn.setOnLongClickListener(v -> {
+            voiceLangPick();
+            return true;
+        });
+        updateVoiceBtn();
+        row(rc, kbBtn, voiceBtn);
         volKeysBtn = btn("", false, v -> {
             Store.putInt("phone_vol", (Store.getInt("phone_vol", 0) + 1) % 3);
             updateVolKeysBtn();
@@ -709,6 +733,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
             final String k = arrows[i][1];
             ImageView b = UiKit.roundButton(this, arrows[i][0], Math.round(a / getResources().getDisplayMetrics().density), false, v -> key(k));
             b.setBackground(new GradientDrawable());
+            holdRepeat(b, k);
             FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(a, a, grav[i]);
             lp.setMargins(dp(6), dp(6), dp(6), dp(6));
             pad.addView(b, lp);
@@ -756,6 +781,58 @@ public class NativeRemoteActivity extends AppCompatActivity {
         return super.dispatchKeyEvent(e);
     }
 
+    // ---- voice search: phone speech recognition (English / Tamil / Hindi)
+    private Button voiceBtn;
+    private static final String[] VOICE_LANG = {"en-IN", "ta-IN", "hi-IN"};
+    private static final String[] VOICE_NAME = {"English", "தமிழ்", "हिन्दी"};
+
+    private int voiceIdx() {
+        String l = Store.getStr("voice_lang", "en-IN");
+        for (int i = 0; i < VOICE_LANG.length; i++) if (VOICE_LANG[i].equals(l)) return i;
+        return 0;
+    }
+
+    private void updateVoiceBtn() {
+        voiceBtn.setText(T.t("Voice") + " · " + VOICE_NAME[voiceIdx()]);
+        voiceBtn.setCompoundDrawablesWithIntrinsicBounds(new UiKit.Icon(this, "mic", 20, Color.WHITE), null, null, null);
+    }
+
+    private void voiceLangPick() {
+        new UiDialog(this).setTitle(T.t("Voice language"))
+                .setSingleChoiceItems(VOICE_NAME, voiceIdx(), (d, w) -> {
+                    Store.putStr("voice_lang", VOICE_LANG[w]);
+                    updateVoiceBtn();
+                    d.dismiss();
+                }).show();
+    }
+
+    private void voice() {
+        Intent i = new Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, VOICE_LANG[voiceIdx()])
+                .putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, T.t("Say what to search or type on the TV"));
+        try {
+            startActivityForResult(i, 77);
+        } catch (Exception e) {
+            toast(T.t("Voice typing needs the Google app on this phone"));
+        }
+    }
+
+    /** What was said: into the TV's text box if one is open, else choose where to search. */
+    private void onVoice(final String said) {
+        if (said == null || said.trim().isEmpty()) return;
+        if (kbdShown || S.optBoolean("kbd")) {
+            if (!kbdShown) showKbd(true);
+            liveBox.append(said);        // live typing sends it to the TV
+            return;
+        }
+        String[] opts = {"▶ " + T.t("Search on YouTube"), "🔍 " + T.t("Search the whole TV"),
+                "📺 " + T.t("Play in TamilCastPlay"), "⌨ " + T.t("Type into the TV")};
+        final String[] where = {"youtube", "tv", "tcp", "type"};
+        new UiDialog(this).setTitle("“" + said + "”").setItems(opts,
+                (d, w) -> call("/search", m("q", said, "where", where[w]), r -> toast(r.optString("msg")))).show();
+    }
+
     private LinearLayout kbdCard;
     private EditText liveBox;
     private String liveSent = "";
@@ -764,12 +841,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
     private final java.util.concurrent.ExecutorService typeExec = java.util.concurrent.Executors.newSingleThreadExecutor();
 
     private void sendKey(final String k) {
-        typeExec.execute(() -> {
-            try {
-                TvClient.post(ip, "/key", m("k", k));
-            } catch (Exception ignored) {
-            }
-        });
+        key(k);
     }
 
     private void showKbd(boolean on) {
@@ -787,6 +859,33 @@ public class NativeRemoteActivity extends AppCompatActivity {
             if (imm != null) imm.showSoftInput(liveBox, 0);
             liveBox.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY);
         } else if (imm != null) imm.hideSoftInputFromWindow(liveBox.getWindowToken(), 0);
+    }
+
+    /** Press = one key; keep holding = repeats (fast scrolling through lists). */
+    private void holdRepeat(final View b, final String k) {
+        final Runnable[] rep = new Runnable[1];
+        rep[0] = () -> {
+            key(k);
+            b.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+            main.postDelayed(rep[0], 110);
+        };
+        b.setOnTouchListener((v, e) -> {
+            switch (e.getActionMasked()) {
+                case android.view.MotionEvent.ACTION_DOWN:
+                    v.setPressed(true);
+                    key(k);
+                    v.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY);
+                    main.postDelayed(rep[0], 420);
+                    return true;
+                case android.view.MotionEvent.ACTION_UP:
+                case android.view.MotionEvent.ACTION_CANCEL:
+                    v.setPressed(false);
+                    main.removeCallbacks(rep[0]);
+                    return true;
+                default:
+                    return true;
+            }
+        });
     }
 
     private void setPadMode(int m) {
@@ -1545,6 +1644,11 @@ public class NativeRemoteActivity extends AppCompatActivity {
     protected void onActivityResult(int req, int res, Intent data) {
         super.onActivityResult(req, res, data);
         if (res != RESULT_OK || data == null) return;
+        if (req == 77) {
+            ArrayList<String> said = data.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS);
+            onVoice(said == null || said.isEmpty() ? null : said.get(0));
+            return;
+        }
         final List<Uri> uris = new ArrayList<>();
         if (data.getClipData() != null) {
             for (int i = 0; i < data.getClipData().getItemCount(); i++) uris.add(data.getClipData().getItemAt(i).getUri());
