@@ -1206,6 +1206,9 @@ public class PlayerActivity extends AppCompatActivity {
                 || (mp.isPlaying() && mp.getLength() > 0 && mp.getVideoTracksCount() == 0 && mp.getTime() > 1500));
         if (audioOnly) audioItem = true;
         audioView.setVisibility(audioItem ? View.VISIBLE : View.GONE);
+        if (audioItem && !Ui.isTv(this) && getRequestedOrientation() != android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT) {
+            setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+        }
         if (!audioItem) {
             if (avSpin.isRunning()) avSpin.pause();
             return;

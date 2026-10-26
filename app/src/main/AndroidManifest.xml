@@ -107,7 +107,8 @@
         <activity
             android:name=".MusicActivity"
             android:exported="false"
-            android:launchMode="singleTop" />
+            android:launchMode="singleTop"
+            android:screenOrientation="portrait" />
 
         <service
             android:name=".MusicService"

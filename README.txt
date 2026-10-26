@@ -1,3 +1,22 @@
+TAMILCASTPLAY 3.1 — new browser + Shield ad blocker, phone music fix
+====================================================================
+FIXED: in Videos / Music on the phone, tapping a song or video now plays it HERE on the
+phone (only the small cast icon sends it to the TV). Cause: a button inside a list row
+stops Android from passing the row tap. Music player stays vertical (portrait).
+Browser (Chrome / Brave / Edge style)
+* Rounded address bar with the site's lock / host, Shield button with the number of
+  blocked ads, thin loading bar, suggestions from history and bookmarks.
+* Phone: bottom toolbar (back, forward, home, tabs, menu). TV: top toolbar.
+* Tab grid with page previews; private tabs; find in page; desktop site; bookmarks;
+  history; clear browsing data; send to TV.
+* New-tab page: search box, shortcut tiles, recent sites, "ads & trackers blocked".
+Shield (Brave-style, on by default, per-site switch)
+* Blocks ad and tracker servers: built-in list + EasyList, EasyPrivacy and Peter
+  Lowe's list (downloaded and refreshed weekly). Hides empty ad boxes.
+* YouTube in the browser: video ads are skipped automatically (muted + fast-forwarded,
+  skip button pressed) and banner ads hidden. Best effort — YouTube changes often.
+* Does NOT affect the official YouTube app (no app can do that).
+
 TAMILCASTPLAY 3.0.1 — phone plays on the phone
 ==============================================
 * Share → TamilCastPlay (from Gallery, WhatsApp, Files …) now asks:

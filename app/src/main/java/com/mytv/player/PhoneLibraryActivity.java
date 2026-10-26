@@ -271,6 +271,9 @@ public class PhoneLibraryActivity extends AppCompatActivity {
         pic.addView(cast, old.getLayoutParams());
         ((TextView) t.getChildAt(1)).setText(m.title);
         ((TextView) t.getChildAt(2)).setText(m.folder + "  ·  " + TvInfo.gb(m.size));
+        // the tile handles its own tap (a button inside a list cell blocks the list's item tap)
+        t.setOnClickListener(v -> open(p));
+        t.setBackground(Ui.focusCard(this, 16));
         return t;
     }
 
@@ -310,6 +313,9 @@ public class PhoneLibraryActivity extends AppCompatActivity {
         ImageView cast = UiKit.roundButton(this, "cast", 36, false, v -> toTv(p));
         r.removeView(old);
         r.addView(cast, new LinearLayout.LayoutParams(dp(36), dp(36)));
+        // tap the row = play here on the phone (the cast icon alone sends to the TV)
+        r.setOnClickListener(v -> open(p));
+        r.setBackground(Ui.focusCard(this, 14));
         return r;
     }
 
