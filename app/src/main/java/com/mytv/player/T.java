@@ -35,6 +35,8 @@ public final class T {
     }
 
     static {
+        TA.put("Downloading in the browser — tap the file when it finishes to install", "உலாவியில் பதிவிறக்குகிறது — முடிந்ததும் கோப்பைத் தட்டி நிறுவவும்");
+        HI.put("Downloading in the browser — tap the file when it finishes to install", "ब्राउज़र में डाउनलोड हो रहा है — पूरा होने पर फ़ाइल पर टैप करके इंस्टॉल करें");
         TA.put("Extra large icons", "மிகப் பெரிய ஐகான்கள்");
         HI.put("Extra large icons", "बहुत बड़े आइकन");
         TA.put("Large icons", "பெரிய ஐகான்கள்");

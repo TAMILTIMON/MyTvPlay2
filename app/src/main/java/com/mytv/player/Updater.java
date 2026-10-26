@@ -49,6 +49,18 @@ public final class Updater {
     }
 
     /** Latest release on GitHub, or null. Run on a background thread. */
+    static boolean tvFlavor = true;
+
+    /** Does this build declare a permission? (the "mobile" variant leaves some out) */
+    static boolean declares(Context c, String perm) {
+        try {
+            String[] r = c.getPackageManager().getPackageInfo(c.getPackageName(), android.content.pm.PackageManager.GET_PERMISSIONS).requestedPermissions;
+            if (r != null) for (String x : r) if (x.equals(perm)) return true;
+        } catch (Exception ignored) {
+        }
+        return false;
+    }
+
     public static Info latest() throws Exception {
         HttpURLConnection c = (HttpURLConnection) new URL("https://api.github.com/repos/" + repo() + "/releases/latest").openConnection();
         c.setConnectTimeout(8000);
@@ -70,19 +82,31 @@ public final class Updater {
         String abi = Build.SUPPORTED_ABIS.length > 0 ? Build.SUPPORTED_ABIS[0] : "";
         String want = abi.contains("arm64") ? "arm64-v8a" : abi.contains("armeabi") ? "armeabi-v7a" : "universal";
         JSONArray as = o.optJSONArray("assets");
-        String uni = "";
+        // TV → the "tv" variant, phone → the "mobile" variant (no TV-only permissions)
+        String flavor = tvFlavor ? "-tv-" : "-mobile-";
+        String uni = "", any = "", anyUni = "";
         if (as != null) for (int k = 0; k < as.length(); k++) {
             String n = as.getJSONObject(k).optString("name"), u = as.getJSONObject(k).optString("browser_download_url");
             if (!n.endsWith(".apk")) continue;
-            if (n.contains(want)) i.url = u;
-            if (n.contains("universal")) uni = u;
+            boolean mine = n.contains(flavor);
+            if (n.contains(want)) {
+                if (mine) i.url = u;
+                else if (any.isEmpty() && !n.contains("-tv-") && !n.contains("-mobile-")) any = u;   // older builds
+            }
+            if (n.contains("universal")) {
+                if (mine) uni = u;
+                else if (anyUni.isEmpty() && !n.contains("-tv-") && !n.contains("-mobile-")) anyUni = u;
+            }
         }
         if (i.url.isEmpty()) i.url = uni;
+        if (i.url.isEmpty()) i.url = any;
+        if (i.url.isEmpty()) i.url = anyUni;
         return i;
     }
 
     /** Checks and asks. quiet = only show something when an update exists. */
     public static void check(final Activity a, final boolean quiet) {
+        tvFlavor = declares(a, "android.permission.REQUEST_INSTALL_PACKAGES") || Ui.isTv(a);
         if (quiet && System.currentTimeMillis() - Store.getLong("upd_last", 0) < 12 * 3600 * 1000L) return;
         Store.putLong("upd_last", System.currentTimeMillis());
         new Thread(() -> {
@@ -109,6 +133,17 @@ public final class Updater {
     }
 
     private static void download(final Activity a, final Info i) {
+        if (!declares(a, "android.permission.REQUEST_INSTALL_PACKAGES")) {
+            // phone variant: the browser downloads it, then tap the file to install (Play Protect friendly)
+            try {
+                a.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(i.url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                android.widget.Toast.makeText(a, T.t("Downloading in the browser — tap the file when it finishes to install"),
+                        android.widget.Toast.LENGTH_LONG).show();
+            } catch (Exception e) {
+                android.widget.Toast.makeText(a, i.url, android.widget.Toast.LENGTH_LONG).show();
+            }
+            return;
+        }
         if (Build.VERSION.SDK_INT >= 26 && !a.getPackageManager().canRequestPackageInstalls()) {
             new UiDialog(a).setTitle(T.t("Allow installing updates"))
                     .setMessage(T.t("On the next screen switch “Allow from this source” ON for ZH Play, then press Update again."))

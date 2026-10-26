@@ -61,7 +61,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: TamilCastPlay-apk
+          name: ZHPlay-apk
           path: app/build/outputs/apk/**/*.apk
 
       - name: Publish release (the TV app checks this for updates)
@@ -69,7 +69,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ env.VCODE }}
-          name: TamilCastPlay build ${{ env.VCODE }}
+          name: ZH Play build ${{ env.VCODE }}
           body: Automatic build from commit ${{ github.sha }}
-          files: app/build/outputs/apk/release/*.apk
+          files: app/build/outputs/apk/*/release/*.apk
           make_latest: true

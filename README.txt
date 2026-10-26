@@ -1,3 +1,19 @@
+ZH PLAY 3.4 — separate TV and Mobile apps (Play Protect friendly)
+=================================================================
+Every build now makes two variants from the same code:
+  ZHPlay-tv-…apk      → install on the TV  (everything: remote for every app, ADB,
+                         notification access, boot start, USB files, self-update)
+  ZHPlay-mobile-…apk  → install on phones  (no accessibility service, no notification
+                         access, no "display over other apps", no all-files access, no
+                         "close other apps", no boot start, no package installer)
+Those TV-only permissions are what Google Play Protect blocks in apps from outside the
+Play Store. Same app ID + key: each installs over the old app and keeps all data.
+Phone updates: "Check for updates" opens the download in the browser; tap the file to
+install. TV updates install directly as before.
+Which file: TV → ZHPlay-tv-armeabi-v7a-release.apk (or -universal-)
+            phone → ZHPlay-mobile-universal-release.apk (or -arm64-v8a-)
+If Play Protect still warns: "More details" → "Install anyway".
+
 ZH PLAY 3.3 — new name and logo (was TamilCastPlay)
 ==================================================
 * The app is now called "ZH Play" everywhere you can see it (launcher, TV home, menus,
