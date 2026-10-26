@@ -226,6 +226,41 @@ public class WebServer extends NanoHTTPD {
                     return msg(TvSearch.youtube(ctx, q));
                 }
 
+                // ---- AI helpers (the AI itself runs on the phone; the TV only shares subtitle text)
+                case "/subtext": {
+                    PlayerActivity pl = Remote.player;
+                    if (pl == null) return fail("Nothing is playing");
+                    String f = pl.currentSubFile();
+                    if (f == null) return fail("No subtitle loaded — load one (or Find subtitles online) for a recap");
+                    long to = pl.positionMs(), from = Math.max(0, to - parseIntOr(val(p, "ms"), 600000));
+                    String text = Subs.between(Subs.parse(new String(readFile(new File(f)), "UTF-8")), from, to);
+                    return json(new JSONObject().put("ok", true).put("title", pl.titleNow()).put("pos", to).put("text", text).toString());
+                }
+
+                case "/subfile": {
+                    PlayerActivity pl = Remote.player;
+                    if (pl == null) return fail("Nothing is playing");
+                    String f = pl.currentSubFile();
+                    if (f == null) return fail("No subtitle loaded — load one first (or Find subtitles online)");
+                    File sf = new File(f);
+                    if (sf.length() > 3_000_000) return fail("Subtitle file too big");
+                    return json(new JSONObject().put("ok", true).put("name", sf.getName()).put("text", new String(readFile(sf), "UTF-8")).toString());
+                }
+
+                case "/subput": {
+                    String text = val(p, "text");
+                    if (text.isEmpty()) return fail("Empty subtitle");
+                    File d = new File(ctx.getCacheDir(), "subs");
+                    //noinspection ResultOfMethodCallIgnored
+                    d.mkdirs();
+                    String nm = val(p, "name").replaceAll("[^A-Za-z0-9._-]", "_");
+                    File out = new File(d, (nm.isEmpty() ? "translated" : nm) + ".srt");
+                    try (java.io.FileOutputStream o = new java.io.FileOutputStream(out)) {
+                        o.write(text.getBytes("UTF-8"));
+                    }
+                    return msg(command("subfile", out.getAbsolutePath(), ""));
+                }
+
                 case "/rename":
                     return Store.renamePlaylist(val(p, "playlist"), val(p, "name")) ? msg("Renamed") : fail("Name already used");
 

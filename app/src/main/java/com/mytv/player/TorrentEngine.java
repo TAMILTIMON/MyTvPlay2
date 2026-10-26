@@ -66,10 +66,88 @@ public final class TorrentEngine {
             sp.connectionsLimit(200);
             sp.activeDownloads(3);
             SessionManager s = new SessionManager(false);
+            s.addListener(new org.libtorrent4j.AlertListener() {
+                public int[] types() {
+                    return new int[]{org.libtorrent4j.alerts.AlertType.SAVE_RESUME_DATA.swig()};
+                }
+
+                public void alert(org.libtorrent4j.alerts.Alert<?> a) {
+                    try {
+                        org.libtorrent4j.alerts.SaveResumeDataAlert ra = (org.libtorrent4j.alerts.SaveResumeDataAlert) a;
+                        String h = ra.handle().infoHash().toHex();
+                        byte[] data = org.libtorrent4j.AddTorrentParams.writeResumeDataBuf(ra.params());
+                        try (java.io.FileOutputStream o = new java.io.FileOutputStream(resumeFile(h))) {
+                            o.write(data);
+                        }
+                    } catch (Throwable ignored) {
+                    } finally {
+                        resumeSaved.countDown();
+                    }
+                }
+            });
             s.start(new SessionParams(sp));
             session = s;
+            // save progress notes every minute (survives crashes / power cuts)
+            new Thread(() -> {
+                while (true) {
+                    try {
+                        Thread.sleep(60000);
+                        TorrentHandle th = handle;
+                        if (th != null && th.isValid()) th.saveResumeData();
+                    } catch (Throwable ignored) {
+                    }
+                }
+            }, "resume-saver").start();
         }
         return session;
+    }
+
+    private volatile java.util.concurrent.CountDownLatch resumeSaved = new java.util.concurrent.CountDownLatch(0);
+
+    File resumeFile(String h) {
+        return new File(baseDir(), h + ".resume");
+    }
+
+    /** Asks the engine to write its progress notes and waits a moment for them. */
+    private void saveResumeNow(TorrentHandle th) {
+        try {
+            resumeSaved = new java.util.concurrent.CountDownLatch(1);
+            th.flushCache();
+            th.saveResumeData();
+            resumeSaved.await(3, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    // ---------- finished files: played straight from storage, no torrent at all
+    /** Full path of a torrent file that is completely downloaded, or null. */
+    public String completePath(String h, int idx) {
+        if (h == null) return null;
+        TorrentHandle th = handle;
+        TorrentInfo ti = info;
+        if (th != null && ti != null && h.equals(hash)) {
+            try {
+                long[] prog = th.fileProgress();
+                long size = ti.files().fileSize(idx);
+                if (idx < prog.length && size > 0 && prog[idx] >= size) {
+                    th.flushCache();
+                    String path = ti.files().filePath(idx, th.savePath());
+                    Store.putStr("tdone_" + h + "_" + idx, path + "|" + size);
+                    Store.putBool("tkeep_" + h, Store.getBool("tkeep_" + h, false));
+                    return path;
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+        String rec = Store.getStr("tdone_" + h + "_" + idx, "");
+        if (rec.isEmpty()) return null;
+        int bar = rec.lastIndexOf('|');
+        File f = new File(rec.substring(0, bar));
+        try {
+            if (f.isFile() && f.length() == Long.parseLong(rec.substring(bar + 1))) return f.getAbsolutePath();
+        } catch (Exception ignored) {
+        }
+        return null;
     }
 
     /** Folder with the most free space (USB drives / SD cards are used when available). */
@@ -192,8 +270,11 @@ public final class TorrentEngine {
             deleteTree(new File(t, h));
             //noinspection ResultOfMethodCallIgnored
             new File(t, h + ".torrent").delete();
+            //noinspection ResultOfMethodCallIgnored
+            new File(t, h + ".resume").delete();
         }
         Store.putBool("tkeep_" + h, false);
+        for (int i = 0; i < 200; i++) Store.putStr("tdone_" + h + "_" + i, "");
     }
 
     /** Marks a torrent as "keep" and adds its file to the Downloads playlist (plays offline). */
@@ -211,6 +292,8 @@ public final class TorrentEngine {
             } catch (Throwable ignored) {
             }
         }
+        if (path == null) path = completePath(h, file);
+        if (path != null) Store.putStr("tlocal_" + path, h + "|" + file);
         Store.add("Downloads", new Store.Item(title, path != null ? path : streamUrl, ""));
     }
 
@@ -306,7 +389,8 @@ public final class TorrentEngine {
         Priority[] pr = Priority.array(Priority.IGNORE, fs.numFiles());
         pr[media.get(0)] = Priority.DEFAULT;
         state = "Checking saved data…";
-        s.download(ti, tdir, null, pr, null, TorrentFlags.SEQUENTIAL_DOWNLOAD);
+        File rf = resumeFile(hx);
+        s.download(ti, tdir, rf.isFile() ? rf : null, pr, null, TorrentFlags.SEQUENTIAL_DOWNLOAD);
 
         TorrentHandle th = null;
         for (int k = 0; k < 150 && th == null; k++) {
@@ -404,6 +488,7 @@ public final class TorrentEngine {
         activeFile = -1;
         state = "idle";
         if (th != null && session != null) {
+            if (!deleteFiles) saveResumeNow(th);
             try {
                 if (deleteFiles) session.remove(th, SessionHandle.DELETE_FILES);
                 else session.remove(th);
@@ -529,7 +614,7 @@ public final class TorrentEngine {
                         return r;
                     }
                 } catch (IOException e) {
-                    if (tries > 40) throw e;
+                    if (tries > 150) throw e;
                     if (raf != null) {
                         try {
                             raf.close();
@@ -538,7 +623,13 @@ public final class TorrentEngine {
                         raf = null;
                     }
                 }
-                if (tries > 40) throw new IOException("Could not read torrent data");
+                if (tries > 150) throw new IOException("Could not read torrent data");
+                if (tries == 3 || tries % 30 == 29) {
+                    try {
+                        th.flushCache();   // piece is downloaded but still in memory: write it out
+                    } catch (Throwable ignored) {
+                    }
+                }
                 try {
                     Thread.sleep(100);
                 } catch (InterruptedException e) {

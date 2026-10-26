@@ -922,6 +922,23 @@ public class PlayerActivity extends AppCompatActivity {
     private void onTick() {
         tickN++;
         updateChip();
+        if (mp != null && mp.isPlaying()) {
+            long tnow = mp.getTime();
+            if (tnow > 0) lastGoodTime = tnow;
+        }
+        if (tickN % 10 == 0 && !switchedLocal && mp != null && current() != null && torrentHash(current().u) != null) {
+            final Store.Item cur = current();
+            Store.Item loc = localForTorrent(cur);
+            if (loc != null) {
+                switchedLocal = true;
+                final long at = Math.max(0, mp.getTime());
+                final List<String> subs = new ArrayList<>(addedSubs);
+                queue.set(index, loc);
+                osd(T.t("Download finished — now playing from storage (smooth)"));
+                startMedia(loc, at, subs);
+                switchedLocal = true;
+            }
+        }
         if (tickN % 2 == 0) updateSession();
         if (overlayVisible && tickN % 2 == 0) updateOverlay();
         if (loadingView.getVisibility() == View.VISIBLE && torrentUsed && mp != null && !mp.isPlaying()) {
@@ -1394,6 +1411,13 @@ public class PlayerActivity extends AppCompatActivity {
             expandList(i);
             return;
         }
+        Store.Item loc = localForTorrent(it);
+        if (loc != null) {
+            queue.set(i, loc);
+            long st = resume ? Store.pos(loc.u) : 0;
+            startMedia(loc, st < 5000 ? 0 : st, null);
+            return;
+        }
         String th = torrentHash(it.u);
         if (th != null && !TorrentEngine.get(this).isActiveHash(th)) {
             String src = Store.getStr("torsrc_" + th, "");
@@ -1410,6 +1434,13 @@ public class PlayerActivity extends AppCompatActivity {
     }
 
     private void startMedia(Store.Item it, long startMs, List<String> keepSubs) {
+        Store.Item loc = localForTorrent(it);
+        if (loc != null) {
+            if (index >= 0 && index < queue.size() && queue.get(index) == it) queue.set(index, loc);
+            it = loc;
+        }
+        switchedLocal = false;
+        lastGoodTime = startMs;
         resolveToken++;
         ended = false;
         closePfd();
@@ -1555,6 +1586,43 @@ public class PlayerActivity extends AppCompatActivity {
         return s > 0 ? rest.substring(0, s) : null;
     }
 
+    private static int torrentFile(String u) {
+        try {
+            String rest = u.substring(u.indexOf("/torrent/") + 9);
+            return Integer.parseInt(rest.split("/")[1]);
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
+    /**
+     * A torrent file that is completely downloaded → the same item but playing straight from storage
+     * (smooth like any downloaded movie; no peers, no re-check). Keeps the resume position.
+     */
+    private Store.Item localForTorrent(Store.Item it) {
+        String th = it == null ? null : torrentHash(it.u);
+        if (th == null) return null;
+        String path = TorrentEngine.get(this).completePath(th, torrentFile(it.u));
+        if (path == null) return null;
+        Store.putStr("tlocal_" + path, th + "|" + torrentFile(it.u));
+        long pos = Store.pos(it.u);
+        if (pos > Store.pos(path)) Store.setPos(path, pos);
+        Store.removeHistory(it.u);
+        return new Store.Item(it.t, path, it.s, it.g, it.l);
+    }
+
+    /** Torrent hash of an item, also for a finished torrent now playing from storage. */
+    private static String hashOf(String u) {
+        String h = torrentHash(u);
+        if (h != null) return h;
+        String loc = Store.getStr("tlocal_" + u, "");
+        return loc.isEmpty() ? null : loc.split("\\|")[0];
+    }
+
+    private boolean switchedLocal;
+    private long lastGoodTime;
+    private int earlyEnds;
+
     /** Restarts a finished torrent and jumps to the same file (used by "Continue watching"). */
     private void reopenTorrent(final int i, final String src, final String streamUrl) {
         final int token = ++resolveToken;
@@ -1663,6 +1731,7 @@ public class PlayerActivity extends AppCompatActivity {
                 case MediaPlayer.Event.Playing:
                     hideLoading();
                     torrentRetries = 0;
+                    if (mp != null && mp.getTime() > 60000) earlyEnds = Math.max(0, earlyEnds - 1);
                     if (audioOnly) handler.postDelayed(() -> { if (mp != null && audioOnly) mp.setVideoTrack(-1); }, 600);
                     handler.postDelayed(PlayerActivity.this::applyAfr, 1500);
                     applyAudio();
@@ -1715,9 +1784,26 @@ public class PlayerActivity extends AppCompatActivity {
 
     private void onEnded() {
         if (ended) return;
+        Store.Item fin0 = current();
+        long len = mp == null ? 0 : mp.getLength();
+        boolean net = fin0 != null && !fin0.u.startsWith("/");
+        if (fin0 != null && len > 120000 && lastGoodTime > 0 && lastGoodTime < len - 90000 && earlyEnds < 6
+                && (net || hashOf(fin0.u) != null)) {
+            // the stream stopped early (torrent data not ready / network blip): carry on, don't ask anything
+            earlyEnds++;
+            final long at = lastGoodTime;
+            final List<String> subs = new ArrayList<>(addedSubs);
+            showLoading(T.t("Continuing…"));
+            handler.postDelayed(() -> {
+                if (isFinishing() || current() == null) return;
+                startMedia(current(), at, subs);
+            }, 1500);
+            return;
+        }
         ended = true;
+        earlyEnds = 0;
         Store.Item fin = current();
-        final String th = fin == null ? null : torrentHash(fin.u);
+        final String th = fin == null ? null : hashOf(fin.u);
         if (th != null && !Store.getBool("tkeep_" + th, false) && !Store.getBool("tasked_" + th, false)) {
             Store.putBool("tasked_" + th, true);
             askKeep(fin, th);
@@ -1728,11 +1814,13 @@ public class PlayerActivity extends AppCompatActivity {
 
     /** Movie from a torrent finished: keep it on the TV for later (no internet) or delete it. */
     private void askKeep(final Store.Item it, final String th) {
-        int file = 0;
-        try {
-            String rest = it.u.substring(it.u.indexOf("/torrent/") + 9);
-            file = Integer.parseInt(rest.split("/")[1]);
-        } catch (Exception ignored) {
+        int file = torrentFile(it.u);
+        String loc = Store.getStr("tlocal_" + it.u, "");
+        if (!loc.isEmpty() && loc.contains("|")) {
+            try {
+                file = Integer.parseInt(loc.split("\\|")[1]);
+            } catch (Exception ignored) {
+            }
         }
         final int f = file;
         new UiDialog(this).setTitle("💾  " + T.t("Keep this movie on the TV?"))
@@ -1951,6 +2039,30 @@ public class PlayerActivity extends AppCompatActivity {
     // =====================================================================
     // Subtitles
     // =====================================================================
+    /** The external subtitle file shown now (latest loaded), or null. */
+    public String currentSubFile() {
+        for (int i = addedSubs.size() - 1; i >= 0; i--) {
+            String p = addedSubs.get(i);
+            if (p.startsWith("/") && new File(p).isFile()) return p;
+        }
+        // a subtitle next to a local video: movie.mkv -> movie.srt
+        Store.Item it = current();
+        if (it != null && it.u.startsWith("/")) {
+            String base = it.u.replaceAll("\\.[^./]+$", "");
+            for (String ext : new String[]{".srt", ".vtt", ".ass", ".ssa"}) if (new File(base + ext).isFile()) return base + ext;
+        }
+        return null;
+    }
+
+    public long positionMs() {
+        return mp == null ? 0 : Math.max(0, mp.getTime());
+    }
+
+    public String titleNow() {
+        Store.Item it = current();
+        return it == null ? "" : it.t;
+    }
+
     private void addSubtitle(String pathOrUrl, boolean select) {
         if (mp == null) return;
         Uri u = pathOrUrl.startsWith("/") ? Uri.fromFile(new File(pathOrUrl)) : Uri.parse(pathOrUrl);

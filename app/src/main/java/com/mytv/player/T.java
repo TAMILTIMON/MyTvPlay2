@@ -35,6 +35,40 @@ public final class T {
     }
 
     static {
+        TA.put("Download finished — now playing from storage (smooth)", "பதிவிறக்கம் முடிந்தது — இப்போது சேமிப்பிலிருந்து இயங்குகிறது");
+        HI.put("Download finished — now playing from storage (smooth)", "डाउनलोड पूरा — अब स्टोरेज से चल रहा है");
+        TA.put("Continuing…", "தொடர்கிறது…");
+        HI.put("Continuing…", "जारी है…");
+        TA.put("AI assistant", "AI உதவியாளர்");
+        HI.put("AI assistant", "AI सहायक");
+        TA.put("Tamil · English · Tanglish", "தமிழ் · English · Tanglish");
+        HI.put("Tamil · English · Tanglish", "तमिल · English · Tanglish");
+        TA.put("Ask the AI assistant", "AI உதவியாளரிடம் கேள்");
+        HI.put("Ask the AI assistant", "AI सहायक से पूछें");
+        TA.put("AI settings", "AI அமைப்புகள்");
+        HI.put("AI settings", "AI सेटिंग्स");
+        TA.put("Try", "முயற்சி");
+        HI.put("Try", "आज़माएँ");
+        TA.put("What did I miss?", "நான் என்ன தவறவிட்டேன்?");
+        HI.put("What did I miss?", "मुझसे क्या छूट गया?");
+        TA.put("Translate subtitles to Tamil", "வசனத்தைத் தமிழில் மொழிபெயர்");
+        HI.put("Translate subtitles to Tamil", "सबटाइटल तमिल में बदलें");
+        TA.put("Turn off in 30 minutes", "30 நிமிடத்தில் அணை");
+        HI.put("Turn off in 30 minutes", "30 मिनट में बंद करें");
+        TA.put("Ask in Tamil, English or Tanglish…", "தமிழ், English அல்லது Tanglish-இல் கேளுங்கள்…");
+        HI.put("Ask in Tamil, English or Tanglish…", "तमिल, English या Tanglish में पूछें…");
+        TA.put("Using", "பயன்படுத்துவது");
+        HI.put("Using", "इस्तेमाल");
+        TA.put("Choose a provider…", "சேவையைத் தேர்வு செய்க…");
+        HI.put("Choose a provider…", "सेवा चुनें…");
+        TA.put("Provider", "சேவை");
+        HI.put("Provider", "सेवा");
+        TA.put("Test", "சோதனை");
+        HI.put("Test", "टेस्ट");
+        TA.put("Testing…", "சோதிக்கிறது…");
+        HI.put("Testing…", "टेस्ट हो रहा है…");
+        TA.put("No AI set up yet — simple commands (pause, next, volume, “Sun TV podu”) still work. Tap AI settings to connect your AI.", "AI இன்னும் அமைக்கப்படவில்லை — எளிய கட்டளைகள் (pause, next, volume, “Sun TV podu”) வேலை செய்யும். உங்கள் AI-ஐ இணைக்க AI அமைப்புகளைத் தட்டவும்.");
+        HI.put("No AI set up yet — simple commands (pause, next, volume, “Sun TV podu”) still work. Tap AI settings to connect your AI.", "AI अभी सेट नहीं — आसान कमांड (pause, next, volume, “Sun TV podu”) चलेंगी। अपना AI जोड़ने के लिए AI सेटिंग्स दबाएँ।");
         TA.put("Keyboard", "விசைப்பலகை");
         HI.put("Keyboard", "कीबोर्ड");
         TA.put("Voice", "குரல்");

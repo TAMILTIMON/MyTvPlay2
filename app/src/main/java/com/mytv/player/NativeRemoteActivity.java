@@ -684,6 +684,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
         View tShare = UiKit.tile(this, "smartphone", T.t("Share this phone"), "", 0xFF14B8A6, v -> shareDialog());
         shareSub = (TextView) tShare.findViewWithTag("sub");
         p.addView(UiKit.grid(this, 3,
+                UiKit.tile(this, "sparkles", T.t("AI assistant"), T.t("Tamil · English · Tanglish"), 0xFF8B5CF6, v -> openAi()),
                 UiKit.tile(this, "monitor-play", T.t("Live TV screen"), T.t("see the TV here"), 0xFFEC4899, v -> openScreen()),
                 tQueue,
                 UiKit.tile(this, "layout-grid", T.t("Apps"), "Netflix, YouTube…", 0xFFF97316, v -> openSheet(appsPage, T.t("Apps"), "layout-grid")),
@@ -826,11 +827,190 @@ public class NativeRemoteActivity extends AppCompatActivity {
             liveBox.append(said);        // live typing sends it to the TV
             return;
         }
-        String[] opts = {"▶ " + T.t("Search on YouTube"), "🔍 " + T.t("Search the whole TV"),
+        String[] opts = {"🚀 " + T.t("Ask the AI assistant"), "▶ " + T.t("Search on YouTube"), "🔍 " + T.t("Search the whole TV"),
                 "📺 " + T.t("Play in TamilCastPlay"), "⌨ " + T.t("Type into the TV")};
-        final String[] where = {"youtube", "tv", "tcp", "type"};
-        new UiDialog(this).setTitle("“" + said + "”").setItems(opts,
-                (d, w) -> call("/search", m("q", said, "where", where[w]), r -> toast(r.optString("msg")))).show();
+        final String[] where = {"ai", "youtube", "tv", "tcp", "type"};
+        new UiDialog(this).setTitle("“" + said + "”").setItems(opts, (d, w) -> {
+            if (w == 0) {
+                openAi();
+                aiAsk(said);
+            } else call("/search", m("q", said, "where", where[w]), r -> toast(r.optString("msg")));
+        }).show();
+    }
+
+    // =====================================================================
+    // AI assistant panel
+    // =====================================================================
+    private View aiPage;
+    private LinearLayout aiLog;
+    private EditText aiIn;
+    private TextView aiStatus;
+    private final java.util.concurrent.ExecutorService aiExec = java.util.concurrent.Executors.newSingleThreadExecutor();
+
+    private final AiBrain.Tv tvLink = (path, p) -> TvClient.post(ip, path, new java.util.HashMap<>(p));
+
+    private View buildAiPage() {
+        LinearLayout p = page();
+        LinearLayout top = card(p, null);
+        aiStatus = Ui.text(this, 12, Ui.DIM, false);
+        top.addView(aiStatus);
+        Button set = btn(T.t("AI settings"), false, v -> aiSettings());
+        set.setCompoundDrawablesWithIntrinsicBounds(new UiKit.Icon(this, "settings", 16, Ui.TEXT), null, null, null);
+        full(top, set);
+        updateAiStatus();
+
+        LinearLayout chips = card(p, T.t("Try"));
+        String[][] ex = {{"sparkles", T.t("What did I miss?")}, {"captions", T.t("Translate subtitles to Tamil")},
+                {"tv", "Sun TV podu"}, {"volume-1", "volume kammi pannu"}, {"search", "YouTube Ilaiyaraaja songs"},
+                {"clock", T.t("Turn off in 30 minutes")}};
+        LinearLayout row = null;
+        for (int i = 0; i < ex.length; i++) {
+            if (i % 2 == 0) {
+                row = new LinearLayout(this);
+                chips.addView(row);
+            }
+            final String q = ex[i][1];
+            Button b = btn(q, false, v -> aiAsk(q));
+            b.setTextSize(13);
+            b.setCompoundDrawablesWithIntrinsicBounds(new UiKit.Icon(this, ex[i][0], 16, Ui.ACCENT), null, null, null);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(46), 1);
+            lp.setMargins(dp(3), dp(3), dp(3), dp(3));
+            row.addView(b, lp);
+        }
+
+        LinearLayout box = card(p, null);
+        LinearLayout in = new LinearLayout(this);
+        in.setGravity(Gravity.CENTER_VERTICAL);
+        aiIn = new EditText(this);
+        aiIn.setHint(T.t("Ask in Tamil, English or Tanglish…"));
+        aiIn.setSingleLine(true);
+        aiIn.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEND);
+        aiIn.setOnEditorActionListener((v, a, e) -> {
+            send();
+            return true;
+        });
+        in.addView(aiIn, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        in.addView(UiKit.roundButton(this, "mic", 44, false, v -> voice()));
+        ImageView go = UiKit.roundButton(this, "chevron-right", 44, true, v -> send());
+        ((LinearLayout.LayoutParams) go.getLayoutParams()).setMargins(dp(6), 0, 0, 0);
+        in.addView(go);
+        box.addView(in);
+        aiLog = new LinearLayout(this);
+        aiLog.setOrientation(LinearLayout.VERTICAL);
+        box.addView(aiLog);
+        return scroll(p);
+    }
+
+    private void send() {
+        String q = aiIn.getText().toString().trim();
+        if (q.isEmpty()) return;
+        aiIn.setText("");
+        hideKeyboard();
+        aiAsk(q);
+    }
+
+    private void openAi() {
+        if (aiPage == null) aiPage = buildAiPage();
+        updateAiStatus();
+        openSheet(aiPage, T.t("AI assistant"), "sparkles");
+    }
+
+    private void updateAiStatus() {
+        if (aiStatus == null) return;
+        aiStatus.setText(AiClient.ready() ? T.t("Using") + ": " + AiClient.model() + "  ·  " + android.net.Uri.parse(AiClient.base()).getHost()
+                : T.t("No AI set up yet — simple commands (pause, next, volume, “Sun TV podu”) still work. Tap AI settings to connect your AI."));
+    }
+
+    private TextView bubble(String text, boolean me) {
+        TextView t = Ui.text(this, 14, me ? Color.WHITE : Ui.TEXT, false);
+        t.setText(UiKit.noEmoji(text));
+        t.setPadding(dp(14), dp(10), dp(14), dp(10));
+        t.setBackground(me ? Ui.gradient(this, 16) : Ui.card(this, Ui.CARD, Ui.STROKE, 16));
+        t.setTextIsSelectable(!me);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.gravity = me ? Gravity.END : Gravity.START;
+        lp.setMargins(me ? dp(40) : 0, dp(8), me ? 0 : dp(40), 0);
+        aiLog.addView(t, 0, lp);    // newest on top, right under the input
+        return t;
+    }
+
+    /** Sends a request to the brain; translation / recap show live progress. */
+    private void aiAsk(final String q) {
+        if (aiPage == null) aiPage = buildAiPage();
+        final TextView answer = bubble("…", false);
+        bubble(q, true);
+        aiExec.execute(() -> {
+            final String r = AiBrain.ask(q, tvLink, s -> main.post(() -> answer.setText(UiKit.noEmoji(s))));
+            main.post(() -> {
+                answer.setText(UiKit.noEmoji(r));
+                poll();
+            });
+        });
+    }
+
+    private void aiSettings() {
+        LinearLayout b = new LinearLayout(this);
+        b.setOrientation(LinearLayout.VERTICAL);
+        b.setPadding(dp(20), dp(4), dp(20), 0);
+        final Button preset = Ui.button(this, T.t("Choose a provider…"), true);
+        final EditText base = new EditText(this), key = new EditText(this), model = new EditText(this);
+        base.setHint("https://…/v1");
+        base.setText(Store.getStr("ai_base", ""));
+        key.setHint(T.t("API key (empty for Ollama / LM Studio)"));
+        key.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        if (!AiClient.key().isEmpty()) key.setHint(T.t("API key saved — type to replace"));
+        model.setHint(T.t("Model name, e.g. gemma-3-12b-it"));
+        model.setText(Store.getStr("ai_model", ""));
+        preset.setOnClickListener(v -> {
+            String[] n = new String[AiClient.PRESETS.length];
+            for (int i = 0; i < n.length; i++) n[i] = AiClient.PRESETS[i][0];
+            new UiDialog(this).setTitle(T.t("Provider")).setItems(n, (d, w) -> {
+                preset.setText(AiClient.PRESETS[w][0]);
+                if (!AiClient.PRESETS[w][1].isEmpty()) base.setText(AiClient.PRESETS[w][1]);
+                if (!AiClient.PRESETS[w][2].isEmpty() && model.getText().toString().isEmpty()) model.setText(AiClient.PRESETS[w][2]);
+            }).show();
+        });
+        TextView note = Ui.text(this, 12, Ui.DIM, false);
+        note.setText(T.t("Works with any OpenAI-compatible service. The key is stored encrypted on this phone only and sent only to the address above. Only your request text, the current title and channel names (or subtitle lines for recap / translation) are sent."));
+        b.addView(preset);
+        b.addView(base);
+        b.addView(key);
+        b.addView(model);
+        b.addView(note);
+        ScrollView sv = new ScrollView(this);
+        sv.addView(b);
+        final androidx.appcompat.app.AlertDialog dlg = new UiDialog(this).setTitle(T.t("AI settings")).setView(sv)
+                .setPositiveButton(T.t("Save"), null)
+                .setNeutralButton(T.t("Test"), null)
+                .setNegativeButton(T.t("Cancel"), null).create();
+        Runnable save = () -> {
+            Store.putStr("ai_base", base.getText().toString().trim());
+            Store.putStr("ai_model", model.getText().toString().trim());
+            if (!key.getText().toString().trim().isEmpty()) Store.putStr("ai_key", SecretBox.seal(key.getText().toString().trim()));
+            updateAiStatus();
+        };
+        dlg.setOnShowListener(x -> {
+            dlg.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+                save.run();
+                dlg.dismiss();
+            });
+            dlg.getButton(androidx.appcompat.app.AlertDialog.BUTTON_NEUTRAL).setOnClickListener(v -> {
+                save.run();
+                toast(T.t("Testing…"));
+                aiExec.execute(() -> {
+                    long t0 = System.currentTimeMillis();
+                    String r;
+                    try {
+                        r = "✓ " + AiClient.chat("Reply with one short sentence.", "Say hello in Tamil.", 60) + "  (" + (System.currentTimeMillis() - t0) + " ms)";
+                    } catch (Exception e) {
+                        r = e.getMessage();
+                    }
+                    final String r2 = r;
+                    main.post(() -> new UiDialog(this).setTitle(T.t("Test")).setMessage(r2).setPositiveButton(T.t("OK"), null).show());
+                });
+            });
+        });
+        dlg.show();
     }
 
     private LinearLayout kbdCard;

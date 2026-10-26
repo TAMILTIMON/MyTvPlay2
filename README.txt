@@ -1,3 +1,37 @@
+TAMILCASTPLAY 2.9.1 — torrent playback fixes
+============================================
+* A finished torrent movie now plays straight from storage (smooth, no peers, no
+  1→100 % re-check), from Continue watching, Recent and Downloads.
+* If the download finishes while you watch, playback switches to the stored file at
+  the same second ("Download finished — now playing from storage").
+* "Keep this movie?" is asked only at the REAL end of the movie. If a stream stops
+  early (data not ready / network blip) the player simply continues from the same spot
+  instead of asking and closing.
+* Part-downloaded torrents remember their progress (resume data, saved every minute and
+  when you stop) — no more re-checking from 1 % on the next play.
+* The stream reader waits for data to be written to storage instead of giving up.
+
+TAMILCASTPLAY 2.9 — AI assistant (bring your own AI)
+===================================================
+Phone app > Board > "AI assistant" (also Voice > "Ask the AI assistant").
+* Ask in Tamil, English, Hindi or Tanglish: "Sun TV podu, volume kammi pannu",
+  "open Netflix and turn off in 30 minutes", "YouTube Ilaiyaraaja songs", "pause".
+  The AI only picks from the app's own actions (play channel, YouTube / TV search, open
+  app, volume, TV volume, play/pause/next/prev/stop, seek, sleep timer, keys, typing,
+  recap, translate, power). Without AI (or if the AI is unsure) a Tamil / Tanglish /
+  English keyword backup still handles simple commands.
+* What did I miss? — 3-line summary of the last 10 minutes, from the subtitles,
+  in your app language.
+* Translate subtitles — the loaded subtitle becomes Tamil / Hindi / English /
+  Malayalam / Telugu / Kannada and is shown on the TV right away.
+  (Recap and translation need a subtitle file: load one or use Find subtitles online.)
+AI settings (in the assistant panel): choose a preset — OpenRouter, Groq, Together,
+Google Gemini, Anthropic Claude, OpenAI, Ollama or LM Studio on your PC (free) — or
+Custom; enter the API key and the model name (e.g. gemma-3-12b-it); press Test.
+Privacy: the key is encrypted with the phone's Android Keystore and sent only to the
+address you chose. Only the request text, the current title, app and channel names
+(or subtitle lines for recap / translation) are sent. The TV never sees the key.
+
 TAMILCASTPLAY 2.8 — keyboard + voice search
 ==========================================
 * Big "Keyboard" and "Voice" buttons under the remote (phone app).
