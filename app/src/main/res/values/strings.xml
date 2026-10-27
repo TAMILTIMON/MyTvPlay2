@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="acc_desc">Lets the ZH Play phone app work like a TV remote everywhere on this TV: arrows, OK, Back, Home, Recent apps and typing text into search boxes. It does not read or collect anything.</string>
+    <string name="acc_label">ZH Play phone remote</string>
+    <string name="widget_desc">Control your TV: play / pause, ±10 s, TV volume and power</string>
+</resources>

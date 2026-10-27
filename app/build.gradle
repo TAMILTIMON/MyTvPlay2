@@ -1,0 +1,87 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.mytv.player'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'com.tamil.castplay'
+        minSdk 21
+        targetSdk 34
+        versionCode = (System.getenv('VCODE') ?: '34').toInteger()
+        versionName = '3.8' + (System.getenv('VCODE') ? '.' + System.getenv('VCODE') : '')
+    }
+
+    // One APK per CPU type keeps the download small. "universal" works on every TV.
+    splits {
+        abi {
+            enable true
+            reset()
+            include 'armeabi-v7a', 'arm64-v8a'
+            universalApk true
+        }
+    }
+
+    // Fixed signing key from GitHub Secrets -> every build installs over the previous one.
+    signingConfigs {
+        if (System.getenv('TCP_KEYSTORE')) {
+            tcp {
+                storeFile file(System.getenv('TCP_KEYSTORE'))
+                storePassword System.getenv('TCP_STORE_PASSWORD')
+                keyAlias System.getenv('TCP_KEY_ALIAS')
+                keyPassword System.getenv('TCP_KEY_PASSWORD')
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (System.getenv('TCP_KEYSTORE')) signingConfig signingConfigs.tcp
+        }
+        debug {
+            if (System.getenv('TCP_KEYSTORE')) signingConfig signingConfigs.tcp
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    packaging {
+        jniLibs {
+            useLegacyPackaging true
+        }
+        resources {
+            excludes += ['META-INF/LICENSE*', 'META-INF/NOTICE*', 'META-INF/DEPENDENCIES']
+        }
+    }
+
+    lint {
+        abortOnError false
+        checkReleaseBuilds false
+    }
+}
+
+// APK files: ZHPlay-tv-armeabi-v7a-release.apk, ZHPlay-mobile-universal-release.apk …
+base {
+    archivesName = 'ZHPlay'
+}
+
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+
+    // VLC engine: plays almost every format/codec, equalizer, volume boost, subtitles, tracks.
+    implementation 'org.videolan.android:libvlc-all:3.6.2'
+
+    // Phone web page / remote control.
+    implementation 'org.nanohttpd:nanohttpd:2.3.1'
+
+    // Magnet / .torrent streaming.
+    implementation 'org.libtorrent4j:libtorrent4j:2.1.0-35'
+    implementation 'org.libtorrent4j:libtorrent4j-android-arm:2.1.0-35'
+    implementation 'org.libtorrent4j:libtorrent4j-android-arm64:2.1.0-35'
+}
