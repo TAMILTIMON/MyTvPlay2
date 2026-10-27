@@ -270,8 +270,13 @@ public final class MusicFx {
         apply();
     }
 
+    /** Told about every change (the browser applies the same EQ to its pages). */
+    public static volatile Runnable onChange;
+
     /** Applies the saved settings. Cheap enough to call while a slider moves. */
     public static synchronized void apply() {
+        Runnable oc = onChange;
+        if (oc != null) oc.run();
         boolean on = on();
         int[] g = effective();
         try {

@@ -301,7 +301,88 @@ public final class TorrentEngine {
      * Gets the torrent info and starts it. Blocks (up to ~2 minutes for magnets), so call it
      * from a background thread. Returns one playable item per video/audio file.
      */
+    // ------------------------------------------------------------------ one file of a torrent
+    /** "magnet:…#zhfile=2" = only file 2 of that torrent (in playlists, "send to TV", …). */
+    public static final String FILE_MARK = "#zhfile=";
+
+    public static String base(String uri) {
+        if (uri == null) return "";
+        int k = uri.indexOf(FILE_MARK);
+        return k < 0 ? uri : uri.substring(0, k);
+    }
+
+    public static int chosenFile(String uri) {
+        int k = uri == null ? -1 : uri.indexOf(FILE_MARK);
+        if (k < 0) return -1;
+        try {
+            return Integer.parseInt(uri.substring(k + FILE_MARK.length()).trim());
+        } catch (Exception e) {
+            return -1;
+        }
+    }
+
+    public static String withFile(String uri, int file) {
+        return base(uri) + FILE_MARK + file;
+    }
+
+    private volatile int preferFile = -1;
+
+    /** Opens a torrent; with "#zhfile=N" only that file is returned (and downloaded first). */
     public List<Store.Item> open(String uri) throws Exception {
+        int only = chosenFile(uri);
+        preferFile = only;
+        List<Store.Item> all = openAll(base(uri));
+        if (only < 0) return all;
+        for (Store.Item it : all) if (it.u.contains("/" + only + "/")) {
+            List<Store.Item> one = new ArrayList<>();
+            one.add(it);
+            return one;
+        }
+        return all;
+    }
+
+    /** The files of a torrent (index, name, size, is video/song) — only the info, nothing is downloaded. */
+    public List<Object[]> listFiles(String uri) throws Exception {
+        uri = base(uri).trim();
+        SessionManager s = session();
+        File dir = baseDir();
+        String key = "tmeta_" + Integer.toHexString(uri.hashCode());
+        File saved = new File(Store.getStr(key, "/nonexistent"));
+        TorrentInfo ti;
+        if (saved.exists()) ti = new TorrentInfo(saved);
+        else {
+            byte[] data;
+            if (uri.toLowerCase(Locale.US).startsWith("magnet:")) {
+                data = s.fetchMagnet(uri, 120, dir);
+                if (data == null) throw new Exception("Could not get the torrent info (no peers found). Try again later.");
+            } else if (uri.startsWith("/")) {
+                ti = new TorrentInfo(new File(uri));
+                data = null;
+            } else data = Net.fetch(uri, 20_000_000).data;
+            if (data != null) {
+                ti = TorrentInfo.bdecode(data);
+                try {
+                    File mf = new File(dir, ti.infoHash().toHex() + ".torrent");
+                    try (java.io.FileOutputStream o = new java.io.FileOutputStream(mf)) {
+                        o.write(data);
+                    }
+                    Store.putStr(key, mf.getAbsolutePath());   // playing it later needs no second fetch
+                } catch (Exception ignored) {
+                }
+            } else ti = new TorrentInfo(new File(uri));
+        }
+        final FileStorage fs = ti.files();
+        List<Object[]> out = new ArrayList<>();
+        for (int i = 0; i < fs.numFiles(); i++) {
+            if (fs.padFileAt(i)) continue;
+            String n = fs.fileName(i);
+            out.add(new Object[]{i, fs.filePath(i), fs.fileSize(i), Formats.isVideo(n) || Formats.isAudio(n)});
+        }
+        Collections.sort(out, (a, b) -> ((String) a[1]).compareToIgnoreCase((String) b[1]));
+        return out;
+    }
+
+    private List<Store.Item> openAll(String uri) throws Exception {
         final int token;
         synchronized (this) {
             if (handle != null && uri.trim().equals(activeUri) && activeItems != null) {
@@ -384,6 +465,11 @@ public final class TorrentEngine {
                 }
             }
             if (best > 0) media.add(0, media.remove(best));
+        }
+        int pf = preferFile;
+        if (pf >= 0 && media.contains(pf)) {               // the file the user picked: download it first
+            media.remove(Integer.valueOf(pf));
+            media.add(0, pf);
         }
 
         Priority[] pr = Priority.array(Priority.IGNORE, fs.numFiles());

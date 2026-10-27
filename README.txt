@@ -1,3 +1,131 @@
+ZH PLAY 4.4 — Release C (with A + B): appearance, site settings, VPN, board customization
+=======================================================================================
+Browser appearance (menu → Appearance, or "✎ Customize" on the new-tab page)
+* Background: 8 animated gradients or your own photo; darken, blur, glass / solid cards,
+  animations, accent colour, clock & greeting, shortcuts / recent / blocked-ads on or off,
+  search engine (Google, DuckDuckGo, Bing, Brave Search, Startpage).
+Site settings (tap the lock in the address bar, or menu → Site settings)
+* Per site: location, camera, microphone, notifications, motion sensors, file uploads, pop-ups,
+  autoplay sound, JavaScript, cookies, ad blocker — Ask first / Allow / Block, remembered.
+* New: websites can use the camera / microphone / location when you allow them; "choose file"
+  upload buttons work; pop-ups are blocked (allowed sites open them in a new tab).
+* Clear one site's cookies & storage; reset its permissions; list of all sites with own settings.
+VPN (browser menu → VPN, or the VPN tile)
+* WireGuard (official library). Import a profile (.conf file or paste) — e.g. Proton VPN's free
+  plan (steps inside). Use it for only ZH Play or the whole phone. Status: server, data used.
+Board customization (remote → BOARD → ✎ Customize)
+* Drag tiles (≡) to any order, ↑ / ↓, hide / show, your own named sections, tile size small /
+  medium / large / list, reset. New tiles of later versions appear at the end.
+
+ZH PLAY 4.3 — Release B: all formats, DJ landscape, new song editor
+==================================================================
+* Video → Audio (and every audio tool: cutter, splitter, merger, karaoke, editor, DJ) reads ALL
+  formats: when Android's own decoders can't (some AVI / WMV / FLV / RM codecs, AC3 / DTS sound …)
+  the VLC engine inside the app reads the sound instead. Output stays M4A.
+* DJ mixer: landscape layout Deck A | Mixer | Deck B; turning the phone keeps the music playing.
+  Rotation button: Auto-rotate → Portrait → Landscape (remembered).
+* Song editor redesign: bigger timeline, compact transport + zoom in one row, Select / Move / Scroll,
+  tool tabs Edit · Effects · Tracks as an icon grid, slim import progress line, landscape layout
+  (timeline left, tools right), rotation button; turning the phone keeps the project.
+* Editor effects on the selected part (undo restores it): Echo, Reverb (small / medium / large),
+  Bass boost, Treble boost, Low cut (rumble), High cut (hiss), Noise gate, Speed (0.5–2×, tape style),
+  Remove vocals, Mono — plus Fade in / out, Amplify, Normalize, Reverse.
+
+ZH PLAY 4.2 — Release A: browser downloads, torrent file picker, fixes
+=====================================================================
+Browser
+* Downloads: any file a page offers (long-press a link → Download, or a page's download button),
+  incl. files a page makes itself (blob: / data:). Saved in Downloads/ZH Play with the site's
+  login cookies. Menu → Downloads: progress, open, delete, retry. Long-press images → Download.
+* Torrents with several files: "Choose files" lists the videos / songs → play here, send to TV,
+  add to TV queue, add to TV playlist, or save — one item per file ("magnet…#zhfile=N").
+* "Add to TV playlist" — before, the phone browser saved into the phone's own list, so links never
+  showed up on the TV. Also: Open in a new tab, Copy link.
+* YouTube: "Skipping ad…" overlay with a spinner while an ad is being skipped.
+AI assistant
+* Voice in the AI panel always asks where the words go again (Ask the AI / YouTube / search the TV /
+  ZH Play / type on the TV). An open "type on TV" box hidden behind the panel took them before.
+
+ZH PLAY 4.1 — Google Play variant (AAB) + your normal APKs unchanged
+===================================================================
+* Two builds from the same code, every feature in both:
+  full = the APKs you install (Android 14 target, GitHub auto-update) — exactly as before
+  play = ZHPlay-play-<n>.aab for Google Play (Android 15 target, Play updates it)
+* Build tools updated (Android Gradle Plugin 8.6.1, Gradle 8.10.2, SDK 35).
+* See PLAY_STORE.md for the Play Console steps and declarations.
+
+ZH PLAY 4.0.1 — screen cast fixed (black screen / phone hanging)
+===============================================================
+* Removed the 60 fps cap added in 3.9.2: on some phones it broke the video encoder
+  (black picture on the TV / PC, phone hanging). The TV and the Linux PC (1.0.1+) show
+  frames as they arrive, so there is no delay without the cap.
+* Safer casting: if the encoder refuses the low-delay settings, ZH Play retries with
+  basic settings; if no picture comes within 4 s it restarts the encoder in safe mode
+  instead of hanging; the screen capture is detached before an encoder restart.
+
+ZH PLAY 4.0 — Present mode (PDF slides on the TV / Linux PC)
+===========================================================
+Phone remote → tile "Present" → choose a PDF (PowerPoint / Google Slides: Share → PDF).
+* The TV (or Linux PC 1.1+) downloads it from the phone and draws every slide at its own
+  screen resolution: sharp small text, no video blur, no notifications on the big screen.
+* Phone = clicker: big current slide + next slide, ◀ Previous / Next ▶, phone volume keys
+  (down = next, up = previous), slide strip to jump, red laser pointer (drag on the slide),
+  Blank screen, First slide, Other PDF, timer, End.
+* The phone screen may turn off — the slides stay on the TV. TV remote ←/→ works too.
+
+ZH PLAY 3.9.2 — screen cast without delay on fast phones
+=======================================================
+* Cast screen is capped at 60 frames a second (Android 10+). 90 / 120 Hz phones sent up to
+  120 frames a second; the PC / TV fell behind and the picture lagged 3–4 s and more.
+
+ZH PLAY 3.9.1 — browser background play really works
+====================================================
+* Videos / songs in the browser keep playing when you switch apps, lock the screen or
+  open another screen: Android's web engine paused video whenever its window was hidden —
+  the browser view now stays "visible" to the engine while Background play is on.
+* The browser no longer disappears when you come back through the ZH Play icon: it now
+  runs as its own task (shown separately in Recents as "ZH Play Browser"). Links sent to
+  an open browser open in a new tab.
+* EQ in the browser opens as a panel over the page (ON/OFF, presets, preamp + 10 bands,
+  bass / treble, curve) — the video stays on screen and keeps playing; changes are heard
+  live. "Full screen" button opens the complete equalizer.
+
+ZH PLAY 3.9 — DJ mixer, song editor, screen cast to the TV
+=========================================================
+DJ mixer (phone: board tile "DJ mixer", or Features)
+* Two decks: scrolling waveform, auto BPM (measured exact on test tracks), play, CDJ-style
+  cue, 4 hot cues (hold = clear), beat loops 1/2/4/8, pitch ±8 % / ±16 % (hold the % label),
+  nudge −/+ (hold), SYNC (matches tempo AND lines up the beats).
+* Mixer: trim, 3-band EQ high / mid / low with kill, one-knob filter (left low-pass, right
+  high-pass), beat-synced echo, channel faders, constant-power crossfader, master,
+  Auto-fade over 8 bars. ● REC records the mix to Music / ZH Play.
+* Tempo works like a turntable (pitch follows tempo); no key lock yet.
+Song editor (board tile "Song editor", or Features)
+* Multi-track, non-destructive (the songs on the phone never change), zoomable timeline
+  with waveforms; modes Select / Move / Scroll; Split, Cut, Copy, Paste, Delete, Trim,
+  Silence, Fade in / out, Amplify, Normalize, Reverse; per-track mute / solo / volume /
+  rename / delete (tap the track name); Undo / Redo; Export to M4A.
+Cast screen (board tile "Cast screen")
+* Shows the whole phone screen on the TV, live (H.264 over Wi-Fi), turns with the phone;
+  the phone's sound too on Android 10+ (apps that block recording stay silent).
+  720p by default, 1080p option. Stop from the notification or the tile; Back on the TV.
+
+ZH PLAY 3.8 — browser: background play, history & bookmarks, fullscreen lock, page EQ
+=====================================================================================
+* Background play (like Brave): videos / songs keep playing with the screen locked or
+  another app open; notification + lock-screen controls (−10 s, play / pause, +10 s,
+  close). Pages are told they stay visible, so YouTube and others don't pause themselves.
+  Menu → "Background play" On / Off.
+* Restore tabs: open tabs come back after closing the app (menu → "Restore tabs").
+* History & bookmarks manager: site icon, page title, site name and time; grouped by
+  Today / Yesterday / date; search; ⋮ = open, open in new tab, copy link, bookmark,
+  delete; clear last hour / today / 7 days / everything. Bookmarks: add, edit, remove.
+* Fullscreen video: 🔒 lock (touches and Back are ignored until unlocked), turns to
+  landscape like a player, EQ button.
+* Page equalizer: a floating EQ button appears when a page plays video or audio; it opens
+  the same Poweramp-style equalizer as the music player and applies it live to the page.
+  Some sites block this for their videos — the app says so and the video plays normally.
+
 ZH PLAY 3.7 — Karaoke master + waveform zoom
 ===========================================
 Karaoke master (Features → Karaoke master): replaces the old 30-second tool.

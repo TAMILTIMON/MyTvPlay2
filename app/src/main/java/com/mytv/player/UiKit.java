@@ -240,6 +240,7 @@ public final class UiKit {
         tt.setSingleLine(true);
         tt.setEllipsize(android.text.TextUtils.TruncateAt.END);
         tt.setPadding(0, Ui.dp(c, 10), 0, 0);
+        tt.setTag("title");
         t.addView(tt);
         TextView ts = Ui.text(c, 12, Ui.DIM, false);
         ts.setText(sub);

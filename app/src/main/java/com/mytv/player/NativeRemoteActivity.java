@@ -42,6 +42,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -57,6 +58,47 @@ public class NativeRemoteActivity extends AppCompatActivity {
     private static final int PICK_MEDIA = 21, PICK_TORRENT = 22, PICK_SUB = 23;
 
     private String ip, tvName;
+    private boolean castHd, castSound = true;
+
+    /** Cast the whole phone screen (and sound on Android 10+) to this TV. */
+    private void castScreen() {
+        if (CastScreenService.running) {
+            new UiDialog(this).setTitle(T.t("Cast screen")).setMessage(CastScreenService.status)
+                    .setPositiveButton(T.t("Stop casting"), (d, w) -> CastScreenService.stop(this))
+                    .setNegativeButton(T.t("Close"), null).show();
+            return;
+        }
+        final boolean[] sel = {Store.getBool("cast_hd", false), Store.getBool("cast_sound", true)};
+        String[] o = {T.t("Full HD (1080p) — needs strong Wi-Fi"),
+                T.t("Send the phone's sound") + (android.os.Build.VERSION.SDK_INT < 29 ? " (" + T.t("Android 10+ only") + ")" : "")};
+        new UiDialog(this).setTitle(T.t("Cast screen"))
+                .setMultiChoiceItems(o, sel, (d, w, c) -> sel[w] = c)
+                .setPositiveButton(T.t("Start"), (d, w) -> {
+                    castHd = sel[0];
+                    castSound = sel[1];
+                    Store.putBool("cast_hd", castHd);
+                    Store.putBool("cast_sound", castSound);
+                    if (castSound && android.os.Build.VERSION.SDK_INT >= 29
+                            && checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                        requestPermissions(new String[]{android.Manifest.permission.RECORD_AUDIO}, 89);   // then the capture prompt
+                        return;
+                    }
+                    askCapture();
+                })
+                .setNegativeButton(T.t("Cancel"), null).show();
+    }
+
+    private void askCapture() {
+        android.media.projection.MediaProjectionManager mpm =
+                (android.media.projection.MediaProjectionManager) getSystemService(MEDIA_PROJECTION_SERVICE);
+        startActivityForResult(mpm.createScreenCaptureIntent(), 88);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int req, String[] p, int[] r) {
+        super.onRequestPermissionsResult(req, p, r);
+        if (req == 89) askCapture();       // with or without sound permission (no sound if refused)
+    }
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService io = Executors.newFixedThreadPool(3);
     private JSONObject S = new JSONObject(), opts = null;
@@ -678,36 +720,72 @@ public class NativeRemoteActivity extends AppCompatActivity {
         bl.setText(T.t("Board").toUpperCase(Locale.ROOT));
         bl.setLetterSpacing(0.12f);
         bl.setPadding(dp(6), dp(14), 0, dp(4));
-        p.addView(bl);
+        LinearLayout bh = new LinearLayout(this);
+        bh.setGravity(Gravity.CENTER_VERTICAL);
+        bh.addView(bl, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        TextView cz = Ui.text(this, 12, Ui.ACCENT, true);
+        cz.setText("✎ " + T.t("Customize"));
+        cz.setPadding(dp(10), dp(14), dp(8), dp(4));
+        cz.setOnClickListener(v -> customizeBoard());
+        bh.addView(cz);
+        p.addView(bh);
         View tQueue = UiKit.tile(this, "list-video", T.t("Channels & queue"), "—", 0xFF8B5CF6, v -> openSheet(pages[0], T.t("Channels & queue"), "list-video"));
         queueSub = (TextView) tQueue.findViewWithTag("sub");
         View tShare = UiKit.tile(this, "smartphone", T.t("Share this phone"), "", 0xFF14B8A6, v -> shareDialog());
         shareSub = (TextView) tShare.findViewWithTag("sub");
-        p.addView(UiKit.grid(this, 3,
-                UiKit.tile(this, "sparkles", T.t("AI assistant"), T.t("Tamil · English · Tanglish"), 0xFF8B5CF6, v -> openAi()),
-                UiKit.tile(this, "wand-sparkles", T.t("Features"), T.t("EQ, cutter, karaoke…"), 0xFFF43F5E,
-                        v -> startActivity(new Intent(this, ToolsActivity.class))),
-                UiKit.tile(this, "film", T.t("Videos"), T.t("on this phone"), 0xFF0EA5E9,
-                        v -> startActivity(new Intent(this, PhoneLibraryActivity.class))),
-                UiKit.tile(this, "list-music", T.t("Music"), T.t("on this phone"), 0xFFD946EF,
-                        v -> startActivity(new Intent(this, PhoneLibraryActivity.class).putExtra(PhoneLibraryActivity.EXTRA_AUDIO, true))),
-                UiKit.tile(this, "monitor-play", T.t("Live TV screen"), T.t("see the TV here"), 0xFFEC4899, v -> openScreen()),
-                tQueue,
-                UiKit.tile(this, "layout-grid", T.t("Apps"), "Netflix, YouTube…", 0xFFF97316, v -> openSheet(appsPage, T.t("Apps"), "layout-grid")),
-                UiKit.tile(this, "cast", T.t("Cast"), T.t("phone videos, links"), 0xFF3B82F6, v -> showTab(3)),
-                UiKit.tile(this, "captions", T.t("Audio & subtitles"), T.t("tracks, delay, online"), 0xFF22C55E, v -> showTab(1)),
-                UiKit.tile(this, "sliders-horizontal", T.t("Picture & sound"), T.t("fit, EQ, dialogue"), 0xFFEAB308, v -> showTab(2)),
-                UiKit.tile(this, "library", T.t("Playlists"), T.t("IPTV, saved links"), 0xFF6366F1, v -> showTab(4)),
-                UiKit.tile(this, "gauge", T.t("My TV"), T.t("storage, speed"), 0xFF06B6D4, v -> myTv()),
-                tShare,
-                UiKit.tile(this, "power", T.t("Power"), T.t("sleep, restart"), 0xFFEF4444, v -> powerMenu()),
-                UiKit.tile(this, "palette", T.t("Colours"), T.t("theme & palette"), 0xFFD946EF, v -> Palette.show(this)),
-                UiKit.tile(this, "tv", T.t("Switch TV"), tvName, 0xFF64748B, v -> {
-                    startActivity(new Intent(this, ConnectActivity.class).putExtra("no_auto", true).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP));
-                    finish();
-                })));
+        final LinkedHashMap<String, View> board = new LinkedHashMap<>();
+        board.put("ai_assistant", UiKit.tile(this, "sparkles", T.t("AI assistant"), T.t("Tamil · English · Tanglish"), 0xFF8B5CF6, v -> openAi()));
+        board.put("cast_screen", UiKit.tile(this, "monitor", T.t("Cast screen"), T.t("show this phone on the TV"), 0xFF0EA5E9, v -> castScreen()));
+        board.put("vpn", UiKit.tile(this, "lock", "VPN", T.t("WireGuard / Proton free"), 0xFF10B981, v -> WgVpn.panel(this)));
+        board.put("present", UiKit.tile(this, "presentation", T.t("Present"), T.t("PDF slides, clicker, laser"), 0xFF6366F1,
+                            v -> startActivity(new Intent(this, PresentActivity.class).putExtra(PresentActivity.EXTRA_IP, ip))));
+        board.put("dj_mixer", UiKit.tile(this, "disc-3", T.t("DJ mixer"), T.t("two decks, sync, EQ"), 0xFFF59E0B,
+                            v -> startActivity(new Intent(this, DjActivity.class))));
+        board.put("song_editor", UiKit.tile(this, "scissors", T.t("Song editor"), T.t("tracks, cut, fades"), 0xFF10B981,
+                            v -> startActivity(new Intent(this, EditorActivity.class))));
+        board.put("features", UiKit.tile(this, "wand-sparkles", T.t("Features"), T.t("EQ, cutter, karaoke…"), 0xFFF43F5E,
+                            v -> startActivity(new Intent(this, ToolsActivity.class))));
+        board.put("videos", UiKit.tile(this, "film", T.t("Videos"), T.t("on this phone"), 0xFF0EA5E9,
+                            v -> startActivity(new Intent(this, PhoneLibraryActivity.class))));
+        board.put("music", UiKit.tile(this, "list-music", T.t("Music"), T.t("on this phone"), 0xFFD946EF,
+                            v -> startActivity(new Intent(this, PhoneLibraryActivity.class).putExtra(PhoneLibraryActivity.EXTRA_AUDIO, true))));
+        board.put("live_tv_screen", UiKit.tile(this, "monitor-play", T.t("Live TV screen"), T.t("see the TV here"), 0xFFEC4899, v -> openScreen()));
+        board.put("queue", tQueue);
+        board.put("apps", UiKit.tile(this, "layout-grid", T.t("Apps"), "Netflix, YouTube…", 0xFFF97316, v -> openSheet(appsPage, T.t("Apps"), "layout-grid")));
+        board.put("cast", UiKit.tile(this, "cast", T.t("Cast"), T.t("phone videos, links"), 0xFF3B82F6, v -> showTab(3)));
+        board.put("audio_subtitles", UiKit.tile(this, "captions", T.t("Audio & subtitles"), T.t("tracks, delay, online"), 0xFF22C55E, v -> showTab(1)));
+        board.put("picture_sound", UiKit.tile(this, "sliders-horizontal", T.t("Picture & sound"), T.t("fit, EQ, dialogue"), 0xFFEAB308, v -> showTab(2)));
+        board.put("playlists", UiKit.tile(this, "library", T.t("Playlists"), T.t("IPTV, saved links"), 0xFF6366F1, v -> showTab(4)));
+        board.put("my_tv", UiKit.tile(this, "gauge", T.t("My TV"), T.t("storage, speed"), 0xFF06B6D4, v -> myTv()));
+        board.put("share", tShare);
+        board.put("power", UiKit.tile(this, "power", T.t("Power"), T.t("sleep, restart"), 0xFFEF4444, v -> powerMenu()));
+        board.put("colours", UiKit.tile(this, "palette", T.t("Colours"), T.t("theme & palette"), 0xFFD946EF, v -> Palette.show(this)));
+        board.put("switch_tv", UiKit.tile(this, "tv", T.t("Switch TV"), tvName, 0xFF64748B, v -> {
+                        startActivity(new Intent(this, ConnectActivity.class).putExtra("no_auto", true).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP));
+                        finish();
+                    }));
+        boardBox = new android.widget.FrameLayout(this);
+        boardTiles = board;
+        boardBox.addView(BoardLayout.build(this, board));
+        p.addView(boardBox);
         updateShareSub();
         return p;
+    }
+
+    private android.widget.FrameLayout boardBox;
+    private LinkedHashMap<String, View> boardTiles;
+
+    /** Order / hide / size / sections of the board tiles — saved, rebuilt at once. */
+    private void customizeBoard() {
+        LinkedHashMap<String, String> names = new LinkedHashMap<>();
+        for (java.util.Map.Entry<String, View> e : boardTiles.entrySet()) {
+            TextView t = e.getValue().findViewWithTag("title");
+            names.put(e.getKey(), t != null ? t.getText().toString() : e.getKey());
+        }
+        BoardLayout.customize(this, names, () -> {
+            boardBox.removeAllViews();
+            boardBox.addView(BoardLayout.build(this, boardTiles));
+        });
     }
 
     /** Row of round Lucide buttons, evenly spread. */
@@ -828,9 +906,13 @@ public class NativeRemoteActivity extends AppCompatActivity {
     /** What was said: into the TV's text box if one is open, else choose where to search. */
     private void onVoice(final String said) {
         if (said == null || said.trim().isEmpty()) return;
-        if (kbdShown || S.optBoolean("kbd")) {
+        // In the AI assistant always ask where it goes (before, an open "type on TV" box — hidden behind the
+        // AI panel — silently took the words, so nothing seemed to happen).
+        boolean inAi = aiPage != null && aiPage.isShown();
+        if (inAi && aiIn != null) aiIn.setText(said);
+        if (!inAi && (kbdShown || S.optBoolean("kbd"))) {
             if (!kbdShown) showKbd(true);
-            liveBox.append(said);        // live typing sends it to the TV
+            liveBox.append(said);        // a text box is open on the TV: type it there
             return;
         }
         String[] opts = {"🚀 " + T.t("Ask the AI assistant"), "▶ " + T.t("Search on YouTube"), "🔍 " + T.t("Search the whole TV"),
@@ -840,6 +922,9 @@ public class NativeRemoteActivity extends AppCompatActivity {
             if (w == 0) {
                 openAi();
                 aiAsk(said);
+            } else if ("type".equals(where[w])) {
+                if (!kbdShown) showKbd(true);
+                liveBox.append(said);
             } else call("/search", m("q", said, "where", where[w]), r -> toast(r.optString("msg")));
         }).show();
     }
@@ -1828,6 +1913,14 @@ public class NativeRemoteActivity extends AppCompatActivity {
 
     @Override
     protected void onActivityResult(int req, int res, Intent data) {
+        if (WgVpn.onResult(this, req, res, data)) return;
+        if (req == 88) {
+            if (res == RESULT_OK && data != null) {
+                CastScreenService.start(this, res, data, ip, castHd, castSound);
+                UiKit.makeToast(this, T.t("Casting your screen to the TV"), android.widget.Toast.LENGTH_SHORT).show();
+            } else UiKit.makeToast(this, T.t("Screen capture was not allowed"), android.widget.Toast.LENGTH_SHORT).show();
+            return;
+        }
         super.onActivityResult(req, res, data);
         if (res != RESULT_OK || data == null) return;
         if (req == 77) {

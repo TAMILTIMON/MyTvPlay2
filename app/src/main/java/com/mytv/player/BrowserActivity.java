@@ -7,6 +7,7 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.net.Uri;
+import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -106,6 +107,8 @@ public class BrowserActivity extends AppCompatActivity {
         siteIcon = new ImageView(this);
         siteIcon.setScaleType(ImageView.ScaleType.CENTER);
         omni.addView(siteIcon, new LinearLayout.LayoutParams(Ui.dp(this, 26), Ui.dp(this, 26)));
+        siteIcon.setContentDescription(T.t("Site settings"));
+        siteIcon.setOnClickListener(v -> SiteSettings.show(this, hosts.get(web), () -> web.reload()));
         bar = new EditText(this);
         bar.setSingleLine(true);
         bar.setHint(T.t("Search or type a web address"));
@@ -174,7 +177,7 @@ public class BrowserActivity extends AppCompatActivity {
         col.addView(loading, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(this, 3)));
         bottomBar = narrow ? buildBottomBar() : null;
         webBox = new FrameLayout(this);
-        web = new WebView(this);
+        web = new BgWebView(this);
         tabs.add(web);
         webBox.addView(web, 0, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         if (tv) {
@@ -191,8 +194,278 @@ public class BrowserActivity extends AppCompatActivity {
 
         String start = getIntent().getStringExtra(EXTRA_URL);
         if (start != null && !start.isEmpty()) go(start);
+        else if (Store.getBool("b_restore", true) && !BrowserData.savedTabs().isEmpty()) restoreTabs();
         else home();
         if (tv) web.requestFocus();
+        buildEqFab();
+        // equalizer changes (also from the equalizer screen) apply to the pages live
+        MusicFx.onChange = () -> main.post(() -> {
+            String js = BrowserMedia.eqCall();
+            for (WebView t : tabs) t.evaluateJavascript(js, null);
+        });
+        // notification / lock-screen buttons → the page's player
+        BrowserPlayService.control = c -> main.post(() -> {
+            for (WebView t : tabs) t.evaluateJavascript("window.__zhCmd&&window.__zhCmd('" + c + "')", null);
+        });
+    }
+
+    // ---------------------------------------------------------------- open tabs kept between starts
+    private void restoreTabs() {
+        List<String[]> st = BrowserData.savedTabs();
+        int cur = 0;
+        try {
+            cur = Integer.parseInt(st.get(st.size() - 1)[2]);
+        } catch (Exception ignored) {
+        }
+        go(st.get(0)[1]);
+        for (int i = 1; i < st.size(); i++) newTab(st.get(i)[1]);
+        if (cur >= 0 && cur < tabs.size()) switchTo(tabs.get(cur));
+    }
+
+    private void saveTabs() {
+        List<String[]> l = new ArrayList<>();
+        for (WebView t : tabs) {
+            String u = t.getUrl();
+            if (u != null && u.startsWith("http")) l.add(new String[]{t.getTitle() == null ? "" : t.getTitle(), u});
+        }
+        if (Store.getBool("b_private", false)) l.clear();
+        BrowserData.saveTabs(l, Math.max(0, tabs.indexOf(web)));
+    }
+
+    // ---------------------------------------------------------------- media on pages: background play, EQ button
+    private ImageView eqFab;
+    private volatile boolean pageMedia, pagePlaying;
+    private String lastEqWarn = "";
+
+    private void buildEqFab() {
+        eqFab = UiKit.roundButton(this, "sliders-vertical", 50, true, v -> eqSheet());
+        eqFab.setContentDescription(T.t("Equalizer"));
+        eqFab.setElevation(Ui.dp(this, 8));
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(Ui.dp(this, 50), Ui.dp(this, 50), Gravity.BOTTOM | Gravity.END);
+        lp.setMargins(0, 0, Ui.dp(this, 16), Ui.dp(this, 16));
+        webBox.addView(eqFab, lp);
+        eqFab.setVisibility(View.GONE);
+    }
+
+    private void mediaState(boolean playing, String title, boolean video, boolean has) {
+        pageMedia = has;
+        pagePlaying = playing;
+        if (eqFab != null) eqFab.setVisibility(has && Store.getBool("b_eq", true) && customView == null ? View.VISIBLE : View.GONE);
+        if (lockBtn != null) lockBtn.setVisibility(customView != null ? View.VISIBLE : View.GONE);
+        if (!Store.getBool("b_bgplay", true)) return;
+        if (playing) BrowserPlayService.update(this, title, true, video);
+        else if (has && BrowserPlayService.title.length() > 0) BrowserPlayService.update(this, title, false, video);
+        else if (!has) BrowserPlayService.stop(this);
+    }
+
+    private void injectMedia(WebView v) {
+        v.evaluateJavascript(BrowserMedia.js(Store.getBool("b_bgplay", true)), null);
+        v.evaluateJavascript(BrowserMedia.eqCall(), null);
+    }
+
+    // ---------------------------------------------------------------- equalizer panel over the page (video keeps playing)
+    private void eqSheet() {
+        final android.app.Dialog d = new android.app.Dialog(this);
+        d.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(Ui.dp(this, 12), Ui.dp(this, 10), Ui.dp(this, 12), Ui.dp(this, 14));
+        android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+        bg.setColor(0xF20B0B0F);
+        float rr = Ui.dp(this, 22);
+        bg.setCornerRadii(new float[]{rr, rr, rr, rr, 0, 0, 0, 0});
+        box.setBackground(bg);
+        // header: ON / OFF · preset · full equalizer
+        LinearLayout h = new LinearLayout(this);
+        h.setGravity(Gravity.CENTER_VERTICAL);
+        TextView t = Ui.text(this, 16, android.graphics.Color.WHITE, true);
+        t.setText(T.t("Equalizer"));
+        h.addView(t, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        final android.widget.Button on = new android.widget.Button(this);
+        on.setAllCaps(false);
+        on.setTextColor(android.graphics.Color.WHITE);
+        final Runnable paintOn = () -> {
+            on.setText(MusicFx.on() ? "ON" : "OFF");
+            on.setBackground(MusicFx.on() ? Ui.gradient(this, 16) : Ui.card(this, 0xFF2A2A33, 0, 16));
+        };
+        paintOn.run();
+        on.setOnClickListener(v -> {
+            MusicFx.setOn(!MusicFx.on());
+            paintOn.run();
+        });
+        h.addView(on, new LinearLayout.LayoutParams(Ui.dp(this, 64), Ui.dp(this, 36)));
+        final android.widget.Button pr = new android.widget.Button(this);
+        pr.setAllCaps(false);
+        pr.setTextColor(android.graphics.Color.WHITE);
+        pr.setText(MusicFx.presetLabel());
+        pr.setBackground(Ui.card(this, 0xFF24242C, 0, 16));
+        LinearLayout.LayoutParams pl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, Ui.dp(this, 36));
+        pl.setMargins(Ui.dp(this, 6), 0, Ui.dp(this, 6), 0);
+        h.addView(pr, pl);
+        h.addView(UiKit.darkButton(this, "maximize", 36, false, v -> {
+            d.dismiss();
+            startActivity(new android.content.Intent(this, PowerEqActivity.class));
+        }));
+        box.addView(h);
+        final PowerViews.EqCurveView curve = new PowerViews.EqCurveView(this);
+        LinearLayout.LayoutParams cl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(this, 80));
+        cl.setMargins(0, Ui.dp(this, 8), 0, Ui.dp(this, 6));
+        box.addView(curve, cl);
+        // preamp + 10 bands
+        final int[] cols = {0xFFEF4444, 0xFFF97316, 0xFFF59E0B, 0xFFEAB308, 0xFF84CC16, 0xFF22C55E, 0xFF14B8A6, 0xFF06B6D4, 0xFF3B82F6, 0xFF8B5CF6};
+        android.widget.HorizontalScrollView hs = new android.widget.HorizontalScrollView(this);
+        hs.setHorizontalScrollBarEnabled(false);
+        LinearLayout row = new LinearLayout(this);
+        hs.addView(row);
+        final List<PowerViews.GlowSlider> sliders = new ArrayList<>();
+        for (int i = -1; i < 10; i++) {
+            final int k = i;
+            LinearLayout col = new LinearLayout(this);
+            col.setOrientation(LinearLayout.VERTICAL);
+            col.setGravity(Gravity.CENTER_HORIZONTAL);
+            PowerViews.GlowSlider s = new PowerViews.GlowSlider(this, k < 0 ? -1200 : MusicFx.MIN, k < 0 ? 1200 : MusicFx.MAX, k < 0 ? 0xFFE5E7EB : cols[k]);
+            s.setValue(k < 0 ? MusicFx.preamp() : MusicFx.bands()[k]);
+            s.setContentDescription(k < 0 ? T.t("Preamp") : MusicFx.LABELS[k]);
+            s.setListener((v, done) -> {
+                if (k < 0) MusicFx.setPreamp(v);
+                else {
+                    int[] b = MusicFx.bands();
+                    b[k] = v;
+                    MusicFx.setBands(b);
+                    Store.putStr("mfx_user_cur", "");
+                    Store.putInt("mfx_preset", -1);
+                }
+                MusicFx.apply();            // → the page's sound changes at once
+                curve.invalidate();
+                pr.setText(MusicFx.presetLabel());
+            });
+            sliders.add(s);
+            col.addView(s, new LinearLayout.LayoutParams(Ui.dp(this, 40), Ui.dp(this, 160)));
+            TextView n = Ui.text(this, 11, android.graphics.Color.WHITE, true);
+            n.setText(k < 0 ? T.t("Pre") : MusicFx.LABELS[k]);
+            col.addView(n);
+            row.addView(col, new LinearLayout.LayoutParams(Ui.dp(this, 48), ViewGroup.LayoutParams.WRAP_CONTENT));
+        }
+        box.addView(hs);
+        // bass / treble
+        LinearLayout tone = new LinearLayout(this);
+        tone.setGravity(Gravity.CENTER);
+        tone.setPadding(0, Ui.dp(this, 8), 0, 0);
+        final PowerViews.Knob kb = new PowerViews.Knob(this, -100, 100, 0, 0xFFEF4444, true);
+        final PowerViews.Knob kt = new PowerViews.Knob(this, -100, 100, 0, 0xFF22C55E, true);
+        kb.setValue(MusicFx.bassTone());
+        kt.setValue(MusicFx.trebleTone());
+        kb.setContentDescription(T.t("Bass"));
+        kt.setContentDescription(T.t("Treble"));
+        PowerViews.OnValue tl = (v, done) -> {
+            MusicFx.setTone(kb.get(), kt.get());
+            MusicFx.apply();
+            curve.invalidate();
+        };
+        kb.setListener(tl);
+        kt.setListener(tl);
+        for (Object[] o : new Object[][]{{kb, T.t("Bass")}, {kt, T.t("Treble")}}) {
+            LinearLayout c = new LinearLayout(this);
+            c.setOrientation(LinearLayout.VERTICAL);
+            c.setGravity(Gravity.CENTER_HORIZONTAL);
+            c.addView((View) o[0], new LinearLayout.LayoutParams(Ui.dp(this, 76), Ui.dp(this, 76)));
+            TextView n = Ui.text(this, 12, android.graphics.Color.WHITE, true);
+            n.setText((String) o[1]);
+            c.addView(n);
+            tone.addView(c, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        }
+        box.addView(tone);
+        pr.setOnClickListener(v -> {
+            String[] names = new String[MusicFx.PRESETS.length];
+            for (int i = 0; i < names.length; i++) names[i] = T.t(MusicFx.PRESETS[i]);
+            new UiDialog(this).setTitle(T.t("Presets")).setItems(names, (dd, w) -> {
+                MusicFx.preset(w);
+                MusicFx.apply();
+                int[] b = MusicFx.bands();
+                for (int i = 0; i < 10; i++) sliders.get(i + 1).setValue(b[i]);
+                curve.invalidate();
+                pr.setText(MusicFx.presetLabel());
+            }).show();
+        });
+        if (lastEqWarn.equals(hosts.get(web))) {
+            TextView warn = Ui.text(this, 11, 0xFFFBBF24, false);
+            warn.setText(T.t("This site doesn't allow the equalizer on its video — it plays normally"));
+            warn.setPadding(0, Ui.dp(this, 8), 0, 0);
+            box.addView(warn);
+        }
+        d.setContentView(box);
+        android.view.Window w = d.getWindow();
+        if (w != null) {
+            w.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0));
+            w.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            w.setGravity(Gravity.BOTTOM);
+            w.clearFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND);   // keep watching the video
+        }
+        d.show();
+    }
+
+    // ---------------------------------------------------------------- fullscreen video: lock against mis-touches
+    private FrameLayout lockLayer;
+    private ImageView lockBtn;
+    private boolean locked;
+    private int oldOrientation = -1;
+    private final Runnable hideLock = () -> {
+        if (lockBtn != null && customView != null) lockBtn.animate().alpha(locked ? 0f : 0.35f).setDuration(300).start();
+    };
+
+    private void showLockUi() {
+        lockLayer = new FrameLayout(this);
+        lockLayer.setOnTouchListener((v, e) -> {
+            if (!locked) return false;          // not locked: touches go to the video
+            if (e.getAction() == android.view.MotionEvent.ACTION_DOWN) flashLock();
+            return true;                          // locked: swallow every touch
+        });
+        root.addView(lockLayer, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        lockBtn = UiKit.darkButton(this, "lock", 48, false, v -> {
+            locked = !locked;
+            lockLayer.setClickable(locked);
+            UiKit.setIcon(this, lockBtn, locked ? "lock" : "lock", 22, locked ? 0xFFEAB308 : android.graphics.Color.WHITE);
+            UiKit.makeToast(this, T.t(locked ? "Screen locked — tap the lock to unlock" : "Unlocked"), Toast.LENGTH_SHORT).show();
+            flashLock();
+        });
+        lockBtn.setContentDescription(T.t("Lock"));
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(Ui.dp(this, 48), Ui.dp(this, 48), Gravity.TOP | Gravity.START);
+        lp.setMargins(Ui.dp(this, 20), Ui.dp(this, 24), 0, 0);
+        root.addView(lockBtn, lp);
+        ImageView eq = UiKit.darkButton(this, "sliders-vertical", 48, false, v -> {
+            if (!locked) eqSheet();
+        });
+        eq.setContentDescription(T.t("Equalizer"));
+        FrameLayout.LayoutParams el = new FrameLayout.LayoutParams(Ui.dp(this, 48), Ui.dp(this, 48), Gravity.TOP | Gravity.END);
+        el.setMargins(0, Ui.dp(this, 24), Ui.dp(this, 20), 0);
+        eq.setTag("fs_eq");
+        if (Store.getBool("b_eq", true)) root.addView(eq, el);
+        flashLock();
+        // landscape like a normal player (back to normal when fullscreen ends)
+        if (!tv) {
+            oldOrientation = getRequestedOrientation();
+            setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+        }
+    }
+
+    private void flashLock() {
+        if (lockBtn == null) return;
+        lockBtn.animate().alpha(1f).setDuration(150).start();
+        main.removeCallbacks(hideLock);
+        main.postDelayed(hideLock, 3000);
+    }
+
+    private void removeLockUi() {
+        locked = false;
+        if (lockLayer != null) root.removeView(lockLayer);
+        if (lockBtn != null) root.removeView(lockBtn);
+        View eq = root.findViewWithTag("fs_eq");
+        if (eq != null) root.removeView(eq);
+        lockLayer = null;
+        lockBtn = null;
+        if (!tv && oldOrientation != -2) {
+            setRequestedOrientation(oldOrientation == -1 ? android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED : oldOrientation);
+        }
     }
 
     /** All the WebView settings and listeners, for every tab. */
@@ -200,6 +473,9 @@ public class BrowserActivity extends AppCompatActivity {
     private void configure(final WebView web) {
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);
+        s.setGeolocationEnabled(true);
+        s.setSupportMultipleWindows(true);                  // pop-ups come to onCreateWindow (blocked unless allowed)
+        s.setJavaScriptCanOpenWindowsAutomatically(true);
         s.setDomStorageEnabled(true);
         s.setMediaPlaybackRequiresUserGesture(false);
         s.setLoadWithOverviewMode(true);
@@ -221,6 +497,7 @@ public class BrowserActivity extends AppCompatActivity {
             public void onPageStarted(WebView v, String url, Bitmap f) {
                 String h = android.net.Uri.parse(url).getHost();
                 hosts.put(v, h == null ? "" : h.toLowerCase(java.util.Locale.ROOT));
+                applySite(v, hosts.get(v));
                 pageBlocked.put(v, 0);
                 if (v != web) return;
                 pageLoading = true;
@@ -232,7 +509,9 @@ public class BrowserActivity extends AppCompatActivity {
 
             @Override
             public void onPageFinished(WebView v, String url) {
-                if (url != null && url.startsWith("http") && !Store.getBool("b_private", false)) addHistory(v.getTitle(), url);
+                if (url != null && url.startsWith("http") && !Store.getBool("b_private", false)) BrowserData.visit(v.getTitle(), url);
+                injectMedia(v);
+                saveTabs();
                 String h = hosts.get(v);
                 if (Shield.enabled() && !Shield.siteOff(h)) {
                     v.evaluateJavascript(Shield.cosmeticJs(), null);
@@ -263,8 +542,96 @@ public class BrowserActivity extends AppCompatActivity {
         web.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onProgressChanged(WebView v, int pr) {
+                if (pr >= 10) v.evaluateJavascript(SiteSettings.pageJs(hosts.get(v)), null);
+                if (pr >= 70) injectMedia(v);   // early, so videos that start by themselves are covered
                 loading.setProgress(pr);
                 loading.setVisibility(pr >= 100 ? View.INVISIBLE : View.VISIBLE);
+            }
+
+            @Override
+            public void onGeolocationPermissionsShowPrompt(final String origin, final android.webkit.GeolocationPermissions.Callback cb) {
+                final String h = hostOf(origin);
+                ask(h, "location", new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION, android.Manifest.permission.ACCESS_COARSE_LOCATION},
+                        ok -> cb.invoke(origin, ok, false));
+            }
+
+            @Override
+            public void onPermissionRequest(final android.webkit.PermissionRequest req) {
+                final String h = hostOf(req.getOrigin().toString());
+                final List<String> grant = new ArrayList<>();
+                final List<String> android_ = new ArrayList<>();
+                final List<String> keys = new ArrayList<>();
+                for (String res : req.getResources()) {
+                    if (android.webkit.PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(res)) {
+                        keys.add("camera");
+                        android_.add(android.Manifest.permission.CAMERA);
+                    } else if (android.webkit.PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(res)) {
+                        keys.add("mic");
+                        android_.add(android.Manifest.permission.RECORD_AUDIO);
+                    } else if (android.webkit.PermissionRequest.RESOURCE_PROTECTED_MEDIA_ID.equals(res)) {
+                        grant.add(res);                        // protected video (DRM) — needed by many video sites
+                    }
+                }
+                if (keys.isEmpty()) {
+                    if (grant.isEmpty()) req.deny();
+                    else req.grant(grant.toArray(new String[0]));
+                    return;
+                }
+                askMany(h, keys, android_, ok -> {
+                    if (ok) {
+                        for (String res : req.getResources()) if (!grant.contains(res)) grant.add(res);
+                        req.grant(grant.toArray(new String[0]));
+                    } else if (!grant.isEmpty()) req.grant(grant.toArray(new String[0]));
+                    else req.deny();
+                });
+            }
+
+            @Override
+            public boolean onShowFileChooser(WebView v, android.webkit.ValueCallback<Uri[]> cb, FileChooserParams params) {
+                String h = hosts.get(v);
+                if (!SiteSettings.allowed(h, "files")) {
+                    UiKit.makeToast(BrowserActivity.this, T.t("File uploads are blocked for this site — tap the lock to allow"), Toast.LENGTH_LONG).show();
+                    cb.onReceiveValue(null);
+                    return true;
+                }
+                if (fileCb != null) fileCb.onReceiveValue(null);
+                fileCb = cb;
+                try {
+                    Intent i = params.createIntent();
+                    if (params.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE) i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+                    startActivityForResult(Intent.createChooser(i, T.t("Choose a file")), 72);
+                } catch (Exception e) {
+                    fileCb = null;
+                    cb.onReceiveValue(null);
+                }
+                return true;
+            }
+
+            @Override
+            public boolean onCreateWindow(WebView v, boolean dialog, boolean userGesture, android.os.Message msg) {
+                String h = hosts.get(v);
+                if (!SiteSettings.allowed(h, "popups")) {
+                    UiKit.makeToast(BrowserActivity.this, "🪟 " + T.t("Pop-up blocked — tap the lock to allow pop-ups here"), Toast.LENGTH_SHORT).show();
+                    return false;
+                }
+                WebView w = new BgWebView(BrowserActivity.this);
+                configure(w);
+                tabs.add(w);
+                switchTo(w);
+                tabsBtn.setText(String.valueOf(tabs.size()));
+                ((WebView.WebViewTransport) msg.obj).setWebView(w);
+                msg.sendToTarget();
+                return true;
+            }
+
+            @Override
+            public void onReceivedTitle(WebView v, String title) {
+                BrowserData.title(v.getUrl(), title);
+            }
+
+            @Override
+            public void onReceivedIcon(WebView v, Bitmap icon) {
+                BrowserData.saveIcon(BrowserActivity.this, v.getUrl(), icon);
             }
 
             @Override
@@ -272,6 +639,8 @@ public class BrowserActivity extends AppCompatActivity {
                 customView = view;
                 customCb = cb;
                 root.addView(view, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+                showLockUi();
+                if (eqFab != null) eqFab.setVisibility(View.GONE);
             }
 
             @Override
@@ -288,19 +657,84 @@ public class BrowserActivity extends AppCompatActivity {
                 main.post(BrowserActivity.this::updateShield);
             }
         }, "TamilShield");
+        web.addJavascriptInterface(new Object() {
+            @android.webkit.JavascriptInterface
+            public void state(final boolean playing, final String title, final boolean video, final boolean has, double pos, double dur) {
+                main.post(() -> mediaState(playing, title, video, has));
+            }
+
+            @android.webkit.JavascriptInterface
+            public void eq(final String status) {
+                if (!"blocked".equals(status)) return;
+                main.post(() -> {
+                    String h = hosts.get(web);
+                    if (h != null && !h.equals(lastEqWarn)) {
+                        lastEqWarn = h;
+                        UiKit.makeToast(BrowserActivity.this, T.t("This site doesn't allow the equalizer on its video — it plays normally"),
+                                Toast.LENGTH_LONG).show();
+                    }
+                });
+            }
+        }, "ZHMedia");
         web.setFindListener((active, count, done) -> {
             if (findCount != null) findCount.setText(count == 0 ? "0/0" : (active + 1) + "/" + count);
         });
         web.setDownloadListener((url, ua, cd, mime, len) -> {
-            if (isPlayable(url, mime)) offer(url, android.webkit.URLUtil.guessFileName(url, cd, mime));
-            else UiKit.makeToast(this, T.t("Downloads are not supported — only videos, songs and torrents"), Toast.LENGTH_LONG).show();
+            final String name = android.webkit.URLUtil.guessFileName(url, cd, mime);
+            if (url.startsWith("blob:") || url.startsWith("data:")) {           // a file the page made itself
+                web.evaluateJavascript(BrowserDownloads.blobJs(url, name), null);
+                UiKit.makeToast(this, T.t("Saving…") + " " + name, Toast.LENGTH_SHORT).show();
+                return;
+            }
+            if (isPlayable(url, mime)) {
+                pendingDl = new String[]{ua, cd, mime};
+                offer(url, name);
+                return;
+            }
+            new UiDialog(this).setTitle(T.t("Download this file?"))
+                    .setMessage(name + (len > 0 ? "\n" + TvInfo.gb(len) : "") + "\n\n" + T.t("Saved in Downloads/ZH Play"))
+                    .setPositiveButton(T.t("Download"), (d, w) -> BrowserDownloads.start(this, url, ua, cd, mime, web.getUrl()))
+                    .setNegativeButton(T.t("Cancel"), null).show();
         });
+        web.addJavascriptInterface(new Object() {
+            @android.webkit.JavascriptInterface
+            public void save(final String dataUrl, final String name, final String mime) {
+                new Thread(() -> {
+                    String m;
+                    try {
+                        m = "✓ " + T.t("Saved in Downloads/ZH Play") + ": " + BrowserDownloads.saveData(BrowserActivity.this, dataUrl, name, mime);
+                    } catch (Exception e) {
+                        m = T.t("Can't download this") + ": " + e.getMessage();
+                    }
+                    final String m2 = m;
+                    main.post(() -> UiKit.makeToast(BrowserActivity.this, m2, Toast.LENGTH_LONG).show());
+                }).start();
+            }
+
+            @android.webkit.JavascriptInterface
+            public void fail(final String why) {
+                main.post(() -> UiKit.makeToast(BrowserActivity.this, T.t("Can't download this") + ": " + why, Toast.LENGTH_LONG).show());
+            }
+        }, "ZHDl");
         web.setOnLongClickListener(v -> {
             WebView.HitTestResult h = web.getHitTestResult();
             String u = h.getExtra();
             int t = h.getType();
             if (u != null && (t == WebView.HitTestResult.SRC_ANCHOR_TYPE || t == WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE)) {
+                pendingDl = null;
                 offer(u, null);
+                return true;
+            }
+            if (u != null && t == WebView.HitTestResult.IMAGE_TYPE) {
+                final String img = u;
+                new UiDialog(this).setTitle(T.t("Image"))
+                        .setItems(new String[]{"⬇  " + T.t("Download image"), T.t("Open image in a new tab"), T.t("Copy image link")}, (d, w) -> {
+                            if (w == 0) {
+                                if (img.startsWith("data:") || img.startsWith("blob:")) web.evaluateJavascript(BrowserDownloads.blobJs(img, ""), null);
+                                else BrowserDownloads.start(this, img, web.getSettings().getUserAgentString(), null, null, web.getUrl());
+                            } else if (w == 1) newTab(img);
+                            else copy(img);
+                        }).show();
                 return true;
             }
             return false;
@@ -328,7 +762,7 @@ public class BrowserActivity extends AppCompatActivity {
     }
 
     private void newTab(String url) {
-        WebView w = new WebView(this);
+        WebView w = new BgWebView(this);
         configure(w);
         tabs.add(w);
         switchTo(w);
@@ -614,15 +1048,35 @@ public class BrowserActivity extends AppCompatActivity {
                     Store.putBool("b_private", !priv);
                     UiKit.makeToast(this, T.t("Private (no history)") + ": " + T.t(!priv ? "On" : "Off"), Toast.LENGTH_SHORT).show();
                 }},
-                {"bookmark", T.t("Bookmarks"), (Runnable) this::bookmarks},
-                {"star", T.t("Add bookmark"), (Runnable) () -> {
-                    if (cur == null || isStartPage(cur)) return;
-                    List<String[]> l = bookmarkList();
-                    l.add(0, new String[]{web.getTitle() == null ? cur : web.getTitle(), cur});
-                    saveBookmarks(l);
-                    UiKit.makeToast(this, T.t("Saved"), Toast.LENGTH_SHORT).show();
+                {"download", T.t("Downloads"), (Runnable) () -> BrowserDownloads.show(this)},
+                {"palette", T.t("Appearance"), (Runnable) this::appearance},
+                {"lock", "VPN" + (WgVpn.on() ? " · " + T.t("On") : ""), (Runnable) () -> WgVpn.panel(this)},
+                {"shield", T.t("Site settings"), (Runnable) () -> {
+                    String h = hosts.get(web);
+                    if (h != null && !h.isEmpty() && !h.equals("tamilcastplay.local")) SiteSettings.show(this, h, () -> web.reload());
+                    else SiteSettings.showAll(this, null);
                 }},
-                {"clock", T.t("History"), (Runnable) this::showHistory},
+                {"bookmark", T.t("Bookmarks"), (Runnable) () -> library(1)},
+                {"star", T.t(cur != null && BrowserData.isBookmarked(cur) ? "Remove bookmark" : "Add bookmark"), (Runnable) () -> {
+                    if (cur == null || isStartPage(cur)) return;
+                    boolean on = BrowserData.toggleBookmark(web.getTitle(), cur);
+                    UiKit.makeToast(this, T.t(on ? "Added to bookmarks" : "Bookmark removed"), Toast.LENGTH_SHORT).show();
+                }},
+                {"clock", T.t("History"), (Runnable) () -> library(0)},
+                {"audio-lines", T.t("Background play") + ": " + T.t(Store.getBool("b_bgplay", true) ? "On" : "Off"), (Runnable) () -> {
+                    Store.putBool("b_bgplay", !Store.getBool("b_bgplay", true));
+                    UiKit.makeToast(this, T.t("Background play") + ": " + T.t(Store.getBool("b_bgplay", true) ? "On" : "Off")
+                            + " — " + T.t("reload the page"), Toast.LENGTH_LONG).show();
+                    if (!Store.getBool("b_bgplay", true)) BrowserPlayService.stop(this);
+                }},
+                {"sliders-vertical", T.t("Page equalizer") + ": " + T.t(Store.getBool("b_eq", true) ? "On" : "Off"), (Runnable) () -> {
+                    Store.putBool("b_eq", !Store.getBool("b_eq", true));
+                    String js = BrowserMedia.eqCall();
+                    for (WebView t : tabs) t.evaluateJavascript(js, null);
+                    mediaState(pagePlaying, web.getTitle(), false, pageMedia);
+                }},
+                {"layers", T.t("Restore tabs") + ": " + T.t(Store.getBool("b_restore", true) ? "On" : "Off"), (Runnable) () ->
+                        Store.putBool("b_restore", !Store.getBool("b_restore", true))},
                 {"text-search", T.t("Find in page"), (Runnable) () -> {
                     findBar.setVisibility(View.VISIBLE);
                     findIn.requestFocus();
@@ -814,7 +1268,14 @@ public class BrowserActivity extends AppCompatActivity {
         boolean dk = Ui.dark();
         String bg = dk ? "#0b0913" : "#f6f5fb", fg = dk ? "#f3f0ff" : "#1b1530", dim = dk ? "#a59fbd" : "#6b6482",
                 card = dk ? "rgba(255,255,255,.06)" : "#ffffff", line = dk ? "rgba(255,255,255,.10)" : "rgba(27,21,48,.10)";
-        String acc = String.format("#%06X", Ui.ACCENT & 0xFFFFFF), acc2 = String.format("#%06X", Ui.ACCENT2 & 0xFFFFFF);
+        String acc = BrowserLook.accent(), acc2 = String.format("#%06X", Ui.ACCENT2 & 0xFFFFFF);
+        boolean pic = BrowserLook.hasBackground();
+        if (pic) {                                         // text on a picture / gradient: always light, cards translucent
+            fg = "#ffffff";
+            dim = "rgba(255,255,255,.75)";
+            card = BrowserLook.glass() ? "rgba(20,16,32,.38)" : "rgba(20,16,32,.82)";
+            line = "rgba(255,255,255,.16)";
+        } else if (!BrowserLook.glass()) card = dk ? "#17141f" : "#ffffff";
         long tot = Shield.total.get();
         StringBuilder h = new StringBuilder();
         h.append("<html><head><meta name=viewport content='width=device-width,initial-scale=1'><style>")
@@ -843,12 +1304,24 @@ public class BrowserActivity extends AppCompatActivity {
                 .append(".r{display:flex;flex-direction:column;gap:2px}.r a{display:block;padding:12px 14px;border-radius:14px;text-decoration:none;color:").append(fg)
                 .append(";background:").append(card).append(";border:1px solid ").append(line).append(";margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}")
                 .append(".r a small{display:block;color:").append(dim).append(";font-size:12px}p{color:").append(dim).append(";font-size:13px;text-align:center;margin-top:26px}")
+                .append(BrowserLook.glass() ? "form,.stats,.r a,.clock{backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}" : "")
+                .append(".clock{text-align:center;margin:8px 0 4px;padding:6px}.clock b{display:block;font-size:52px;font-weight:300;letter-spacing:1px}")
+                .append(".clock span{color:").append(dim).append(";font-size:15px}")
+                .append(".cz{position:fixed;right:14px;bottom:14px;padding:9px 14px;border-radius:20px;font-size:13px;text-decoration:none;color:#fff;")
+                .append("background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.2);backdrop-filter:blur(8px)}")
+                .append(BrowserLook.backgroundCss(this, dk)).append(BrowserLook.animCss())
                 .append("</style></head><body><div class=wrap>")
-                .append("<div class=logo><i></i><b>ZH Play</b></div>")
-                .append("<form onsubmit=\"location.href='https://www.google.com/search?q='+encodeURIComponent(q.value);return false\">")
+                .append("<div class=logo><i></i><b>ZH Play</b></div>");
+        if (BrowserLook.show("clock")) {
+            h.append("<div class=clock><b id=zt></b><span id=zg></span></div><script>(function(){function t(){var d=new Date();")
+                    .append("document.getElementById('zt').textContent=d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});var hr=d.getHours();")
+                    .append("document.getElementById('zg').textContent=hr<12?'").append(esc(T.t("Good morning"))).append("':hr<17?'")
+                    .append(esc(T.t("Good afternoon"))).append("':'").append(esc(T.t("Good evening"))).append("';}t();setInterval(t,10000);})();</script>");
+        }
+        h.append("<form onsubmit=\"location.href='").append(BrowserLook.searchUrl()).append("'+encodeURIComponent(q.value);return false\">")
                 .append("<input id=q placeholder='").append(esc(T.t("Search Google or type a web address"))).append("'><button>")
                 .append(esc(T.t("Search"))).append("</button></form>");
-        if (Shield.enabled()) {
+        if (Shield.enabled() && BrowserLook.show("stats")) {
             h.append("<div class=stats><div><b>").append(tot).append("</b><span>").append(esc(T.t("Ads & trackers blocked"))).append("</span></div>")
                     .append("<div><b>").append(Math.max(0, tot * 2 / 60)).append(" min</b><span>").append(esc(T.t("Time saved"))).append("</span></div>")
                     .append("<div><b>").append(String.format(java.util.Locale.US, "%.1f MB", tot * 0.05)).append("</b><span>").append(esc(T.t("Data saved")))
@@ -856,7 +1329,7 @@ public class BrowserActivity extends AppCompatActivity {
         }
         String[] colors = {"#ef4444", "#f97316", "#eab308", "#22c55e", "#14b8a6", "#3b82f6", "#8b5cf6", "#ec4899"};
         List<String[]> bm = bookmarkList();
-        if (!bm.isEmpty()) {
+        if (!bm.isEmpty() && BrowserLook.show("shortcuts")) {
             h.append("<h2>").append(esc(T.t("Shortcuts"))).append("</h2><div class=g>");
             int i = 0;
             for (String[] b : bm) {
@@ -870,7 +1343,7 @@ public class BrowserActivity extends AppCompatActivity {
             h.append("</div>");
         }
         List<String[]> rec = Store.getBool("b_private", false) ? new ArrayList<String[]>() : history(6);
-        if (!rec.isEmpty()) {
+        if (!rec.isEmpty() && BrowserLook.show("recent")) {
             h.append("<h2>").append(esc(T.t("Recent"))).append("</h2><div class=r>");
             for (String[] b : rec) {
                 h.append("<a href='").append(b[1].replace("'", "%27")).append("'>").append(esc(b[0])).append("<small>")
@@ -878,7 +1351,8 @@ public class BrowserActivity extends AppCompatActivity {
             }
             h.append("</div>");
         }
-        h.append("<p>").append(esc(T.t("Videos found on a page appear under the film button. Long-press any link to play it."))).append("</p></div></body></html>");
+        h.append("<p>").append(esc(T.t("Videos found on a page appear under the film button. Long-press any link to play it."))).append("</p></div><a class=cz href='https://tamilcastplay.local/appearance'>✎ ").append(esc(T.t("Customize")))
+                .append("</a></body></html>");
         web.loadDataWithBaseURL("https://tamilcastplay.local/", h.toString(), "text/html", "utf-8", null);
         hosts.put(web, "");
         bar.setText("");
@@ -917,6 +1391,10 @@ public class BrowserActivity extends AppCompatActivity {
 
     /** Return true when we handle the link ourselves. */
     private boolean handleNav(String u) {
+        if (u.startsWith("https://tamilcastplay.local/appearance")) {
+            main.post(this::appearance);
+            return true;
+        }
         String l = u.toLowerCase(Locale.US);
         if (l.startsWith("magnet:") || Formats.isTorrent(u) || isPlayable(u, null)) {
             offer(u, null);
@@ -1028,15 +1506,164 @@ public class BrowserActivity extends AppCompatActivity {
                 Remote.player.enqueue(new Store.Item(t, withHeaders(url), ""));
             });
         }
-        labels.add(T.t("💾 Save to playlist “From browser”"));
+        if (Formats.isTorrent(url)) {
+            labels.add("📂 " + T.t("Choose files (torrents with several videos)"));
+            acts.add(() -> torrentFiles(url, t));
+        }
+        if (!tv && !tvIp.isEmpty()) {
+            // the playlist on the TV (before, this saved into the phone's own list — it never showed up on the TV)
+            labels.add("💾 " + T.t("Add to TV playlist “From browser”"));
+            acts.add(() -> addToTvPlaylist(tvIp, java.util.Collections.singletonList(new Store.Item(t, Formats.isTorrent(url) ? url : withHeaders(url), ""))));
+        }
+        labels.add("💾 " + T.t(tv ? "Save to playlist “From browser”" : "Save to this phone's playlist “From browser”"));
         acts.add(() -> {
-            Store.add(T.t("From browser"), new Store.Item(t, withHeaders(url), ""));
+            Store.add(T.t("From browser"), new Store.Item(t, Formats.isTorrent(url) ? url : withHeaders(url), ""));
             UiKit.makeToast(this, T.t("Saved"), Toast.LENGTH_SHORT).show();
         });
+        if (url.startsWith("http")) {
+            final String[] dl = pendingDl;
+            labels.add("⬇ " + T.t(tv ? "Download to this TV" : "Download to this phone"));
+            acts.add(() -> BrowserDownloads.start(this, url, dl != null ? dl[0] : web.getSettings().getUserAgentString(),
+                    dl != null ? dl[1] : null, dl != null ? dl[2] : null, web.getUrl()));
+        }
         labels.add(T.t("Open link here"));
         acts.add(() -> web.loadUrl(url));
+        labels.add(T.t("Open in a new tab"));
+        acts.add(() -> newTab(url));
+        labels.add(T.t("Copy link"));
+        acts.add(() -> copy(url));
         new UiDialog(this).setTitle((Formats.isTorrent(url) ? "🧲 " + T.t("Torrent found — play or download?") + "\n" : "") + t)
                 .setItems(labels.toArray(new String[0]), (d, w) -> acts.get(w).run()).show();
+    }
+
+    private android.webkit.ValueCallback<Uri[]> fileCb;      // a page's "choose file" waiting for the picker
+    private String[] pendingDl;       // user agent / content-disposition / mime of a download the page started
+
+    private void copy(String text) {
+        android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+        if (cm != null) cm.setPrimaryClip(android.content.ClipData.newPlainText("link", text));
+        UiKit.makeToast(this, T.t("Copied"), Toast.LENGTH_SHORT).show();
+    }
+
+    private void addToTvPlaylist(final String ip, final List<Store.Item> items) {
+        new Thread(() -> {
+            String msg;
+            try {
+                int n = 0;
+                for (Store.Item it : items) {
+                    HashMap<String, String> p = new HashMap<>();
+                    p.put("url", it.u);
+                    p.put("title", it.t);
+                    p.put("playlist", T.t("From browser"));
+                    if (TvClient.post(ip, "/add", p).optBoolean("ok", true)) n++;
+                }
+                msg = n + " " + T.t("added to the TV playlist “From browser”");
+            } catch (TvClient.AuthNeeded e) {
+                msg = T.t("Open the remote and enter the TV PIN first");
+            } catch (Exception e) {
+                msg = T.t("Cannot reach the TV");
+            }
+            final String m = msg;
+            main.post(() -> UiKit.makeToast(this, m, Toast.LENGTH_LONG).show());
+        }).start();
+    }
+
+    // ---------------------------------------------------------------- torrents with several files: pick which
+    private void torrentFiles(final String url, final String title) {
+        final AlertDialog wait = new UiDialog(this).setTitle(T.t("Getting the file list…"))
+                .setMessage(T.t("This can take up to a minute (the torrent's info comes from other people).")).setNegativeButton(T.t("Cancel"), null).show();
+        new Thread(() -> {
+            try {
+                final List<Object[]> files = TorrentEngine.get(this).listFiles(url);
+                main.post(() -> {
+                    if (!wait.isShowing()) return;
+                    wait.dismiss();
+                    pickTorrentFiles(url, title, files);
+                });
+            } catch (final Exception e) {
+                main.post(() -> {
+                    wait.dismiss();
+                    UiKit.makeToast(this, e.getMessage(), Toast.LENGTH_LONG).show();
+                });
+            }
+        }).start();
+    }
+
+    private void pickTorrentFiles(final String url, final String title, List<Object[]> files) {
+        final List<Object[]> media = new ArrayList<>();
+        for (Object[] f : files) if ((Boolean) f[3]) media.add(f);
+        if (media.isEmpty()) {
+            UiKit.makeToast(this, T.t("This torrent has no videos or songs"), Toast.LENGTH_LONG).show();
+            return;
+        }
+        final String[] names = new String[media.size()];
+        final boolean[] on = new boolean[media.size()];
+        for (int i = 0; i < names.length; i++) {
+            String path = (String) media.get(i)[1];
+            names[i] = path.substring(path.lastIndexOf('/') + 1) + "  ·  " + TvInfo.gb((Long) media.get(i)[2]);
+            on[i] = true;
+        }
+        new UiDialog(this).setTitle(media.size() + " " + T.t("files in this torrent"))
+                .setMultiChoiceItems(names, on, (d, w, c) -> on[w] = c)
+                .setPositiveButton(T.t("Next"), (d, w) -> {
+                    final List<Store.Item> chosen = new ArrayList<>();
+                    for (int i = 0; i < on.length; i++) {
+                        if (!on[i]) continue;
+                        String path = (String) media.get(i)[1];
+                        String nm = path.substring(path.lastIndexOf('/') + 1).replaceAll("\\.[A-Za-z0-9]{2,4}$", "");
+                        chosen.add(new Store.Item(nm, TorrentEngine.withFile(url, (Integer) media.get(i)[0]), ""));
+                    }
+                    if (chosen.isEmpty()) return;
+                    torrentActions(chosen);
+                })
+                .setNegativeButton(T.t("Cancel"), null).show();
+    }
+
+    private void torrentActions(final List<Store.Item> chosen) {
+        final String tvIp = Store.getStr("last_tv", "");
+        final List<String> labels = new ArrayList<>();
+        final List<Runnable> acts = new ArrayList<>();
+        labels.add("▶ " + T.t(tv ? "Play on this TV" : "Play on this phone") + " (" + chosen.size() + ")");
+        acts.add(() -> Remote.play(this, chosen, 0));
+        if (!tv && !tvIp.isEmpty()) {
+            labels.add("📺 " + T.t("Send to TV") + " (" + chosen.size() + ")");
+            acts.add(() -> sendManyToTv(tvIp, chosen, "now"));
+            labels.add("+ " + T.t("Add to TV queue"));
+            acts.add(() -> sendManyToTv(tvIp, chosen, "queue"));
+            labels.add("💾 " + T.t("Add to TV playlist “From browser”"));
+            acts.add(() -> addToTvPlaylist(tvIp, chosen));
+        }
+        labels.add("💾 " + T.t(tv ? "Save to playlist “From browser”" : "Save to this phone's playlist “From browser”"));
+        acts.add(() -> {
+            for (Store.Item it : chosen) Store.add(T.t("From browser"), it);
+            UiKit.makeToast(this, chosen.size() + " " + T.t("saved"), Toast.LENGTH_SHORT).show();
+        });
+        new UiDialog(this).setTitle(chosen.size() + " " + T.t("files"))
+                .setItems(labels.toArray(new String[0]), (d, w) -> acts.get(w).run()).show();
+    }
+
+    private void sendManyToTv(final String ip, final List<Store.Item> items, final String mode) {
+        new Thread(() -> {
+            String msg;
+            try {
+                StringBuilder us = new StringBuilder(), ts = new StringBuilder();
+                for (Store.Item it : items) {
+                    us.append(it.u).append('\n');
+                    ts.append(it.t).append('\n');
+                }
+                HashMap<String, String> p = new HashMap<>();
+                p.put("urls", us.toString());
+                p.put("titles", ts.toString());
+                p.put("mode", mode);
+                msg = TvClient.post(ip, "/playmany", p).optString("msg", T.t("Sent"));
+            } catch (TvClient.AuthNeeded e) {
+                msg = T.t("Open the remote and enter the TV PIN first");
+            } catch (Exception e) {
+                msg = T.t("Cannot reach the TV");
+            }
+            final String m = msg;
+            main.post(() -> UiKit.makeToast(this, m, Toast.LENGTH_LONG).show());
+        }).start();
     }
 
     private void sendToTv(final String ip, final String url, final String title, final String mode) {
@@ -1108,9 +1735,157 @@ public class BrowserActivity extends AppCompatActivity {
                 }).show();
     }
 
+    /** The browser is its own task now: a link sent while it is open arrives here → new tab. */
+    @Override
+    protected void onNewIntent(android.content.Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        String u = intent.getStringExtra(EXTRA_URL);
+        if (u != null && !u.isEmpty()) newTab(u);
+    }
+
+    // ---------- site settings ----------
+    private static String hostOf(String origin) {
+        String h = Uri.parse(origin).getHost();
+        return h == null ? "" : h.toLowerCase(java.util.Locale.ROOT);
+    }
+
+    /** JavaScript, autoplay and cookies for the site that is opening. */
+    private void applySite(WebView v, String h) {
+        WebSettings st = v.getSettings();
+        boolean start = h == null || h.isEmpty() || h.equals("tamilcastplay.local");
+        st.setJavaScriptEnabled(start || SiteSettings.allowed(h, "js"));
+        st.setMediaPlaybackRequiresUserGesture(!start && !SiteSettings.allowed(h, "autoplay"));
+        CookieManager.getInstance().setAcceptCookie(start || SiteSettings.allowed(h, "cookies"));
+    }
+
+    private interface Answer {
+        void on(boolean ok);
+    }
+
+    private Answer pendingAnswer;
+    private String[] pendingPerms;
+
+    private void ask(final String host, final String key, final String[] androidPerms, final Answer ans) {
+        java.util.List<String> keys = new ArrayList<>();
+        keys.add(key);
+        askMany(host, keys, java.util.Arrays.asList(androidPerms), ans);
+    }
+
+    /** Site choice first (ask → a dialog with "remember"), then Android's own permission if needed. */
+    private void askMany(final String host, final List<String> keys, final List<String> androidPerms, final Answer ans) {
+        main.post(() -> {
+            boolean anyBlock = false, allAllow = true;
+            for (String k : keys) {
+                String v = SiteSettings.get(host, k);
+                if ("block".equals(v)) anyBlock = true;
+                if (!"allow".equals(v)) allAllow = false;
+            }
+            if (anyBlock) {
+                ans.on(false);
+                return;
+            }
+            final Runnable thenAndroid = () -> {
+                List<String> need = new ArrayList<>();
+                for (String p : androidPerms) if (checkSelfPermission(p) != android.content.pm.PackageManager.PERMISSION_GRANTED) need.add(p);
+                if (need.isEmpty()) ans.on(true);
+                else {
+                    pendingAnswer = ans;
+                    pendingPerms = need.toArray(new String[0]);
+                    requestPermissions(pendingPerms, 74);
+                }
+            };
+            if (allAllow) {
+                thenAndroid.run();
+                return;
+            }
+            StringBuilder what = new StringBuilder();
+            for (String k : keys) {
+                if (what.length() > 0) what.append(" + ");
+                for (int i = 0; i < SiteSettings.KEYS.length; i++)
+                    if (SiteSettings.KEYS[i].equals(k)) what.append(SiteSettings.ICONS[i]).append(" ").append(T.t(SiteSettings.NAMES[i]));
+            }
+            final boolean[] remember = {true};
+            new UiDialog(this).setTitle(host)
+                    .setMultiChoiceItems(new String[]{T.t("Remember for this site")}, remember, (d, w, c) -> remember[0] = c)
+                    .setMessage(null)
+                    .setPositiveButton(T.t("Allow") + " " + what, (d, w) -> {
+                        if (remember[0]) for (String k : keys) SiteSettings.set(host, k, "allow");
+                        thenAndroid.run();
+                    })
+                    .setNegativeButton(T.t("Block"), (d, w) -> {
+                        if (remember[0]) for (String k : keys) SiteSettings.set(host, k, "block");
+                        ans.on(false);
+                    })
+                    .setOnCancelListener(d -> ans.on(false)).show();
+        });
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int req, String[] p, int[] r) {
+        super.onRequestPermissionsResult(req, p, r);
+        if (req != 74 || pendingAnswer == null) return;
+        boolean ok = r.length > 0;
+        for (int x : r) if (x != android.content.pm.PackageManager.PERMISSION_GRANTED) ok = false;
+        Answer a = pendingAnswer;
+        pendingAnswer = null;
+        a.on(ok);
+    }
+
+    // ---------- appearance ----------
+    private void appearance() {
+        BrowserLook.settings(this, () -> {
+            if (isStartPage(web.getUrl())) home();
+        }, () -> {
+            Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("image/*");
+            startActivityForResult(i, 73);
+        });
+    }
+
+    // ---------- history & bookmarks manager ----------
+    private void library(int tab) {
+        startActivityForResult(new android.content.Intent(this, BrowserLibraryActivity.class)
+                .putExtra(BrowserLibraryActivity.EXTRA_TAB, tab), 71);
+    }
+
+    @Override
+    protected void onActivityResult(int req, int res, android.content.Intent data) {
+        super.onActivityResult(req, res, data);
+        if (WgVpn.onResult(this, req, res, data)) return;
+        if (req == 73) {
+            if (res == RESULT_OK && data != null && data.getData() != null) {
+                try {
+                    BrowserLook.setPhoto(this, data.getData());
+                    if (isStartPage(web.getUrl())) home();
+                    appearance();
+                } catch (Exception e) {
+                    UiKit.makeToast(this, T.t("Can't use this picture") + ": " + e.getMessage(), Toast.LENGTH_LONG).show();
+                }
+            }
+            return;
+        }
+        if (req == 72) {
+            if (fileCb != null) fileCb.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(res, data));
+            fileCb = null;
+            return;
+        }
+        if (req != 71 || res != RESULT_OK || data == null) return;
+        String u = data.getStringExtra(BrowserLibraryActivity.RESULT_URL);
+        if (u == null) return;
+        if (data.getBooleanExtra(BrowserLibraryActivity.RESULT_NEW_TAB, false)) newTab(u);
+        else go(u);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        saveTabs();          // the page keeps playing (background play); only the tab list is saved
+    }
+
     // ---------- keys / back ----------
     private void hideCustom() {
         if (customView != null) {
+            removeLockUi();
             root.removeView(customView);
             customView = null;
             if (customCb != null) customCb.onCustomViewHidden();
@@ -1176,6 +1951,11 @@ public class BrowserActivity extends AppCompatActivity {
 
     @Override
     public void onBackPressed() {
+        if (locked && customView != null) {
+            flashLock();
+            UiKit.makeToast(this, T.t("Screen locked — tap the lock to unlock"), Toast.LENGTH_SHORT).show();
+            return;
+        }
         if (customView != null) hideCustom();
         else if (bar.hasFocus() && tv) web.requestFocus();
         else if (web.canGoBack()) web.goBack();
@@ -1184,6 +1964,10 @@ public class BrowserActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        saveTabs();
+        MusicFx.onChange = null;
+        BrowserPlayService.control = null;
+        BrowserPlayService.stop(this);
         for (WebView w : tabs) w.destroy();
         super.onDestroy();
     }

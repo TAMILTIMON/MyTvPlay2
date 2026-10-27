@@ -66,7 +66,7 @@ public final class SettingsDialog {
                 "📺  " + T.t("Show other apps' videos on the remote") + ": " + T.t(SessionWatcher.available(a) ? "On" : "Off")
                         + (!SessionWatcher.allowed(a) && SessionWatcher.available(a) ? " (ADB)" : ""),
                 "⬇  " + T.t("Downloads") + " · " + T.t("night only") + ": " + T.t(TorrentDownloads.nightOnly() ? "On" : "Off"),
-                "⬆  " + T.t("Check for updates") + " (" + Updater.installedName(a) + ")",
+                "⬆  " + T.t(Updater.playBuild(a) ? "Updates (Google Play)" : "Check for updates") + " (" + Updater.installedName(a) + ")",
                 "💾  " + T.t("Backup & restore"),
                 "🧲  " + T.t("Torrent storage: ") + String.format(java.util.Locale.US, "%.2f GB", TorrentEngine.cacheBytes(a) / 1073741824.0),
                 T.t("📱  Use as remote for another TV…"),

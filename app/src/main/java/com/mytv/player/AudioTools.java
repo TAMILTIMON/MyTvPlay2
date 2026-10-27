@@ -81,6 +81,17 @@ public final class AudioTools {
     }
 
     public static long durationUs(Context c, Uri u) {
+        long d = durationDirect(c, u);
+        if (d > 0) return d;
+        try {                                                      // a format only the VLC engine reads
+            File w = VlcAudio.toWav(c, u, null);
+            return Math.max(0, w.length() - 44) / 4 * 1_000_000L / 44100;
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
+    private static long durationDirect(Context c, Uri u) {
         try {
             MediaExtractor ex = open(c, u);
             int t = audioTrack(ex);
@@ -100,8 +111,32 @@ public final class AudioTools {
         void pcm(short[] data, int frames, long ptsUs) throws Exception;
     }
 
-    /** Decodes the audio of `u` from startUs to endUs (endUs ≤ 0 = to the end) into the sink. */
-    public static void decode(Context c, Uri u, long startUs, long endUs, PcmSink sink, Progress p) throws Exception {
+    /**
+     * Decodes the audio of `u` from startUs to endUs (endUs ≤ 0 = to the end) into the sink.
+     * If Android's own decoders can't read the file, the VLC engine reads it instead (all formats).
+     */
+    public static void decode(Context c, Uri u, long startUs, long endUs, final PcmSink sink, Progress p) throws Exception {
+        final boolean[] gotSound = {false};
+        PcmSink watch = new PcmSink() {
+            public void format(int rate, int ch) throws Exception {
+                sink.format(rate, ch);
+            }
+
+            public void pcm(short[] data, int frames, long ptsUs) throws Exception {
+                gotSound[0] = true;
+                sink.pcm(data, frames, ptsUs);
+            }
+        };
+        try {
+            decodeDirect(c, u, startUs, endUs, watch, p);
+        } catch (Exception e) {
+            if (gotSound[0] || cancel || "file".equals(u.getScheme()) && u.getPath() != null && u.getPath().endsWith(".wav")) throw e;
+            File wav = VlcAudio.toWav(c, u, p);                     // Android couldn't: the VLC engine can
+            decodeDirect(c, Uri.fromFile(wav), startUs, endUs, sink, p);
+        }
+    }
+
+    private static void decodeDirect(Context c, Uri u, long startUs, long endUs, PcmSink sink, Progress p) throws Exception {
         MediaExtractor ex = open(c, u);
         int t = audioTrack(ex);
         if (t < 0) {
@@ -451,7 +486,13 @@ public final class AudioTools {
     public static String toAudio(Context c, Uri u, String name, Progress p) throws Exception {
         cancel = false;
         File out = temp(c, ".m4a");
-        if (!remuxAac(c, u, 0, 0, out, p)) {
+        boolean copied;
+        try {
+            copied = remuxAac(c, u, 0, 0, out, p);           // AAC sound: copied without any loss
+        } catch (Exception e) {
+            copied = false;                                  // container Android can't open (RM, some AVI / WMV …)
+        }
+        if (!copied) {
             //noinspection ResultOfMethodCallIgnored
             out.delete();
             out = transcode(c, u, 0, 0, null, 0, false, 0, 0, p);
@@ -476,7 +517,14 @@ public final class AudioTools {
             }
         }
         File out = temp(c, ".m4a");
-        if (fades || !remuxAac(c, u, startUs, endUs, out, p)) {
+        boolean copied = false;
+        if (!fades) {
+            try {
+                copied = remuxAac(c, u, startUs, endUs, out, p);
+            } catch (Exception ignored) {
+            }
+        }
+        if (!copied) {
             //noinspection ResultOfMethodCallIgnored
             out.delete();
             out = transcode(c, u, startUs, endUs, null, 0, false, fadeInUs, fadeOutUs, p);

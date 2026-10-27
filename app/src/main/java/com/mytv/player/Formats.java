@@ -65,7 +65,7 @@ public final class Formats {
 
     public static boolean isTorrent(String url) {
         if (url == null) return false;
-        String l = url.trim().toLowerCase(Locale.US);
+        String l = TorrentEngine.base(url).trim().toLowerCase(Locale.US);   // without a "#zhfile=" choice
         return l.startsWith("magnet:") || "torrent".equals(ext(l));
     }
 

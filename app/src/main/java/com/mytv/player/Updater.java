@@ -82,7 +82,32 @@ public final class Updater {
     }
 
     /** Checks and asks. quiet = only show something when an update exists. */
+    /** The Google Play build: Play updates the app (apps from Play may not install their own updates). */
+    public static boolean playBuild(android.content.Context c) {
+        try {
+            return c.getResources().getBoolean(R.bool.play_store);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     public static void check(final Activity a, final boolean quiet) {
+        if (playBuild(a)) {
+            if (quiet) return;
+            new UiDialog(a).setTitle(T.t("Updates"))
+                    .setMessage(T.t("This copy of ZH Play comes from Google Play — Play installs new versions automatically."))
+                    .setPositiveButton(T.t("Open in Play"), (d, w) -> {
+                        try {
+                            a.startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW,
+                                    android.net.Uri.parse("market://details?id=" + a.getPackageName())));
+                        } catch (Exception e) {
+                            a.startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW,
+                                    android.net.Uri.parse("https://play.google.com/store/apps/details?id=" + a.getPackageName())));
+                        }
+                    })
+                    .setNegativeButton(T.t("Close"), null).show();
+            return;
+        }
         if (quiet && System.currentTimeMillis() - Store.getLong("upd_last", 0) < 12 * 3600 * 1000L) return;
         Store.putLong("upd_last", System.currentTimeMillis());
         new Thread(() -> {

@@ -4,14 +4,28 @@ plugins {
 
 android {
     namespace 'com.mytv.player'
-    compileSdk 34
+    compileSdk 35
 
     defaultConfig {
         applicationId 'com.tamil.castplay'
         minSdk 21
         targetSdk 34
         versionCode = (System.getenv('VCODE') ?: '34').toInteger()
-        versionName = '3.7' + (System.getenv('VCODE') ? '.' + System.getenv('VCODE') : '')
+        versionName = '4.4' + (System.getenv('VCODE') ? '.' + System.getenv('VCODE') : '')
+    }
+
+    // Two variants from the same code — every feature is in both:
+    //   full = the APKs you install yourself (exactly as before: Android 14 target, auto-update from GitHub)
+    //   play = the Google Play AAB (targets Android 15 as Play requires; updates come from Play)
+    flavorDimensions = ['store']
+    productFlavors {
+        full {
+            dimension 'store'
+        }
+        play {
+            dimension 'store'
+            targetSdk 35
+        }
     }
 
     // One APK per CPU type keeps the download small. "universal" works on every TV.
@@ -47,6 +61,7 @@ android {
     }
 
     compileOptions {
+        coreLibraryDesugaringEnabled true          // the WireGuard library uses newer Java parts on old Android
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
@@ -79,6 +94,10 @@ dependencies {
 
     // Phone web page / remote control.
     implementation 'org.nanohttpd:nanohttpd:2.3.1'
+
+    // Built-in VPN: WireGuard's official Android library (uses the profile the user imports)
+    implementation 'com.wireguard.android:tunnel:1.0.20230706'
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'
 
     // Magnet / .torrent streaming.
     implementation 'org.libtorrent4j:libtorrent4j:2.1.0-35'

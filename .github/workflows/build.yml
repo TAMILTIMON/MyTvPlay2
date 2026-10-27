@@ -1,4 +1,4 @@
-name: Build APK
+name: Build APK + AAB
 
 on:
   push:
@@ -17,10 +17,10 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Make sure Android SDK 34 is installed
+      - name: Make sure Android SDK 35 is installed
         run: |
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null || true
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-34" "build-tools;34.0.0" || true
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-35" "build-tools;35.0.0" || true
 
       - name: Version number (used by in-app auto-update)
         run: echo "VCODE=$((100 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
@@ -45,7 +45,7 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.5'
+          gradle-version: '8.10.2'
 
       - name: Build APKs
         env:
@@ -53,16 +53,45 @@ jobs:
           TCP_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           TCP_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
+          # the "full" APKs: exactly the app you install yourself (with GitHub auto-update)
           if [ -n "$TCP_KEYSTORE" ]; then
-            gradle assembleRelease --no-daemon --stacktrace
+            gradle assembleFullRelease --no-daemon --stacktrace
           else
-            gradle assembleDebug --no-daemon --stacktrace
+            gradle assembleFullDebug --no-daemon --stacktrace
           fi
+          # same file names as before, so the installed app's auto-update keeps finding them
+          for f in $(find app/build/outputs/apk -name "*.apk"); do
+            n=$(basename "$f" | sed 's/-full-/-/'); [ "$n" != "$(basename "$f")" ] && mv "$f" "$(dirname "$f")/$n"
+          done
+          find app/build/outputs/apk -name "*.apk"
+
+      - name: Build AAB (Google Play variant)
+        env:
+          TCP_STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          TCP_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          TCP_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ -n "$TCP_KEYSTORE" ]; then
+            gradle bundlePlayRelease --no-daemon --stacktrace
+            SRC=$(find app/build/outputs/bundle/playRelease -name "*.aab" | head -1)
+          else
+            echo "::warning::No signing key secrets - the AAB is a debug bundle (the Play Store will not accept it)"
+            gradle bundlePlayDebug --no-daemon --stacktrace
+            SRC=$(find app/build/outputs/bundle/playDebug -name "*.aab" | head -1)
+          fi
+          mkdir -p out-aab
+          cp "$SRC" "out-aab/ZHPlay-play-${VCODE}.aab"
+          ls -la out-aab
 
       - uses: actions/upload-artifact@v4
         with:
           name: ZHPlay-apk
           path: app/build/outputs/apk/**/*.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ZHPlay-aab
+          path: out-aab/*.aab
 
       - name: Publish release (the TV app checks this for updates)
         if: env.TCP_KEYSTORE != ''
@@ -71,5 +100,7 @@ jobs:
           tag_name: v${{ env.VCODE }}
           name: ZH Play build ${{ env.VCODE }}
           body: Automatic build from commit ${{ github.sha }}
-          files: app/build/outputs/apk/release/*.apk
+          files: |
+            app/build/outputs/apk/full/release/*.apk
+            out-aab/*.aab
           make_latest: true
