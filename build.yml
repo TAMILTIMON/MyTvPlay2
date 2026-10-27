@@ -1,0 +1,106 @@
+name: Build APK + AAB
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Make sure Android SDK 35 is installed
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null || true
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-35" "build-tools;35.0.0" || true
+
+      - name: Version number (used by in-app auto-update)
+        run: echo "VCODE=$((100 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+
+      - name: Safety check (no self-calling toast helper)
+        run: |
+          if grep -A2 "Toast makeToast" app/src/main/java/com/mytv/player/UiKit.java | grep -q "UiKit.makeToast"; then
+            echo "::error::UiKit.makeToast calls itself (would crash the app)"; exit 1
+          fi
+
+      - name: Prepare signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/tcp.jks"
+            echo "TCP_KEYSTORE=$RUNNER_TEMP/tcp.jks" >> "$GITHUB_ENV"
+            echo "Signing with your fixed TamilCastPlay key"
+          else
+            echo "::warning::No KEYSTORE_B64 secret found - building with a temporary key (updates may not install over older builds)"
+          fi
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Build APKs
+        env:
+          TCP_STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          TCP_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          TCP_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          # the "full" APKs: exactly the app you install yourself (with GitHub auto-update)
+          if [ -n "$TCP_KEYSTORE" ]; then
+            gradle assembleFullRelease --no-daemon --stacktrace
+          else
+            gradle assembleFullDebug --no-daemon --stacktrace
+          fi
+          # same file names as before, so the installed app's auto-update keeps finding them
+          for f in $(find app/build/outputs/apk -name "*.apk"); do
+            n=$(basename "$f" | sed 's/-full-/-/'); [ "$n" != "$(basename "$f")" ] && mv "$f" "$(dirname "$f")/$n"
+          done
+          find app/build/outputs/apk -name "*.apk"
+
+      - name: Build AAB (Google Play variant)
+        env:
+          TCP_STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          TCP_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          TCP_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ -n "$TCP_KEYSTORE" ]; then
+            gradle bundlePlayRelease --no-daemon --stacktrace
+            SRC=$(find app/build/outputs/bundle/playRelease -name "*.aab" | head -1)
+          else
+            echo "::warning::No signing key secrets - the AAB is a debug bundle (the Play Store will not accept it)"
+            gradle bundlePlayDebug --no-daemon --stacktrace
+            SRC=$(find app/build/outputs/bundle/playDebug -name "*.aab" | head -1)
+          fi
+          mkdir -p out-aab
+          cp "$SRC" "out-aab/ZHPlay-play-${VCODE}.aab"
+          ls -la out-aab
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ZHPlay-apk
+          path: app/build/outputs/apk/**/*.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ZHPlay-aab
+          path: out-aab/*.aab
+
+      - name: Publish release (the TV app checks this for updates)
+        if: env.TCP_KEYSTORE != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.VCODE }}
+          name: ZH Play build ${{ env.VCODE }}
+          body: Automatic build from commit ${{ github.sha }}
+          files: |
+            app/build/outputs/apk/full/release/*.apk
+            out-aab/*.aab
+          make_latest: true
