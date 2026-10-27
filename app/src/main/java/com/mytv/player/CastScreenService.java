@@ -153,22 +153,41 @@ public class CastScreenService extends Service {
         return new int[]{ow, oh, dm.densityDpi};
     }
 
-    private void startEncoder(int[] sz) throws Exception {
-        w = sz[0];
-        h = sz[1];
+    /** safe = only the basic settings every phone's encoder supports (used when the normal ones fail). */
+    private boolean safe;
+
+    private MediaFormat format(boolean basic) {
         MediaFormat f = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, w, h);
         f.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface);
         f.setInteger(MediaFormat.KEY_BIT_RATE, hd ? 10_000_000 : 6_000_000);
         f.setInteger(MediaFormat.KEY_FRAME_RATE, 30);
         f.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1);
-        f.setLong(MediaFormat.KEY_REPEAT_PREVIOUS_FRAME_AFTER, 100_000);   // still screen: keep sending
-        // 90 / 120 Hz phones would send up to 120 frames a second; receivers fall behind (seconds of delay).
-        // 60 is plenty for mirroring and saves Wi-Fi and battery.
-        if (Build.VERSION.SDK_INT >= 29) f.setFloat(MediaFormat.KEY_MAX_FPS_TO_ENCODER, 60f);
-        if (Build.VERSION.SDK_INT >= 23) f.setInteger(MediaFormat.KEY_PRIORITY, 0);
-        if (Build.VERSION.SDK_INT >= 30) f.setInteger(MediaFormat.KEY_LATENCY, 1);
-        enc = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC);
-        enc.configure(f, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
+        if (!basic) {
+            f.setLong(MediaFormat.KEY_REPEAT_PREVIOUS_FRAME_AFTER, 100_000);   // still screen: keep sending
+            if (Build.VERSION.SDK_INT >= 23) f.setInteger(MediaFormat.KEY_PRIORITY, 0);
+            if (Build.VERSION.SDK_INT >= 30) f.setInteger(MediaFormat.KEY_LATENCY, 1);
+        }
+        // NOTE: no frame-rate cap here — "max fps to encoder" broke the encoder on some phones
+        // (black picture, phone hanging). The TV and the PC show frames as they arrive instead.
+        return f;
+    }
+
+    private void startEncoder(int[] sz) throws Exception {
+        w = sz[0];
+        h = sz[1];
+        try {
+            enc = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC);
+            enc.configure(format(safe), null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
+        } catch (Exception e) {
+            // this phone's encoder refused the low-delay settings: retry with the basic ones
+            try {
+                if (enc != null) enc.release();
+            } catch (Exception ignored) {
+            }
+            safe = true;
+            enc = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC);
+            enc.configure(format(true), null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
+        }
         surface = enc.createInputSurface();
         enc.start();
         if (display == null) {
@@ -180,6 +199,11 @@ public class CastScreenService extends Service {
     }
 
     private void stopEncoder() {
+        // detach the screen capture from the old picture surface BEFORE releasing it
+        try {
+            if (display != null) display.setSurface(null);
+        } catch (Exception ignored) {
+        }
         try {
             if (enc != null) {
                 enc.stop();
@@ -196,9 +220,19 @@ public class CastScreenService extends Service {
         int[] sz = size();
         startEncoder(sz);
         MediaCodec.BufferInfo bi = new MediaCodec.BufferInfo();
-        long lastCheck = 0;
+        long lastCheck = 0, started = System.currentTimeMillis();
+        boolean gotFrame = false, retried = false;
         byte[] buf = new byte[1 << 18];
         while (alive) {
+            if (!gotFrame && System.currentTimeMillis() - started > 4000) {
+                if (retried) throw new Exception(T.t("This phone's video encoder doesn't respond"));
+                retried = true;
+                safe = true;
+                stopEncoder();
+                startEncoder(size());
+                started = System.currentTimeMillis();
+                main.post(() -> notifyNow(T.t("Casting your screen to the TV") + " · " + T.t("safe mode")));
+            }
             // phone turned (portrait ↔ landscape): restart the encoder with the new shape
             if (System.currentTimeMillis() - lastCheck > 700) {
                 lastCheck = System.currentTimeMillis();
@@ -229,6 +263,7 @@ public class CastScreenService extends Service {
                     ob.position(bi.offset);
                     ob.get(buf, 0, bi.size);
                     MirrorProto.write(out, MirrorProto.VIDEO, (bi.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0, bi.presentationTimeUs, buf, 0, bi.size);
+                    gotFrame = true;
                 }
                 enc.releaseOutputBuffer(oi, false);
             }

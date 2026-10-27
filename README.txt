@@ -1,3 +1,12 @@
+ZH PLAY 4.0.1 — screen cast fixed (black screen / phone hanging)
+===============================================================
+* Removed the 60 fps cap added in 3.9.2: on some phones it broke the video encoder
+  (black picture on the TV / PC, phone hanging). The TV and the Linux PC (1.0.1+) show
+  frames as they arrive, so there is no delay without the cap.
+* Safer casting: if the encoder refuses the low-delay settings, ZH Play retries with
+  basic settings; if no picture comes within 4 s it restarts the encoder in safe mode
+  instead of hanging; the screen capture is detached before an encoder restart.
+
 ZH PLAY 4.0 — Present mode (PDF slides on the TV / Linux PC)
 ===========================================================
 Phone remote → tile "Present" → choose a PDF (PowerPoint / Google Slides: Share → PDF).

@@ -35,6 +35,10 @@ public final class T {
     }
 
     static {
+        TA.put("safe mode", "பாதுகாப்பு முறை");
+        HI.put("safe mode", "सुरक्षित मोड");
+        TA.put("This phone's video encoder doesn't respond", "இந்த போனின் வீடியோ என்கோடர் பதிலளிக்கவில்லை");
+        HI.put("This phone's video encoder doesn't respond", "इस फ़ोन का वीडियो एन्कोडर जवाब नहीं दे रहा");
         TA.put("Present", "வழங்கு");
         HI.put("Present", "प्रेज़ेंट");
         TA.put("PDF slides, clicker, laser", "PDF ஸ்லைடுகள், கிளிக்கர், லேசர்");

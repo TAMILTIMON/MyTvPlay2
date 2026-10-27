@@ -11,7 +11,7 @@ android {
         minSdk 21
         targetSdk 34
         versionCode = (System.getenv('VCODE') ?: '34').toInteger()
-        versionName = '4.0' + (System.getenv('VCODE') ? '.' + System.getenv('VCODE') : '')
+        versionName = '4.0.1' + (System.getenv('VCODE') ? '.' + System.getenv('VCODE') : '')
     }
 
     // One APK per CPU type keeps the download small. "universal" works on every TV.
