@@ -1,3 +1,11 @@
+ZH PLAY 4.1 — Google Play variant (AAB) + your normal APKs unchanged
+===================================================================
+* Two builds from the same code, every feature in both:
+  full = the APKs you install (Android 14 target, GitHub auto-update) — exactly as before
+  play = ZHPlay-play-<n>.aab for Google Play (Android 15 target, Play updates it)
+* Build tools updated (Android Gradle Plugin 8.6.1, Gradle 8.10.2, SDK 35).
+* See PLAY_STORE.md for the Play Console steps and declarations.
+
 ZH PLAY 4.0.1 — screen cast fixed (black screen / phone hanging)
 ===============================================================
 * Removed the 60 fps cap added in 3.9.2: on some phones it broke the video encoder

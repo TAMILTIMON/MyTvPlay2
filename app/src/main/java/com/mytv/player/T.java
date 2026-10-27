@@ -35,6 +35,14 @@ public final class T {
     }
 
     static {
+        TA.put("Updates", "புதுப்பிப்புகள்");
+        HI.put("Updates", "अपडेट");
+        TA.put("Open in Play", "Play-இல் திற");
+        HI.put("Open in Play", "Play में खोलें");
+        TA.put("Updates (Google Play)", "புதுப்பிப்புகள் (Google Play)");
+        HI.put("Updates (Google Play)", "अपडेट (Google Play)");
+        TA.put("This copy of ZH Play comes from Google Play — Play installs new versions automatically.", "இந்த ZH Play நகல் Google Play-இலிருந்து வந்தது — Play புதிய பதிப்புகளைத் தானாக நிறுவும்.");
+        HI.put("This copy of ZH Play comes from Google Play — Play installs new versions automatically.", "ZH Play की यह कॉपी Google Play से है — Play नए वर्शन अपने आप इंस्टॉल करता है।");
         TA.put("safe mode", "பாதுகாப்பு முறை");
         HI.put("safe mode", "सुरक्षित मोड");
         TA.put("This phone's video encoder doesn't respond", "இந்த போனின் வீடியோ என்கோடர் பதிலளிக்கவில்லை");
