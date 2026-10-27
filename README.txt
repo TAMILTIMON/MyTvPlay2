@@ -1,3 +1,15 @@
+ZH PLAY 3.9.1 — browser background play really works
+====================================================
+* Videos / songs in the browser keep playing when you switch apps, lock the screen or
+  open another screen: Android's web engine paused video whenever its window was hidden —
+  the browser view now stays "visible" to the engine while Background play is on.
+* The browser no longer disappears when you come back through the ZH Play icon: it now
+  runs as its own task (shown separately in Recents as "ZH Play Browser"). Links sent to
+  an open browser open in a new tab.
+* EQ in the browser opens as a panel over the page (ON/OFF, presets, preamp + 10 bands,
+  bass / treble, curve) — the video stays on screen and keeps playing; changes are heard
+  live. "Full screen" button opens the complete equalizer.
+
 ZH PLAY 3.9 — DJ mixer, song editor, screen cast to the TV
 =========================================================
 DJ mixer (phone: board tile "DJ mixer", or Features)

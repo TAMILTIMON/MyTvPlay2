@@ -174,7 +174,7 @@ public class BrowserActivity extends AppCompatActivity {
         col.addView(loading, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(this, 3)));
         bottomBar = narrow ? buildBottomBar() : null;
         webBox = new FrameLayout(this);
-        web = new WebView(this);
+        web = new BgWebView(this);
         tabs.add(web);
         webBox.addView(web, 0, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         if (tv) {
@@ -235,7 +235,7 @@ public class BrowserActivity extends AppCompatActivity {
     private String lastEqWarn = "";
 
     private void buildEqFab() {
-        eqFab = UiKit.roundButton(this, "sliders-vertical", 50, true, v -> startActivity(new android.content.Intent(this, PowerEqActivity.class)));
+        eqFab = UiKit.roundButton(this, "sliders-vertical", 50, true, v -> eqSheet());
         eqFab.setContentDescription(T.t("Equalizer"));
         eqFab.setElevation(Ui.dp(this, 8));
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(Ui.dp(this, 50), Ui.dp(this, 50), Gravity.BOTTOM | Gravity.END);
@@ -258,6 +258,147 @@ public class BrowserActivity extends AppCompatActivity {
     private void injectMedia(WebView v) {
         v.evaluateJavascript(BrowserMedia.js(Store.getBool("b_bgplay", true)), null);
         v.evaluateJavascript(BrowserMedia.eqCall(), null);
+    }
+
+    // ---------------------------------------------------------------- equalizer panel over the page (video keeps playing)
+    private void eqSheet() {
+        final android.app.Dialog d = new android.app.Dialog(this);
+        d.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(Ui.dp(this, 12), Ui.dp(this, 10), Ui.dp(this, 12), Ui.dp(this, 14));
+        android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+        bg.setColor(0xF20B0B0F);
+        float rr = Ui.dp(this, 22);
+        bg.setCornerRadii(new float[]{rr, rr, rr, rr, 0, 0, 0, 0});
+        box.setBackground(bg);
+        // header: ON / OFF · preset · full equalizer
+        LinearLayout h = new LinearLayout(this);
+        h.setGravity(Gravity.CENTER_VERTICAL);
+        TextView t = Ui.text(this, 16, android.graphics.Color.WHITE, true);
+        t.setText(T.t("Equalizer"));
+        h.addView(t, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        final android.widget.Button on = new android.widget.Button(this);
+        on.setAllCaps(false);
+        on.setTextColor(android.graphics.Color.WHITE);
+        final Runnable paintOn = () -> {
+            on.setText(MusicFx.on() ? "ON" : "OFF");
+            on.setBackground(MusicFx.on() ? Ui.gradient(this, 16) : Ui.card(this, 0xFF2A2A33, 0, 16));
+        };
+        paintOn.run();
+        on.setOnClickListener(v -> {
+            MusicFx.setOn(!MusicFx.on());
+            paintOn.run();
+        });
+        h.addView(on, new LinearLayout.LayoutParams(Ui.dp(this, 64), Ui.dp(this, 36)));
+        final android.widget.Button pr = new android.widget.Button(this);
+        pr.setAllCaps(false);
+        pr.setTextColor(android.graphics.Color.WHITE);
+        pr.setText(MusicFx.presetLabel());
+        pr.setBackground(Ui.card(this, 0xFF24242C, 0, 16));
+        LinearLayout.LayoutParams pl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, Ui.dp(this, 36));
+        pl.setMargins(Ui.dp(this, 6), 0, Ui.dp(this, 6), 0);
+        h.addView(pr, pl);
+        h.addView(UiKit.darkButton(this, "maximize", 36, false, v -> {
+            d.dismiss();
+            startActivity(new android.content.Intent(this, PowerEqActivity.class));
+        }));
+        box.addView(h);
+        final PowerViews.EqCurveView curve = new PowerViews.EqCurveView(this);
+        LinearLayout.LayoutParams cl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(this, 80));
+        cl.setMargins(0, Ui.dp(this, 8), 0, Ui.dp(this, 6));
+        box.addView(curve, cl);
+        // preamp + 10 bands
+        final int[] cols = {0xFFEF4444, 0xFFF97316, 0xFFF59E0B, 0xFFEAB308, 0xFF84CC16, 0xFF22C55E, 0xFF14B8A6, 0xFF06B6D4, 0xFF3B82F6, 0xFF8B5CF6};
+        android.widget.HorizontalScrollView hs = new android.widget.HorizontalScrollView(this);
+        hs.setHorizontalScrollBarEnabled(false);
+        LinearLayout row = new LinearLayout(this);
+        hs.addView(row);
+        final List<PowerViews.GlowSlider> sliders = new ArrayList<>();
+        for (int i = -1; i < 10; i++) {
+            final int k = i;
+            LinearLayout col = new LinearLayout(this);
+            col.setOrientation(LinearLayout.VERTICAL);
+            col.setGravity(Gravity.CENTER_HORIZONTAL);
+            PowerViews.GlowSlider s = new PowerViews.GlowSlider(this, k < 0 ? -1200 : MusicFx.MIN, k < 0 ? 1200 : MusicFx.MAX, k < 0 ? 0xFFE5E7EB : cols[k]);
+            s.setValue(k < 0 ? MusicFx.preamp() : MusicFx.bands()[k]);
+            s.setContentDescription(k < 0 ? T.t("Preamp") : MusicFx.LABELS[k]);
+            s.setListener((v, done) -> {
+                if (k < 0) MusicFx.setPreamp(v);
+                else {
+                    int[] b = MusicFx.bands();
+                    b[k] = v;
+                    MusicFx.setBands(b);
+                    Store.putStr("mfx_user_cur", "");
+                    Store.putInt("mfx_preset", -1);
+                }
+                MusicFx.apply();            // → the page's sound changes at once
+                curve.invalidate();
+                pr.setText(MusicFx.presetLabel());
+            });
+            sliders.add(s);
+            col.addView(s, new LinearLayout.LayoutParams(Ui.dp(this, 40), Ui.dp(this, 160)));
+            TextView n = Ui.text(this, 11, android.graphics.Color.WHITE, true);
+            n.setText(k < 0 ? T.t("Pre") : MusicFx.LABELS[k]);
+            col.addView(n);
+            row.addView(col, new LinearLayout.LayoutParams(Ui.dp(this, 48), ViewGroup.LayoutParams.WRAP_CONTENT));
+        }
+        box.addView(hs);
+        // bass / treble
+        LinearLayout tone = new LinearLayout(this);
+        tone.setGravity(Gravity.CENTER);
+        tone.setPadding(0, Ui.dp(this, 8), 0, 0);
+        final PowerViews.Knob kb = new PowerViews.Knob(this, -100, 100, 0, 0xFFEF4444, true);
+        final PowerViews.Knob kt = new PowerViews.Knob(this, -100, 100, 0, 0xFF22C55E, true);
+        kb.setValue(MusicFx.bassTone());
+        kt.setValue(MusicFx.trebleTone());
+        kb.setContentDescription(T.t("Bass"));
+        kt.setContentDescription(T.t("Treble"));
+        PowerViews.OnValue tl = (v, done) -> {
+            MusicFx.setTone(kb.get(), kt.get());
+            MusicFx.apply();
+            curve.invalidate();
+        };
+        kb.setListener(tl);
+        kt.setListener(tl);
+        for (Object[] o : new Object[][]{{kb, T.t("Bass")}, {kt, T.t("Treble")}}) {
+            LinearLayout c = new LinearLayout(this);
+            c.setOrientation(LinearLayout.VERTICAL);
+            c.setGravity(Gravity.CENTER_HORIZONTAL);
+            c.addView((View) o[0], new LinearLayout.LayoutParams(Ui.dp(this, 76), Ui.dp(this, 76)));
+            TextView n = Ui.text(this, 12, android.graphics.Color.WHITE, true);
+            n.setText((String) o[1]);
+            c.addView(n);
+            tone.addView(c, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        }
+        box.addView(tone);
+        pr.setOnClickListener(v -> {
+            String[] names = new String[MusicFx.PRESETS.length];
+            for (int i = 0; i < names.length; i++) names[i] = T.t(MusicFx.PRESETS[i]);
+            new UiDialog(this).setTitle(T.t("Presets")).setItems(names, (dd, w) -> {
+                MusicFx.preset(w);
+                MusicFx.apply();
+                int[] b = MusicFx.bands();
+                for (int i = 0; i < 10; i++) sliders.get(i + 1).setValue(b[i]);
+                curve.invalidate();
+                pr.setText(MusicFx.presetLabel());
+            }).show();
+        });
+        if (lastEqWarn.equals(hosts.get(web))) {
+            TextView warn = Ui.text(this, 11, 0xFFFBBF24, false);
+            warn.setText(T.t("This site doesn't allow the equalizer on its video — it plays normally"));
+            warn.setPadding(0, Ui.dp(this, 8), 0, 0);
+            box.addView(warn);
+        }
+        d.setContentView(box);
+        android.view.Window w = d.getWindow();
+        if (w != null) {
+            w.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0));
+            w.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            w.setGravity(Gravity.BOTTOM);
+            w.clearFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND);   // keep watching the video
+        }
+        d.show();
     }
 
     // ---------------------------------------------------------------- fullscreen video: lock against mis-touches
@@ -289,7 +430,7 @@ public class BrowserActivity extends AppCompatActivity {
         lp.setMargins(Ui.dp(this, 20), Ui.dp(this, 24), 0, 0);
         root.addView(lockBtn, lp);
         ImageView eq = UiKit.darkButton(this, "sliders-vertical", 48, false, v -> {
-            if (!locked) startActivity(new android.content.Intent(this, PowerEqActivity.class));
+            if (!locked) eqSheet();
         });
         eq.setContentDescription(T.t("Equalizer"));
         FrameLayout.LayoutParams el = new FrameLayout.LayoutParams(Ui.dp(this, 48), Ui.dp(this, 48), Gravity.TOP | Gravity.END);
@@ -491,7 +632,7 @@ public class BrowserActivity extends AppCompatActivity {
     }
 
     private void newTab(String url) {
-        WebView w = new WebView(this);
+        WebView w = new BgWebView(this);
         configure(w);
         tabs.add(w);
         switchTo(w);
@@ -1281,6 +1422,15 @@ public class BrowserActivity extends AppCompatActivity {
                                 }
                             }).show();
                 }).show();
+    }
+
+    /** The browser is its own task now: a link sent while it is open arrives here → new tab. */
+    @Override
+    protected void onNewIntent(android.content.Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        String u = intent.getStringExtra(EXTRA_URL);
+        if (u != null && !u.isEmpty()) newTab(u);
     }
 
     // ---------- history & bookmarks manager ----------
