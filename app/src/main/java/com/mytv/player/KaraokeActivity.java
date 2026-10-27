@@ -377,7 +377,6 @@ public class KaraokeActivity extends AppCompatActivity {
                 final BufferedOutputStream o = new BufferedOutputStream(new FileOutputStream(pcm), 1 << 16);
                 final int[] fmt = {44100, 2};
                 final long[] count = {0};
-                AudioTools.cancel = false;   // a Cancel / close elsewhere must not abort this load
                 AudioTools.decode(this, uri, 0, 0, new AudioTools.PcmSink() {
                     public void format(int r, int ch) {
                         fmt[0] = r;

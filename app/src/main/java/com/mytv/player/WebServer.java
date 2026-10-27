@@ -497,6 +497,29 @@ public class WebServer extends NanoHTTPD {
                     return r;
                 }
 
+                case "/present": {
+                    // the phone sends a PDF to show full screen (it stays on the phone; the TV downloads it)
+                    final String pu = val(p, "url");
+                    if (pu.isEmpty()) return fail("No presentation");
+                    boolean started = false;
+                    if (App.visible == 0 && !Perms.overlayOk(ctx) && AdbClient.enabled() && PresentShowActivity.inst == null) {
+                        try {
+                            String o = AdbClient.shell(ctx, "am start -n " + ctx.getPackageName() + "/" + PresentShowActivity.class.getName()
+                                    + " --es url '" + pu.replace("'", "") + "' --es title '" + val(p, "title").replace("'", "") + "' 2>&1");
+                            started = o != null && !o.contains("Error");
+                        } catch (Exception ignored) {
+                        }
+                    }
+                    if (!started) PresentShowActivity.open(ctx, pu, val(p, "title"));
+                    return msg("Opening the presentation");
+                }
+
+                case "/presentcmd":
+                    return json(PresentShowActivity.cmd(val(p, "c"), val(p, "v"), val(p, "x"), val(p, "y")).toString());
+
+                case "/presentstate":
+                    return json(PresentShowActivity.state().toString());
+
                 case "/mirror": {
                     // a phone wants to cast its screen: open the full-screen receiver (it listens on 8091)
                     if (!MirrorActivity.open) {

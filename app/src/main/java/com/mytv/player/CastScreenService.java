@@ -162,6 +162,9 @@ public class CastScreenService extends Service {
         f.setInteger(MediaFormat.KEY_FRAME_RATE, 30);
         f.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1);
         f.setLong(MediaFormat.KEY_REPEAT_PREVIOUS_FRAME_AFTER, 100_000);   // still screen: keep sending
+        // 90 / 120 Hz phones would send up to 120 frames a second; receivers fall behind (seconds of delay).
+        // 60 is plenty for mirroring and saves Wi-Fi and battery.
+        if (Build.VERSION.SDK_INT >= 29) f.setFloat(MediaFormat.KEY_MAX_FPS_TO_ENCODER, 60f);
         if (Build.VERSION.SDK_INT >= 23) f.setInteger(MediaFormat.KEY_PRIORITY, 0);
         if (Build.VERSION.SDK_INT >= 30) f.setInteger(MediaFormat.KEY_LATENCY, 1);
         enc = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC);

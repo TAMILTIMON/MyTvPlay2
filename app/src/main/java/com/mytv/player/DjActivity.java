@@ -4,7 +4,6 @@ import android.graphics.Color;
 import android.media.AudioFormat;
 import android.media.AudioManager;
 import android.media.AudioTrack;
-import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -431,6 +430,10 @@ public class DjActivity extends AppCompatActivity {
     // ------------------------------------------------------------------ loading a song into a deck
     private void load(final int i) {
         final List<PhoneMedia.M> all = PhoneMedia.query(this, true);
+        if (all.isEmpty()) {
+            toast(T.t("No music found on this phone."));
+            return;
+        }
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
         box.setPadding(dp(16), dp(4), dp(16), 0);
@@ -462,36 +465,11 @@ public class DjActivity extends AppCompatActivity {
         lv.setAdapter(ad);
         box.addView(lv, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(380)));
         final AlertDialog d = new UiDialog(this).setTitle(T.t("Load deck") + " " + (i == 0 ? "A" : "B")).setView(box)
-                .setNeutralButton(T.t("Browse files…"), (x, w) -> {
-                    pendingDeck = i;
-                    Intent it = new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*");
-                    startActivityForResult(it, 71);   // any file: mp3, m4a, wav, flac, ogg, opus, wma, avi, mkv, mp4 …
-                })
                 .setNegativeButton(T.t("Cancel"), null).show();
         lv.setOnItemClickListener((pa, v, pos, id) -> {
             d.dismiss();
             decode(i, shown.get(pos));
         });
-        if (all.isEmpty()) toast(T.t("Allow access in Music first, or use Browse files…"));
-    }
-
-    private int pendingDeck = -1;
-
-    @Override
-    protected void onActivityResult(int req, int res, Intent data) {
-        super.onActivityResult(req, res, data);
-        if (req != 71 || res != RESULT_OK || data == null || data.getData() == null || pendingDeck < 0) return;
-        Uri u = data.getData();
-        PhoneMedia.M m = new PhoneMedia.M();
-        m.uri = u;
-        String n = LocalShare.displayName(this, u);
-        m.title = n == null ? "audio" : n;
-        m.sub = "";
-        m.folder = "";
-        m.dur = AudioTools.durationUs(this, u) / 1000;
-        int i = pendingDeck;
-        pendingDeck = -1;
-        decode(i, m);
     }
 
     private void decode(final int i, final PhoneMedia.M m) {
@@ -506,8 +484,7 @@ public class DjActivity extends AppCompatActivity {
             try {
                 File f = new File(getCacheDir(), "dj_deck" + i + "_" + System.nanoTime() + ".pcm");
                 final float[] peaks = new float[3000];
-                AudioTools.cancel = false;   // "Cancelled" came from a stale flag left by another screen
-                final long[] dur = {Math.max(1, AudioTools.durationUs(this, m.uri))};
+                final long dur = Math.max(1, AudioTools.durationUs(this, m.uri));
                 final int[] fmt = {44100, 2};
                 final long[] count = {0};
                 try (BufferedOutputStream o = new BufferedOutputStream(new FileOutputStream(f), 1 << 16)) {
@@ -515,10 +492,6 @@ public class DjActivity extends AppCompatActivity {
                         public void format(int r, int ch) {
                             fmt[0] = r;
                             fmt[1] = ch;
-                        }
-
-                        public void duration(long us) {
-                            if (us > 0) dur[0] = us;
                         }
 
                         public void pcm(short[] data, int n, long pts) throws Exception {
@@ -529,7 +502,7 @@ public class DjActivity extends AppCompatActivity {
                                 bb.putShort(l);
                                 bb.putShort(r);
                                 long t = (count[0] + k) * 1_000_000L / fmt[0];
-                                int col = (int) Math.min(peaks.length - 1, t * peaks.length / dur[0]);
+                                int col = (int) Math.min(peaks.length - 1, t * peaks.length / dur);
                                 float v = Math.max(Math.abs(l), Math.abs(r)) / 32768f;
                                 if (v > peaks[col]) peaks[col] = v;
                             }

@@ -89,14 +89,14 @@ public class ToolsActivity extends AppCompatActivity {
                         v -> startActivity(new Intent(this, DjActivity.class))),
                 UiKit.tile(this, "audio-waveform", T.t("Song editor"), T.t("tracks, cut, fades"), 0xFF10B981,
                         v -> startActivity(new Intent(this, EditorActivity.class))),
-                UiKit.tile(this, "film", T.t("Video → Audio"), T.t("Any video to MP3 / M4A"), 0xFF3B82F6, v -> pick(false, this::convert)),
+                UiKit.tile(this, "film", T.t("Video → Audio"), T.t("MP4 / MKV to M4A"), 0xFF3B82F6, v -> pick(false, this::convert)),
                 UiKit.tile(this, "scissors", T.t("Cutter"), T.t("trim with waveform"), 0xFF22C55E, v -> pick(true, this::cutter)),
                 UiKit.tile(this, "split", T.t("Splitter"), T.t("into parts"), 0xFFEAB308, v -> pick(true, this::splitter)),
                 UiKit.tile(this, "combine", T.t("Merger"), T.t("join songs"), 0xFF8B5CF6, v -> merger(new ArrayList<>())),
                 UiKit.tile(this, "mic-vocal", T.t("Karaoke master"), T.t("voice / music layers"), 0xFFEC4899, v -> pick(true, m -> startActivity(new Intent(this, KaraokeActivity.class)
                         .putExtra(KaraokeActivity.EXTRA_URI, m.uri.toString()).putExtra(KaraokeActivity.EXTRA_TITLE, m.title))))));
         TextView n = Ui.text(this, 12, Ui.DIM, false);
-        n.setText(T.t("Results are saved in Music / ZH Play and appear in Music → Folders. Video → Audio works with any video format and saves MP3 or M4A. MP3 stays MP3 when cutting, splitting or merging (no quality loss); other tools save M4A (AAC)."));
+        n.setText(T.t("Results are saved in Music / ZH Play and appear in Music → Folders. MP3 stays MP3 when cutting, splitting or merging (no quality loss); other results are M4A (AAC) — Android has no MP3 encoder."));
         n.setPadding(dp(4), dp(14), dp(4), 0);
         page.addView(n);
     }
@@ -147,7 +147,7 @@ public class ToolsActivity extends AppCompatActivity {
                     pending = cb;
                     Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
                             .setType(audio ? "audio/*" : "*/*");
-                    // no MIME filter for video: AVI / FLV / WMV / MPG / MKV … are often reported as application/octet-stream
+                    if (!audio) i.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"video/*", "audio/*"});
                     startActivityForResult(i, 61);
                 })
                 .setNegativeButton(T.t("Cancel"), null).create();
@@ -216,11 +216,7 @@ public class ToolsActivity extends AppCompatActivity {
 
     // ------------------------------------------------------------------ Video → Audio
     private void convert(final PhoneMedia.M m) {
-        new UiDialog(this).setTitle(T.t("Save the sound as"))
-                .setMessage(m.title + "\n\n" + T.t("MP3 plays everywhere. M4A (AAC) keeps the original quality when the video already has AAC sound."))
-                .setPositiveButton("MP3", (x, w) -> run(T.t("Video → Audio") + " (MP3)", p -> AudioTools.toAudio(this, m.uri, m.title, true, p)))
-                .setNeutralButton("M4A", (x, w) -> run(T.t("Video → Audio") + " (M4A)", p -> AudioTools.toAudio(this, m.uri, m.title, false, p)))
-                .setNegativeButton(T.t("Cancel"), null).show();
+        run(T.t("Video → Audio"), p -> AudioTools.toAudio(this, m.uri, m.title, p));
     }
 
     private WaveView newWave(final PhoneMedia.M m, boolean markers) {

@@ -727,6 +727,8 @@ public class NativeRemoteActivity extends AppCompatActivity {
         p.addView(UiKit.grid(this, 3,
                 UiKit.tile(this, "sparkles", T.t("AI assistant"), T.t("Tamil · English · Tanglish"), 0xFF8B5CF6, v -> openAi()),
                 UiKit.tile(this, "monitor", T.t("Cast screen"), T.t("show this phone on the TV"), 0xFF0EA5E9, v -> castScreen()),
+                UiKit.tile(this, "presentation", T.t("Present"), T.t("PDF slides, clicker, laser"), 0xFF6366F1,
+                        v -> startActivity(new Intent(this, PresentActivity.class).putExtra(PresentActivity.EXTRA_IP, ip))),
                 UiKit.tile(this, "disc-3", T.t("DJ mixer"), T.t("two decks, sync, EQ"), 0xFFF59E0B,
                         v -> startActivity(new Intent(this, DjActivity.class))),
                 UiKit.tile(this, "scissors", T.t("Song editor"), T.t("tracks, cut, fades"), 0xFF10B981,

@@ -278,7 +278,6 @@ public class EditorActivity extends AppCompatActivity {
                 final long[] count = {0};
                 try (BufferedOutputStream o = new BufferedOutputStream(new FileOutputStream(f), 1 << 16)) {
                     final PcmFx.Resampler[] rs = new PcmFx.Resampler[1];
-                    AudioTools.cancel = false;   // a Cancel / close elsewhere must not abort this load
                     AudioTools.decode(this, m.uri, 0, 0, new AudioTools.PcmSink() {
                         public void format(int r, int ch) {
                             rs[0] = new PcmFx.Resampler(r, ch, R44, 2);

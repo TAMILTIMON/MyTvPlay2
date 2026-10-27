@@ -119,6 +119,18 @@
             android:exported="false" />
 
         <activity
+            android:name=".PresentActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
+        <activity
+            android:name=".PresentShowActivity"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:theme="@style/PlayerTheme" />
+
+        <activity
             android:name=".MirrorActivity"
             android:exported="false"
             android:configChanges="orientation|screenSize|keyboardHidden"
@@ -191,6 +203,9 @@
             android:name=".BrowserActivity"
             android:configChanges="orientation|screenSize|keyboardHidden|keyboard|navigation|screenLayout|uiMode"
             android:exported="false"
+            android:label="ZH Play Browser"
+            android:launchMode="singleTask"
+            android:taskAffinity="com.tamil.castplay.browser"
             android:windowSoftInputMode="adjustResize" />
 
         <activity

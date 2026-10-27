@@ -247,57 +247,9 @@ public final class MusicLib {
     public static List<PhoneMedia.M> resolve(List<String> uris, List<PhoneMedia.M> all) {
         Map<String, PhoneMedia.M> by = new HashMap<>();
         for (PhoneMedia.M m : all) by.put(m.uri.toString(), m);
-        JSONObject remote = null;
         List<PhoneMedia.M> out = new ArrayList<>();
-        for (String u : uris) {
-            if (by.containsKey(u)) out.add(by.get(u));
-            else if (u.startsWith("http://") || u.startsWith("https://")) {   // song / station from an imported M3U link
-                if (remote == null) remote = remoteAll();
-                out.add(remoteSong(u, remote.optJSONObject(u)));
-            }
-        }
+        for (String u : uris) if (by.containsKey(u)) out.add(by.get(u));
         return out;
-    }
-
-    // ------------------------------------------------------------------ online songs (from M3U links)
-    private static JSONObject remoteAll() {
-        try {
-            return new JSONObject(Store.getStr(Store.pk("m_remote"), "{}"));
-        } catch (Exception e) {
-            return new JSONObject();
-        }
-    }
-
-    private static PhoneMedia.M remoteSong(String url, JSONObject meta) {
-        PhoneMedia.M m = new PhoneMedia.M();
-        m.uri = Uri.parse(url);
-        String t = meta == null ? "" : meta.optString("t", "");
-        if (t.isEmpty()) {
-            String p = m.uri.getLastPathSegment();
-            t = p == null || p.isEmpty() ? (m.uri.getHost() == null ? url : m.uri.getHost()) : p;
-        }
-        m.title = t;
-        m.dur = meta == null ? 0 : meta.optLong("d", 0) * 1000L;
-        m.sub = T.t("Online") + (m.uri.getHost() == null ? "" : " · " + m.uri.getHost());
-        m.folder = T.t("Online");
-        m.id = -Math.abs(url.hashCode());
-        applyEdits(m);
-        return m;
-    }
-
-    /** Remembers titles / lengths of online songs so the playlist shows names instead of web addresses. */
-    public static synchronized void saveRemote(List<M3u.Entry> items) {
-        JSONObject o = remoteAll();
-        try {
-            for (M3u.Entry e : items) {
-                JSONObject j = new JSONObject();
-                if (e.title != null) j.put("t", e.title);
-                if (e.durSec > 0) j.put("d", e.durSec);
-                o.put(e.url, j);
-            }
-        } catch (Exception ignored) {
-        }
-        Store.putStr(Store.pk("m_remote"), o.toString());
     }
 
     // ------------------------------------------------------------------ lyrics (LRCLIB, free; saved for offline)

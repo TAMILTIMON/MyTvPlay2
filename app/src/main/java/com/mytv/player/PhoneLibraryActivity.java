@@ -1,7 +1,5 @@
 package com.mytv.player;
 
-import android.net.Uri;
-import android.content.Intent;
 import android.Manifest;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -324,9 +322,6 @@ public class PhoneLibraryActivity extends AppCompatActivity {
                 PhoneMedia.M add = PhoneMedia.group("+new", "＋ " + T.t("New playlist"), new ArrayList<PhoneMedia.M>());
                 add.sub = T.t("tap to create");
                 shown.add(add);
-                PhoneMedia.M imp = PhoneMedia.group("+m3u", "🔗 " + T.t("Import M3U link"), new ArrayList<PhoneMedia.M>());
-                imp.sub = T.t("playlist from a web link");
-                shown.add(imp);
                 hint = T.t("hold a playlist for more");
             } else {
                 for (PhoneMedia.M m : MusicLib.resolve(MusicLib.songs(plName), all)) if (match(m)) shown.add(m);
@@ -609,7 +604,7 @@ public class PhoneLibraryActivity extends AppCompatActivity {
 
     /** Hold an album / artist / genre / folder / playlist card. */
     private void groupMenu(final PhoneMedia.M g) {
-        if ("+new".equals(g.groupKey) || "+m3u".equals(g.groupKey)) return;
+        if ("+new".equals(g.groupKey)) return;
         final List<PhoneMedia.M> songs = tab == 5 ? MusicLib.resolve(MusicLib.songs(g.groupKey), all)
                 : MusicLib.group(all, tab - 1).get(g.groupKey);
         final boolean own = tab == 5 && MusicLib.playlistNames().contains(g.groupKey);
@@ -695,32 +690,10 @@ public class PhoneLibraryActivity extends AppCompatActivity {
         });
     }
 
-    @Override
-    protected void onActivityResult(int req, int res, Intent data) {
-        super.onActivityResult(req, res, data);
-        if (req != 81 || res != RESULT_OK || data == null || data.getData() == null) return;
-        Uri u = data.getData();
-        MusicDialogs.importM3uFile(this, u, LocalShare.displayName(this, u), n -> {
-            tab = 5;
-            plName = n;
-            apply();
-        });
-    }
-
     // ------------------------------------------------------------------ actions
     private void open(int pos) {
         PhoneMedia.M g = shown.get(pos);
         if (audio && g.groupKey != null) {
-            if ("+m3u".equals(g.groupKey)) {
-                MusicDialogs.importM3u(this, () -> {
-                    Intent it = new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*");
-                    startActivityForResult(it, 81);   // .m3u / .m3u8 / .pls (phones often label them as "other")
-                }, n -> {
-                    plName = n;
-                    apply();
-                });
-                return;
-            }
             if ("+new".equals(g.groupKey)) {
                 MusicDialogs.newPlaylist(this, n -> {
                     plName = n;

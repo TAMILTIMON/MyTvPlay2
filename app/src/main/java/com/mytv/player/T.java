@@ -35,6 +35,38 @@ public final class T {
     }
 
     static {
+        TA.put("Present", "வழங்கு");
+        HI.put("Present", "प्रेज़ेंट");
+        TA.put("PDF slides, clicker, laser", "PDF ஸ்லைடுகள், கிளிக்கர், லேசர்");
+        HI.put("PDF slides, clicker, laser", "PDF स्लाइड, क्लिकर, लेज़र");
+        TA.put("Previous", "முந்தையது");
+        HI.put("Previous", "पिछला");
+        TA.put("Next", "அடுத்து");
+        HI.put("Next", "अगला");
+        TA.put("Blank screen", "வெற்றுத் திரை");
+        HI.put("Blank screen", "खाली स्क्रीन");
+        TA.put("First slide", "முதல் ஸ்லைடு");
+        HI.put("First slide", "पहली स्लाइड");
+        TA.put("Other PDF", "வேறு PDF");
+        HI.put("Other PDF", "दूसरी PDF");
+        TA.put("End", "முடி");
+        HI.put("End", "समाप्त");
+        TA.put("slides", "ஸ்லைடுகள்");
+        HI.put("slides", "स्लाइड");
+        TA.put("Slide", "ஸ்லைடு");
+        HI.put("Slide", "स्लाइड");
+        TA.put("Opening the presentation…", "விளக்கக்காட்சியைத் திறக்கிறது…");
+        HI.put("Opening the presentation…", "प्रेज़ेंटेशन खुल रहा है…");
+        TA.put("Can't open this PDF", "இந்த PDF-ஐத் திறக்க முடியவில்லை");
+        HI.put("Can't open this PDF", "यह PDF नहीं खुल रही");
+        TA.put("Opening on the TV…", "டிவியில் திறக்கிறது…");
+        HI.put("Opening on the TV…", "टीवी पर खुल रहा है…");
+        TA.put("On the TV — ", "டிவியில் — ");
+        HI.put("On the TV — ", "टीवी पर — ");
+        TA.put("Drag on the slide = red laser dot on the TV · volume keys = next / previous", "ஸ்லைடில் இழுக்கவும் = டிவியில் சிவப்பு லேசர் · ஒலி பொத்தான்கள் = அடுத்து / முந்தையது");
+        HI.put("Drag on the slide = red laser dot on the TV · volume keys = next / previous", "स्लाइड पर खींचें = टीवी पर लाल लेज़र · वॉल्यूम बटन = अगला / पिछला");
+        TA.put("Choose a PDF. PowerPoint / Google Slides: Share or Save as PDF first.", "ஒரு PDF-ஐத் தேர்ந்தெடுக்கவும். PowerPoint / Google Slides: முதலில் PDF ஆக சேமிக்கவும்.");
+        HI.put("Choose a PDF. PowerPoint / Google Slides: Share or Save as PDF first.", "एक PDF चुनें। PowerPoint / Google Slides: पहले PDF के रूप में सेव करें।");
         TA.put("DJ mixer", "DJ மிக்சர்");
         HI.put("DJ mixer", "DJ मिक्सर");
         TA.put("two decks, sync, EQ", "இரண்டு டெக், ஒத்திசைவு, EQ");

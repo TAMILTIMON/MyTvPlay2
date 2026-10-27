@@ -1,7 +1,6 @@
 package com.mytv.player;
 
 import android.app.Activity;
-import android.net.Uri;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
@@ -132,105 +131,6 @@ public final class MusicDialogs {
                     if (MusicLib.create(n)) done.on(n);
                     else toast(a, T.t("That name is empty or already used"));
                 }).setNegativeButton(T.t("Cancel"), null).show();
-    }
-
-    /** "Import M3U link": downloads the playlist, makes a new playlist of it and reports its name. */
-    public static void importM3u(final Activity a, final Runnable pickFile, final Named done) {
-        LinearLayout box = new LinearLayout(a);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(Ui.dp(a, 22), Ui.dp(a, 6), Ui.dp(a, 22), 0);
-        final EditText link = field(a, box, T.t("M3U / M3U8 link"), "");
-        link.setSingleLine(true);
-        link.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_URI);
-        final EditText nm = field(a, box, T.t("Playlist name (optional)"), "");
-        try {   // a copied link is filled in for you
-            android.content.ClipboardManager cm = (android.content.ClipboardManager) a.getSystemService(Activity.CLIPBOARD_SERVICE);
-            if (cm != null && cm.hasPrimaryClip() && cm.getPrimaryClip().getItemCount() > 0) {
-                CharSequence c = cm.getPrimaryClip().getItemAt(0).getText();
-                if (c != null && c.toString().trim().toLowerCase().startsWith("http")) link.setText(c.toString().trim());
-            }
-        } catch (Exception ignored) {
-        }
-        new UiDialog(a).setTitle(T.t("Import M3U link")).setView(box)
-                .setPositiveButton(T.t("Import"), (d, w) -> {
-                    String u = link.getText().toString().trim();
-                    if (!u.toLowerCase().startsWith("http://") && !u.toLowerCase().startsWith("https://")) {
-                        toast(a, T.t("Paste a web link that starts with http:// or https://"));
-                        return;
-                    }
-                    runImport(a, u, nm.getText().toString().trim(), done);
-                })
-                .setNeutralButton(T.t("Choose file…"), (d, w) -> pickFile.run())
-                .setNegativeButton(T.t("Cancel"), null).show();
-    }
-
-    private static void runImport(final Activity a, final String url, final String wanted, final Named done) {
-        toast(a, T.t("Loading the playlist…"));
-        new Thread(() -> {
-            try {
-                String link = M3u.rawLink(url);
-                String text = Net.fetchText(link);
-                if (text.trim().toLowerCase().startsWith("<!doctype html") || text.trim().toLowerCase().startsWith("<html"))
-                    throw new Exception(T.t("This link is a web page, not a playlist file"));
-                finish(a, M3u.parse(text, link), wanted, nameFromUrl(link), done);
-            } catch (Throwable e) {
-                failed(a, e);
-            }
-        }).start();
-    }
-
-    /** Import from a .m3u / .m3u8 / .pls file chosen on the phone (`fileName` is used for the playlist name). */
-    public static void importM3uFile(final Activity a, final android.net.Uri file, final String fileName, final Named done) {
-        toast(a, T.t("Loading the playlist…"));
-        new Thread(() -> {
-            try {
-                String text = new String(AudioTools.readAll(a, file), "UTF-8");
-                String base = fileName == null ? "" : fileName.replaceAll("(?i)\\.(m3u8?|pls)$", "").replace('_', ' ').trim();
-                finish(a, M3u.parse(text, null), "", base.isEmpty() ? T.t("M3U playlist") : base, done);
-            } catch (Throwable e) {
-                failed(a, e);
-            }
-        }).start();
-    }
-
-    private static void failed(Activity a, Throwable e) {
-        final String msg = "⚠ " + (e.getMessage() == null ? String.valueOf(e) : e.getMessage());
-        a.runOnUiThread(() -> toast(a, msg));
-    }
-
-    private static void finish(final Activity a, M3u.Result r, String wanted, String fallbackName, final Named done) throws Exception {
-        if (r.items.isEmpty()) throw new Exception(T.t("No songs found in this link"));
-        String base = !wanted.isEmpty() ? wanted : r.name != null && !r.name.isEmpty() ? r.name : fallbackName;
-        String name = base;
-        for (int n = 2; !MusicLib.create(name); n++) {
-            if (n > 99) throw new Exception(T.t("That name is empty or already used"));
-            name = base + " (" + n + ")";
-        }
-        MusicLib.saveRemote(r.items);
-        List<String> uris = new ArrayList<>();
-        for (M3u.Entry e : r.items) uris.add(e.url);
-        MusicLib.add(name, uris);
-        final String made = name;
-        final String msg = T.t("Playlist created") + ": " + name + " (" + r.items.size() + ")"
-                + (r.skipped > 0 ? " · " + r.skipped + " " + T.t("skipped (not web links)") : "");
-        a.runOnUiThread(() -> {
-            toast(a, msg);
-            done.on(made);
-        });
-    }
-
-    private static String nameFromUrl(String url) {
-        try {
-            Uri u = Uri.parse(url);
-            String seg = u.getLastPathSegment();
-            if (seg != null) {
-                seg = seg.replaceAll("(?i)\\.(m3u8?|pls)$", "").replace('_', ' ').replace('-', ' ').trim();
-                if (!seg.isEmpty() && !seg.equalsIgnoreCase("playlist") && !seg.equalsIgnoreCase("index")) return seg;
-            }
-            if (u.getHost() != null) return u.getHost();
-        } catch (Exception ignored) {
-        }
-        return T.t("M3U playlist");
     }
 
     private static View pad(Activity a, View v) {
