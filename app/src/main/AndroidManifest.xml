@@ -191,9 +191,6 @@
             android:name=".BrowserActivity"
             android:configChanges="orientation|screenSize|keyboardHidden|keyboard|navigation|screenLayout|uiMode"
             android:exported="false"
-            android:label="ZH Play Browser"
-            android:launchMode="singleTask"
-            android:taskAffinity="com.tamil.castplay.browser"
             android:windowSoftInputMode="adjustResize" />
 
         <activity

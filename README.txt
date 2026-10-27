@@ -1,15 +1,3 @@
-ZH PLAY 3.9.1 — browser background play really works
-====================================================
-* Videos / songs in the browser keep playing when you switch apps, lock the screen or
-  open another screen: Android's web engine paused video whenever its window was hidden —
-  the browser view now stays "visible" to the engine while Background play is on.
-* The browser no longer disappears when you come back through the ZH Play icon: it now
-  runs as its own task (shown separately in Recents as "ZH Play Browser"). Links sent to
-  an open browser open in a new tab.
-* EQ in the browser opens as a panel over the page (ON/OFF, presets, preamp + 10 bands,
-  bass / treble, curve) — the video stays on screen and keeps playing; changes are heard
-  live. "Full screen" button opens the complete equalizer.
-
 ZH PLAY 3.9 — DJ mixer, song editor, screen cast to the TV
 =========================================================
 DJ mixer (phone: board tile "DJ mixer", or Features)
@@ -87,7 +75,7 @@ Features menu (✨ button in Music, ⋮ in Now playing, board tile "Features")
 * Karaoke maker: removes the centre vocal, keeps panned instruments and (optionally)
   bass & drums; strength 0–100 %; 30 s preview.
 * MP3 stays MP3 for cut / split / merge (frame-exact, no quality loss, correct length
-  header). Other results are M4A (AAC) — Android has no MP3 encoder.
+  header). Other results are M4A (AAC). Video → Audio accepts ANY video format and can save MP3 (built-in LAME encoder, LGPL, app/src/main/java/net/sourceforge/lame) or M4A; formats Android can't open itself (AVI, FLV, WMV, MPG …) are decoded through the bundled VLC engine.
 * Results are saved in Music / ZH Play (appear in Music → Folders).
 
 ZH PLAY 3.5 — complete music player (phone)
@@ -726,3 +714,5 @@ IF THE BUILD FAILS WITH "Could not find org.videolan.android:libvlc-all:3.6.2"
 Add to the tv-detox home screen:
    adb shell am start -n com.ansub.tvhome/.MainActivity --es apps org.videolan.vlc,in.startv.hotstar,com.netflix.ninja,com.mxtech.videoplayer.ad,com.mxtech.videoplayer.television,com.tamil.castplay
 To remove the app:  adb uninstall com.tamil.castplay
+
+Music on this phone → Playlists → "Import M3U link": paste an .m3u / .m3u8 / .pls web link to create a playlist of its songs or stations (online songs play with the phone player).

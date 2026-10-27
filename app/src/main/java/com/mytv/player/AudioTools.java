@@ -86,7 +86,18 @@ public final class AudioTools {
             int t = audioTrack(ex);
             long d = t >= 0 && ex.getTrackFormat(t).containsKey(MediaFormat.KEY_DURATION) ? ex.getTrackFormat(t).getLong(MediaFormat.KEY_DURATION) : 0;
             ex.release();
-            return d;
+            if (d > 0) return d;
+        } catch (Exception ignored) {
+        }
+        try {   // containers MediaExtractor can't open (AVI, FLV, WMV …)
+            android.media.MediaMetadataRetriever mr = new android.media.MediaMetadataRetriever();
+            try {
+                mr.setDataSource(c, u);
+                String v = mr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION);
+                return v == null ? 0 : Long.parseLong(v) * 1000L;
+            } finally {
+                mr.release();
+            }
         } catch (Exception e) {
             return 0;
         }
@@ -98,10 +109,100 @@ public final class AudioTools {
         void format(int rate, int ch) throws Exception;
 
         void pcm(short[] data, int frames, long ptsUs) throws Exception;
+
+        /** total length in µs, when known (called once before the first pcm()) */
+        default void duration(long us) {
+        }
     }
 
     /** Decodes the audio of `u` from startUs to endUs (endUs ≤ 0 = to the end) into the sink. */
-    public static void decode(Context c, Uri u, long startUs, long endUs, PcmSink sink, Progress p) throws Exception {
+    public static void decode(Context c, final Uri u, long startUs, long endUs, final PcmSink sink, final Progress p) throws Exception {
+        final boolean[] started = {false};
+        PcmSink watch = new PcmSink() {
+            public void format(int r, int ch) throws Exception {
+                sink.format(r, ch);
+            }
+
+            public void pcm(short[] d, int n, long pts) throws Exception {
+                started[0] = true;
+                sink.pcm(d, n, pts);
+            }
+
+            public void duration(long us) {
+                sink.duration(us);
+            }
+        };
+        try {
+            decodeNative(c, u, startUs, endUs, watch, p);
+        } catch (Exception e) {
+            // Android can't read this container / codec (AVI, FLV, WMV, MPG, AC3, DTS, WMA …): let VLC turn it into WAV
+            if (started[0] || cancel || !VlcWav.available()) throw e;
+            File wav = VlcWav.toWav(c, u, p);
+            try {
+                decodeWav(wav, startUs, endUs, watch, p == null ? null : (f, w) -> p.on(0.5f + f * 0.5f, w));
+            } finally {
+                //noinspection ResultOfMethodCallIgnored
+                wav.delete();
+            }
+        }
+    }
+
+    /** Reads a 16-bit PCM WAV file (what VLC writes) into the sink. */
+    static void decodeWav(File f, long startUs, long endUs, PcmSink sink, Progress p) throws Exception {
+        try (java.io.RandomAccessFile r = new java.io.RandomAccessFile(f, "r")) {
+            byte[] h = new byte[12];
+            r.readFully(h);
+            int rate = 44100, ch = 2, bits = 16;
+            long dataStart = -1, dataLen = 0;
+            while (r.getFilePointer() + 8 <= r.length()) {
+                byte[] ck = new byte[8];
+                r.readFully(ck);
+                String id = new String(ck, 0, 4, "US-ASCII");
+                long len = (ck[4] & 0xFFL) | (ck[5] & 0xFFL) << 8 | (ck[6] & 0xFFL) << 16 | (ck[7] & 0xFFL) << 24;
+                if (id.equals("fmt ")) {
+                    byte[] b = new byte[(int) Math.min(len, 64)];
+                    r.readFully(b);
+                    ch = (b[2] & 0xFF) | (b[3] & 0xFF) << 8;
+                    rate = (b[4] & 0xFF) | (b[5] & 0xFF) << 8 | (b[6] & 0xFF) << 16 | (b[7] & 0xFF) << 24;
+                    bits = (b[14] & 0xFF) | (b[15] & 0xFF) << 8;
+                    long skip = len - b.length + (len & 1);
+                    if (skip > 0) r.seek(r.getFilePointer() + skip);
+                } else if (id.equals("data")) {
+                    dataStart = r.getFilePointer();
+                    long avail = r.length() - dataStart;
+                    dataLen = (len == 0 || len > avail) ? avail : len;   // streamed WAV: size field may be 0 / 0xFFFFFFFF
+                    break;
+                } else {
+                    r.seek(r.getFilePointer() + len + (len & 1));
+                }
+            }
+            if (dataStart < 0 || bits != 16 || ch < 1) throw new Exception(T.t("This file has no sound track"));
+            long totalFrames = dataLen / (2L * ch);
+            long totalUs = totalFrames * 1_000_000L / rate;
+            if (endUs <= 0 || endUs > totalUs) endUs = totalUs;
+            sink.format(rate, ch);
+            sink.duration(totalUs);
+            long frame = Math.min(totalFrames, startUs * rate / 1_000_000L);
+            long endFrame = Math.min(totalFrames, endUs * rate / 1_000_000L);
+            long span = Math.max(1, endFrame - frame);
+            long first = frame;
+            r.seek(dataStart + frame * 2L * ch);
+            final int CH = 16384;
+            byte[] raw = new byte[CH * 2 * ch];
+            while (frame < endFrame) {
+                if (cancel) throw new Exception(T.t("Cancelled"));
+                int n = (int) Math.min(CH, endFrame - frame);
+                r.readFully(raw, 0, n * 2 * ch);
+                short[] s = new short[n * ch];
+                java.nio.ByteBuffer.wrap(raw, 0, n * 2 * ch).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().get(s);
+                sink.pcm(s, n, frame * 1_000_000L / rate);
+                frame += n;
+                if (p != null) p.on(Math.min(1f, (frame - first) / (float) span), "");
+            }
+        }
+    }
+
+    private static void decodeNative(Context c, Uri u, long startUs, long endUs, PcmSink sink, Progress p) throws Exception {
         MediaExtractor ex = open(c, u);
         int t = audioTrack(ex);
         if (t < 0) {
@@ -113,11 +214,18 @@ public final class AudioTools {
         long dur = fmt.containsKey(MediaFormat.KEY_DURATION) ? fmt.getLong(MediaFormat.KEY_DURATION) : 0;
         if (endUs <= 0 || (dur > 0 && endUs > dur)) endUs = dur > 0 ? dur : Long.MAX_VALUE;
         if (startUs > 0) ex.seekTo(startUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC);
-        MediaCodec dec = MediaCodec.createDecoderByType(fmt.getString(MediaFormat.KEY_MIME));
-        dec.configure(fmt, null, null, 0);
-        dec.start();
+        MediaCodec dec;
+        try {
+            dec = MediaCodec.createDecoderByType(fmt.getString(MediaFormat.KEY_MIME));
+            dec.configure(fmt, null, null, 0);
+            dec.start();
+        } catch (Exception e) {
+            ex.release();
+            throw e;
+        }
         int rate = fmt.getInteger(MediaFormat.KEY_SAMPLE_RATE), ch = fmt.getInteger(MediaFormat.KEY_CHANNEL_COUNT);
         sink.format(rate, ch);
+        if (dur > 0) sink.duration(dur);
         MediaCodec.BufferInfo bi = new MediaCodec.BufferInfo();
         boolean inEos = false, outEos = false;
         long span = Math.max(1, endUs - startUs);
@@ -447,16 +555,76 @@ public final class AudioTools {
         }
     }
 
-    /** Video → audio (AAC copied without loss when possible). */
+    /** Video / audio → M4A (AAC copied without loss when possible). */
     public static String toAudio(Context c, Uri u, String name, Progress p) throws Exception {
+        return toAudio(c, u, name, false, p);
+    }
+
+    /** Any video or audio file → MP3 (mp3 = true) or M4A. Containers Android can't read go through VLC. */
+    public static String toAudio(Context c, Uri u, String name, boolean mp3, Progress p) throws Exception {
         cancel = false;
+        if (mp3) {
+            if (isMp3(c, u, name)) {   // already MP3 → plain copy, no quality loss
+                File out = temp(c, ".mp3");
+                try (InputStream in = c.getContentResolver().openInputStream(u); OutputStream o = new FileOutputStream(out)) {
+                    if (in == null) throw new Exception("Can't open the file");
+                    byte[] b = new byte[65536];
+                    int n;
+                    while ((n = in.read(b)) > 0) o.write(b, 0, n);
+                }
+                return publish(c, out, safe(name) + ".mp3");
+            }
+            return publish(c, transcodeMp3(c, u, p), safe(name) + ".mp3");
+        }
         File out = temp(c, ".m4a");
-        if (!remuxAac(c, u, 0, 0, out, p)) {
+        boolean ok;
+        try {
+            ok = remuxAac(c, u, 0, 0, out, p);
+        } catch (Exception e) {
+            if (cancel) throw e;
+            ok = false;   // not readable by Android → decode path (VLC fallback)
+        }
+        if (!ok) {
             //noinspection ResultOfMethodCallIgnored
             out.delete();
             out = transcode(c, u, 0, 0, null, 0, false, 0, 0, p);
         }
         return publish(c, out, safe(name) + ".m4a");
+    }
+
+    /** Decodes everything (any format) and writes a 192 kbit/s MP3. */
+    private static File transcodeMp3(Context c, Uri u, Progress p) throws Exception {
+        final File out = temp(c, ".mp3");
+        final Mp3Enc[] w = new Mp3Enc[1];
+        try {
+            decode(c, u, 0, 0, new PcmSink() {
+                int ch;
+
+                public void format(int r, int cc) throws Exception {
+                    if (w[0] != null) return;
+                    ch = cc;
+                    w[0] = new Mp3Enc(out, r, Math.min(2, cc), 192);
+                }
+
+                public void pcm(short[] d, int frames, long pts) throws Exception {
+                    short[] s = d;
+                    int oc = w[0].channels();
+                    if (ch != oc) {   // >2 channels → first two
+                        s = new short[frames * oc];
+                        for (int i = 0; i < frames; i++) for (int k = 0; k < oc; k++) s[i * oc + k] = d[i * ch + Math.min(k, ch - 1)];
+                    }
+                    w[0].write(s, frames);
+                }
+            }, p);
+            if (w[0] == null) throw new Exception(T.t("No sound found"));
+            w[0].finish();
+            return out;
+        } catch (Exception e) {
+            if (w[0] != null) w[0].close();
+            //noinspection ResultOfMethodCallIgnored
+            out.delete();
+            throw e;
+        }
     }
 
     /** Cut one part. MP3 → MP3 (lossless), AAC → M4A (lossless) unless fades are wanted. */

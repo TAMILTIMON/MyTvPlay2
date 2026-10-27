@@ -120,6 +120,7 @@ public final class PhoneMedia {
     @SuppressWarnings("deprecation")
     public static Bitmap art(Context c, M m, boolean audio) {
         String k = m.uri.toString();
+        if (k.startsWith("http://") || k.startsWith("https://")) return null;   // online song: no cover lookup
         Bitmap b = ART.get(k);
         if (b != null || NONE.containsKey(k)) return b;
         try {
