@@ -135,7 +135,7 @@ public final class MusicDialogs {
     }
 
     /** "Import M3U link": downloads the playlist, makes a new playlist of it and reports its name. */
-    public static void importM3u(final Activity a, final Named done) {
+    public static void importM3u(final Activity a, final Runnable pickFile, final Named done) {
         LinearLayout box = new LinearLayout(a);
         box.setOrientation(LinearLayout.VERTICAL);
         box.setPadding(Ui.dp(a, 22), Ui.dp(a, 6), Ui.dp(a, 22), 0);
@@ -159,39 +159,64 @@ public final class MusicDialogs {
                         return;
                     }
                     runImport(a, u, nm.getText().toString().trim(), done);
-                }).setNegativeButton(T.t("Cancel"), null).show();
+                })
+                .setNeutralButton(T.t("Choose file…"), (d, w) -> pickFile.run())
+                .setNegativeButton(T.t("Cancel"), null).show();
     }
 
     private static void runImport(final Activity a, final String url, final String wanted, final Named done) {
         toast(a, T.t("Loading the playlist…"));
         new Thread(() -> {
-            String msg;
-            String made = null;
             try {
-                M3u.Result r = M3u.parse(Net.fetchText(url), url);
-                if (r.items.isEmpty()) throw new Exception(T.t("No songs found in this link"));
-                String base = !wanted.isEmpty() ? wanted : r.name != null && !r.name.isEmpty() ? r.name : nameFromUrl(url);
-                String name = base;
-                for (int n = 2; !MusicLib.create(name); n++) {
-                    if (n > 99) throw new Exception(T.t("That name is empty or already used"));
-                    name = base + " (" + n + ")";
-                }
-                MusicLib.saveRemote(r.items);
-                List<String> uris = new ArrayList<>();
-                for (M3u.Entry e : r.items) uris.add(e.url);
-                MusicLib.add(name, uris);
-                made = name;
-                msg = T.t("Playlist created") + ": " + name + " (" + r.items.size() + ")"
-                        + (r.skipped > 0 ? " · " + r.skipped + " " + T.t("skipped (not web links)") : "");
+                String link = M3u.rawLink(url);
+                String text = Net.fetchText(link);
+                if (text.trim().toLowerCase().startsWith("<!doctype html") || text.trim().toLowerCase().startsWith("<html"))
+                    throw new Exception(T.t("This link is a web page, not a playlist file"));
+                finish(a, M3u.parse(text, link), wanted, nameFromUrl(link), done);
             } catch (Throwable e) {
-                msg = "⚠ " + (e.getMessage() == null ? String.valueOf(e) : e.getMessage());
+                failed(a, e);
             }
-            final String fm = msg, fn = made;
-            a.runOnUiThread(() -> {
-                toast(a, fm);
-                if (fn != null) done.on(fn);
-            });
         }).start();
+    }
+
+    /** Import from a .m3u / .m3u8 / .pls file chosen on the phone (`fileName` is used for the playlist name). */
+    public static void importM3uFile(final Activity a, final android.net.Uri file, final String fileName, final Named done) {
+        toast(a, T.t("Loading the playlist…"));
+        new Thread(() -> {
+            try {
+                String text = new String(AudioTools.readAll(a, file), "UTF-8");
+                String base = fileName == null ? "" : fileName.replaceAll("(?i)\\.(m3u8?|pls)$", "").replace('_', ' ').trim();
+                finish(a, M3u.parse(text, null), "", base.isEmpty() ? T.t("M3U playlist") : base, done);
+            } catch (Throwable e) {
+                failed(a, e);
+            }
+        }).start();
+    }
+
+    private static void failed(Activity a, Throwable e) {
+        final String msg = "⚠ " + (e.getMessage() == null ? String.valueOf(e) : e.getMessage());
+        a.runOnUiThread(() -> toast(a, msg));
+    }
+
+    private static void finish(final Activity a, M3u.Result r, String wanted, String fallbackName, final Named done) throws Exception {
+        if (r.items.isEmpty()) throw new Exception(T.t("No songs found in this link"));
+        String base = !wanted.isEmpty() ? wanted : r.name != null && !r.name.isEmpty() ? r.name : fallbackName;
+        String name = base;
+        for (int n = 2; !MusicLib.create(name); n++) {
+            if (n > 99) throw new Exception(T.t("That name is empty or already used"));
+            name = base + " (" + n + ")";
+        }
+        MusicLib.saveRemote(r.items);
+        List<String> uris = new ArrayList<>();
+        for (M3u.Entry e : r.items) uris.add(e.url);
+        MusicLib.add(name, uris);
+        final String made = name;
+        final String msg = T.t("Playlist created") + ": " + name + " (" + r.items.size() + ")"
+                + (r.skipped > 0 ? " · " + r.skipped + " " + T.t("skipped (not web links)") : "");
+        a.runOnUiThread(() -> {
+            toast(a, msg);
+            done.on(made);
+        });
     }
 
     private static String nameFromUrl(String url) {

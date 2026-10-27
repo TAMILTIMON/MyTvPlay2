@@ -47,7 +47,7 @@ final class M3u {
                 if (l.regionMatches(true, 0, "#PLAYLIST:", 0, 10)) r.name = l.substring(10).trim();
                 else if (l.regionMatches(true, 0, "#EXTINF:", 0, 8)) {
                     String rest = l.substring(8);
-                    int comma = rest.indexOf(',');
+                    int comma = commaOutsideQuotes(rest);
                     String head = comma >= 0 ? rest.substring(0, comma) : rest;
                     title = comma >= 0 ? rest.substring(comma + 1).trim() : null;
                     try {
@@ -106,6 +106,24 @@ final class M3u {
         }
         for (Entry e : m.values()) if (e.url != null) r.items.add(e);
         return r;
+    }
+
+    /** The comma that ends the #EXTINF attributes (commas inside "quotes", e.g. in group-title, don't count). */
+    private static int commaOutsideQuotes(String s) {
+        boolean q = false;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c == '"') q = !q;
+            else if (c == ',' && !q) return i;
+        }
+        return -1;
+    }
+
+    /** Page links of GitLab / GitHub (…/blob/…) → the raw file, so pasting the browser address works too. */
+    static String rawLink(String u) {
+        if (u.contains("/-/blob/")) return u.replace("/-/blob/", "/-/raw/");
+        if (u.matches("(?i)^https?://(www\\.)?github\\.com/[^/]+/[^/]+/blob/.*")) return u.replaceFirst("/blob/", "/raw/");
+        return u;
     }
 
     private static String attr(String head, String key) {

@@ -1,5 +1,7 @@
 package com.mytv.player;
 
+import android.net.Uri;
+import android.content.Intent;
 import android.Manifest;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -693,12 +695,27 @@ public class PhoneLibraryActivity extends AppCompatActivity {
         });
     }
 
+    @Override
+    protected void onActivityResult(int req, int res, Intent data) {
+        super.onActivityResult(req, res, data);
+        if (req != 81 || res != RESULT_OK || data == null || data.getData() == null) return;
+        Uri u = data.getData();
+        MusicDialogs.importM3uFile(this, u, LocalShare.displayName(this, u), n -> {
+            tab = 5;
+            plName = n;
+            apply();
+        });
+    }
+
     // ------------------------------------------------------------------ actions
     private void open(int pos) {
         PhoneMedia.M g = shown.get(pos);
         if (audio && g.groupKey != null) {
             if ("+m3u".equals(g.groupKey)) {
-                MusicDialogs.importM3u(this, n -> {
+                MusicDialogs.importM3u(this, () -> {
+                    Intent it = new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*");
+                    startActivityForResult(it, 81);   // .m3u / .m3u8 / .pls (phones often label them as "other")
+                }, n -> {
                     plName = n;
                     apply();
                 });

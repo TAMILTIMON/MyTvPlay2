@@ -715,4 +715,4 @@ Add to the tv-detox home screen:
    adb shell am start -n com.ansub.tvhome/.MainActivity --es apps org.videolan.vlc,in.startv.hotstar,com.netflix.ninja,com.mxtech.videoplayer.ad,com.mxtech.videoplayer.television,com.tamil.castplay
 To remove the app:  adb uninstall com.tamil.castplay
 
-Music on this phone → Playlists → "Import M3U link": paste an .m3u / .m3u8 / .pls web link to create a playlist of its songs or stations (online songs play with the phone player).
+Music on this phone → Playlists → "Import M3U link" (paste a link or Choose file…): paste an .m3u / .m3u8 / .pls web link to create a playlist of its songs or stations (online songs play with the phone player).
