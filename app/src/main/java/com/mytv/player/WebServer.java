@@ -497,6 +497,23 @@ public class WebServer extends NanoHTTPD {
                     return r;
                 }
 
+                case "/mirror": {
+                    // a phone wants to cast its screen: open the full-screen receiver (it listens on 8091)
+                    if (!MirrorActivity.open) {
+                        Intent mi = new Intent(ctx, MirrorActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        boolean started = false;
+                        if (App.visible == 0 && !Perms.overlayOk(ctx) && AdbClient.enabled()) {
+                            try {
+                                String o = AdbClient.shell(ctx, "am start -n " + ctx.getPackageName() + "/" + MirrorActivity.class.getName() + " 2>&1");
+                                started = o != null && !o.contains("Error");
+                            } catch (Exception ignored) {
+                            }
+                        }
+                        if (!started) ctx.startActivity(mi);
+                    }
+                    return msg("Ready for the screen");
+                }
+
                 case "/browse": {
                     final String u = val(p, "url");
                     Intent bi = new Intent(ctx, BrowserActivity.class);

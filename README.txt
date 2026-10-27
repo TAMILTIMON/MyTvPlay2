@@ -1,3 +1,23 @@
+ZH PLAY 3.9 — DJ mixer, song editor, screen cast to the TV
+=========================================================
+DJ mixer (phone: board tile "DJ mixer", or Features)
+* Two decks: scrolling waveform, auto BPM (measured exact on test tracks), play, CDJ-style
+  cue, 4 hot cues (hold = clear), beat loops 1/2/4/8, pitch ±8 % / ±16 % (hold the % label),
+  nudge −/+ (hold), SYNC (matches tempo AND lines up the beats).
+* Mixer: trim, 3-band EQ high / mid / low with kill, one-knob filter (left low-pass, right
+  high-pass), beat-synced echo, channel faders, constant-power crossfader, master,
+  Auto-fade over 8 bars. ● REC records the mix to Music / ZH Play.
+* Tempo works like a turntable (pitch follows tempo); no key lock yet.
+Song editor (board tile "Song editor", or Features)
+* Multi-track, non-destructive (the songs on the phone never change), zoomable timeline
+  with waveforms; modes Select / Move / Scroll; Split, Cut, Copy, Paste, Delete, Trim,
+  Silence, Fade in / out, Amplify, Normalize, Reverse; per-track mute / solo / volume /
+  rename / delete (tap the track name); Undo / Redo; Export to M4A.
+Cast screen (board tile "Cast screen")
+* Shows the whole phone screen on the TV, live (H.264 over Wi-Fi), turns with the phone;
+  the phone's sound too on Android 10+ (apps that block recording stay silent).
+  720p by default, 1080p option. Stop from the notification or the tile; Back on the TV.
+
 ZH PLAY 3.8 — browser: background play, history & bookmarks, fullscreen lock, page EQ
 =====================================================================================
 * Background play (like Brave): videos / songs keep playing with the screen locked or

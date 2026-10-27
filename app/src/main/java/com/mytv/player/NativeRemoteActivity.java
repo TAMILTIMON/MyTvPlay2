@@ -57,6 +57,47 @@ public class NativeRemoteActivity extends AppCompatActivity {
     private static final int PICK_MEDIA = 21, PICK_TORRENT = 22, PICK_SUB = 23;
 
     private String ip, tvName;
+    private boolean castHd, castSound = true;
+
+    /** Cast the whole phone screen (and sound on Android 10+) to this TV. */
+    private void castScreen() {
+        if (CastScreenService.running) {
+            new UiDialog(this).setTitle(T.t("Cast screen")).setMessage(CastScreenService.status)
+                    .setPositiveButton(T.t("Stop casting"), (d, w) -> CastScreenService.stop(this))
+                    .setNegativeButton(T.t("Close"), null).show();
+            return;
+        }
+        final boolean[] sel = {Store.getBool("cast_hd", false), Store.getBool("cast_sound", true)};
+        String[] o = {T.t("Full HD (1080p) — needs strong Wi-Fi"),
+                T.t("Send the phone's sound") + (android.os.Build.VERSION.SDK_INT < 29 ? " (" + T.t("Android 10+ only") + ")" : "")};
+        new UiDialog(this).setTitle(T.t("Cast screen"))
+                .setMultiChoiceItems(o, sel, (d, w, c) -> sel[w] = c)
+                .setPositiveButton(T.t("Start"), (d, w) -> {
+                    castHd = sel[0];
+                    castSound = sel[1];
+                    Store.putBool("cast_hd", castHd);
+                    Store.putBool("cast_sound", castSound);
+                    if (castSound && android.os.Build.VERSION.SDK_INT >= 29
+                            && checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                        requestPermissions(new String[]{android.Manifest.permission.RECORD_AUDIO}, 89);   // then the capture prompt
+                        return;
+                    }
+                    askCapture();
+                })
+                .setNegativeButton(T.t("Cancel"), null).show();
+    }
+
+    private void askCapture() {
+        android.media.projection.MediaProjectionManager mpm =
+                (android.media.projection.MediaProjectionManager) getSystemService(MEDIA_PROJECTION_SERVICE);
+        startActivityForResult(mpm.createScreenCaptureIntent(), 88);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int req, String[] p, int[] r) {
+        super.onRequestPermissionsResult(req, p, r);
+        if (req == 89) askCapture();       // with or without sound permission (no sound if refused)
+    }
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService io = Executors.newFixedThreadPool(3);
     private JSONObject S = new JSONObject(), opts = null;
@@ -685,6 +726,11 @@ public class NativeRemoteActivity extends AppCompatActivity {
         shareSub = (TextView) tShare.findViewWithTag("sub");
         p.addView(UiKit.grid(this, 3,
                 UiKit.tile(this, "sparkles", T.t("AI assistant"), T.t("Tamil · English · Tanglish"), 0xFF8B5CF6, v -> openAi()),
+                UiKit.tile(this, "monitor", T.t("Cast screen"), T.t("show this phone on the TV"), 0xFF0EA5E9, v -> castScreen()),
+                UiKit.tile(this, "disc-3", T.t("DJ mixer"), T.t("two decks, sync, EQ"), 0xFFF59E0B,
+                        v -> startActivity(new Intent(this, DjActivity.class))),
+                UiKit.tile(this, "scissors", T.t("Song editor"), T.t("tracks, cut, fades"), 0xFF10B981,
+                        v -> startActivity(new Intent(this, EditorActivity.class))),
                 UiKit.tile(this, "wand-sparkles", T.t("Features"), T.t("EQ, cutter, karaoke…"), 0xFFF43F5E,
                         v -> startActivity(new Intent(this, ToolsActivity.class))),
                 UiKit.tile(this, "film", T.t("Videos"), T.t("on this phone"), 0xFF0EA5E9,
@@ -1828,6 +1874,13 @@ public class NativeRemoteActivity extends AppCompatActivity {
 
     @Override
     protected void onActivityResult(int req, int res, Intent data) {
+        if (req == 88) {
+            if (res == RESULT_OK && data != null) {
+                CastScreenService.start(this, res, data, ip, castHd, castSound);
+                UiKit.makeToast(this, T.t("Casting your screen to the TV"), android.widget.Toast.LENGTH_SHORT).show();
+            } else UiKit.makeToast(this, T.t("Screen capture was not allowed"), android.widget.Toast.LENGTH_SHORT).show();
+            return;
+        }
         super.onActivityResult(req, res, data);
         if (res != RESULT_OK || data == null) return;
         if (req == 77) {
