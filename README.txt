@@ -1,3 +1,18 @@
+ZH PLAY 4.5 — YouTube ads, VPN profiles, board fix, complete Present mode
+=======================================================================
+* YouTube in the browser: ads are now removed before they are planned (the video's ad schedule
+  is taken out — the uBlock Origin / Brave method), with skip / fast-forward as backup, and
+  YouTube's "ad blockers are not allowed" pop-up is closed. Injected as early as possible.
+* VPN: now covers the WHOLE PHONE by default (it covered only ZH Play before — that is why other
+  apps still showed your own IP). Several profiles: import many .conf files at once, switch any
+  time (reconnects), rename / delete. "Check my IP" shows what the internet sees.
+* Board Customize: no more crash — drag is now a visual slide (the list is rebuilt after the
+  touch); any problem shows a message instead of closing the app.
+* Present mode, complete: pinch to zoom (the TV / PC redraws the zoomed part sharp — tiny text
+  readable), two-finger pan, double-tap = whole slide, + / − / Fit; tools Laser · Pen (5 colours,
+  clear) · Spotlight · Move; black / white screen; slide overview grid; go to slide №; timer
+  (tap pause, hold reset); volume keys; landscape layout with rotation lock.
+
 ZH PLAY 4.4 — Release C (with A + B): appearance, site settings, VPN, board customization
 =======================================================================================
 Browser appearance (menu → Appearance, or "✎ Customize" on the new-tab page)

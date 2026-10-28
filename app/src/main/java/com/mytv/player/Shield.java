@@ -190,29 +190,62 @@ public final class Shield {
     }
 
     /** YouTube (in this browser): skips video ads and hides ad boxes. Best effort — YouTube changes often. */
+    /**
+     * YouTube in the browser, 3 layers:
+     *  1. remove the ad schedule from the video's data (adPlacements / playerAds / adSlots) — the ads are never planned
+     *     (the uBlock Origin / Brave method: works for normal and "stitched" ads)
+     *  2. if an ad still shows: press Skip, or mute + fast-forward it, with a "Skipping ad…" spinner
+     *  3. close YouTube's "ad blockers are not allowed" pop-up and resume the video
+     */
     public static String youtubeJs() {
         return "(function(){if(window.__tcpYt)return;window.__tcpYt=1;"
+                // ---- 1. prune the ad schedule
+                + "var AD=['adPlacements','playerAds','adSlots','adBreakHeartbeatParams'];"
+                + "function prune(o){try{if(!o||typeof o!=='object')return o;var hit=0;"
+                + "AD.forEach(function(k){if(k in o){delete o[k];hit=1;}});"
+                + "if(o.playerResponse)prune(o.playerResponse);if(o.response)prune(o.response);"
+                + "if(Array.isArray(o))o.forEach(prune);"
+                + "if(hit&&window.TamilShield)TamilShield.ad();}catch(e){}return o;}"
+                + "var jp=JSON.parse;JSON.parse=function(){var r=jp.apply(this,arguments);"
+                + "if(r&&typeof r==='object'&&(r.playabilityStatus||r.streamingData||r.playerResponse||r.adPlacements))prune(r);return r;};"
+                + "var _pr=window.ytInitialPlayerResponse;"
+                + "try{Object.defineProperty(window,'ytInitialPlayerResponse',{configurable:true,get:function(){return _pr;},set:function(v){_pr=prune(v);}});"
+                + "if(_pr)prune(_pr);}catch(e){}"
+                + "var of=window.fetch;if(of)window.fetch=function(i,o){var u=(typeof i==='string')?i:(i&&i.url)||'';"
+                + "var pr=of.apply(this,arguments);if(u.indexOf('/youtubei/v1/player')<0&&u.indexOf('/youtubei/v1/next')<0)return pr;"
+                + "return pr.then(function(res){return res.clone().json().then(function(j){prune(j);"
+                + "return new Response(JSON.stringify(j),{status:res.status,statusText:res.statusText,headers:res.headers});})"
+                + ".catch(function(){return res;});});};"
+                // ---- banners / promoted cards / the "Skipping ad…" spinner
                 + "var css=document.createElement('style');css.textContent='ytm-promoted-sparkles-web-renderer,ytm-companion-ad-renderer,"
                 + "ytd-ad-slot-renderer,ytd-promoted-video-renderer,ytm-promoted-video-renderer,#player-ads,.ytp-ad-overlay-container,"
                 + "ytd-in-feed-ad-layout-renderer,ytm-ad-slot-renderer,ad-slot-renderer,.ytd-banner-promo-renderer,"
-                + "ytd-statement-banner-renderer,ytm-statement-banner-renderer{display:none!important}"
-                // "Skipping ad…" spinner shown over the player while an ad is being skipped
+                + "ytd-statement-banner-renderer,ytm-statement-banner-renderer,ytd-enforcement-message-view-model,"
+                + "ytm-companion-slot,.ytp-ad-image-overlay{display:none!important}"
                 + "#zh-adskip{position:absolute;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;"
                 + "justify-content:center;background:rgba(0,0,0,.72);color:#fff;font:600 15px/1.4 sans-serif;pointer-events:none}"
                 + "#zh-adskip i{width:38px;height:38px;border:4px solid rgba(255,255,255,.25);border-top-color:#E83C30;"
                 + "border-radius:50%;animation:zhspin .8s linear infinite;margin-bottom:12px}"
                 + "@keyframes zhspin{to{transform:rotate(360deg)}}';"
                 + "(document.head||document.documentElement).appendChild(css);"
+                // ---- 2. an ad that still shows: skip / fast-forward
+                + "var wasAd=false;"
                 + "function tick(){try{var p=document.querySelector('.ad-showing,.ad-interrupting');var v=document.querySelector('video');"
-                + "var b=document.querySelector('.ytp-ad-skip-button,.ytp-ad-skip-button-modern,.ytp-skip-ad-button,button.ytp-ad-skip-button-container');"
+                + "var b=document.querySelector('.ytp-ad-skip-button,.ytp-ad-skip-button-modern,.ytp-skip-ad-button,"
+                + "button.ytp-ad-skip-button-container,.ytp-ad-skip-button-slot button,[id^=skip-button] button,.ytm-skip-ad-button');"
                 + "if(b){b.click();}"
                 + "var o=document.getElementById('zh-adskip');"
                 + "if(p){if(!o){o=document.createElement('div');o.id='zh-adskip';o.innerHTML='<i></i>Skipping ad…';"
                 + "if(getComputedStyle(p).position==='static')p.style.position='relative';p.appendChild(o);}}"
                 + "else if(o){o.remove();}"
-                + "if(p&&v&&isFinite(v.duration)&&v.duration>0){v.muted=true;v.playbackRate=16;v.currentTime=Math.max(v.currentTime,v.duration-0.1);"
+                + "if(p&&v){wasAd=true;v.muted=true;try{v.playbackRate=16;}catch(e){}"
+                // a short separate ad: jump to its end; a long one (ad stitched into the video) is only fast-forwarded
+                + "if(isFinite(v.duration)&&v.duration>0&&v.duration<=180)v.currentTime=Math.max(v.currentTime,v.duration-0.1);"
                 + "window.TamilShield&&TamilShield.ad();}"
-                + "else if(v&&v.playbackRate===16){v.playbackRate=1;v.muted=false;}"
-                + "}catch(e){}}setInterval(tick,300);})();";
+                + "else if(v&&wasAd){wasAd=false;v.playbackRate=1;v.muted=false;}"
+                // ---- 3. the "ad blockers are not allowed" pop-up
+                + "var en=document.querySelector('ytd-enforcement-message-view-model,tp-yt-paper-dialog:has(ytd-enforcement-message-view-model)');"
+                + "if(en){en.remove();var bd=document.querySelector('tp-yt-iron-overlay-backdrop');if(bd)bd.remove();if(v&&v.paused)v.play();}"
+                + "}catch(e){}}setInterval(tick,250);})();";
     }
 }

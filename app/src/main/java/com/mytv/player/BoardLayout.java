@@ -70,6 +70,17 @@ public final class BoardLayout {
 
     /** The board for these tiles (id → tile view), in the saved order, with sections. */
     public static View build(Activity a, LinkedHashMap<String, View> tiles) {
+        try {
+            return buildUnsafe(a, tiles);
+        } catch (Throwable e) {
+            // something in a saved layout is wrong: forget it and show the normal board
+            Store.putStr(KEY, "{}");
+            for (View t : tiles.values()) if (t.getParent() != null) ((ViewGroup) t.getParent()).removeView(t);
+            return UiKit.grid(a, 3, tiles.values().toArray(new View[0]));
+        }
+    }
+
+    private static View buildUnsafe(Activity a, LinkedHashMap<String, View> tiles) {
         Layout l = load(new ArrayList<>(tiles.keySet()));
         int cols = COLS[l.size];
         LinearLayout box = new LinearLayout(a);
@@ -106,6 +117,23 @@ public final class BoardLayout {
     // ------------------------------------------------------------------ the Customize screen
     /** names: id → title (for the list). onSave runs after "Save" (rebuild the board). */
     public static void customize(final Activity a, final LinkedHashMap<String, String> names, final Runnable onSave) {
+        try {
+            customizeUnsafe(a, names, onSave);
+        } catch (Throwable e) {
+            problem(a, e);
+        }
+    }
+
+    /** Instead of a crash: say what went wrong (and keep the app running). */
+    static void problem(Activity a, Throwable e) {
+        StackTraceElement at = e.getStackTrace().length > 0 ? e.getStackTrace()[0] : null;
+        new UiDialog(a).setTitle(T.t("Something went wrong"))
+                .setMessage(e.getClass().getSimpleName() + ": " + e.getMessage() + (at == null ? "" : "\n" + at.getFileName() + ":" + at.getLineNumber())
+                        + "\n\n" + T.t("Please send this text to the developer."))
+                .setPositiveButton(T.t("OK"), null).show();
+    }
+
+    private static void customizeUnsafe(final Activity a, final LinkedHashMap<String, String> names, final Runnable onSave) {
         final Layout l = load(new ArrayList<>(names.keySet()));
         final Dialog d = new Dialog(a);
         d.requestWindowFeature(Window.FEATURE_NO_TITLE);
@@ -166,7 +194,13 @@ public final class BoardLayout {
         save.setOnClickListener(v -> {
             save(l);
             d.dismiss();
-            if (onSave != null) onSave.run();
+            if (onSave != null) {
+                try {
+                    onSave.run();
+                } catch (Throwable e) {
+                    problem(a, e);
+                }
+            }
         });
         bottom.addView(cancel, new LinearLayout.LayoutParams(0, Ui.dp(a, 46), 1));
         bottom.addView(save, new LinearLayout.LayoutParams(0, Ui.dp(a, 46), 1));
@@ -190,39 +224,40 @@ public final class BoardLayout {
         handle.setPadding(Ui.dp(a, 6), 0, Ui.dp(a, 10), 0);
         handle.setContentDescription(T.t("Drag to move"));
         handle.setOnTouchListener(new View.OnTouchListener() {
-            int at = i;
+            float downY;
+            int from, target;
 
             @Override
             public boolean onTouch(View v, MotionEvent e) {
-                if (e.getActionMasked() == MotionEvent.ACTION_DOWN) {
-                    sv.requestDisallowInterceptTouchEvent(true);
-                    r.setAlpha(0.6f);
-                    at = l.order.indexOf(id);
-                    return true;
-                }
-                if (e.getActionMasked() == MotionEvent.ACTION_MOVE) {
-                    float y = e.getRawY();
-                    int[] loc = new int[2];
-                    for (int k = 0; k < list.getChildCount(); k++) {
-                        View c = list.getChildAt(k);
-                        c.getLocationOnScreen(loc);
-                        if (y >= loc[1] && y < loc[1] + c.getHeight() && k != at) {
-                            l.order.add(k, l.order.remove(at));         // swap places as the finger passes
-                            View moved = list.getChildAt(at);
-                            list.removeViewAt(at);
-                            list.addView(moved, k);
-                            at = k;
-                            break;
+                switch (e.getActionMasked()) {
+                    case MotionEvent.ACTION_DOWN:
+                        sv.requestDisallowInterceptTouchEvent(true);
+                        downY = e.getRawY();
+                        from = target = l.order.indexOf(id);
+                        r.setAlpha(0.75f);
+                        r.setElevation(Ui.dp(a, 8));
+                        return true;
+                    case MotionEvent.ACTION_MOVE: {
+                        // only a visual slide while the finger moves — nothing is removed during the touch
+                        float dy = e.getRawY() - downY;
+                        r.setTranslationY(dy);
+                        int rowH = Math.max(1, r.getHeight() + Ui.dp(a, 6));
+                        target = Math.max(0, Math.min(l.order.size() - 1, from + Math.round(dy / rowH)));
+                        for (int k = 0; k < list.getChildCount(); k++) {
+                            View c = list.getChildAt(k);
+                            if (c != r) c.setAlpha(k == target ? 0.55f : 1f);      // where it will land
                         }
+                        return true;
                     }
-                    return true;
+                    case MotionEvent.ACTION_UP:
+                    case MotionEvent.ACTION_CANCEL:
+                        sv.requestDisallowInterceptTouchEvent(false);
+                        if (target != from && from >= 0) l.order.add(target, l.order.remove(from));
+                        list.post(fill[0]);                                     // rebuild after the touch is finished
+                        return true;
+                    default:
+                        return false;
                 }
-                if (e.getActionMasked() == MotionEvent.ACTION_UP || e.getActionMasked() == MotionEvent.ACTION_CANCEL) {
-                    sv.requestDisallowInterceptTouchEvent(false);
-                    fill[0].run();                                   // refresh positions / buttons
-                    return true;
-                }
-                return false;
             }
         });
         r.addView(handle);

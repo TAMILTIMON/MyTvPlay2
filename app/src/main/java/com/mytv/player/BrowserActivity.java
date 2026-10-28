@@ -543,6 +543,10 @@ public class BrowserActivity extends AppCompatActivity {
             @Override
             public void onProgressChanged(WebView v, int pr) {
                 if (pr >= 10) v.evaluateJavascript(SiteSettings.pageJs(hosts.get(v)), null);
+                String yh = hosts.get(v);
+                if (pr >= 5 && yh != null && yh.contains("youtube.com") && Shield.enabled() && !Shield.siteOff(yh) && Shield.ytSkip()) {
+                    v.evaluateJavascript(Shield.youtubeJs(), null);     // early: before YouTube reads its ad schedule
+                }
                 if (pr >= 70) injectMedia(v);   // early, so videos that start by themselves are covered
                 loading.setProgress(pr);
                 loading.setVisibility(pr >= 100 ? View.INVISIBLE : View.VISIBLE);

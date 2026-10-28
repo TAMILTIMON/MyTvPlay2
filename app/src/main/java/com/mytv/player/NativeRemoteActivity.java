@@ -779,8 +779,8 @@ public class NativeRemoteActivity extends AppCompatActivity {
     private void customizeBoard() {
         LinkedHashMap<String, String> names = new LinkedHashMap<>();
         for (java.util.Map.Entry<String, View> e : boardTiles.entrySet()) {
-            TextView t = e.getValue().findViewWithTag("title");
-            names.put(e.getKey(), t != null ? t.getText().toString() : e.getKey());
+            View t = e.getValue().findViewWithTag("title");
+            names.put(e.getKey(), t instanceof TextView ? ((TextView) t).getText().toString() : e.getKey());
         }
         BoardLayout.customize(this, names, () -> {
             boardBox.removeAllViews();

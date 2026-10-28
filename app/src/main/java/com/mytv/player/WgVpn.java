@@ -50,19 +50,51 @@ public final class WgVpn {
         return state == Tunnel.State.UP;
     }
 
+    // ------------------------------------------------------------------ several profiles
+    /** [ {name, conf(sealed)} … ] — the old single profile is moved in once. */
+    static org.json.JSONArray profiles() {
+        try {
+            org.json.JSONArray a = new org.json.JSONArray(Store.getStr("wg_profiles", "[]"));
+            String old = Store.getStr("wg_conf", "");
+            if (!old.isEmpty()) {
+                a.put(new org.json.JSONObject().put("name", "Profile 1").put("conf", old));
+                Store.putStr("wg_profiles", a.toString());
+                Store.putStr("wg_conf", "");
+            }
+            return a;
+        } catch (Exception e) {
+            return new org.json.JSONArray();
+        }
+    }
+
+    static int active() {
+        int n = profiles().length();
+        return n == 0 ? -1 : Math.max(0, Math.min(n - 1, Store.getInt("wg_active", 0)));
+    }
+
+    static String activeName() {
+        int i = active();
+        return i < 0 ? "" : profiles().optJSONObject(i).optString("name");
+    }
+
     static boolean hasProfile() {
-        return !Store.getStr("wg_conf", "").isEmpty();
+        return active() >= 0;
     }
 
     private static String profile() {
-        return SecretBox.open(Store.getStr("wg_conf", ""));
+        int i = active();
+        return i < 0 ? "" : SecretBox.open(profiles().optJSONObject(i).optString("conf"));
+    }
+
+    private static void saveAll(org.json.JSONArray a) {
+        Store.putStr("wg_profiles", a.toString());
     }
 
     /** "Only ZH Play" → the profile's [Interface] gets IncludedApplications = this app. */
     private static String withScope(Context c, String conf) {
         StringBuilder out = new StringBuilder();
         boolean inIface = false, added = false;
-        boolean onlyApp = Store.getBool("wg_only_app", true);
+        boolean onlyApp = onlyApp();
         for (String line : conf.replace("\r", "").split("\n")) {
             String t = line.trim();
             String low = t.toLowerCase(Locale.ROOT);
@@ -78,6 +110,15 @@ public final class WgVpn {
         }
         if (inIface && onlyApp && !added) out.append("IncludedApplications = ").append(c.getPackageName()).append('\n');
         return out.toString();
+    }
+
+    /** Default: the whole phone (like any VPN app). "Only ZH Play" is a choice. */
+    static boolean onlyApp() {
+        return Store.getBool("wg_only_app2", false);
+    }
+
+    static String scopeName() {
+        return T.t(onlyApp() ? "only ZH Play" : "the whole phone");
     }
 
     /** Server address from the profile (shown in the status line). */
@@ -111,7 +152,7 @@ public final class WgVpn {
                 InputStream in = new ByteArrayInputStream(withScope(a, profile()).getBytes("UTF-8"));
                 Config cfg = Config.parse(in);
                 state = backend(a).setState(TUNNEL, Tunnel.State.UP, cfg);
-                msg = "🔐 " + T.t("VPN on") + " · " + server();
+                msg = "🔐 " + T.t("VPN on") + " · " + activeName() + " · " + server() + "\n" + T.t("Use VPN for") + ": " + scopeName();
             } catch (Throwable e) {
                 state = Tunnel.State.DOWN;
                 msg = T.t("VPN didn't connect") + ": " + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage());
@@ -133,17 +174,22 @@ public final class WgVpn {
 
     static String status(Context c) {
         if (!hasProfile()) return T.t("No profile yet");
-        if (!on()) return T.t("Off") + " · " + server();
+        String base = activeName() + " · " + server() + " · " + scopeName();
+        if (!on()) return T.t("Off") + " · " + base;
         try {
             Statistics s = backend(c).getStatistics(TUNNEL);
-            return "🔐 " + T.t("On") + " · " + server() + " · ↓ " + TvInfo.gb(s.totalRx()) + "  ↑ " + TvInfo.gb(s.totalTx());
+            return "🔐 " + T.t("On") + " · " + base + " · ↓ " + TvInfo.gb(s.totalRx()) + "  ↑ " + TvInfo.gb(s.totalTx());
         } catch (Throwable e) {
-            return "🔐 " + T.t("On") + " · " + server();
+            return "🔐 " + T.t("On") + " · " + base;
         }
     }
 
     // ------------------------------------------------------------------ profile
     static boolean saveProfile(Activity a, String text) {
+        return saveProfile(a, text, null);
+    }
+
+    static boolean saveProfile(Activity a, String text, String name) {
         if (text == null || !text.contains("[Interface]") || !text.contains("[Peer]")) {
             UiKit.makeToast(a, T.t("That is not a WireGuard profile (it needs [Interface] and [Peer])"), Toast.LENGTH_LONG).show();
             return false;
@@ -154,8 +200,16 @@ public final class WgVpn {
             UiKit.makeToast(a, T.t("The profile has an error") + ": " + e.getMessage(), Toast.LENGTH_LONG).show();
             return false;
         }
-        Store.putStr("wg_conf", SecretBox.seal(text));
-        UiKit.makeToast(a, "✓ " + T.t("Profile saved") + " · " + server(), Toast.LENGTH_SHORT).show();
+        try {
+            org.json.JSONArray all = profiles();
+            String n = name == null || name.trim().isEmpty() ? "Profile " + (all.length() + 1) : name.trim();
+            all.put(new org.json.JSONObject().put("name", n).put("conf", SecretBox.seal(text)));
+            saveAll(all);
+            Store.putInt("wg_active", all.length() - 1);
+        } catch (Exception e) {
+            return false;
+        }
+        UiKit.makeToast(a, "✓ " + T.t("Profile saved") + " · " + activeName() + " · " + server(), Toast.LENGTH_SHORT).show();
         return true;
     }
 
@@ -167,16 +221,27 @@ public final class WgVpn {
             return true;
         }
         if (req == REQ_FILE) {
-            if (res == Activity.RESULT_OK && data != null && data.getData() != null) {
-                try (InputStream in = a.getContentResolver().openInputStream(data.getData())) {
-                    java.io.ByteArrayOutputStream o = new java.io.ByteArrayOutputStream();
-                    byte[] b = new byte[8192];
-                    int n;
-                    while ((n = in.read(b)) > 0 && o.size() < 64 * 1024) o.write(b, 0, n);
-                    if (saveProfile(a, o.toString("UTF-8"))) panel(a);
-                } catch (Exception e) {
-                    UiKit.makeToast(a, T.t("Can't read this file"), Toast.LENGTH_SHORT).show();
+            if (res == Activity.RESULT_OK && data != null) {
+                java.util.List<Uri> uris = new java.util.ArrayList<>();
+                if (data.getClipData() != null) {
+                    for (int i = 0; i < data.getClipData().getItemCount(); i++) uris.add(data.getClipData().getItemAt(i).getUri());
+                } else if (data.getData() != null) uris.add(data.getData());
+                int ok = 0;
+                for (Uri u : uris) {
+                    try (InputStream in = a.getContentResolver().openInputStream(u)) {
+                        java.io.ByteArrayOutputStream o = new java.io.ByteArrayOutputStream();
+                        byte[] b = new byte[8192];
+                        int n;
+                        while ((n = in.read(b)) > 0 && o.size() < 64 * 1024) o.write(b, 0, n);
+                        String fn = LocalShare.displayName(a, u);
+                        String nm = fn == null ? null : fn.replaceAll("(?i)\\.conf$", "");
+                        if (saveProfile(a, o.toString("UTF-8"), nm)) ok++;
+                    } catch (Exception e) {
+                        UiKit.makeToast(a, T.t("Can't read this file"), Toast.LENGTH_SHORT).show();
+                    }
                 }
+                if (uris.size() > 1) UiKit.makeToast(a, ok + " / " + uris.size() + " " + T.t("profiles imported"), Toast.LENGTH_LONG).show();
+                if (ok > 0) panel(a);
             }
             return true;
         }
@@ -185,14 +250,16 @@ public final class WgVpn {
 
     // ------------------------------------------------------------------ the VPN panel
     public static void panel(final Activity a) {
-        boolean only = Store.getBool("wg_only_app", true);
+        final org.json.JSONArray all = profiles();
         String[] items = {
                 (on() ? "⏹  " + T.t("Disconnect") : "▶  " + T.t("Connect")),
-                "📄  " + T.t("Import profile file (.conf)"),
+                "🌍  " + T.t("Profile") + ": " + (hasProfile() ? activeName() + "  (" + all.length() + ")" : T.t("none")),
+                "📄  " + T.t("Import profile files (.conf) — several at once"),
                 "📋  " + T.t("Paste profile text"),
-                "🎯  " + T.t("Use VPN for") + ": " + T.t(only ? "only ZH Play" : "the whole phone"),
-                "❓  " + T.t("How to get a free profile (Proton VPN)"),
-                "🗑  " + T.t("Remove profile")};
+                "🎯  " + T.t("Use VPN for") + ": " + scopeName(),
+                "🔎  " + T.t("Check my IP"),
+                "✏  " + T.t("Rename / delete profiles"),
+                "❓  " + T.t("How to get a free profile (Proton VPN)")};
         new UiDialog(a).setTitle("VPN — " + status(a)).setItems(items, (d, w) -> {
             switch (w) {
                 case 0:
@@ -202,35 +269,68 @@ public final class WgVpn {
                     } else connect(a);
                     break;
                 case 1: {
-                    Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*");
-                    a.startActivityForResult(i, REQ_FILE);
+                    if (all.length() == 0) {
+                        UiKit.makeToast(a, T.t("Import a VPN profile first"), Toast.LENGTH_SHORT).show();
+                        break;
+                    }
+                    String[] names = new String[all.length()];
+                    for (int i = 0; i < names.length; i++) names[i] = all.optJSONObject(i).optString("name");
+                    new UiDialog(a).setTitle(T.t("Profile")).setSingleChoiceItems(names, active(), (d2, k) -> {
+                        Store.putInt("wg_active", k);
+                        d2.dismiss();
+                        if (on()) reconnect(a);
+                        panel(a);
+                    }).show();
                     break;
                 }
                 case 2: {
+                    Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*")
+                            .putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+                    a.startActivityForResult(i, REQ_FILE);
+                    break;
+                }
+                case 3: {
                     final EditText e = new EditText(a);
                     e.setHint("[Interface]\nPrivateKey = …\nAddress = …\n\n[Peer]\nPublicKey = …\nEndpoint = …");
                     e.setMinLines(6);
-                    new UiDialog(a).setTitle(T.t("Paste profile text")).setView(e)
+                    final EditText nm = new EditText(a);
+                    nm.setHint(T.t("Name (e.g. Netherlands free)"));
+                    nm.setSingleLine(true);
+                    android.widget.LinearLayout box = new android.widget.LinearLayout(a);
+                    box.setOrientation(android.widget.LinearLayout.VERTICAL);
+                    box.addView(nm);
+                    box.addView(e);
+                    new UiDialog(a).setTitle(T.t("Paste profile text")).setView(box)
                             .setPositiveButton(T.t("Save"), (d2, w2) -> {
-                                if (saveProfile(a, e.getText().toString())) panel(a);
+                                if (saveProfile(a, e.getText().toString(), nm.getText().toString())) panel(a);
                             })
                             .setNegativeButton(T.t("Cancel"), null).show();
                     break;
                 }
-                case 3:
-                    Store.putBool("wg_only_app", !Store.getBool("wg_only_app", true));
-                    if (on()) {                     // apply at once
-                        disconnect(a);
-                        new Handler(Looper.getMainLooper()).postDelayed(() -> connect(a), 1200);
-                    }
-                    panel(a);
-                    break;
                 case 4:
+                    new UiDialog(a).setTitle(T.t("Use VPN for")).setSingleChoiceItems(
+                            new String[]{T.t("the whole phone") + " — " + T.t("every app, like a normal VPN"),
+                                    T.t("only ZH Play") + " — " + T.t("browser and streaming in this app")},
+                            onlyApp() ? 1 : 0, (d2, k) -> {
+                                Store.putBool("wg_only_app2", k == 1);
+                                d2.dismiss();
+                                if (on()) reconnect(a);
+                                panel(a);
+                            }).show();
+                    break;
+                case 5:
+                    checkIp(a);
+                    break;
+                case 6:
+                    manage(a);
+                    break;
+                default:
                     new UiDialog(a).setTitle(T.t("Free VPN profile (Proton VPN)"))
                             .setMessage(T.t("1. Make a free account at protonvpn.com (no payment).\n"
                                     + "2. Open account.protonvpn.com → Downloads → WireGuard configuration.\n"
                                     + "3. Platform: Android · choose a free server · Create → Download the .conf file.\n"
-                                    + "4. Here: Import profile file → pick that .conf.\n\n"
+                                    + "   Repeat for other free countries — import all the files at once.\n"
+                                    + "4. Here: Import profile files → pick the .conf files.\n\n"
                                     + "Any WireGuard profile works (your own server, another provider). Free 'VPN' apps without an account often sell your data — a profile from a provider you trust is safer."))
                             .setPositiveButton(T.t("Open Proton VPN"), (d2, w2) -> {
                                 try {
@@ -239,12 +339,75 @@ public final class WgVpn {
                                 }
                             })
                             .setNegativeButton(T.t("Close"), null).show();
-                    break;
-                default:
-                    if (on()) disconnect(a);
-                    Store.putStr("wg_conf", "");
-                    UiKit.makeToast(a, T.t("Profile removed"), Toast.LENGTH_SHORT).show();
             }
         }).show();
+    }
+
+    private static void reconnect(final Activity a) {
+        disconnect(a);
+        new Handler(Looper.getMainLooper()).postDelayed(() -> connect(a), 1200);
+    }
+
+    /** What the internet sees (through the VPN when it covers this app). */
+    static void checkIp(final Activity a) {
+        UiKit.makeToast(a, T.t("Checking…"), Toast.LENGTH_SHORT).show();
+        final Handler h = new Handler(Looper.getMainLooper());
+        new Thread(() -> {
+            String msg;
+            try {
+                java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL("https://ipinfo.io/json").openConnection();
+                c.setConnectTimeout(8000);
+                c.setReadTimeout(8000);
+                java.io.InputStream in = c.getInputStream();
+                java.io.ByteArrayOutputStream o = new java.io.ByteArrayOutputStream();
+                byte[] b = new byte[4096];
+                int n;
+                while ((n = in.read(b)) > 0) o.write(b, 0, n);
+                org.json.JSONObject j = new org.json.JSONObject(o.toString("UTF-8"));
+                msg = T.t("Your IP") + ": " + j.optString("ip") + "\n" + j.optString("city") + ", " + j.optString("country")
+                        + "\n" + j.optString("org") + "\n\n" + (on() ? "🔐 VPN " + T.t("On") + " · " + scopeName() : T.t("VPN off"));
+            } catch (Exception e) {
+                msg = T.t("Can't check right now") + ": " + e.getMessage();
+            }
+            final String m = msg;
+            h.post(() -> new UiDialog(a).setTitle(T.t("Check my IP")).setMessage(m).setPositiveButton(T.t("OK"), null).show());
+        }).start();
+    }
+
+    private static void manage(final Activity a) {
+        final org.json.JSONArray all = profiles();
+        if (all.length() == 0) {
+            UiKit.makeToast(a, T.t("No profile yet"), Toast.LENGTH_SHORT).show();
+            return;
+        }
+        String[] names = new String[all.length()];
+        for (int i = 0; i < names.length; i++) names[i] = all.optJSONObject(i).optString("name");
+        new UiDialog(a).setTitle(T.t("Rename / delete profiles")).setItems(names, (d, k) ->
+                new UiDialog(a).setTitle(names[k]).setItems(new String[]{T.t("Rename"), T.t("Delete")}, (d2, w) -> {
+                    try {
+                        if (w == 0) {
+                            final EditText e = new EditText(a);
+                            e.setText(names[k]);
+                            new UiDialog(a).setTitle(T.t("Rename")).setView(e).setPositiveButton(T.t("Save"), (d3, w3) -> {
+                                try {
+                                    all.optJSONObject(k).put("name", e.getText().toString().trim());
+                                    saveAll(all);
+                                } catch (Exception ignored) {
+                                }
+                                manage(a);
+                            }).show();
+                        } else {
+                            boolean wasActive = k == active();
+                            if (wasActive && on()) disconnect(a);
+                            org.json.JSONArray keep = new org.json.JSONArray();
+                            for (int i = 0; i < all.length(); i++) if (i != k) keep.put(all.get(i));
+                            saveAll(keep);
+                            Store.putInt("wg_active", 0);
+                            UiKit.makeToast(a, T.t("Profile removed"), Toast.LENGTH_SHORT).show();
+                            manage(a);
+                        }
+                    } catch (Exception ignored) {
+                    }
+                }).show()).show();
     }
 }
