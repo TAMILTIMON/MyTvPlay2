@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:background="@drawable/widget_bg" android:orientation="vertical" android:padding="12dp" android:gravity="center_horizontal">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:gravity="center_vertical" android:orientation="horizontal">
+        <ImageView android:id="@+id/wp_logo" android:layout_width="24dp" android:layout_height="24dp" android:src="@drawable/zh_logo"
+            android:background="@drawable/widget_logo_bg" android:padding="2dp" android:contentDescription="ZH Play" />
+        <TextView android:id="@+id/wp_title" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:layout_marginStart="8dp" android:ellipsize="end" android:singleLine="true" android:text="ZH Play"
+            android:textColor="#FFFFFFFF" android:textSize="13sp" android:textStyle="bold" />
+        <ImageButton android:id="@+id/wp_power" android:layout_width="32dp" android:layout_height="32dp"
+            android:layout_marginStart="3dp" android:layout_marginEnd="3dp" android:background="@drawable/widget_btn"
+            android:src="@drawable/lc_power" android:scaleType="center" android:contentDescription="Power" />
+    </LinearLayout>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:gravity="center">
+        <FrameLayout android:layout_width="170dp" android:layout_height="170dp" android:background="@drawable/widget_pad_ring">
+            <ImageButton android:id="@+id/wp_up" android:layout_width="51dp" android:layout_height="51dp"
+                android:layout_gravity="top|center_horizontal" android:layout_margin="4dp" android:background="@drawable/widget_key"
+                android:src="@drawable/lc_chevron_up" android:scaleType="center" android:contentDescription="Up" />
+            <ImageButton android:id="@+id/wp_down" android:layout_width="51dp" android:layout_height="51dp"
+                android:layout_gravity="bottom|center_horizontal" android:layout_margin="4dp" android:background="@drawable/widget_key"
+                android:src="@drawable/lc_chevron_down" android:scaleType="center" android:contentDescription="Down" />
+            <ImageButton android:id="@+id/wp_left" android:layout_width="51dp" android:layout_height="51dp"
+                android:layout_gravity="start|center_vertical" android:layout_margin="4dp" android:background="@drawable/widget_key"
+                android:src="@drawable/lc_chevron_left" android:scaleType="center" android:contentDescription="Left" />
+            <ImageButton android:id="@+id/wp_right" android:layout_width="51dp" android:layout_height="51dp"
+                android:layout_gravity="end|center_vertical" android:layout_margin="4dp" android:background="@drawable/widget_key"
+                android:src="@drawable/lc_chevron_right" android:scaleType="center" android:contentDescription="Right" />
+            <Button android:id="@+id/wp_ok" android:layout_width="57dp" android:layout_height="57dp" android:layout_gravity="center"
+                android:background="@drawable/widget_pad_ok" android:text="OK" android:textColor="#FFFFFFFF" android:textSize="15sp"
+                android:textStyle="bold" android:contentDescription="OK" />
+        </FrameLayout>
+    </LinearLayout>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp"
+        android:gravity="center" android:orientation="horizontal">
+        <ImageButton android:id="@+id/wp_back" android:layout_width="40dp" android:layout_height="40dp"
+            android:layout_marginStart="3dp" android:layout_marginEnd="3dp" android:background="@drawable/widget_btn"
+            android:src="@drawable/lc_back" android:scaleType="center" android:contentDescription="Back" />
+        <ImageButton android:id="@+id/wp_home" android:layout_width="40dp" android:layout_height="40dp"
+            android:layout_marginStart="3dp" android:layout_marginEnd="3dp" android:background="@drawable/widget_btn"
+            android:src="@drawable/lc_house" android:scaleType="center" android:contentDescription="Home" />
+        <ImageButton android:id="@+id/wp_menu" android:layout_width="40dp" android:layout_height="40dp"
+            android:layout_marginStart="3dp" android:layout_marginEnd="3dp" android:background="@drawable/widget_btn"
+            android:src="@drawable/lc_menu" android:scaleType="center" android:contentDescription="Menu" />
+    </LinearLayout>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp"
+        android:gravity="center" android:orientation="horizontal">
+        <ImageButton android:id="@+id/wp_rew" android:layout_width="38dp" android:layout_height="38dp"
+            android:layout_marginStart="3dp" android:layout_marginEnd="3dp" android:background="@drawable/widget_btn"
+            android:src="@drawable/lc_rotate_ccw" android:scaleType="center" android:contentDescription="Back 10 seconds" />
+        <ImageButton android:id="@+id/wp_play" android:layout_width="46dp" android:layout_height="46dp"
+            android:layout_marginStart="3dp" android:layout_marginEnd="3dp" android:background="@drawable/widget_btn_main"
+            android:src="@drawable/lc_play" android:scaleType="center" android:contentDescription="Play / pause" />
+        <ImageButton android:id="@+id/wp_ff" android:layout_width="38dp" android:layout_height="38dp"
+            android:layout_marginStart="3dp" android:layout_marginEnd="3dp" android:background="@drawable/widget_btn"
+            android:src="@drawable/lc_rotate_cw" android:scaleType="center" android:contentDescription="Forward 10 seconds" />
+        <ImageButton android:id="@+id/wp_next" android:layout_width="38dp" android:layout_height="38dp"
+            android:layout_marginStart="3dp" android:layout_marginEnd="3dp" android:background="@drawable/widget_btn"
+            android:src="@drawable/lc_skip_forward" android:scaleType="center" android:contentDescription="Next" />
+    </LinearLayout>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp"
+        android:gravity="center" android:orientation="horizontal">
+        <ImageButton android:id="@+id/wp_vdown" android:layout_width="40dp" android:layout_height="40dp"
+            android:layout_marginStart="3dp" android:layout_marginEnd="3dp" android:background="@drawable/widget_btn"
+            android:src="@drawable/lc_volume_1" android:scaleType="center" android:contentDescription="Volume down" />
+        <ImageButton android:id="@+id/wp_mute" android:layout_width="40dp" android:layout_height="40dp"
+            android:layout_marginStart="3dp" android:layout_marginEnd="3dp" android:background="@drawable/widget_btn"
+            android:src="@drawable/lc_volume_x" android:scaleType="center" android:contentDescription="Mute" />
+        <ImageButton android:id="@+id/wp_vup" android:layout_width="40dp" android:layout_height="40dp"
+            android:layout_marginStart="3dp" android:layout_marginEnd="3dp" android:background="@drawable/widget_btn"
+            android:src="@drawable/lc_volume_2" android:scaleType="center" android:contentDescription="Volume up" />
+    </LinearLayout>
+</LinearLayout>

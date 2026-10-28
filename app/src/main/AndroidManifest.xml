@@ -329,13 +329,26 @@
         <receiver
             android:name=".TvWidget"
             android:exported="true"
-            android:label="ZH Play remote">
+            android:label="ZH Play · now playing">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info" />
+        </receiver>
+
+        <!-- full TV remote on the home screen (resizable) -->
+        <receiver
+            android:name=".PadWidget"
+            android:exported="true"
+            android:label="ZH Play · TV remote">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_pad_info" />
         </receiver>
 
         <!-- "Hey Google, play … on ZH Play" -->

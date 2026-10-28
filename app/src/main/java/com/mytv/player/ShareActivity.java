@@ -148,6 +148,7 @@ public class ShareActivity extends AppCompatActivity {
             try {
                 JSONObject r = TvClient.post(tv.ip, "/playmany", p);
                 Store.putStr("last_tv", tv.ip);
+                PadWidget.refreshAll(this);            // the home-screen remote shows the new TV
                 final String msg = r.optString("msg", r.optBoolean("ok") ? "Sent" : "Failed");
                 main.post(() -> {
                     UiKit.makeToast(this, msg, Toast.LENGTH_LONG).show();

@@ -249,6 +249,7 @@ public class ConnectActivity extends AppCompatActivity {
 
     private void open(String ip, String name) {
         Store.putStr("last_tv", ip);
+        PadWidget.refreshAll(this);            // the home-screen remote shows the new TV
         startActivity(new Intent(this, NativeRemoteActivity.class)
                 .putExtra(NativeRemoteActivity.EXTRA_IP, ip)
                 .putExtra(NativeRemoteActivity.EXTRA_NAME, name));

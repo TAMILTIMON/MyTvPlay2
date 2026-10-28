@@ -1,3 +1,11 @@
+ZH PLAY 4.6 — TV remote widget for the home screen
+=================================================
+* New widget "ZH Play · TV remote": control the TV without opening the app. Resizable —
+  the layout follows the size: small = D-pad + OK · medium = + Back / Home / Menu + volume ·
+  wide = D-pad beside the buttons · large = everything (+ ⟲10 / play-pause / 10⟳ / next, power).
+  Tap the title / logo to open ZH Play. It shows (and follows) the TV you picked last.
+* The old widget is now called "ZH Play · now playing" (title, ±10 s, play / pause, volume, power).
+
 ZH PLAY 4.5 — YouTube ads, VPN profiles, board fix, complete Present mode
 =======================================================================
 * YouTube in the browser: ads are now removed before they are planned (the video's ad schedule

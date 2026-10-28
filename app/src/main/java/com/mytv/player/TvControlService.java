@@ -25,7 +25,7 @@ public class TvControlService extends Service {
     private static final int ID = 7;
     static final String A_TOGGLE = "tcp.toggle", A_STOP = "tcp.stop", A_REW = "tcp.rew", A_FF = "tcp.ff",
             A_NEXT = "tcp.next", A_CLOSE = "tcp.close", A_VOLUP = "tcp.volup", A_VOLDOWN = "tcp.voldown",
-            A_MUTE = "tcp.mute", A_POWER = "tcp.power";
+            A_MUTE = "tcp.mute", A_POWER = "tcp.power", A_KEY = "tcp.key";
     private android.media.session.MediaSession session;
 
     private String ip = "", name = "TV", title = "", sub = "";
@@ -70,6 +70,11 @@ public class TvControlService extends Service {
                 case A_VOLDOWN: sendKey("vol_down"); break;
                 case A_MUTE: sendKey("vol_mute"); break;
                 case A_POWER: sendKey("power"); break;
+                case A_KEY: {                                     // the home-screen remote widget
+                    String k = intent.getStringExtra("k");
+                    if (k != null && !k.isEmpty()) sendKey(k);
+                    break;
+                }
                 default: break;
             }
             if (c != null) send(c, v);

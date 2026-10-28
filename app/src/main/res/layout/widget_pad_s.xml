@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:background="@drawable/widget_bg" android:padding="6dp">
+    <FrameLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="center">
+        <FrameLayout android:layout_width="120dp" android:layout_height="120dp" android:background="@drawable/widget_pad_ring">
+            <ImageButton android:id="@+id/wp_up" android:layout_width="36dp" android:layout_height="36dp"
+                android:layout_gravity="top|center_horizontal" android:layout_margin="4dp" android:background="@drawable/widget_key"
+                android:src="@drawable/lc_chevron_up" android:scaleType="center" android:contentDescription="Up" />
+            <ImageButton android:id="@+id/wp_down" android:layout_width="36dp" android:layout_height="36dp"
+                android:layout_gravity="bottom|center_horizontal" android:layout_margin="4dp" android:background="@drawable/widget_key"
+                android:src="@drawable/lc_chevron_down" android:scaleType="center" android:contentDescription="Down" />
+            <ImageButton android:id="@+id/wp_left" android:layout_width="36dp" android:layout_height="36dp"
+                android:layout_gravity="start|center_vertical" android:layout_margin="4dp" android:background="@drawable/widget_key"
+                android:src="@drawable/lc_chevron_left" android:scaleType="center" android:contentDescription="Left" />
+            <ImageButton android:id="@+id/wp_right" android:layout_width="36dp" android:layout_height="36dp"
+                android:layout_gravity="end|center_vertical" android:layout_margin="4dp" android:background="@drawable/widget_key"
+                android:src="@drawable/lc_chevron_right" android:scaleType="center" android:contentDescription="Right" />
+            <Button android:id="@+id/wp_ok" android:layout_width="40dp" android:layout_height="40dp" android:layout_gravity="center"
+                android:background="@drawable/widget_pad_ok" android:text="OK" android:textColor="#FFFFFFFF" android:textSize="15sp"
+                android:textStyle="bold" android:contentDescription="OK" />
+        </FrameLayout>
+    </FrameLayout>
+</FrameLayout>
