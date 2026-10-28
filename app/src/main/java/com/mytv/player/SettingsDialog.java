@@ -43,20 +43,25 @@ public final class SettingsDialog {
         final String[] themes = {"dark", "light", "system"};
         final String[] themeNames = {T.t("Dark"), T.t("Light"), T.t("Follow system")};
         String[] items = {
+                "§" + T.t("General"),
                 "🌐  Language / மொழி / भाषा: " + T.langName(),
                 "🔐  " + T.t("Remote PIN: ") + (Pair.enabled() ? Pair.pin() : T.t("Off")),
                 "🎨  " + T.t("Colours & style") + ": " + Palette.NAMES[Palette.index()] + (Palette.hasCustom() ? " +" : ""),
                 T.t("🎨  Theme: ") + themeNames[idx(themes, Store.getStr("theme", "dark"))],
                 T.t("📺  Device name: ") + Discovery.deviceName(a),
+                "§" + T.t("Picture & sound"),
                 T.t("🖼  Picture fit: ") + PlayerActivity.FIT_NAMES[Math.max(0, Math.min(3, Store.getInt("fit", 0)))],
                 T.t("📐  Aspect ratio: ") + PlayerActivity.ASPECT_NAMES[idx(PlayerActivity.ASPECT_VALUES, Store.getStr("aspect", ""))],
                 T.t("🎚  Equalizer…"),
                 T.t("🔊  Default volume: ") + Store.getInt("vol", 100) + "%",
+                "§" + T.t("Subtitles"),
                 T.t("💬  Subtitle size: ") + PlayerActivity.SUB_SIZE_NAMES[Math.max(0, idx(PlayerActivity.SUB_SIZES, Store.getInt("subsize", 16)))],
                 T.t("💬  Subtitle background: ") + (Store.getBool("subbg", false) ? "On" : T.t("Off")),
                 T.t("🔤  Subtitle encoding: ") + PlayerActivity.ENC_NAMES[idx(PlayerActivity.ENC_VALUES, Store.getStr("subenc", ""))],
+                "§" + T.t("Playback"),
                 T.t("⚙  Decoder: ") + (Store.getInt("hw", 0) == 1 ? T.t("Software") : T.t("Hardware (auto)")),
                 T.t("🌐  Network buffer: ") + Store.getInt("cache", 2000) / 1000f + " s",
+                "§" + T.t("Remote & permissions"),
                 T.t("🔌  Start phone remote when device boots: ") + (Store.getBool("boot", Ui.isTv(a)) ? "On" : T.t("Off")),
                 T.t("🧹  Clear “Recently played”"),
                 T.t("🔓  Allow phone to start videos (display over apps): ") + (Perms.overlayOk(a) ? T.t("Allowed") : T.t("Not allowed")),
@@ -65,10 +70,12 @@ public final class SettingsDialog {
                 "🔌  " + T.t("Full remote for every app (ADB)") + ": " + T.t(AdbClient.enabled() ? "On" : "Off"),
                 "📺  " + T.t("Show other apps' videos on the remote") + ": " + T.t(SessionWatcher.available(a) ? "On" : "Off")
                         + (!SessionWatcher.allowed(a) && SessionWatcher.available(a) ? " (ADB)" : ""),
+                "§" + T.t("Storage & updates"),
                 "⬇  " + T.t("Downloads") + " · " + T.t("night only") + ": " + T.t(TorrentDownloads.nightOnly() ? "On" : "Off"),
                 "⬆  " + T.t(Updater.playBuild(a) ? "Updates (Google Play)" : "Check for updates") + " (" + Updater.installedName(a) + ")",
                 "💾  " + T.t("Backup & restore"),
                 "🧲  " + T.t("Torrent storage: ") + String.format(java.util.Locale.US, "%.2f GB", TorrentEngine.cacheBytes(a) / 1073741824.0),
+                "§" + T.t("More"),
                 T.t("📱  Use as remote for another TV…"),
                 "👨‍👩‍👧  " + T.t("Profiles & kids lock") + ": " + Family.label(),
                 T.t("ℹ  Phone remote address: http://") + Net.ip() + ":" + RemoteService.PORT};

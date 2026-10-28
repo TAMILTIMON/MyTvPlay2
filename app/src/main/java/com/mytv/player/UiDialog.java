@@ -37,18 +37,80 @@ public class UiDialog extends AlertDialog.Builder {
         return super.setMessage(m == null ? null : UiKit.noEmoji(m));
     }
 
-    /** Menu lists: a Lucide icon in front of each row. */
+    /**
+     * Menu lists in the settings style (Brave-like): each line a rounded card — icon, title, grey value underneath,
+     * a switch for On / Off values, red for delete / reset / clear. Lines starting with "§" are headings
+     * (not counted: the listener still gets the same numbers as before).
+     */
     @Override
     public AlertDialog.Builder setItems(final CharSequence[] items, final DialogInterface.OnClickListener l) {
-        ArrayAdapter<CharSequence> ad = new ArrayAdapter<CharSequence>(ctx, android.R.layout.select_dialog_item, items) {
+        final java.util.List<Object[]> rows = new java.util.ArrayList<>();
+        final java.util.List<Integer> realIndex = new java.util.ArrayList<>();
+        int n = 0;
+        for (CharSequence it : items) {
+            Object[] r = UiRows.parse(ctx, it);
+            rows.add(r);
+            realIndex.add((Integer) r[3] == -2 ? -1 : n++);
+        }
+        android.widget.BaseAdapter ad = new android.widget.BaseAdapter() {
+            public int getCount() {
+                return rows.size();
+            }
+
+            public Object getItem(int p) {
+                return rows.get(p);
+            }
+
+            public long getItemId(int p) {
+                return p;
+            }
+
             @Override
+            public boolean isEnabled(int p) {
+                return realIndex.get(p) >= 0;
+            }
+
+            @Override
+            public boolean areAllItemsEnabled() {
+                return false;
+            }
+
             public View getView(int p, View cv, ViewGroup parent) {
-                TextView t = (TextView) super.getView(p, cv, parent);
-                UiKit.iconize(t, Ui.ACCENT);
-                return t;
+                Object[] r = rows.get(p);
+                android.widget.FrameLayout wrap = new android.widget.FrameLayout(ctx);
+                wrap.setPadding(Ui.dp(ctx, 14), 0, Ui.dp(ctx, 14), 0);
+                if ((Integer) r[3] == -2) {
+                    wrap.addView(UiRows.header(ctx, (String) r[1]));
+                    return wrap;
+                }
+                View row = UiRows.row(ctx, (String) r[0], (String) r[1], (String) r[2], (Integer) r[3], (Boolean) r[4], null);
+                row.setClickable(false);          // the list handles the tap
+                row.setFocusable(false);
+                wrap.addView(row);
+                return wrap;
             }
         };
-        return super.setAdapter(ad, l);
+        return super.setAdapter(ad, (d, w) -> {
+            int real = w >= 0 && w < realIndex.size() ? realIndex.get(w) : -1;
+            if (real >= 0 && l != null) l.onClick(d, real);
+        });
+    }
+
+    /** No grey lines between the card rows. */
+    @Override
+    public AlertDialog create() {
+        final AlertDialog d = super.create();
+        d.setOnShowListener(x -> {
+            android.widget.ListView lv = d.getListView();
+            if (lv != null) {
+                lv.setDivider(null);
+                lv.setDividerHeight(0);
+                lv.setSelector(new android.graphics.drawable.ColorDrawable(0));
+                lv.setPadding(0, Ui.dp(ctx, 4), 0, Ui.dp(ctx, 8));
+                lv.setClipToPadding(false);
+            }
+        });
+        return d;
     }
 
     @Override

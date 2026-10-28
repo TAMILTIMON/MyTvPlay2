@@ -226,6 +226,10 @@ public class PresentShowActivity extends AppCompatActivity {
             main.post(() -> {
                 if (tok != loadToken || page != i || bm == null || gen != renderGen) return;
                 if (newPage) {
+                    shownZoom = 1f;
+                    shownCx = shownCy = 0.5f;
+                    img.setImageMatrix(new android.graphics.Matrix());
+                    img.setScaleType(ImageView.ScaleType.FIT_XY);
                     img.setAlpha(0.35f);
                     img.animate().alpha(1f).setDuration(160).start();
                 }
@@ -253,6 +257,63 @@ public class PresentShowActivity extends AppCompatActivity {
             }
         }).start();
     }
+
+    // ---- live zoom: scale the picture already on screen while the fingers move, redraw sharp after
+    private float shownZoom = 1f, shownCx = 0.5f, shownCy = 0.5f;     // what the current bitmap was drawn for
+    private int shownGen;
+
+    /** page → screen {S, ox, oy} for a zoom state, without opening the page (sizes from the last render). */
+    private float[] tfFor(float z, float cx, float cy) {
+        float pw, ph;
+        synchronized (tf) {
+            pw = tf[3];
+            ph = pageH;
+        }
+        int W = Math.max(1, img.getWidth()), H = Math.max(1, img.getHeight());
+        if (pw <= 0 || ph <= 0) return null;
+        float S = Math.min(W / pw, H / ph) * z;
+        float ox = pw * S <= W ? (W - pw * S) / 2 : Math.max(W - pw * S, Math.min(0, W / 2f - cx * pw * S));
+        float oy = ph * S <= H ? (H - ph * S) / 2 : Math.max(H - ph * S, Math.min(0, H / 2f - cy * ph * S));
+        return new float[]{S, ox, oy};
+    }
+
+    private void liveZoom() {
+        float[] a = tfFor(shownZoom, shownCx, shownCy), b = tfFor(zoom, zcx, zcy);
+        if (a == null || b == null) return;
+        float k = b[0] / a[0];                               // screen point of the old picture → where it belongs now
+        android.graphics.Matrix m = new android.graphics.Matrix();
+        m.setScale(k, k);
+        m.postTranslate(b[1] - a[1] * k, b[2] - a[2] * k);
+        img.setScaleType(ImageView.ScaleType.MATRIX);
+        img.setImageMatrix(m);
+        synchronized (tf) {                                  // laser / pen / spotlight follow the new view too
+            tf[0] = b[0];
+            tf[1] = b[1];
+            tf[2] = b[2];
+        }
+        pointer.invalidate();
+    }
+
+    private final Runnable sharpZoom = () -> {
+        final int i = page, tok = loadToken, gen = ++renderGen;
+        final float z = zoom, cx = zcx, cy = zcy;
+        new Thread(() -> {
+            final Bitmap bm = render(i);
+            main.post(() -> {
+                // show it unless the page changed or a newer picture is already up (never throw away a newer one)
+                if (tok != loadToken || page != i || bm == null || gen < shownGen) return;
+                shownGen = gen;
+                shownZoom = z;
+                shownCx = cx;
+                shownCy = cy;
+                img.setImageMatrix(new android.graphics.Matrix());
+                img.setScaleType(ImageView.ScaleType.FIT_XY);
+                img.setImageBitmap(bm);
+                if (z != zoom || cx != zcx || cy != zcy) liveZoom();   // fingers moved on meanwhile
+                pointer.invalidate();
+            });
+        }).start();
+    };
 
     /** Slide coordinates (0…1) → screen pixels with the current zoom. */
     float[] toScreen(float fx, float fy) {
@@ -282,17 +343,9 @@ public class PresentShowActivity extends AppCompatActivity {
                     zoom = Math.max(1f, Math.min(8f, Float.parseFloat(z[0])));
                     zcx = Math.max(0f, Math.min(1f, Float.parseFloat(z[1])));
                     zcy = Math.max(0f, Math.min(1f, Float.parseFloat(z[2])));
-                    final int i = page;
-                    final int tok = loadToken, gen = ++renderGen;
-                    new Thread(() -> {
-                        if (gen != renderGen) return;
-                        final Bitmap bm = render(i);
-                        main.post(() -> {
-                            if (tok != loadToken || page != i || bm == null || gen != renderGen) return;
-                            img.setImageBitmap(bm);
-                            pointer.invalidate();
-                        });
-                    }).start();
+                    liveZoom();                                       // 1. follow the fingers at once
+                    main.removeCallbacks(sharpZoom);
+                    main.postDelayed(sharpZoom, 140);                 // 2. sharp picture when the fingers pause
                     break;
                 }
                 case "pointer": pointer.laser(Float.parseFloat(x), Float.parseFloat(y)); break;

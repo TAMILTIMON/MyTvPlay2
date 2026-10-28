@@ -1,3 +1,16 @@
+ZH PLAY 4.7 — live zoom on the TV, address suggestions, new menu style
+=====================================================================
+* Present: the TV follows the pinch live (scales the picture at once, redraws it sharp when the
+  fingers pause). Before, every in-between drawing was thrown away while the fingers moved, so the
+  TV only changed after the pinch. The phone warns if the TV's ZH Play is too old for zoom.
+* Browser: suggestions while typing in the address bar — history (sites you visit often first),
+  bookmarks ★, open the typed address, search; inline completion ("you" → youtube.com, Enter takes
+  it); ↖ puts a suggestion into the bar to edit.
+* Menus in the settings style (like Brave): each line a rounded card with the title, the current
+  value in grey underneath, switches for On / Off, red for delete / reset / clear, section headings
+  (Settings: General · Picture & sound · Subtitles · Playback · Remote & permissions · Storage &
+  updates · More). Browser menu: quick buttons + This page · Privacy & security · Customize.
+
 ZH PLAY 4.6 — TV remote widget for the home screen
 =================================================
 * New widget "ZH Play · TV remote": control the TV without opening the app. Resizable —

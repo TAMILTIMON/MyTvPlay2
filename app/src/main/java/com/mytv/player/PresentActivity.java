@@ -395,8 +395,16 @@ public class PresentActivity extends AppCompatActivity {
                 p.put("url", shareUrl);
                 p.put("title", title);
                 org.json.JSONObject r = TvClient.post(ip, "/present", p);
-                final String m = r.optBoolean("ok", true) ? T.t("On the TV — ") + count + " " + T.t("slides") : r.optString("msg");
-                main.post(() -> status.setText(m));
+                String m = r.optBoolean("ok", true) ? T.t("On the TV — ") + count + " " + T.t("slides") : r.optString("msg");
+                // an older ZH Play on the TV doesn't know zoom / pen / spotlight: say so instead of silently ignoring
+                try {
+                    Thread.sleep(1500);
+                    org.json.JSONObject st = TvClient.post(ip, "/presentstate", new HashMap<String, String>());
+                    if (!st.has("zoom")) m = "⚠ " + T.t("Update ZH Play on the TV for zoom, pen and spotlight");
+                } catch (Exception ignored) {
+                }
+                final String m2 = m;
+                main.post(() -> status.setText(m2));
             } catch (Exception e) {
                 main.post(() -> status.setText("⚠ " + T.t("Cannot reach the TV")));
             }

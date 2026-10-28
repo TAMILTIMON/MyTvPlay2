@@ -120,6 +120,7 @@ public class BrowserActivity extends AppCompatActivity {
         bar.setImeOptions(EditorInfo.IME_ACTION_GO);
         bar.setSelectAllOnFocus(true);
         bar.setOnEditorActionListener((v, a1, e) -> {
+            hideSuggest();
             go(bar.getText().toString());
             bar.clearFocus();
             return true;
@@ -129,7 +130,26 @@ public class BrowserActivity extends AppCompatActivity {
                 String u = web.getUrl();
                 bar.setText(u == null || u.startsWith("data:") || u.startsWith("about:") || u.contains("tamilcastplay.local") ? "" : u);
                 bar.selectAll();
-            } else updateOmni();
+            } else {
+                hideSuggest();
+                updateOmni();
+            }
+        });
+        bar.addTextChangedListener(new android.text.TextWatcher() {
+            int before;
+
+            public void beforeTextChanged(CharSequence c, int st, int cnt, int after) {
+                before = c.length();
+            }
+
+            public void onTextChanged(CharSequence c, int st, int b, int cnt) {
+            }
+
+            public void afterTextChanged(android.text.Editable e) {
+                if (completing || !bar.hasFocus()) return;
+                boolean typedMore = e.length() > before;           // deleting must not bring the completion back
+                suggest(e.toString(), typedMore);
+            }
         });
         omni.addView(bar, new LinearLayout.LayoutParams(0, Ui.dp(this, 44), 1));
         reloadBtn = new ImageView(this);
@@ -1121,25 +1141,22 @@ public class BrowserActivity extends AppCompatActivity {
                     UiKit.makeToast(this, T.t("Copied"), Toast.LENGTH_SHORT).show();
                 }},
                 {"house", T.t("Exit browser"), (Runnable) () -> Ui.goHome(this, tv)}};
-        LinearLayout row = null;
-        for (int i = 0; i < it.length; i++) {
-            if (i % 4 == 0) {
-                row = new LinearLayout(this);
-                box.addView(row);
-            }
+        // ---- quick buttons on top, then grouped settings-style rows (like Brave)
+        LinearLayout quick = new LinearLayout(this);
+        for (int i : new int[]{0, 20, 6, 8, 2}) {
             final Runnable run = (Runnable) it[i][2];
             LinearLayout c = new LinearLayout(this);
             c.setOrientation(LinearLayout.VERTICAL);
             c.setGravity(Gravity.CENTER_HORIZONTAL);
-            c.setPadding(0, Ui.dp(this, 10), 0, Ui.dp(this, 10));
+            c.setPadding(0, Ui.dp(this, 10), 0, Ui.dp(this, 8));
             c.setBackground(Ui.focusCard(this, 16));
             c.setFocusable(true);
             c.setClickable(true);
-            c.addView(UiKit.icon(this, (String) it[i][0], 22, Ui.TEXT), new LinearLayout.LayoutParams(Ui.dp(this, 30), Ui.dp(this, 30)));
+            c.addView(UiKit.icon(this, (String) it[i][0], 22, Ui.ACCENT), new LinearLayout.LayoutParams(Ui.dp(this, 28), Ui.dp(this, 28)));
             TextView t = Ui.text(this, 11, Ui.TEXT, false);
-            t.setText((String) it[i][1]);
+            t.setText(i == 20 ? T.t("Tabs") + " (" + tabs.size() + ")" : (String) it[i][1]);
             t.setGravity(Gravity.CENTER);
-            t.setMaxLines(2);
+            t.setSingleLine(true);
             t.setPadding(Ui.dp(this, 2), Ui.dp(this, 4), Ui.dp(this, 2), 0);
             c.addView(t);
             c.setOnClickListener(v -> {
@@ -1147,10 +1164,62 @@ public class BrowserActivity extends AppCompatActivity {
                 run.run();
             });
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
-            lp.setMargins(Ui.dp(this, 3), Ui.dp(this, 3), Ui.dp(this, 3), Ui.dp(this, 3));
-            row.addView(c, lp);
+            lp.setMargins(Ui.dp(this, 3), 0, Ui.dp(this, 3), Ui.dp(this, 4));
+            quick.addView(c, lp);
         }
-        while (row != null && row.getChildCount() < 4) row.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1));
+        box.addView(quick);
+        LinearLayout list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        String host = hosts.get(web);
+        boolean site = host != null && !host.isEmpty() && !host.equals("tamilcastplay.local");
+        boolean bm = cur != null && BrowserData.isBookmarked(cur);
+        // {index in `it`, title, value under it, switch (-1 none / 0 / 1), red}
+        Object[][] sections = {
+                {"§", T.t("This page")},
+                {19, T.t("Reload"), null, -1, false},
+                {12, T.t("Find in page"), null, -1, false},
+                {16, T.t("Videos on page"), found.isEmpty() ? null : found.size() + " " + T.t("found"), -1, false},
+                {7, T.t(bm ? "Remove bookmark" : "Add bookmark"), null, -1, false},
+                {14, T.t("Share"), null, -1, false},
+                {21, T.t("Copy link"), null, -1, false},
+                {15, T.t("Open on TV"), tv ? null : Store.getStr("last_tv", ""), -1, false},
+                {13, T.t("Desktop site"), T.t(desk ? "On" : "Off"), desk ? 1 : 0, false},
+                {"§", T.t("Privacy & security")},
+                {1, T.t("Private tab"), T.t("No history is saved"), priv ? 1 : 0, false},
+                {17, T.t("Shield"), T.t(Shield.enabled() ? "Ads & trackers blocked" : "Off"), -1, false},
+                {5, T.t("Site settings"), site ? host : T.t("All sites"), -1, false},
+                {4, "VPN", WgVpn.status(this), -1, false},
+                {18, T.t("Clear data"), T.t("History, cookies, cache"), -1, true},
+                {"§", T.t("Customize")},
+                {3, T.t("Appearance"), T.t(BrowserLook.BG_NAMES[java.util.Arrays.asList(BrowserLook.BG_IDS).indexOf(BrowserLook.bg()) < 0 ? 0
+                        : java.util.Arrays.asList(BrowserLook.BG_IDS).indexOf(BrowserLook.bg())]), -1, false},
+                {9, T.t("Background play"), T.t("Keep playing with the screen off"), Store.getBool("b_bgplay", true) ? 1 : 0, false},
+                {10, T.t("Page equalizer"), T.t("EQ button on pages with sound"), Store.getBool("b_eq", true) ? 1 : 0, false},
+                {11, T.t("Restore tabs"), T.t("Open last tabs next time"), Store.getBool("b_restore", true) ? 1 : 0, false},
+                {"§", ""},
+                {22, T.t("Exit browser"), null, -1, false}};
+        for (Object[] sct : sections) {
+            if ("§".equals(sct[0])) {
+                if (!((String) sct[1]).isEmpty()) list.addView(UiRows.header(this, (String) sct[1]));
+                continue;
+            }
+            int i = (Integer) sct[0];
+            if (i == 15 && tv) continue;                               // "Open on TV" only from the phone
+            final Runnable run = (Runnable) it[i][2];
+            final boolean isToggle = (Integer) sct[3] >= 0;
+            list.addView(UiRows.row(this, (String) it[i][0], (String) sct[1], (String) sct[2], (Integer) sct[3], (Boolean) sct[4], v -> {
+                d.dismiss();
+                run.run();
+                if (isToggle) main.postDelayed(this::menu, 120);      // reopen: the switch shows the new state
+            }));
+        }
+        android.widget.ScrollView sv = new android.widget.ScrollView(this);
+        sv.addView(list);
+        sv.setVerticalScrollBarEnabled(false);
+        int maxH = (int) (getResources().getDisplayMetrics().heightPixels * 0.62f);
+        list.measure(View.MeasureSpec.makeMeasureSpec(getResources().getDisplayMetrics().widthPixels, View.MeasureSpec.AT_MOST),
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
+        box.addView(sv, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Math.min(maxH, list.getMeasuredHeight())));
         d.setContentView(box);
         android.view.Window w = d.getWindow();
         if (w != null) {
@@ -1746,6 +1815,130 @@ public class BrowserActivity extends AppCompatActivity {
         setIntent(intent);
         String u = intent.getStringExtra(EXTRA_URL);
         if (u != null && !u.isEmpty()) newTab(u);
+    }
+
+    // ---------- address bar suggestions (history, bookmarks, search) ----------
+    private LinearLayout suggestBox;
+    private boolean completing;
+
+    private void hideSuggest() {
+        if (suggestBox != null) suggestBox.setVisibility(View.GONE);
+    }
+
+    private void suggest(String typed, boolean inlineComplete) {
+        String q = typed.trim();
+        if (bar.getSelectionStart() != bar.getSelectionEnd() && bar.getSelectionEnd() == typed.length()) {
+            q = typed.substring(0, bar.getSelectionStart()).trim();      // ignore our own completed part
+        }
+        if (q.isEmpty()) {
+            hideSuggest();
+            return;
+        }
+        if (suggestBox == null) {
+            suggestBox = new LinearLayout(this);
+            suggestBox.setOrientation(LinearLayout.VERTICAL);
+            suggestBox.setBackground(Ui.card(this, Ui.dark() ? 0xF21A1722 : 0xF2FFFFFF, Ui.STROKE, 16));
+            suggestBox.setElevation(Ui.dp(this, 10));
+            suggestBox.setPadding(0, Ui.dp(this, 4), 0, Ui.dp(this, 4));
+            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP);
+            lp.setMargins(Ui.dp(this, 8), Ui.dp(this, 4), Ui.dp(this, 8), 0);
+            webBox.addView(suggestBox, lp);
+        }
+        final String ql = q.toLowerCase(java.util.Locale.ROOT);
+        List<BrowserData.Entry> hits = new ArrayList<>();
+        List<Integer> score = new ArrayList<>();
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        for (BrowserData.Entry e : BrowserData.bookmarks()) addHit(e, ql, true, hits, score, seen);
+        for (BrowserData.Entry e : BrowserData.history()) addHit(e, ql, false, hits, score, seen);
+        // best first: address starts with the text > title has it > address has it; bookmarks and frequent visits higher
+        Integer[] order = new Integer[hits.size()];
+        for (int i = 0; i < order.length; i++) order[i] = i;
+        java.util.Arrays.sort(order, (x, y) -> score.get(y) - score.get(x));
+        suggestBox.removeAllViews();
+        boolean looksUrl = q.contains(".") && !q.contains(" ");
+        if (looksUrl) suggestRow("globe", q, T.t("Open this address"), q, null);
+        int n = 0;
+        String completion = null;
+        for (Integer k : order) {
+            if (n >= 6) break;
+            BrowserData.Entry e = hits.get(k);
+            String host = BrowserData.host(e.url);
+            if (completion == null && host.toLowerCase(java.util.Locale.ROOT).startsWith(ql)) completion = host;
+            suggestRow(null, e.title == null || e.title.isEmpty() ? host : e.title, host + (score.get(k) >= 1000 ? "  ★" : ""), e.url, e.url);
+            n++;
+        }
+        suggestRow("search", q, T.t("Search") + " · " + BrowserLook.ENGINES[Store.getInt("bl_engine", 0)], q, null);
+        suggestBox.setVisibility(View.VISIBLE);
+        // inline completion: "you" → "youtube.com" with the added part selected (typing replaces it, Enter takes it)
+        if (inlineComplete && completion != null && completion.length() > q.length() && typed.equals(q)) {
+            completing = true;
+            bar.setText(completion);
+            bar.setSelection(q.length(), completion.length());
+            completing = false;
+        }
+    }
+
+    private void addHit(BrowserData.Entry e, String ql, boolean bookmark, List<BrowserData.Entry> hits, List<Integer> score,
+                        java.util.Set<String> seen) {
+        if (e.url == null || seen.contains(e.url)) return;
+        String host = BrowserData.host(e.url).toLowerCase(java.util.Locale.ROOT);
+        String t = e.title == null ? "" : e.title.toLowerCase(java.util.Locale.ROOT), u = e.url.toLowerCase(java.util.Locale.ROOT);
+        int sc;
+        if (host.startsWith(ql) || host.startsWith("m." + ql)) sc = 500;
+        else if (t.contains(ql)) sc = 300;
+        else if (u.contains(ql)) sc = 200;
+        else return;
+        sc += Math.min(200, e.visits * 10) + (bookmark ? 1000 : 0);
+        seen.add(e.url);
+        hits.add(e);
+        score.add(sc);
+    }
+
+    private void suggestRow(String icon, String title, String sub, final String go, final String fill) {
+        LinearLayout r = new LinearLayout(this);
+        r.setGravity(Gravity.CENTER_VERTICAL);
+        r.setPadding(Ui.dp(this, 12), Ui.dp(this, 8), Ui.dp(this, 4), Ui.dp(this, 8));
+        r.setBackground(Ui.focusCard(this, 10));
+        ImageView ic = new ImageView(this);
+        Bitmap fav = icon == null ? BrowserData.icon(this, go) : null;
+        if (fav != null) ic.setImageBitmap(fav);
+        else ic.setImageDrawable(new UiKit.Icon(this, icon == null ? "globe" : icon, 18, Ui.DIM));
+        r.addView(ic, new LinearLayout.LayoutParams(Ui.dp(this, 22), Ui.dp(this, 22)));
+        LinearLayout col = new LinearLayout(this);
+        col.setOrientation(LinearLayout.VERTICAL);
+        col.setPadding(Ui.dp(this, 12), 0, Ui.dp(this, 6), 0);
+        TextView t = Ui.text(this, 14, Ui.TEXT, false);
+        t.setText(title);
+        t.setSingleLine(true);
+        t.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        TextView sv = Ui.text(this, 11, Ui.DIM, false);
+        sv.setText(sub);
+        sv.setSingleLine(true);
+        sv.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        col.addView(t);
+        col.addView(sv);
+        r.addView(col, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        if (fill != null) {
+            TextView up = Ui.text(this, 18, Ui.DIM, true);
+            up.setText("↖");
+            up.setGravity(Gravity.CENTER);
+            up.setContentDescription(T.t("Edit this address"));
+            up.setOnClickListener(v -> {
+                completing = true;
+                bar.setText(fill);
+                bar.setSelection(fill.length());
+                completing = false;
+                suggest(fill, false);
+            });
+            r.addView(up, new LinearLayout.LayoutParams(Ui.dp(this, 40), Ui.dp(this, 40)));
+        }
+        r.setOnClickListener(v -> {
+            hideSuggest();
+            go(go);
+            bar.clearFocus();
+        });
+        suggestBox.addView(r);
     }
 
     // ---------- site settings ----------
