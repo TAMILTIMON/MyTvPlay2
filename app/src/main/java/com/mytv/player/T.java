@@ -35,6 +35,20 @@ public final class T {
     }
 
     static {
+        TA.put("Starting the live picture…", "நேரலைப் படம் தொடங்குகிறது…");
+        HI.put("Starting the live picture…", "लाइव तस्वीर शुरू हो रही है…");
+        TA.put("If the TV asks \"Start now?\", press OK once", "டிவி \"இப்போது தொடங்கவா?\" என்று கேட்டால், ஒருமுறை OK அழுத்தவும்");
+        HI.put("If the TV asks \"Start now?\", press OK once", "अगर टीवी \"अभी शुरू करें?\" पूछे, तो एक बार OK दबाएँ");
+        TA.put("Showing this TV on the phone", "இந்த டிவியை போனில் காட்டுகிறது");
+        HI.put("Showing this TV on the phone", "यह टीवी फ़ोन पर दिख रहा है");
+        TA.put("The TV stopped the live picture", "டிவி நேரலைப் படத்தை நிறுத்தியது");
+        HI.put("The TV stopped the live picture", "टीवी ने लाइव तस्वीर रोकी");
+        TA.put("Live picture of the TV. Netflix / Prime may show black (protected).", "டிவியின் நேரலைப் படம். Netflix / Prime கருப்பாகத் தெரியலாம் (பாதுகாக்கப்பட்டது).");
+        HI.put("Live picture of the TV. Netflix / Prime may show black (protected).", "टीवी की लाइव तस्वीर। Netflix / Prime काला दिख सकता है (सुरक्षित)।");
+        TA.put("showing a picture about once a second", "ஒரு வினாடிக்கு ஒரு படம் காட்டுகிறது");
+        HI.put("showing a picture about once a second", "हर सेकंड एक तस्वीर दिखा रहा है");
+        TA.put("Live video isn't available from this TV yet (update ZH Play on the TV) — showing a picture about once a second.", "இந்த டிவியிலிருந்து நேரலை வீடியோ இன்னும் இல்லை (டிவியில் ZH Play-ஐப் புதுப்பிக்கவும்) — ஒரு வினாடிக்கு ஒரு படம் காட்டுகிறது.");
+        HI.put("Live video isn't available from this TV yet (update ZH Play on the TV) — showing a picture about once a second.", "इस टीवी से लाइव वीडियो अभी उपलब्ध नहीं (टीवी पर ZH Play अपडेट करें) — हर सेकंड एक तस्वीर दिखा रहा है।");
         TA.put("Select all", "அனைத்தையும் தேர்ந்தெடு");
         HI.put("Select all", "सभी चुनें");
         TA.put("songs to deck", "பாடல்கள் டெக்குக்கு");

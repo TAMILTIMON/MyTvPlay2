@@ -40,7 +40,11 @@ import java.util.HashMap;
  * Android's screen capture → H.264 encoder → Wi-Fi → ZH Play on the TV decodes and shows it full screen.
  */
 public class CastScreenService extends Service {
-    public static final String EXTRA_CODE = "code", EXTRA_DATA = "data", EXTRA_TV = "tv", EXTRA_HD = "hd", EXTRA_SOUND = "sound";
+    public static final String EXTRA_CODE = "code", EXTRA_DATA = "data", EXTRA_TV = "tv", EXTRA_HD = "hd", EXTRA_SOUND = "sound",
+            EXTRA_LIVE_KEY = "live_key", EXTRA_LIVE_PORT = "live_port";
+    /** "Live TV screen": the TV streams its own screen to a phone that is waiting with a one-time key. */
+    private String liveKey;
+    private int livePort;
     private static final String CH = "cast_screen";
     private static final int ID = 14;
 
@@ -69,6 +73,15 @@ public class CastScreenService extends Service {
         else c.startService(i);
     }
 
+    /** On the TV: stream this TV's screen to a phone waiting at ip:port with a one-time key. */
+    public static void startLive(Context c, int code, Intent data, String phoneIp, int port, String key) {
+        Intent i = new Intent(c, CastScreenService.class).putExtra(EXTRA_CODE, code).putExtra(EXTRA_DATA, data)
+                .putExtra(EXTRA_TV, phoneIp).putExtra(EXTRA_HD, false).putExtra(EXTRA_SOUND, false)
+                .putExtra(EXTRA_LIVE_KEY, key).putExtra(EXTRA_LIVE_PORT, port);
+        if (Build.VERSION.SDK_INT >= 26) c.startForegroundService(i);
+        else c.startService(i);
+    }
+
     public static void stop(Context c) {
         c.stopService(new Intent(c, CastScreenService.class));
     }
@@ -84,6 +97,9 @@ public class CastScreenService extends Service {
         tv = intent.getStringExtra(EXTRA_TV);
         hd = intent.getBooleanExtra(EXTRA_HD, false);
         sound = intent.getBooleanExtra(EXTRA_SOUND, true);
+        liveKey = intent.getStringExtra(EXTRA_LIVE_KEY);
+        livePort = intent.getIntExtra(EXTRA_LIVE_PORT, 0);
+        if (liveKey != null) sound = false;                       // the phone only shows the picture
         MediaProjectionManager mpm = (MediaProjectionManager) getSystemService(MEDIA_PROJECTION_SERVICE);
         try {
             projection = mpm.getMediaProjection(intent.getIntExtra(EXTRA_CODE, 0), intent.getParcelableExtra(EXTRA_DATA));
@@ -109,14 +125,17 @@ public class CastScreenService extends Service {
 
     private void run() {
         try {
-            // 1. the TV opens its screen-cast page and waits for us
-            HashMap<String, String> p = new HashMap<>();
-            p.put("token", "");
-            TvClient.post(tv, "/mirror", p);
+            // 1. the TV opens its screen-cast page and waits for us (live view: the phone is already waiting)
+            if (liveKey == null) {
+                HashMap<String, String> p = new HashMap<>();
+                p.put("token", "");
+                TvClient.post(tv, "/mirror", p);
+            }
+            int port = liveKey != null ? livePort : MirrorProto.PORT;
             for (int i = 0; i < 25 && sock == null && alive; i++) {
                 try {
                     Socket s = new Socket();
-                    s.connect(new InetSocketAddress(tv, MirrorProto.PORT), 800);
+                    s.connect(new InetSocketAddress(tv, port), 800);
                     s.setTcpNoDelay(true);
                     s.setSendBufferSize(1 << 20);
                     sock = s;
@@ -128,11 +147,11 @@ public class CastScreenService extends Service {
             primaryOut = new BufferedOutputStream(sock.getOutputStream(), 1 << 16);
             out = new DataOutputStream(primaryOut);
             // first line: the pairing token, so only paired phones can show their screen
-            String token = TvClient.token(tv);
+            String token = liveKey != null ? liveKey : TvClient.token(tv);
             byte[] t = ((token == null ? "" : token) + "\n").getBytes("UTF-8");
             MirrorProto.write(out, MirrorProto.BYE + 1, false, 0, t, 0, t.length);   // type 10 = hello
             // a TV group: the same picture to every other TV of the group
-            for (String other : TvGroup.others(tv)) {
+            for (String other : liveKey != null ? new java.util.ArrayList<String>() : TvGroup.others(tv)) {
                 try {
                     HashMap<String, String> op = new HashMap<>();
                     op.put("token", "");
@@ -159,7 +178,7 @@ public class CastScreenService extends Service {
                 }
             }
             if (!peers.isEmpty()) out = new DataOutputStream(new GroupOut(primaryOut, peers));
-            final String msg = peers.isEmpty() ? T.t("Casting your screen to the TV")
+            final String msg = liveKey != null ? T.t("Showing this TV on the phone") : peers.isEmpty() ? T.t("Casting your screen to the TV")
                     : T.t("Casting your screen to") + " " + (peers.size() + 1) + " " + T.t("TVs");
             main.post(() -> notifyNow(msg));
             status = msg;

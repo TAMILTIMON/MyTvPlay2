@@ -1,3 +1,15 @@
+ZH PLAY 5.4 — Live TV screen: smooth live video
+=============================================
+* Live TV screen is now real live video: the TV records its own screen with the hardware video
+  encoder (like Cast screen, the other way round) and streams it to the phone — smooth (up to
+  30 frames a second), low delay. Before, it was a full PNG screenshot through ADB each time,
+  which can only manage about one picture a second.
+* No ADB needed for it. Android asks once on the TV for screen capture ("Start now?"); with the
+  ADB full remote on, ZH Play allows itself permanently (appops PROJECT_MEDIA) and nothing is asked.
+  Or once from a PC: adb shell appops set com.tamil.castplay PROJECT_MEDIA allow
+* The TV stops capturing as soon as the Live TV screen page is closed.
+* Fallback: an older TV app or the Linux PC keeps the picture-about-once-a-second view (it says so).
+
 ZH PLAY 5.3 — DJ: jog wheels (scratch), easier multi-song adding, files & folders
 ==============================================================================
 * Jog wheel on both decks (like a DJ controller): the platter turns with the music (33⅓ rpm);

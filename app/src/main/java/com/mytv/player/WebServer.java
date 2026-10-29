@@ -366,6 +366,33 @@ public class WebServer extends NanoHTTPD {
                     return json(new JSONObject().put("app", "mytvplayer").put("name", Discovery.deviceName(ctx))
                             .put("tv", Ui.isTv(ctx)).put("ip", Net.ip()).put("share", Store.getBool("share_fs", false)).toString());
 
+                case "/livescreen": {
+                    // the phone watches this TV live: it waits at its address + port with a one-time key
+                    final String phone = s.getRemoteIpAddress();
+                    final int port = parseIntOr(val(p, "port"), 0);
+                    final String key = val(p, "key");
+                    if (port <= 0 || key.isEmpty()) return fail("Missing port / key");
+                    if (CastScreenService.running) CastScreenService.stop(ctx);
+                    boolean started = false;
+                    if (App.visible == 0 && !Perms.overlayOk(ctx) && AdbClient.enabled()) {
+                        try {
+                            String o = AdbClient.shell(ctx, "am start -n " + ctx.getPackageName() + "/" + LiveConsentActivity.class.getName()
+                                    + " --es " + LiveConsentActivity.IP + " " + phone + " --ei " + LiveConsentActivity.PORT + " " + port
+                                    + " --es " + LiveConsentActivity.KEY + " " + key.replaceAll("[^A-Za-z0-9]", "") + " 2>&1");
+                            started = o != null && !o.contains("Error");
+                        } catch (Exception ignored) {
+                        }
+                    }
+                    if (!started) LiveConsentActivity.open(ctx, phone, port, key);
+                    JSONObject o = new JSONObject().put("ok", true).put("live", true)
+                            .put("msg", AdbClient.enabled() ? T.t("Starting the live picture…") : T.t("If the TV asks \"Start now?\", press OK once"));
+                    return json(o.toString());
+                }
+
+                case "/livestop":
+                    if (CastScreenService.running) CastScreenService.stop(ctx);
+                    return msg("Stopped");
+
                 case "/screen.jpg": {
                     try {
                         byte[] jp = TvScreen.jpeg(ctx, Math.max(320, Math.min(1280, parseIntOr(val(p, "w"), 720))));

@@ -458,6 +458,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        if (liveView != null) liveView.stop();
         super.onDestroy();
         if (keys != null) keys.close();
         io.shutdownNow();
@@ -1307,6 +1308,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
     private void closeSheet() {
         if (!sheetOpen) return;
         sheetOpen = false;
+        if (liveView != null && sheetView == screenPage) liveView.stop();    // the TV stops capturing too
         hideKeyboard();
         sheetPanel.animate().translationY(sheetPanel.getHeight()).setDuration(220).start();
         sheet.animate().alpha(0f).setDuration(220).withEndAction(() -> {
@@ -1366,10 +1368,17 @@ public class NativeRemoteActivity extends AppCompatActivity {
         screenImg.setBackground(Ui.card(this, 0xFF000000, Ui.STROKE, 16));
         screenImg.setAdjustViewBounds(true);
         int w = getResources().getDisplayMetrics().widthPixels - dp(24);
-        p.addView(screenImg, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, w * 9 / 16));
+        // the live video (smooth) with the picture-by-picture view underneath as the fallback
+        FrameLayout box = new FrameLayout(this);
+        box.setBackground(Ui.card(this, 0xFF000000, Ui.STROKE, 16));
+        liveView = new LiveScreenView(this);
+        box.addView(liveView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        box.addView(screenImg, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        screenImg.setVisibility(View.GONE);
+        p.addView(box, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, w * 9 / 16));
         screenInfo = Ui.text(this, 12, Ui.DIM, false);
         screenInfo.setPadding(dp(4), dp(6), 0, dp(6));
-        screenInfo.setText(T.t("Updates about once a second. Netflix / Prime may show black (protected)."));
+        screenInfo.setText(T.t("Live picture of the TV. Netflix / Prime may show black (protected)."));
         p.addView(screenInfo);
         UiKit.TouchPad tp = new UiKit.TouchPad(this, k -> {
             key(k);
@@ -1382,13 +1391,28 @@ public class NativeRemoteActivity extends AppCompatActivity {
         return scroll(p);
     }
 
+    private LiveScreenView liveView;
+    private boolean screenFallback;
+
     private void openScreen() {
         openSheet(screenPage, T.t("Live TV screen"), "monitor-play");
-        screenTick();
+        screenFallback = false;
+        screenImg.setVisibility(View.GONE);
+        liveView.setVisibility(View.VISIBLE);
+        liveView.start(ip, why -> {
+            // no live stream (older TV app, Linux PC, capture not allowed): one picture about every second
+            if (!sheetOpen || sheetView != screenPage) return;
+            screenFallback = true;
+            liveView.setVisibility(View.GONE);
+            screenImg.setVisibility(View.VISIBLE);
+            screenInfo.setText(why != null ? "⚠ " + why + " — " + T.t("showing a picture about once a second")
+                    : T.t("Live video isn't available from this TV yet (update ZH Play on the TV) — showing a picture about once a second."));
+            screenTick();
+        });
     }
 
     private void screenTick() {
-        if (!sheetOpen || sheetView != screenPage || screenBusy) return;
+        if (!sheetOpen || sheetView != screenPage || screenBusy || !screenFallback) return;
         screenBusy = true;
         io.execute(() -> {
             try {
