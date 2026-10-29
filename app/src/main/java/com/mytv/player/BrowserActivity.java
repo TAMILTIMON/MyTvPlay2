@@ -1,13 +1,13 @@
 package com.mytv.player;
 
 import android.annotation.SuppressLint;
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.net.Uri;
-import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -29,10 +29,10 @@ import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
-import android.widget.TextView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AlertDialog;
@@ -1004,17 +1004,33 @@ public class BrowserActivity extends AppCompatActivity {
     private void switchTo(WebView w) {
         if (w == null) return;
         if (w == web && w.getParent() != null) return;
-        snap(web);
-        webBox.removeView(web);
 
+        snap(web);
+
+        // Pause web engine/timers on the backgrounded tab unless actively playing media
+        if (web != null && web != w) {
+            if (!pagePlaying) {
+                try {
+                    web.onPause();
+                } catch (Throwable ignored) {
+                }
+            }
+            webBox.removeView(web);
+        }
+
+        // Clean parent attachment
         if (w.getParent() instanceof ViewGroup) {
             ((ViewGroup) w.getParent()).removeView(w);
         }
 
         web = w;
+        try {
+            web.onResume();
+        } catch (Throwable ignored) {
+        }
+
         webBox.addView(web, 0, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
-
         found.clear();
         updateVideos();
         tabsBtn.setText(String.valueOf(tabs.size()));
@@ -1041,12 +1057,30 @@ public class BrowserActivity extends AppCompatActivity {
         }
         int i = tabs.indexOf(w);
         tabs.remove(w);
-        if (w == web) switchTo(tabs.get(Math.max(0, i - 1)));
-        else webBox.removeView(w);
-        w.destroy();
+
+        Bitmap thumb = thumbs.remove(w);
+        if (thumb != null && !thumb.isRecycled()) {
+            thumb.recycle();
+        }
+
+        if (w == web) {
+            switchTo(tabs.get(Math.max(0, i - 1)));
+        } else {
+            webBox.removeView(w);
+        }
+
+        // Clean destruction of background WebView
+        try {
+            w.stopLoading();
+            w.loadUrl("about:blank");
+            w.clearHistory();
+            w.removeAllViews();
+            w.destroy();
+        } catch (Throwable ignored) {
+        }
+
         tabsBtn.setText(String.valueOf(tabs.size()));
     }
-
 
     // ---------------------------------------------------------------- history
     private void addHistory(String title, String url) {
@@ -1116,14 +1150,12 @@ public class BrowserActivity extends AppCompatActivity {
                 }).setNegativeButton(T.t("Cancel"), null).show();
     }
 
-
     private void applyUa(WebView w) {
         WebSettings s = w.getSettings();
         String ua = WebSettings.getDefaultUserAgent(this).replace("; wv", "");
         if (Store.getBool("b_desktop", false)) ua = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36";
         s.setUserAgentString(ua);
     }
-
 
     // =====================================================================
     // modern browser chrome
@@ -1402,7 +1434,7 @@ public class BrowserActivity extends AppCompatActivity {
                 run.run();
             });
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
-            lp.setMargins(Ui.dp(this, 3), 0, Ui.dp(this, 3), Ui.dp(this, 4));
+            lp.setMargins(Ui.dp(this, 3), 0, Ui.dp(this, 3), 0);
             quick.addView(c, lp);
         }
         box.addView(quick);
@@ -1508,7 +1540,11 @@ public class BrowserActivity extends AppCompatActivity {
     // ---- tab switcher: cards with a picture of each tab
     private void snap(WebView w) {
         try {
-            if (w.getWidth() <= 0) return;
+            if (w == null || w.getWidth() <= 0 || w.getHeight() <= 0) return;
+            Bitmap old = thumbs.get(w);
+            if (old != null && !old.isRecycled()) {
+                old.recycle();
+            }
             Bitmap b = Bitmap.createBitmap(w.getWidth() / 3, w.getHeight() / 3, Bitmap.Config.RGB_565);
             android.graphics.Canvas c = new android.graphics.Canvas(b);
             c.scale(1 / 3f, 1 / 3f);
@@ -1543,7 +1579,7 @@ public class BrowserActivity extends AppCompatActivity {
         TextView h = Ui.text(this, 19, Ui.TEXT, true);
         h.setText("  " + T.t("Tabs") + " · " + tabs.size());
         top.addView(h, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
-        
+
         Button closeAll = Ui.button(this, T.t("Close all"), false);
         closeAll.setOnClickListener(v -> {
             while (tabs.size() > 1) closeTab(tabs.get(tabs.size() - 1));
@@ -1579,7 +1615,9 @@ public class BrowserActivity extends AppCompatActivity {
             public Object getItem(int p) { return tabs.get(p); }
             public long getItemId(int p) { return p; }
             public View getView(int p, View cv, ViewGroup parent) {
-                final WebView w = tabs.get(p);
+                final int pos = p;
+                final WebView w = tabs.get(pos);
+
                 LinearLayout card = new LinearLayout(BrowserActivity.this);
                 card.setOrientation(LinearLayout.VERTICAL);
                 card.setBackground(Ui.card(BrowserActivity.this, Ui.SOLID, w == web ? Ui.ACCENT : Ui.STROKE, 16));
@@ -1618,7 +1656,7 @@ public class BrowserActivity extends AppCompatActivity {
                 pic.setClickable(false);
 
                 Bitmap b = thumbs.get(w);
-                if (b != null) pic.setImageBitmap(b);
+                if (b != null && !b.isRecycled()) pic.setImageBitmap(b);
                 else pic.setImageDrawable(new UiKit.Icon(BrowserActivity.this, "globe", 32, Ui.DIM));
 
                 LinearLayout.LayoutParams pl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(BrowserActivity.this, tv ? 120 : 170));
@@ -1768,7 +1806,6 @@ public class BrowserActivity extends AppCompatActivity {
         web.loadUrl(url);
         web.requestFocus();
     }
-
 
     /** Return true when we handle the link ourselves. */
     private boolean handleNav(String u) {
@@ -2404,15 +2441,21 @@ public class BrowserActivity extends AppCompatActivity {
             bar.requestFocus();
             return true;
         }
-        if (tv && cursor != null && customView == null && web.hasFocus()) {
+        if (tv && cursor != null && customView == null && web != null && web.hasFocus()) {
             boolean down = e.getAction() == KeyEvent.ACTION_DOWN;
             int step = Ui.dp(this, Math.min(48, 10 + e.getRepeatCount() * 4));
             switch (code) {
                 case KeyEvent.KEYCODE_DPAD_UP:
                     if (down) {
-                        if (cursor.y <= Ui.dp(this, 4) && web.getScrollY() == 0) bar.requestFocus();
-                        else if (cursor.y <= Ui.dp(this, 40)) web.scrollBy(0, -step * 3);
-                        else cursor.move(0, -step);
+                        // If near the top border, smoothly yield focus up to the address bar
+                        if (cursor.y <= Ui.dp(this, 12)) {
+                            bar.requestFocus();
+                            return true;
+                        } else if (cursor.y <= Ui.dp(this, 40)) {
+                            web.scrollBy(0, -step * 3);
+                        } else {
+                            cursor.move(0, -step);
+                        }
                     }
                     return true;
                 case KeyEvent.KEYCODE_DPAD_DOWN:
@@ -2480,7 +2523,25 @@ public class BrowserActivity extends AppCompatActivity {
         MusicFx.onChange = null;
         BrowserPlayService.control = null;
         BrowserPlayService.stop(this);
-        for (WebView w : tabs) w.destroy();
+
+        for (Bitmap b : thumbs.values()) {
+            if (b != null && !b.isRecycled()) {
+                b.recycle();
+            }
+        }
+        thumbs.clear();
+
+        for (WebView w : tabs) {
+            try {
+                w.stopLoading();
+                w.loadUrl("about:blank");
+                w.clearHistory();
+                w.removeAllViews();
+                w.destroy();
+            } catch (Throwable ignored) {
+            }
+        }
+        tabs.clear();
         super.onDestroy();
     }
 
