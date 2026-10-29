@@ -373,6 +373,13 @@ public class WebServer extends NanoHTTPD {
                     final String key = val(p, "key");
                     if (port <= 0 || key.isEmpty()) return fail("Missing port / key");
                     if (CastScreenService.running) CastScreenService.stop(ctx);
+                    if (AdbClient.enabled()) {
+                        // ADB full remote on: Android's own screenrecord through ADB — no "Start now?" question;
+                        // if that can't stream on this TV, fall back to screen capture
+                        final Context cx = ctx;
+                        LiveAdbStreamer.start(ctx, phone, port, key, () -> LiveConsentActivity.open(cx, phone, port, key));
+                        return json(new JSONObject().put("ok", true).put("live", true).put("msg", T.t("Starting the live picture…")).toString());
+                    }
                     boolean started = false;
                     if (App.visible == 0 && !Perms.overlayOk(ctx) && AdbClient.enabled()) {
                         try {
@@ -390,6 +397,7 @@ public class WebServer extends NanoHTTPD {
                 }
 
                 case "/livestop":
+                    LiveAdbStreamer.stop();
                     if (CastScreenService.running) CastScreenService.stop(ctx);
                     return msg("Stopped");
 

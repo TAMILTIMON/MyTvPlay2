@@ -272,6 +272,79 @@ public final class AdbClient {
         }
     }
 
+    // ------------------------------------------------------------------ a long-running command on its OWN connection
+    public interface Sink {
+        void data(byte[] b, int off, int len) throws Exception;
+    }
+
+    /**
+     * Runs a command that keeps writing (screenrecord) on a separate connection, so it never blocks the remote's
+     * keys on the shared one. Same approved key (no new "Allow?"). Returns when the command ends or `alive` is false.
+     */
+    public static void stream(Context c, String cmd, Sink sink, java.util.concurrent.atomic.AtomicBoolean alive) throws Exception {
+        KeyPair kp = keys(c.getApplicationContext());
+        try (Socket so = new Socket()) {
+            so.connect(new InetSocketAddress("127.0.0.1", 5555), 2000);
+            so.setTcpNoDelay(true);
+            so.setSoTimeout(5000);
+            DataInputStream si = new DataInputStream(new java.io.BufferedInputStream(so.getInputStream(), 1 << 16));
+            OutputStream so2 = so.getOutputStream();
+            sendTo(so2, CNXN, VERSION, MAXDATA, "host::\u0000".getBytes("UTF-8"));
+            boolean sentSig = false;
+            while (true) {                                    // log in with the key the TV already allowed
+                Msg m = recvFrom(si);
+                if (m.cmd == CNXN) break;
+                if (m.cmd == AUTH && m.a0 == 1) {
+                    if (sentSig) throw new Exception("ADB is not allowed for ZH Play yet");
+                    sendTo(so2, AUTH, 2, 0, sign(kp.getPrivate(), m.data));
+                    sentSig = true;
+                }
+            }
+            so.setSoTimeout(0);
+            int local = 77;
+            sendTo(so2, OPEN, local, 0, ("exec:" + cmd + "\u0000").getBytes("UTF-8"));
+            int remote = 0;
+            while (alive.get()) {
+                Msg m = recvFrom(si);
+                if (m.a1 != local) continue;
+                if (m.cmd == OKAY) remote = m.a0;
+                else if (m.cmd == WRTE) {
+                    sink.data(m.data, 0, m.data.length);
+                    sendTo(so2, OKAY, local, m.a0, null);          // ask for more
+                } else if (m.cmd == CLSE) {
+                    sendTo(so2, CLSE, local, m.a0 != 0 ? m.a0 : remote, null);
+                    return;
+                }
+            }
+            sendTo(so2, CLSE, local, remote, null);
+        }
+    }
+
+    private static void sendTo(OutputStream o, int cmd, int a0, int a1, byte[] data) throws Exception {
+        int len = data == null ? 0 : data.length, sum = 0;
+        if (data != null) for (byte x : data) sum += x & 0xff;
+        ByteBuffer h = ByteBuffer.allocate(24).order(ByteOrder.LITTLE_ENDIAN);
+        h.putInt(cmd).putInt(a0).putInt(a1).putInt(len).putInt(sum).putInt(~cmd);
+        o.write(h.array());
+        if (len > 0) o.write(data);
+        o.flush();
+    }
+
+    private static Msg recvFrom(DataInputStream i) throws Exception {
+        byte[] hb = new byte[24];
+        i.readFully(hb);
+        ByteBuffer h = ByteBuffer.wrap(hb).order(ByteOrder.LITTLE_ENDIAN);
+        Msg m = new Msg();
+        m.cmd = h.getInt();
+        m.a0 = h.getInt();
+        m.a1 = h.getInt();
+        int len = h.getInt();
+        if (len < 0 || len > 1024 * 1024) throw new Exception("bad adb message");
+        m.data = new byte[len];
+        if (len > 0) i.readFully(m.data);
+        return m;
+    }
+
     /** Presses a key anywhere on the TV. Returns null when done. */
     public static String key(Context c, int keyCode) {
         try {

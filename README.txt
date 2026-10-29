@@ -1,3 +1,12 @@
+ZH PLAY 5.5 — Live TV screen without the "Start now?" question
+=============================================================
+* With the ADB full remote on, the live picture now comes straight through ADB like before — no
+  question on the TV — but as smooth live video: Android's own "screenrecord" streams H.264 on a
+  separate ADB connection (the remote's keys never wait for it), cut into frames for the phone.
+  screenrecord's 3-minute limit is handled by starting it again at once.
+* Without ADB (or if screenrecord can't stream on the TV), Android's screen capture is used, which asks
+  "Start now?" on the TV.
+
 ZH PLAY 5.4 — Live TV screen: smooth live video
 =============================================
 * Live TV screen is now real live video: the TV records its own screen with the hardware video
