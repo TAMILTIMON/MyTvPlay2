@@ -35,6 +35,8 @@ public final class T {
     }
 
     static {
+        TA.put("The TV / PC couldn't download the PDF from this phone — same Wi-Fi?", "டிவி / கணினி இந்த போனிலிருந்து PDF-ஐப் பதிவிறக்க முடியவில்லை — ஒரே Wi-Fi-யா?");
+        HI.put("The TV / PC couldn't download the PDF from this phone — same Wi-Fi?", "टीवी / पीसी इस फ़ोन से PDF डाउनलोड नहीं कर सका — एक ही Wi-Fi?");
         TA.put("Tools", "கருவிகள்");
         HI.put("Tools", "टूल");
         TA.put("More: pages, paper, save, share", "மேலும்: பக்கங்கள், தாள், சேமி, பகிர்");

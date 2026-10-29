@@ -1,3 +1,12 @@
+ZH PLAY 5.0.1 — PDF slides / phone videos on the PC (and TV) fixed
+=================================================================
+* The phone told the PC / TV the wrong address of itself when mobile data or the VPN was on (a
+  10.x address the PC can't reach), so PDF slides and phone videos didn't open — the whiteboard,
+  which downloads nothing, worked. Now the phone uses the address that actually reaches the TV / PC.
+* VPN: the home network stays direct (like WireGuard's "Exclude private IPs"), so the phone still
+  reaches the TV / PC with the VPN on; the VPN's DNS still goes through the VPN.
+* Present: if the TV / PC can't download the PDF, the phone says so (instead of nothing happening).
+
 ZH PLAY 5.0 — whiteboard: full screen, circle menu, saved boards, PDF / Word export
 ==================================================================================
 * The board / slide fills the screen. Tools are in a floating round button (drag it anywhere):

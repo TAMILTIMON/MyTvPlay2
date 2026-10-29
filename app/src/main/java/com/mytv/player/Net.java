@@ -24,20 +24,52 @@ public final class Net {
     private Net() {
     }
 
+    /**
+     * This phone's address as the TV / PC sees it. Before, the first private address of ANY connection was used —
+     * with mobile data or the VPN on that could be a 10.x address the TV / PC can't reach (PDF slides, phone videos
+     * didn't open while the whiteboard, which downloads nothing, worked).
+     */
     public static String ip() {
-        String fallback = null;
+        String tv = Store.getStr("last_tv", "");
+        String r = ipFor(tv);
+        return r != null ? r : wifiIp();
+    }
+
+    /** The local address Android would use to reach `target` (a routing question only — nothing is sent). */
+    public static String ipFor(String target) {
+        if (target == null || target.isEmpty() || !target.matches("[0-9.]+")) return null;
+        try (java.net.DatagramSocket s = new java.net.DatagramSocket()) {
+            s.connect(InetAddress.getByName(target), 9);
+            InetAddress a = s.getLocalAddress();
+            if (a != null && !a.isAnyLocalAddress() && !a.isLoopbackAddress() && a instanceof Inet4Address) return a.getHostAddress();
+        } catch (Exception ignored) {
+        }
+        return null;
+    }
+
+    /** Wi-Fi / Ethernet first; mobile data, VPN and other virtual connections last. */
+    static String wifiIp() {
+        String best = null, fallback = null;
+        int bestRank = 99;
         try {
             for (NetworkInterface ni : Collections.list(NetworkInterface.getNetworkInterfaces())) {
-                if (!ni.isUp()) continue;
+                if (!ni.isUp() || ni.isLoopback()) continue;
+                String n = ni.getName() == null ? "" : ni.getName().toLowerCase(java.util.Locale.ROOT);
+                int rank = n.startsWith("wlan") || n.startsWith("eth") || n.startsWith("swlan") || n.startsWith("ap") ? 0
+                        : n.startsWith("rmnet") || n.startsWith("ccmni") || n.startsWith("tun") || n.startsWith("wg")
+                        || n.startsWith("ppp") || n.startsWith("v4-") || n.startsWith("dummy") || n.startsWith("clat") ? 5 : 2;
                 for (InetAddress a : Collections.list(ni.getInetAddresses())) {
                     if (a.isLoopbackAddress() || !(a instanceof Inet4Address)) continue;
-                    if (a.isSiteLocalAddress()) return a.getHostAddress();
+                    if (a.isSiteLocalAddress() && rank < bestRank) {
+                        best = a.getHostAddress();
+                        bestRank = rank;
+                    }
                     if (fallback == null) fallback = a.getHostAddress();
                 }
             }
         } catch (Exception ignored) {
         }
-        return fallback != null ? fallback : "TV-IP";
+        return best != null ? best : fallback != null ? fallback : "TV-IP";
     }
 
     public static final class Fetched {

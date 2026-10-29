@@ -719,9 +719,20 @@ public class PresentActivity extends AppCompatActivity {
                 String m = r.optBoolean("ok", true) ? T.t("On the TV — ") + count + " " + T.t("slides") + (TvGroup.on() ? " · " + TvGroup.label() : "")
                         : r.optString("msg");
                 try {
-                    Thread.sleep(1500);
-                    JSONObject st = TvClient.post(ip, "/presentstate", new HashMap<String, String>());
-                    if (!st.has("zoom")) m = "⚠ " + T.t("Update ZH Play on the TV for zoom, pen and spotlight");
+                    // the TV / PC downloads the PDF from this phone: wait for it and say clearly if it couldn't
+                    for (int k = 0; k < 20; k++) {
+                        Thread.sleep(500);
+                        JSONObject st = TvClient.post(ip, "/presentstate", new HashMap<String, String>());
+                        String sts = st.optString("status");
+                        if ("error".equals(sts)) {
+                            m = "⚠ " + T.t("The TV / PC couldn't download the PDF from this phone — same Wi-Fi?") + " (" + Net.ip() + ")";
+                            break;
+                        }
+                        if ("ready".equals(sts) || !st.has("status")) {
+                            if (!st.has("zoom")) m = "⚠ " + T.t("Update ZH Play on the TV for zoom, pen and spotlight");
+                            break;
+                        }
+                    }
                 } catch (Exception ignored) {
                 }
                 final String m2 = m;

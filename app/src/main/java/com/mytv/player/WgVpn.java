@@ -90,26 +90,62 @@ public final class WgVpn {
         Store.putStr("wg_profiles", a.toString());
     }
 
-    /** "Only ZH Play" → the profile's [Interface] gets IncludedApplications = this app. */
-    private static String withScope(Context c, String conf) {
+    /** Everything except the home network (10.x, 172.16–31.x, 192.168.x, link-local, multicast) — like the WireGuard
+     * app's "Exclude private IPs": with the VPN on, the phone still reaches the TV / PC at home. */
+    static final String LAN_FREE = "0.0.0.0/5, 8.0.0.0/7, 11.0.0.0/8, 12.0.0.0/6, 16.0.0.0/4, 32.0.0.0/3, 64.0.0.0/3, 96.0.0.0/4, 112.0.0.0/5, 120.0.0.0/6, 124.0.0.0/7, 126.0.0.0/8, 128.0.0.0/3, 160.0.0.0/5, 168.0.0.0/8, 169.0.0.0/9, 169.128.0.0/10, 169.192.0.0/11, 169.224.0.0/12, 169.240.0.0/13, 169.248.0.0/14, 169.252.0.0/15, 169.255.0.0/16, 170.0.0.0/7, 172.0.0.0/12, 172.32.0.0/11, 172.64.0.0/10, 172.128.0.0/9, 173.0.0.0/8, 174.0.0.0/7, 176.0.0.0/4, 192.0.0.0/9, 192.128.0.0/11, 192.160.0.0/13, 192.169.0.0/16, 192.170.0.0/15, 192.172.0.0/14, 192.176.0.0/12, 192.192.0.0/10, 193.0.0.0/8, 194.0.0.0/7, 196.0.0.0/6, 200.0.0.0/5, 208.0.0.0/4, 240.0.0.0/4";
+
+    /**
+     * The profile as used: "Only ZH Play" → IncludedApplications = this app; a route for everything (0.0.0.0/0) →
+     * everything except the home network, plus the profile's DNS servers (so names still resolve through the VPN).
+     */
+    static String withScope(String pkg, String conf, boolean onlyApp) {
+        java.util.List<String> dns = new java.util.ArrayList<>();
+        for (String line : conf.replace("\r", "").split("\n")) {
+            String t = line.trim();
+            if (t.toLowerCase(Locale.ROOT).startsWith("dns") && t.contains("=")) {
+                for (String d : t.substring(t.indexOf('=') + 1).split(",")) {
+                    d = d.trim();
+                    if (d.matches("\\d+\\.\\d+\\.\\d+\\.\\d+")) dns.add(d + "/32");
+                }
+            }
+        }
         StringBuilder out = new StringBuilder();
         boolean inIface = false, added = false;
-        boolean onlyApp = onlyApp();
         for (String line : conf.replace("\r", "").split("\n")) {
             String t = line.trim();
             String low = t.toLowerCase(Locale.ROOT);
             if (low.startsWith("includedapplications") || low.startsWith("excludedapplications")) continue;   // our choice decides
+            if (low.startsWith("allowedips") && t.contains("=")) {
+                java.util.List<String> parts = new java.util.ArrayList<>();
+                boolean all = false;
+                for (String r : t.substring(t.indexOf('=') + 1).split(",")) {
+                    r = r.trim();
+                    if (r.equals("0.0.0.0/0")) all = true;
+                    else if (!r.isEmpty()) parts.add(r);
+                }
+                if (all) {
+                    StringBuilder nl = new StringBuilder("AllowedIPs = ").append(LAN_FREE);
+                    for (String d : dns) nl.append(", ").append(d);
+                    for (String r : parts) nl.append(", ").append(r);
+                    out.append(nl).append('\n');
+                    continue;
+                }
+            }
             if (t.startsWith("[")) {
                 if (inIface && onlyApp && !added) {
-                    out.append("IncludedApplications = ").append(c.getPackageName()).append('\n');
+                    out.append("IncludedApplications = ").append(pkg).append('\n');
                     added = true;
                 }
                 inIface = t.equalsIgnoreCase("[Interface]");
             }
             out.append(line).append('\n');
         }
-        if (inIface && onlyApp && !added) out.append("IncludedApplications = ").append(c.getPackageName()).append('\n');
+        if (inIface && onlyApp && !added) out.append("IncludedApplications = ").append(pkg).append('\n');
         return out.toString();
+    }
+
+    private static String withScope(Context c, String conf) {
+        return withScope(c.getPackageName(), conf, onlyApp());
     }
 
     /** Default: the whole phone (like any VPN app). "Only ZH Play" is a choice. */
