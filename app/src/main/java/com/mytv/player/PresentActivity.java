@@ -95,14 +95,12 @@ public class PresentActivity extends AppCompatActivity {
     private long lastSend, lastPointer, lastZoom;
     private float downX, downY;
 
-    private LinearLayout root, slideBox, controls, optRow, boardRow;
-    private FrameLayout stage;
+    private LinearLayout root;
     private ImageView cur, next;
     private Ink overlay;
     private TextView counter, timer, status, titleT, zoomT;
     private LinearLayout strip;
-    private Button blankBtn, sizeBtn, paperBtn;
-    private final Button[] toolBtns = new Button[TOOLS.length];
+    private Button blankBtn, paperBtn;
     private long started, pausedAt, pausedTotal;
     private boolean timerPaused, multi;
     private ScaleGestureDetector pinch;
@@ -121,20 +119,11 @@ public class PresentActivity extends AppCompatActivity {
         if (ip == null || ip.isEmpty()) ip = Store.getStr("last_tv", "");
         board = getIntent().getBooleanExtra(EXTRA_BOARD, false);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(0xFF0B0B0F);
-        root.setPadding(dp(10), dp(10), dp(10), dp(8));
-        buildTop();
-        buildSlide();
-        buildControls();
-        stage = new FrameLayout(this);
-        root.addView(stage, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
-        arrange();
-        setContentView(root);
+        buildUi();
         Orient.apply(this, "present_orient");
         setTool(board ? PEN : LASER);
         paintBlank();
+        paintOpts();
         pinch = new ScaleGestureDetector(this, new ScaleGestureDetector.SimpleOnScaleGestureListener() {
             @Override
             public boolean onScale(ScaleGestureDetector d) {
@@ -161,25 +150,52 @@ public class PresentActivity extends AppCompatActivity {
         else pick();
     }
 
-    // ------------------------------------------------------------------ building the screen
-    private void buildTop() {
-        LinearLayout top = new LinearLayout(this);
-        top.setGravity(Gravity.CENTER_VERTICAL);
-        top.addView(UiKit.darkButton(this, "arrow-left", 38, false, v -> finish()));
+    // ------------------------------------------------------------------ the screen: the board fills it
+    // floating round button → circle menu of tools (EZ Write style); hidden side panel → pages, paper, zoom, save, share
+    private FrameLayout full, radial;
+    private LinearLayout drawer, topBar, navPill;
+    private TextView fab, handle;
+    private boolean drawerOpen;
+    private final Runnable hideDrawer = () -> showDrawer(false);
+
+    private void buildUi() {
+        full = new FrameLayout(this);
+        full.setBackgroundColor(0xFF0B0B0F);
+        // the slide / board
+        FrameLayout frame = new FrameLayout(this);
+        cur = new ImageView(this);
+        cur.setScaleType(ImageView.ScaleType.FIT_XY);
+        frame.addView(cur, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        overlay = new Ink(this);
+        frame.addView(overlay, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        frame.setContentDescription(T.t("Current slide — pinch to zoom, use the tool below with one finger"));
+        frame.setOnTouchListener(this::touch);
+        frame.addOnLayoutChangeListener((v, l, t, r, bt, ol, ot, or, ob) -> {
+            if (r - l != or - ol || bt - t != ob - ot) refresh();
+        });
+        FrameLayout.LayoutParams fl = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+        fl.setMargins(dp(4), dp(48), dp(4), dp(4));
+        full.addView(frame, fl);
+
+        // small top bar: back · title / status · timer · End
+        topBar = new LinearLayout(this);
+        topBar.setGravity(Gravity.CENTER_VERTICAL);
+        topBar.setPadding(dp(6), dp(4), dp(6), dp(4));
+        topBar.addView(UiKit.darkButton(this, "arrow-left", 36, false, v -> finish()));
         LinearLayout tc = new LinearLayout(this);
         tc.setOrientation(LinearLayout.VERTICAL);
         tc.setPadding(dp(8), 0, 0, 0);
-        titleT = Ui.text(this, 15, Color.WHITE, true);
+        titleT = Ui.text(this, 14, Color.WHITE, true);
         titleT.setText(T.t(board ? "Whiteboard" : "Present"));
         titleT.setSingleLine(true);
         titleT.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        status = Ui.text(this, 11, 0xB3FFFFFF, false);
+        status = Ui.text(this, 10, 0xB3FFFFFF, false);
         status.setSingleLine(true);
         tc.addView(titleT);
         tc.addView(status);
-        top.addView(tc, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
-        timer = Ui.text(this, 16, 0xFFFBBF24, true);
-        timer.setPadding(dp(6), 0, dp(6), 0);
+        topBar.addView(tc, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        timer = Ui.text(this, 15, 0xFFFBBF24, true);
+        timer.setPadding(dp(8), 0, dp(8), 0);
         timer.setContentDescription(T.t("Timer — tap to pause, hold to reset"));
         timer.setOnClickListener(v -> {
             if (timerPaused) {
@@ -196,166 +212,304 @@ public class PresentActivity extends AppCompatActivity {
             timerPaused = false;
             return true;
         });
-        top.addView(timer);
-        top.addView(Orient.button(this, "present_orient"));
+        topBar.addView(timer);
         Button end = small(T.t("End"), v -> {
             send("end", "");
             finish();
         });
         end.setBackground(Ui.card(this, 0xFFDC2626, 0, 14));
-        top.addView(end, new LinearLayout.LayoutParams(dp(60), dp(38)));
-        root.addView(top);
-    }
+        topBar.addView(end, new LinearLayout.LayoutParams(dp(58), dp(34)));
+        full.addView(topBar, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(46), Gravity.TOP));
 
-    private void buildSlide() {
-        slideBox = new LinearLayout(this);
-        slideBox.setOrientation(LinearLayout.VERTICAL);
-        FrameLayout frame = new FrameLayout(this);
-        frame.setBackground(Ui.card(this, 0xFF16161C, 0x33FFFFFF, 14));
-        cur = new ImageView(this);
-        cur.setScaleType(ImageView.ScaleType.FIT_XY);
-        frame.addView(cur, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        overlay = new Ink(this);
-        frame.addView(overlay, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        frame.setContentDescription(T.t("Current slide — pinch to zoom, use the tool below with one finger"));
-        frame.setOnTouchListener(this::touch);
-        frame.addOnLayoutChangeListener((v, l, t, r, bt, ol, ot, or, ob) -> {
-            if (r - l != or - ol || bt - t != ob - ot) refresh();
-        });
-        slideBox.addView(frame, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
-        zoomT = Ui.text(this, 11, 0x99FFFFFF, false);
-        zoomT.setGravity(Gravity.CENTER);
-        zoomT.setPadding(0, dp(3), 0, 0);
-        slideBox.addView(zoomT);
-    }
-
-    private void buildControls() {
-        controls = new LinearLayout(this);
-        controls.setOrientation(LinearLayout.VERTICAL);
-        // tools (scrolls sideways)
-        HorizontalScrollView ts = new HorizontalScrollView(this);
-        ts.setHorizontalScrollBarEnabled(false);
-        LinearLayout tools = new LinearLayout(this);
-        for (int i = 0; i < TOOLS.length; i++) {
-            final int k = i;
-            toolBtns[i] = small(TOOLS[i][0] + " " + T.t(TOOLS[i][1]), v -> {
-                if (k == SHAPE && tool == SHAPE) pickShape();
-                setTool(k);
-            });
-            toolBtns[i].setPadding(dp(10), 0, dp(10), 0);
-            tools.addView(toolBtns[i]);
-        }
-        ts.addView(tools);
-        controls.addView(ts);
-        // colours · size · undo · redo · clear
-        optRow = new LinearLayout(this);
-        optRow.setGravity(Gravity.CENTER_VERTICAL);
-        for (final int col : COLORS) {
-            View dot = new View(this);
-            dot.setBackground(Ui.card(this, col, 0x66FFFFFF, 13));
-            dot.setContentDescription(T.t("Colour"));
-            dot.setOnClickListener(v -> {
-                color = col;
-                paintOpts();
-            });
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(26), dp(26));
-            lp.setMargins(dp(4), dp(4), dp(4), dp(4));
-            optRow.addView(dot, lp);
-        }
-        sizeBtn = small("", v -> {
-            size = (size + 1) % 3;
-            paintOpts();
-        });
-        optRow.addView(sizeBtn, new LinearLayout.LayoutParams(dp(54), dp(36)));
-        optRow.addView(small("↶", v -> undo()), new LinearLayout.LayoutParams(dp(40), dp(36)));
-        optRow.addView(small("↷", v -> redo()), new LinearLayout.LayoutParams(dp(40), dp(36)));
-        optRow.addView(small("🧹", v -> clearPage()), new LinearLayout.LayoutParams(dp(40), dp(36)));
-        HorizontalScrollView os = new HorizontalScrollView(this);
-        os.setHorizontalScrollBarEnabled(false);
-        os.addView(optRow);
-        controls.addView(os);
-        // previous · next slide / page
-        LinearLayout nav = new LinearLayout(this);
-        nav.setGravity(Gravity.CENTER_VERTICAL);
-        nav.setPadding(0, dp(2), 0, dp(2));
-        nav.addView(small("◀  " + T.t("Previous"), v -> go(page - 1)), new LinearLayout.LayoutParams(0, dp(52), 1));
-        LinearLayout mid = new LinearLayout(this);
-        mid.setOrientation(LinearLayout.VERTICAL);
-        mid.setGravity(Gravity.CENTER);
-        next = new ImageView(this);
-        next.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        next.setBackground(Ui.card(this, 0xFF16161C, 0, 8));
-        next.setContentDescription(T.t("Next slide"));
-        mid.addView(next, new LinearLayout.LayoutParams(dp(80), dp(45)));
+        // ◀ 1 / 3 ▶ — slides / pages without opening anything
+        navPill = new LinearLayout(this);
+        navPill.setGravity(Gravity.CENTER_VERTICAL);
+        navPill.setBackground(Ui.card(this, 0xCC16161C, 0x33FFFFFF, 22));
+        navPill.setPadding(dp(4), 0, dp(4), 0);
+        TextView pv = Ui.text(this, 20, Color.WHITE, true);
+        pv.setText("‹");
+        pv.setGravity(Gravity.CENTER);
+        pv.setContentDescription(T.t("Previous"));
+        pv.setOnClickListener(v -> go(page - 1));
+        navPill.addView(pv, new LinearLayout.LayoutParams(dp(40), dp(40)));
         counter = Ui.text(this, 12, Color.WHITE, true);
-        mid.addView(counter);
-        LinearLayout.LayoutParams ml = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        ml.setMargins(dp(6), 0, dp(6), 0);
-        nav.addView(mid, ml);
-        Button nx = small(T.t("Next") + "  ▶", v -> {
-            if (board && page == count - 1) addPage();          // whiteboard: "next" on the last page = a new page
+        counter.setPadding(dp(4), 0, dp(4), 0);
+        navPill.addView(counter);
+        TextView nv = Ui.text(this, 20, Color.WHITE, true);
+        nv.setText("›");
+        nv.setGravity(Gravity.CENTER);
+        nv.setContentDescription(T.t("Next"));
+        nv.setOnClickListener(v -> {
+            if (board && page == count - 1) addPage();
             else go(page + 1);
         });
-        nx.setBackground(Ui.gradient(this, 14));
-        nav.addView(nx, new LinearLayout.LayoutParams(0, dp(52), 1));
-        controls.addView(nav);
-        // zoom · blank · overview · go to
-        LinearLayout row2 = new LinearLayout(this);
-        row2.addView(small("−", v -> setZoom(zoom / 1.5f, zcx, zcy)), new LinearLayout.LayoutParams(0, dp(38), 0.6f));
-        row2.addView(small(T.t("Fit"), v -> setZoom(1f, 0.5f, 0.5f)), new LinearLayout.LayoutParams(0, dp(38), 0.8f));
-        row2.addView(small("＋", v -> setZoom(zoom * 1.5f, zcx, zcy)), new LinearLayout.LayoutParams(0, dp(38), 0.6f));
+        navPill.addView(nv, new LinearLayout.LayoutParams(dp(40), dp(40)));
+        FrameLayout.LayoutParams np = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(42), Gravity.BOTTOM | Gravity.START);
+        np.setMargins(dp(12), 0, 0, dp(12));
+        full.addView(navPill, np);
+
+        // the floating round button (drag it anywhere; tap = circle menu)
+        fab = Ui.text(this, 22, Color.WHITE, true);
+        fab.setGravity(Gravity.CENTER);
+        fab.setElevation(dp(10));
+        fab.setContentDescription(T.t("Tools"));
+        FrameLayout.LayoutParams fp = new FrameLayout.LayoutParams(dp(58), dp(58), Gravity.BOTTOM | Gravity.END);
+        fp.setMargins(0, 0, dp(18), dp(18));
+        full.addView(fab, fp);
+        fab.setOnTouchListener(new View.OnTouchListener() {
+            float dx, dy, sx, sy;
+            boolean moved;
+
+            public boolean onTouch(View v, MotionEvent e) {
+                switch (e.getActionMasked()) {
+                    case MotionEvent.ACTION_DOWN:
+                        dx = v.getX() - e.getRawX();
+                        dy = v.getY() - e.getRawY();
+                        sx = e.getRawX();
+                        sy = e.getRawY();
+                        moved = false;
+                        return true;
+                    case MotionEvent.ACTION_MOVE:
+                        if (Math.hypot(e.getRawX() - sx, e.getRawY() - sy) > dp(8)) moved = true;
+                        if (moved) {
+                            v.setX(Math.max(0, Math.min(full.getWidth() - v.getWidth(), e.getRawX() + dx)));
+                            v.setY(Math.max(0, Math.min(full.getHeight() - v.getHeight(), e.getRawY() + dy)));
+                        }
+                        return true;
+                    case MotionEvent.ACTION_UP:
+                        if (!moved) toggleRadial();
+                        return true;
+                    default:
+                        return false;
+                }
+            }
+        });
+
+        // the side panel (pages · paper · zoom · save · share …), hidden at the right edge
+        handle = Ui.text(this, 18, Color.WHITE, true);
+        handle.setText("‹");
+        handle.setGravity(Gravity.CENTER);
+        handle.setBackground(Ui.card(this, 0xAA26262E, 0x33FFFFFF, 12));
+        handle.setContentDescription(T.t("More: pages, paper, save, share"));
+        handle.setOnClickListener(v -> showDrawer(true));
+        FrameLayout.LayoutParams hp = new FrameLayout.LayoutParams(dp(26), dp(72), Gravity.END | Gravity.CENTER_VERTICAL);
+        full.addView(handle, hp);
+        buildDrawer();
+        setContentView(full);
+    }
+
+    private void buildDrawer() {
+        drawer = new LinearLayout(this);
+        drawer.setOrientation(LinearLayout.VERTICAL);
+        drawer.setBackground(Ui.card(this, 0xF2121218, 0x33FFFFFF, 18));
+        drawer.setPadding(dp(10), dp(10), dp(10), dp(10));
+        drawer.setElevation(dp(14));
+        ScrollView sv = new ScrollView(this);
+        LinearLayout in = new LinearLayout(this);
+        in.setOrientation(LinearLayout.VERTICAL);
+        sv.addView(in);
+        drawer.addView(sv, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
+        // pages
+        in.addView(UiRows.header(this, T.t(board ? "Pages" : "Slides")));
+        strip = new LinearLayout(this);
+        strip.setOrientation(LinearLayout.VERTICAL);
+        in.addView(strip);
+        LinearLayout pr = new LinearLayout(this);
+        pr.addView(small("＋ " + T.t("Page"), v -> addPage()), new LinearLayout.LayoutParams(0, dp(38), 1));
+        pr.addView(small("🗑 " + T.t("Page"), v -> deletePage()), new LinearLayout.LayoutParams(0, dp(38), 1));
+        pr.setVisibility(board ? View.VISIBLE : View.GONE);
+        in.addView(pr);
+        paperBtn = small("", v -> pickPaper());
+        paperBtn.setVisibility(board ? View.VISIBLE : View.GONE);
+        in.addView(paperBtn, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(38)));
+        in.addView(small("▦ " + T.t("All") + "  ·  # " + T.t("Go to slide"), v -> {
+            showDrawer(false);
+            new UiDialog(this).setItems(new String[]{"▦ " + T.t("All"), "# " + T.t("Go to slide")}, (d, w) -> {
+                if (w == 0) overview();
+                else goToNumber();
+            }).show();
+        }), new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(38)));
+        // view
+        in.addView(UiRows.header(this, T.t("View")));
+        LinearLayout zr = new LinearLayout(this);
+        zr.addView(small("−", v -> setZoom(zoom / 1.5f, zcx, zcy)), new LinearLayout.LayoutParams(0, dp(38), 1));
+        zr.addView(small(T.t("Fit"), v -> setZoom(1f, 0.5f, 0.5f)), new LinearLayout.LayoutParams(0, dp(38), 1.2f));
+        zr.addView(small("＋", v -> setZoom(zoom * 1.5f, zcx, zcy)), new LinearLayout.LayoutParams(0, dp(38), 1));
+        in.addView(zr);
         blankBtn = small("", v -> {
             blankMode = (blankMode + 1) % 3;
             send("blank", String.valueOf(blankMode));
             paintBlank();
         });
-        row2.addView(blankBtn, new LinearLayout.LayoutParams(0, dp(38), 1.2f));
-        row2.addView(small("▦ " + T.t("All"), v -> overview()), new LinearLayout.LayoutParams(0, dp(38), 0.9f));
-        row2.addView(small("#", v -> goToNumber()), new LinearLayout.LayoutParams(0, dp(38), 0.5f));
-        controls.addView(row2);
-        // whiteboard: paper · add page · delete page
-        boardRow = new LinearLayout(this);
-        paperBtn = small("", v -> pickPaper());
-        boardRow.addView(paperBtn, new LinearLayout.LayoutParams(0, dp(38), 1.4f));
-        boardRow.addView(small("＋ " + T.t("Page"), v -> addPage()), new LinearLayout.LayoutParams(0, dp(38), 1f));
-        boardRow.addView(small("🗑 " + T.t("Page"), v -> deletePage()), new LinearLayout.LayoutParams(0, dp(38), 1f));
-        boardRow.setVisibility(board ? View.VISIBLE : View.GONE);
-        controls.addView(boardRow);
-        HorizontalScrollView hs = new HorizontalScrollView(this);
-        hs.setHorizontalScrollBarEnabled(false);
-        strip = new LinearLayout(this);
-        hs.addView(strip);
-        LinearLayout.LayoutParams sl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(56));
-        sl.setMargins(0, dp(4), 0, 0);
-        controls.addView(hs, sl);
+        in.addView(blankBtn, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(38)));
+        Button rot = Orient.button(this, "present_orient");
+        in.addView(rot, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(38)));
+        next = new ImageView(this);                     // the next slide, small
+        next.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        next.setVisibility(View.GONE);
+        zoomT = Ui.text(this, 11, 0x99FFFFFF, false);
+        zoomT.setPadding(dp(4), dp(6), dp(4), dp(2));
+        in.addView(zoomT);
+        // keep & share
+        in.addView(UiRows.header(this, T.t("Keep & share")));
+        if (board) {
+            in.addView(small("💾 " + T.t("Save now"), v -> {
+                saveBoard(true);
+            }), new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(38)));
+            in.addView(small("📂 " + T.t("Open saved board"), v -> openSaved()), new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(38)));
+            in.addView(small("✨ " + T.t("New board"), v -> newBoard()), new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(38)));
+        }
+        in.addView(small("📤 " + T.t("Share / export (PDF, Word, pictures)"), v -> exportMenu()),
+                new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(38)));
+        drawer.setOnTouchListener((v, e) -> {
+            keepDrawer();
+            return false;
+        });
+        sv.setOnTouchListener((v, e) -> {
+            keepDrawer();
+            return false;
+        });
+        FrameLayout.LayoutParams dl = new FrameLayout.LayoutParams(dp(250), ViewGroup.LayoutParams.MATCH_PARENT, Gravity.END);
+        dl.setMargins(0, dp(48), dp(4), dp(4));
+        full.addView(drawer, dl);
+        drawer.setTranslationX(dp(270));
+        drawer.setVisibility(View.INVISIBLE);
     }
 
-    private void arrange() {
-        for (View v : new View[]{slideBox, controls}) if (v.getParent() != null) ((ViewGroup) v.getParent()).removeView(v);
-        stage.removeAllViews();
-        ScrollView cs = new ScrollView(this);
-        cs.addView(controls);
-        if (Orient.landscape(this)) {
-            LinearLayout row = new LinearLayout(this);
-            row.addView(slideBox, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1.6f));
-            cs.setPadding(dp(8), 0, 0, 0);
-            row.addView(cs, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
-            stage.addView(row);
+    private void showDrawer(boolean open) {
+        drawerOpen = open;
+        main.removeCallbacks(hideDrawer);
+        if (open) {
+            if (radial != null) toggleRadial();
+            drawer.setVisibility(View.VISIBLE);
+            drawer.animate().translationX(0).setDuration(180).start();
+            handle.animate().alpha(0f).setDuration(120).start();
+            keepDrawer();
         } else {
-            LinearLayout col = new LinearLayout(this);
-            col.setOrientation(LinearLayout.VERTICAL);
-            LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1);
-            sp.setMargins(0, dp(8), 0, dp(4));
-            col.addView(slideBox, sp);
-            col.addView(cs, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-            stage.addView(col);
+            drawer.animate().translationX(dp(270)).setDuration(180).withEndAction(() -> {
+                if (!drawerOpen) drawer.setVisibility(View.INVISIBLE);
+            }).start();
+            handle.animate().alpha(1f).setDuration(180).start();
         }
+    }
+
+    /** Auto-hide: 6 s after the last touch in the panel. */
+    private void keepDrawer() {
+        main.removeCallbacks(hideDrawer);
+        if (drawerOpen) main.postDelayed(hideDrawer, 6000);
+    }
+
+    // ---- the circle menu
+    private static final String[][] RING = {{"🔴", "Laser"}, {"✏", "Pen"}, {"🖍", "Highlighter"}, {"🧽", "Eraser"}, {"⬜", "Shapes"},
+            {"📏", "Ruler"}, {"T", "Text"}, {"🔦", "Spotlight"}, {"✋", "Move"}, {"↶", "Undo"}, {"↷", "Redo"}, {"🧹", "Clear"}};
+
+    private void toggleRadial() {
+        if (radial != null) {
+            final FrameLayout r = radial;
+            radial = null;
+            r.animate().alpha(0f).setDuration(120).withEndAction(() -> full.removeView(r)).start();
+            return;
+        }
+        if (drawerOpen) showDrawer(false);
+        radial = new FrameLayout(this);
+        radial.setBackgroundColor(0x66000000);
+        radial.setOnClickListener(v -> toggleRadial());
+        full.addView(radial, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        // the circle fits the screen (smaller on narrow phones); labels need more room sideways than up / down
+        float item = dp(50), labelW = dp(36), labelH = dp(10);
+        float room = Math.min(full.getWidth() / 2f - labelW, full.getHeight() / 2f - labelH) - item * 0.78f;
+        if (room < dp(115)) item = dp(44);
+        float R1 = Math.max(dp(88), Math.min(dp(122), room)), R2 = R1 * 0.56f, small = item * 0.72f;
+        // centre on the button, but keep the whole circle and its labels on screen
+        float cx = fab.getX() + fab.getWidth() / 2f, cy = fab.getY() + fab.getHeight() / 2f;
+        float mx = R1 + item * 0.78f + labelW, my = R1 + item * 0.78f + labelH;
+        cx = Math.max(mx, Math.min(full.getWidth() - mx, cx));
+        cy = Math.max(my, Math.min(full.getHeight() - my, cy));
+        for (int i = 0; i < RING.length; i++) {
+            final int k = i;
+            double ang = -Math.PI / 2 + 2 * Math.PI * i / RING.length;
+            boolean isTool = i < TOOLS.length;
+            TextView b = Ui.text(this, i == TEXT ? 20 : 19, Color.WHITE, true);
+            b.setText(RING[i][0]);
+            b.setGravity(Gravity.CENTER);
+            b.setContentDescription(T.t(RING[i][1]));
+            b.setBackground(Ui.card(this, isTool && tool == i ? 0xFF0E7490 : 0xF226262E, isTool && tool == i ? 0xFF22D3EE : 0x55FFFFFF, (int) (item / 2)));
+            b.setElevation(dp(8));
+            b.setOnClickListener(v -> {
+                if (k < TOOLS.length) {
+                    if (k == SHAPE) {
+                        toggleRadial();
+                        pickShape();
+                        return;
+                    }
+                    setTool(k);
+                    toggleRadial();
+                } else if (k == TOOLS.length) undo();
+                else if (k == TOOLS.length + 1) redo();
+                else clearPage();
+            });
+            place(b, cx + (float) (R1 * Math.cos(ang)), cy + (float) (R1 * Math.sin(ang)), item);
+            TextView lab = Ui.text(this, 9, 0xDDFFFFFF, false);
+            lab.setText(T.t(RING[i][1]));
+            lab.setGravity(Gravity.CENTER);
+            lab.setShadowLayer(4, 0, 1, Color.BLACK);
+            place(lab, cx + (float) ((R1 + item * 0.78f) * Math.cos(ang)), cy + (float) ((R1 + item * 0.78f) * Math.sin(ang)), dp(70), dp(16));
+        }
+        // inner ring: colours + size
+        for (int i = 0; i <= COLORS.length; i++) {
+            final int k = i;
+            double ang = -Math.PI / 2 + 2 * Math.PI * i / (COLORS.length + 1);
+            TextView b = Ui.text(this, 12, Color.WHITE, true);
+            b.setGravity(Gravity.CENTER);
+            b.setElevation(dp(8));
+            if (i < COLORS.length) {
+                b.setBackground(Ui.card(this, COLORS[i], COLORS[i] == color ? 0xFFFFFFFF : 0x66FFFFFF, (int) (small / 2)));
+                if (COLORS[i] == color) b.setText("✓");
+                b.setTextColor(COLORS[i] == 0xFFFFFFFF || COLORS[i] == 0xFFFACC15 ? Color.BLACK : Color.WHITE);
+                b.setContentDescription(T.t("Colour"));
+                b.setOnClickListener(v -> {
+                    color = COLORS[k];
+                    paintOpts();
+                    toggleRadial();
+                    toggleRadial();                       // re-open: the tick moves
+                });
+            } else {
+                b.setText(new String[]{"S", "M", "L"}[size]);
+                b.setBackground(Ui.card(this, 0xF226262E, 0x55FFFFFF, (int) (small / 2)));
+                b.setContentDescription(T.t("Size"));
+                b.setOnClickListener(v -> {
+                    size = (size + 1) % 3;
+                    paintOpts();
+                    ((TextView) v).setText(new String[]{"S", "M", "L"}[size]);
+                });
+            }
+            place(b, cx + (float) (R2 * Math.cos(ang)), cy + (float) (R2 * Math.sin(ang)), small);
+        }
+        TextView close = Ui.text(this, 18, Color.WHITE, true);
+        close.setText("✕");
+        close.setGravity(Gravity.CENTER);
+        close.setBackground(Ui.gradient(this, (int) (dp(40) / 2)));
+        close.setOnClickListener(v -> toggleRadial());
+        place(close, cx, cy, dp(40));
+        radial.setAlpha(0f);
+        radial.animate().alpha(1f).setDuration(140).start();
+    }
+
+    private void place(View v, float cx, float cy, float size) {
+        place(v, cx, cy, size, size);
+    }
+
+    private void place(View v, float cx, float cy, float w, float h) {
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams((int) w, (int) h);
+        radial.addView(v, lp);
+        v.setX(cx - w / 2);
+        v.setY(cy - h / 2);
     }
 
     @Override
     public void onConfigurationChanged(android.content.res.Configuration c) {
         super.onConfigurationChanged(c);
-        arrange();
+        if (radial != null) toggleRadial();
         main.postDelayed(this::refresh, 150);
     }
 
@@ -366,23 +520,21 @@ public class PresentActivity extends AppCompatActivity {
         b.setTextSize(13);
         b.setTextColor(Color.WHITE);
         b.setBackground(Ui.card(this, 0xFF26262E, 0, 14));
-        b.setOnClickListener(l);
-        b.setPadding(dp(4), 0, dp(4), 0);
+        b.setOnClickListener(v -> {
+            keepDrawer();
+            l.onClick(v);
+        });
+        b.setPadding(dp(6), 0, dp(6), 0);
         b.setMinWidth(0);
         b.setMinimumWidth(0);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(38));
-        lp.setMargins(dp(2), dp(2), dp(2), dp(2));
+        lp.setMargins(dp(2), dp(3), dp(2), dp(3));
         b.setLayoutParams(lp);
         return b;
     }
 
     private void setTool(int t) {
         tool = t;
-        for (int i = 0; i < toolBtns.length; i++)
-            toolBtns[i].setBackground(i == t ? Ui.card(this, 0xFF0E7490, 0, 14) : Ui.card(this, 0xFF26262E, 0, 14));
-        toolBtns[SHAPE].setText(t == SHAPE ? "⬜ " + T.t(SHAPE_NAMES[java.util.Arrays.asList(SHAPES).indexOf(shape)]) + " ▾" : "⬜ " + T.t("Shapes"));
-        boolean drawing = t == PEN || t == HL || t == SHAPE || t == RULER || t == TEXT || t == ERASE;
-        ((View) optRow.getParent()).setVisibility(drawing || board ? View.VISIBLE : View.GONE);
         paintOpts();
     }
 
@@ -393,18 +545,18 @@ public class PresentActivity extends AppCompatActivity {
         }).show();
     }
 
+    /** The round button shows the tool, in the pen colour. */
     private void paintOpts() {
-        for (int i = 0; i < COLORS.length; i++) {
-            View d = optRow.getChildAt(i);
-            d.setScaleX(COLORS[i] == color ? 1.3f : 1f);
-            d.setScaleY(COLORS[i] == color ? 1.3f : 1f);
-        }
-        sizeBtn.setText(new String[]{"• S", "● M", "⬤ L"}[size]);
-        if (paperBtn != null) paperBtn.setText("📄 " + T.t(InkDraw.PAPER_NAMES[Math.max(0, java.util.Arrays.asList(InkDraw.PAPERS).indexOf(paper))]));
+        if (fab == null) return;
+        fab.setText(TOOLS[tool][0]);
+        boolean ink = tool == PEN || tool == HL || tool == SHAPE || tool == RULER || tool == TEXT;
+        fab.setBackground(Ui.card(this, 0xF226262E, ink ? color : 0xFF22D3EE, dp(29)));
+        if (paperBtn != null) paperBtn.setText("📄 " + T.t("Paper") + ": "
+                + T.t(InkDraw.PAPER_NAMES[Math.max(0, java.util.Arrays.asList(InkDraw.PAPERS).indexOf(paper))]));
     }
 
     private void paintBlank() {
-        String[] n = {"⬛ " + T.t("Blank"), "⬛ " + T.t("Black"), "⬜ " + T.t("White")};
+        String[] n = {"⬛ " + T.t("Blank screen") + ": " + T.t("Off"), "⬛ " + T.t("Black"), "⬜ " + T.t("White")};
         blankBtn.setText(n[blankMode]);
         blankBtn.setBackground(blankMode == 0 ? Ui.card(this, 0xFF26262E, 0, 14) : Ui.card(this, blankMode == 2 ? 0xFFE5E7EB : 0xFF000000, 0xFFF59E0B, 14));
         blankBtn.setTextColor(blankMode == 2 ? Color.BLACK : Color.WHITE);
@@ -642,9 +794,10 @@ public class PresentActivity extends AppCompatActivity {
                 next.setImageBitmap(nb);
                 overlay.invalidate();
                 counter.setText((i + 1) + " / " + count);
+                if (board) scheduleSave();
                 zoomT.setText(z > 1.01f ? String.format(Locale.US, "%.1f×  ·  %s", z, T.t("Fit = whole page"))
                         : T.t("Pinch to zoom · two fingers move the page"));
-                for (int k = 0; k < strip.getChildCount(); k++) strip.getChildAt(k).setAlpha(k == i ? 1f : 0.5f);
+                for (int k = 0; k < strip.getChildCount(); k++) strip.getChildAt(k).setAlpha(k == i ? 1f : 0.6f);
             });
         });
     }
@@ -683,9 +836,18 @@ public class PresentActivity extends AppCompatActivity {
             t.setBackground(Ui.card(this, 0xFF26262E, 0, 6));
             t.setContentDescription(T.t("Slide") + " " + (i + 1));
             t.setOnClickListener(v -> go(k));
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(88), dp(50));
-            lp.setMargins(dp(3), 0, dp(3), 0);
-            strip.addView(t, lp);
+            t.setPadding(dp(2), dp(2), dp(2), dp(2));
+            LinearLayout cell = new LinearLayout(this);
+            cell.setGravity(Gravity.CENTER_VERTICAL);
+            TextView num = Ui.text(this, 11, Ui.DIM, true);
+            num.setText(String.valueOf(i + 1));
+            num.setGravity(Gravity.CENTER);
+            cell.addView(num, new LinearLayout.LayoutParams(dp(22), ViewGroup.LayoutParams.WRAP_CONTENT));
+            cell.addView(t, new LinearLayout.LayoutParams(0, dp(110) * 9 / 16, 1));
+            cell.setOnClickListener(v -> go(k));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            lp.setMargins(0, dp(3), 0, dp(3));
+            strip.addView(cell, lp);
             draw.execute(() -> {
                 final Bitmap bm = thumb(k);
                 main.post(() -> t.setImageBitmap(bm));
@@ -706,7 +868,7 @@ public class PresentActivity extends AppCompatActivity {
             draw.execute(() -> {
                 final Bitmap bm = thumb(old);
                 main.post(() -> {
-                    if (old < strip.getChildCount()) ((ImageView) strip.getChildAt(old)).setImageBitmap(bm);
+                    if (old < strip.getChildCount()) ((ImageView) ((ViewGroup) strip.getChildAt(old)).getChildAt(1)).setImageBitmap(bm);
                 });
             });
         }
@@ -715,10 +877,8 @@ public class PresentActivity extends AppCompatActivity {
         zcx = zcy = 0.5f;
         refresh();
         send("goto", String.valueOf(i));
-        if (strip.getChildCount() > i) {
-            View c = strip.getChildAt(i);
-            ((HorizontalScrollView) strip.getParent()).smoothScrollTo(Math.max(0, c.getLeft() - dp(100)), 0);
-        }
+        for (int k = 0; k < strip.getChildCount(); k++)
+            strip.getChildAt(k).setBackground(k == i ? Ui.card(this, 0x330E7490, 0xFF22D3EE, 8) : null);
     }
 
     private void setZoom(float z, float cx, float cy) {
@@ -978,6 +1138,7 @@ public class PresentActivity extends AppCompatActivity {
     }
 
     private void pushUndo(String op, int pg, Object what) {
+        scheduleSave();
         undo.add(new Object[]{op, pg, what});
         if (undo.size() > 200) undo.remove(0);
         redo.clear();
@@ -1001,6 +1162,7 @@ public class PresentActivity extends AppCompatActivity {
     /** reverse = undo. */
     @SuppressWarnings("unchecked")
     private void apply(Object[] u, boolean reverse) {
+        scheduleSave();
         String op = (String) u[0];
         int pg = (Integer) u[1];
         if ("clear".equals(op)) {
@@ -1079,6 +1241,223 @@ public class PresentActivity extends AppCompatActivity {
                 c.drawCircle(sp[0], sp[1], dp(5), p);
             }
         }
+    }
+
+    // ------------------------------------------------------------------ saved boards (local) and exports
+    private String boardId;
+    private final Runnable autoSave = () -> saveBoard(false);
+
+    private void scheduleSave() {
+        if (!board) return;
+        main.removeCallbacks(autoSave);
+        main.postDelayed(autoSave, 1500);
+    }
+
+    private JSONObject boardDoc() throws Exception {
+        if (boardId == null) {
+            boardId = "b" + System.currentTimeMillis();
+            title = T.t("Whiteboard") + " " + new java.text.SimpleDateFormat("d MMM HH:mm", Locale.getDefault()).format(new java.util.Date());
+        }
+        JSONArray pages = new JSONArray();
+        for (int pg = 0; pg < count; pg++) {
+            JSONArray els = new JSONArray();
+            LinkedHashMap<String, JSONObject> m = ink.get(pg);
+            if (m != null) for (JSONObject e : m.values()) els.put(e);
+            pages.put(els);
+        }
+        return new JSONObject().put("id", boardId).put("title", title).put("paper", paper).put("pages", pages);
+    }
+
+    private void saveBoard(boolean say) {
+        if (!board) return;
+        try {
+            final JSONObject d = boardDoc();
+            boolean empty = BoardFiles.countEls(d) == 0;
+            if (empty && !say) return;                       // nothing drawn yet: nothing to keep
+            draw.execute(() -> BoardFiles.save(this, d));
+            if (say) UiKit.makeToast(this, "💾 " + T.t("Saved") + " · " + title, android.widget.Toast.LENGTH_SHORT).show();
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void openSaved() {
+        showDrawer(false);
+        saveBoard(false);
+        draw.execute(() -> {
+            final List<JSONObject> all = BoardFiles.list(this);
+            main.post(() -> {
+                if (all.isEmpty()) {
+                    UiKit.makeToast(this, T.t("No saved boards yet — they are kept automatically while you draw"),
+                            android.widget.Toast.LENGTH_LONG).show();
+                    return;
+                }
+                String[] rows = new String[all.size()];
+                java.text.DateFormat df = java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.MEDIUM, java.text.DateFormat.SHORT);
+                for (int i = 0; i < rows.length; i++) {
+                    JSONObject j = all.get(i);
+                    rows[i] = "🗂  " + j.optString("title") + ": " + df.format(new java.util.Date(j.optLong("modified"))) + " · "
+                            + j.optJSONArray("pages").length() + " " + T.t("pages") + " · " + BoardFiles.countEls(j) + " " + T.t("drawings");
+                }
+                AlertDialog dl = new UiDialog(this).setTitle(T.t("Saved boards")).setItems(rows, (d, w) -> loadBoard(all.get(w)))
+                        .setNegativeButton(T.t("Close"), null).create();
+                dl.setOnShowListener(x -> dl.getListView().setOnItemLongClickListener((p, v, pos, id) -> {
+                    dl.dismiss();
+                    boardActions(all.get(pos));
+                    return true;
+                }));
+                dl.show();
+                UiKit.makeToast(this, T.t("Hold a board to rename or delete it"), android.widget.Toast.LENGTH_SHORT).show();
+            });
+        });
+    }
+
+    private void boardActions(final JSONObject j) {
+        new UiDialog(this).setTitle(j.optString("title")).setItems(new String[]{"✎  " + T.t("Rename"), "🗑  " + T.t("Delete")}, (d, w) -> {
+            if (w == 0) {
+                final EditText e = new EditText(this);
+                e.setText(j.optString("title"));
+                new UiDialog(this).setTitle(T.t("Rename")).setView(e).setPositiveButton(T.t("Save"), (d2, w2) -> {
+                    try {
+                        j.put("title", e.getText().toString().trim());
+                        if (j.optString("id").equals(boardId)) title = j.optString("title");
+                        draw.execute(() -> BoardFiles.save(this, j));
+                    } catch (Exception ignored) {
+                    }
+                }).show();
+            } else {
+                draw.execute(() -> BoardFiles.delete(this, j.optString("id")));
+                UiKit.makeToast(this, T.t("Deleted"), android.widget.Toast.LENGTH_SHORT).show();
+            }
+        }).show();
+    }
+
+    /** Opens a saved board here and on the TV (paper, pages, every drawing). */
+    private void loadBoard(JSONObject j) {
+        try {
+            boardId = j.getString("id");
+            title = j.optString("title");
+            paper = j.optString("paper", "white");
+            JSONArray pages = j.getJSONArray("pages");
+            count = Math.max(1, pages.length());
+            ink.clear();
+            undo.clear();
+            redo.clear();
+            for (int pg = 0; pg < pages.length(); pg++) {
+                JSONArray els = pages.getJSONArray(pg);
+                for (int k = 0; k < els.length(); k++) pageInk(pg).put(els.getJSONObject(k).optString("id"), els.getJSONObject(k));
+            }
+            titleT.setText(title);
+            page = 0;
+            zoom = 1f;
+            zcx = zcy = 0.5f;
+            thumbs.evictAll();
+            buildStrip();
+            paintOpts();
+            refresh();
+            final List<JSONObject> all = new ArrayList<>();
+            for (LinkedHashMap<String, JSONObject> m : ink.values()) all.addAll(m.values());
+            net.execute(() -> {
+                try {
+                    HashMap<String, String> p = new HashMap<>();
+                    p.put("url", "zhboard:" + paper);
+                    p.put("title", title);
+                    TvClient.post(ip, "/present", p);
+                    Thread.sleep(800);
+                } catch (Exception ignored) {
+                }
+                post("pages", String.valueOf(count), null, null);
+                for (JSONObject e : all) post("el", e.toString(), null, null);
+            });
+            UiKit.makeToast(this, "📂 " + title, android.widget.Toast.LENGTH_SHORT).show();
+        } catch (Exception e) {
+            UiKit.makeToast(this, T.t("Can't open this board"), android.widget.Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void newBoard() {
+        showDrawer(false);
+        saveBoard(false);
+        boardId = null;
+        ink.clear();
+        undo.clear();
+        redo.clear();
+        count = 1;
+        page = 0;
+        titleT.setText(T.t("Whiteboard"));
+        send("clearpg", "0");
+        send("pages", "1");
+        send("goto", "0");
+        buildStrip();
+        refresh();
+    }
+
+    /** One page as a picture: paper / slide + the drawing (for PDF, Word, pictures). */
+    private Bitmap pagePicture(int i, int W, int H) {
+        Bitmap bm = Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888);
+        Canvas c = new Canvas(bm);
+        float pw = board ? 960 : pageW, ph = board ? 540 : pageH;
+        if (!board) {
+            synchronized (this) {
+                if (renderer != null) {
+                    PdfRenderer.Page p = renderer.openPage(i);
+                    pw = p.getWidth();
+                    ph = p.getHeight();
+                    float S = Math.min(W / pw, H / ph);
+                    float ox = (W - pw * S) / 2, oy = (H - ph * S) / 2;
+                    bm.eraseColor(Color.WHITE);
+                    Matrix m = new Matrix();
+                    m.setScale(S, S);
+                    m.postTranslate(ox, oy);
+                    p.render(bm, null, m, PdfRenderer.Page.RENDER_MODE_FOR_PRINT);
+                    p.close();
+                }
+            }
+        }
+        final float S = Math.min(W / pw, H / ph), ox = (W - pw * S) / 2, oy = (H - ph * S) / 2, fpw = pw, fph = ph;
+        if (board) InkDraw.paper(c, paper, new RectF(ox, oy, ox + pw * S, oy + ph * S), ph * S);
+        LinkedHashMap<String, JSONObject> m = ink.get(i);
+        if (m != null) for (JSONObject e : new ArrayList<>(m.values()))
+            InkDraw.draw(c, e, (fx, fy) -> new float[]{ox + fx * fpw * S, oy + fy * fph * S}, fph * S);
+        return bm;
+    }
+
+    private void exportMenu() {
+        showDrawer(false);
+        final String[] kinds = {"📄  PDF", "📝  Word (.docx)", "🖼  " + T.t("Pictures (PNG)")};
+        new UiDialog(this).setTitle(T.t("Share / export")).setItems(kinds, (d, k) ->
+                new UiDialog(this).setTitle(kinds[k].replaceAll("^\\S+\\s+", "")).setItems(new String[]{"📤  " + T.t("Share to an app"),
+                        "⬇  " + T.t("Save to Downloads/ZH Play")}, (d2, how) -> export(k, how == 0)).show()).show();
+    }
+
+    private void export(final int kind, final boolean share) {
+        if (count == 0) return;
+        UiKit.makeToast(this, T.t("Preparing…"), android.widget.Toast.LENGTH_SHORT).show();
+        final BoardFiles.Pages pages = new BoardFiles.Pages() {
+            public int count() {
+                return count;
+            }
+
+            public Bitmap page(int i, int w, int h) {
+                return pagePicture(i, w, h);
+            }
+        };
+        final String name = title == null || title.isEmpty() ? T.t("Whiteboard") : title;
+        draw.execute(() -> {
+            try {
+                final List<java.io.File> files = new ArrayList<>();
+                if (kind == 0) files.add(BoardFiles.pdf(this, pages, name));
+                else if (kind == 1) files.add(BoardFiles.docx(this, pages, name));
+                else files.addAll(BoardFiles.pngs(this, pages, name));
+                if (!share) BoardFiles.saveToDownloads(this, files);
+                main.post(() -> {
+                    if (share) BoardFiles.share(this, files);
+                    else UiKit.makeToast(this, "✓ " + T.t("Saved in Downloads/ZH Play") + ": " + files.get(0).getName()
+                            + (files.size() > 1 ? " +" + (files.size() - 1) : ""), android.widget.Toast.LENGTH_LONG).show();
+                });
+            } catch (final Exception e) {
+                main.post(() -> UiKit.makeToast(this, T.t("Can't export") + ": " + e.getMessage(), android.widget.Toast.LENGTH_LONG).show());
+            }
+        });
     }
 
     // ------------------------------------------------------------------ overview / go to
@@ -1182,6 +1561,14 @@ public class PresentActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        main.removeCallbacks(autoSave);
+        if (board) {
+            try {
+                JSONObject d = boardDoc();
+                if (BoardFiles.countEls(d) > 0) BoardFiles.save(this, d);   // keep it (directly: the app is closing)
+            } catch (Exception ignored) {
+            }
+        }
         main.removeCallbacks(tick);
         closePdf();
         net.shutdown();

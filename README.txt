@@ -1,3 +1,17 @@
+ZH PLAY 5.0 — whiteboard: full screen, circle menu, saved boards, PDF / Word export
+==================================================================================
+* The board / slide fills the screen. Tools are in a floating round button (drag it anywhere):
+  tap it and the tools open in a circle — outer ring: Laser, Pen, Highlighter, Eraser, Shapes,
+  Ruler, Text, Spotlight, Move, Undo, Redo, Clear; inner ring: 6 colours + size. The button shows
+  the current tool in the current colour. The circle always fits the screen.
+* Hidden side panel (tap ‹ at the right edge; hides itself after 6 s): pages with pictures,
+  + / delete page, paper, all slides / go to, zoom, blank screen, rotation, save, open, share.
+* ‹ 1 / 3 › at the bottom left changes slides / pages without opening anything.
+* Saved boards: kept automatically while you draw (and when you leave); Open saved board shows
+  title, date, pages, drawings — it opens on the TV too; hold to rename or delete; New board.
+* Share / export: PDF, Word (.docx, one page per sheet, A4 landscape) or pictures (PNG) — share to any
+  app or save in Downloads/ZH Play. Also for PDF slides with your drawings.
+
 ZH PLAY 4.9 — browser: audio-only mode, sleep timer, fully dark
 ==============================================================
 * Audio only (menu → Listening): videos on any page are hidden behind an "Audio mode" card while
