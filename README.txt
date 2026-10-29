@@ -1,3 +1,13 @@
+ZH PLAY 5.6 — browser music in the notification like a music player
+==================================================================
+* YouTube (or any page) playing in the ZH Play browser now shows a full media notification:
+  song title, artist and cover (as YouTube publishes them), play / pause, −10 s / +10 s, close,
+  and a timeline that moves — drag it to jump. Also on the lock screen and in Android's media controls.
+* Fixed: the notification stopped updating (or vanished) after leaving the app — every update
+  re-started the service, which Android refuses from the background; updates now go straight to it.
+* If notifications are off for ZH Play (Android 13+), the browser asks again the first time
+  something plays, or offers to open the notification settings.
+
 ZH PLAY 5.5 — Live TV screen without the "Start now?" question
 =============================================================
 * With the ADB full remote on, the live picture now comes straight through ADB like before — no

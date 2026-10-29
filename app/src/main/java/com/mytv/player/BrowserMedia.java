@@ -29,14 +29,19 @@ public final class BrowserMedia {
                 + "var p=m.filter(function(x){return !x.paused&&!x.ended&&x.readyState>2;});"
                 + "var v=p.length?p[0]:(m.length?m[0]:null);"
                 + "ZHMedia.state(p.length>0,document.title||'',v?(v.tagName=='VIDEO'):false,m.length>0,"
-                + "v?(v.currentTime||0):0,v?(isFinite(v.duration)?v.duration:0):0);}catch(e){}}"
+                + "v?(v.currentTime||0):0,v?(isFinite(v.duration)?v.duration:0):0);"
+                // the song's title / artist / cover as the site publishes them (YouTube does)
+                + "var md=navigator.mediaSession&&navigator.mediaSession.metadata;if(md&&ZHMedia.meta){var aw=md.artwork||[];"
+                + "var best=aw.length?aw[aw.length-1].src:'';ZHMedia.meta(md.title||'',md.artist||'',best||'');}"
+                + "}catch(e){}}"
                 + "['play','playing','pause','ended','loadedmetadata','emptied'].forEach(function(t){"
                 + "document.addEventListener(t,function(e){rep();if(t=='play'||t=='playing')try{window.__zhEqAttach&&window.__zhEqAttach(e.target);}catch(x){}},true);});"
-                + "setInterval(rep,3000);rep();"
+                + "setInterval(rep,2000);rep();"
                 + "window.__zhCmd=function(c){var m=[].slice.call(document.querySelectorAll('video,audio'));"
                 + "var v=m.filter(function(x){return !x.paused;})[0]||m[0];if(!v)return;"
                 + "if(c=='toggle'){if(v.paused)v.play();else v.pause();}else if(c=='play')v.play();else if(c=='pause')v.pause();"
                 + "else if(c=='fwd')v.currentTime=Math.min(v.duration||1e9,v.currentTime+10);else if(c=='back')v.currentTime=Math.max(0,v.currentTime-10);"
+                + "else if(c.indexOf('seek:')==0)v.currentTime=Math.max(0,parseFloat(c.substring(5))/1000);"
                 + "setTimeout(rep,300);};"
                 + EQ
                 + "})();";

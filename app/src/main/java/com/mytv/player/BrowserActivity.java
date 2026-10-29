@@ -277,15 +277,49 @@ public class BrowserActivity extends AppCompatActivity {
         eqFab.setVisibility(View.GONE);
     }
 
+    private volatile String pageSong = "";
+
     private void mediaState(boolean playing, String title, boolean video, boolean has) {
+        mediaState(playing, title, video, has, -1, -1);
+    }
+
+    private void mediaState(boolean playing, String title, boolean video, boolean has, long pos, long dur) {
+        if (!pageSong.isEmpty()) title = pageSong;                       // the song's own title (YouTube)
+        else if (title != null) title = title.replaceAll("\\s*-\\s*YouTube$", "");
         pageMedia = has;
         pagePlaying = playing;
         if (eqFab != null) eqFab.setVisibility(has && Store.getBool("b_eq", true) && customView == null ? View.VISIBLE : View.GONE);
         if (lockBtn != null) lockBtn.setVisibility(customView != null ? View.VISIBLE : View.GONE);
         if (!Store.getBool("b_bgplay", true)) return;
-        if (playing) BrowserPlayService.update(this, title, true, video);
-        else if (has && BrowserPlayService.title.length() > 0) BrowserPlayService.update(this, title, false, video);
+        if (playing) {
+            askNotifications();
+            BrowserPlayService.update(this, title, true, video, pos, dur);
+        } else if (has && BrowserPlayService.title.length() > 0) BrowserPlayService.update(this, title, false, video, pos, dur);
         else if (!has) BrowserPlayService.stop(this);
+    }
+
+    private boolean askedNotif;
+
+    /** The playback controls live in a notification: if notifications are off for ZH Play, ask (once per run). */
+    private void askNotifications() {
+        if (askedNotif || Build.VERSION.SDK_INT < 33 || tv) return;
+        if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) == android.content.pm.PackageManager.PERMISSION_GRANTED) return;
+        askedNotif = true;
+        if (shouldShowRequestPermissionRationale(android.Manifest.permission.POST_NOTIFICATIONS) || !Store.getBool("asked_notif", false)) {
+            Store.putBool("asked_notif", true);
+            requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 76);
+            return;
+        }
+        new UiDialog(this).setTitle(T.t("Play / pause from the notification"))
+                .setMessage(T.t("Notifications are off for ZH Play, so the player controls (play / pause, timeline) can't be shown. Turn them on?"))
+                .setPositiveButton(T.t("Open settings"), (d, w) -> {
+                    try {
+                        startActivity(new Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, getPackageName()));
+                    } catch (Exception ignored) {
+                    }
+                })
+                .setNegativeButton(T.t("Not now"), null).show();
     }
 
     private void injectMedia(WebView v) {
@@ -873,8 +907,15 @@ public class BrowserActivity extends AppCompatActivity {
         }, "TamilShield");
         web.addJavascriptInterface(new Object() {
             @android.webkit.JavascriptInterface
-            public void state(final boolean playing, final String title, final boolean video, final boolean has, double pos, double dur) {
-                main.post(() -> mediaState(playing, title, video, has));
+            public void state(final boolean playing, final String title, final boolean video, final boolean has, final double pos, final double dur) {
+                main.post(() -> mediaState(playing, title, video, has, (long) (pos * 1000), (long) (dur * 1000)));
+            }
+
+            @android.webkit.JavascriptInterface
+            public void meta(final String t, final String artist, final String art) {
+                pageSong = t == null ? "" : t;
+                BrowserPlayService.artist = artist == null ? "" : artist;
+                BrowserPlayService.artwork(art);
             }
 
             @android.webkit.JavascriptInterface

@@ -38,10 +38,32 @@ public class BrowserPlayService extends Service {
     private MediaSession session;
     private PowerManager.WakeLock wake;
 
+    // what the page says (timeline + YouTube's song info)
+    static volatile long posMs, durMs, at;
+    static volatile String artist = "", artUrl = "";
+    static volatile android.graphics.Bitmap art;
+    private static volatile BrowserPlayService self;
+
     public static void update(Context c, String t, boolean isPlaying, boolean isVideo) {
+        update(c, t, isPlaying, isVideo, -1, -1);
+    }
+
+    /** pos / dur in ms (−1 = unknown). A running service is updated directly — no new start (Android refuses
+     *  starts from the background, which used to make the notification freeze or disappear after leaving the app). */
+    public static void update(Context c, String t, boolean isPlaying, boolean isVideo, long pos, long dur) {
         title = t == null ? "" : t;
         playing = isPlaying;
         video = isVideo;
+        if (pos >= 0) {
+            posMs = pos;
+            durMs = Math.max(0, dur);
+            at = android.os.SystemClock.elapsedRealtime();
+        }
+        final BrowserPlayService s = self;
+        if (s != null) {
+            new android.os.Handler(android.os.Looper.getMainLooper()).post(s::refresh);
+            return;
+        }
         try {
             Intent i = new Intent(c, BrowserPlayService.class).setAction(A_UPDATE);
             if (Build.VERSION.SDK_INT >= 26) c.startForegroundService(i);
@@ -52,13 +74,19 @@ public class BrowserPlayService extends Service {
 
     public static void stop(Context c) {
         c.stopService(new Intent(c, BrowserPlayService.class));
+        artist = "";
+        artUrl = "";
+        art = null;
+        durMs = 0;
     }
 
     @Override
     public void onCreate() {
         super.onCreate();
         session = new MediaSession(this, "ZHPlayBrowser");
+        self = this;
         session.setCallback(new MediaSession.Callback() {
+            public void onSeekTo(long ms) { send("seek:" + ms); }          // dragging the timeline
             public void onPlay() { send("play"); }
             public void onPause() { send("pause"); }
             public void onFastForward() { send("fwd"); }
@@ -88,10 +116,34 @@ public class BrowserPlayService extends Service {
             stopSelf();
             return START_NOT_STICKY;
         }
+        refresh();
+        return START_NOT_STICKY;
+    }
+
+    void refresh() {
         show();
         if (playing && !wake.isHeld()) wake.acquire(4 * 3600 * 1000L);
         else if (!playing && wake.isHeld()) wake.release();
-        return START_NOT_STICKY;
+    }
+
+    /** The song's cover (from the page) — fetched once per picture. */
+    static void artwork(final String url) {
+        if (url == null || url.isEmpty() || url.equals(artUrl)) return;
+        artUrl = url;
+        new Thread(() -> {
+            try {
+                java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+                c.setConnectTimeout(6000);
+                c.setReadTimeout(8000);
+                android.graphics.Bitmap b = android.graphics.BitmapFactory.decodeStream(c.getInputStream());
+                if (b != null && url.equals(artUrl)) {
+                    art = b;
+                    BrowserPlayService s = self;
+                    if (s != null) new android.os.Handler(android.os.Looper.getMainLooper()).post(s::refresh);
+                }
+            } catch (Exception ignored) {
+            }
+        }).start();
     }
 
     private PendingIntent pi(String a, int req) {
@@ -102,12 +154,19 @@ public class BrowserPlayService extends Service {
 
     @SuppressWarnings("deprecation")
     private void show() {
+        // position + speed: Android draws the timeline and moves it by itself between updates
+        boolean known = durMs > 0;
+        long pos = known ? posMs : PlaybackState.PLAYBACK_POSITION_UNKNOWN;
         session.setPlaybackState(new PlaybackState.Builder()
-                .setState(playing ? PlaybackState.STATE_PLAYING : PlaybackState.STATE_PAUSED, PlaybackState.PLAYBACK_POSITION_UNKNOWN, 1)
+                .setState(playing ? PlaybackState.STATE_PLAYING : PlaybackState.STATE_PAUSED, pos, playing ? 1f : 0f, at)
                 .setActions(PlaybackState.ACTION_PLAY | PlaybackState.ACTION_PAUSE | PlaybackState.ACTION_PLAY_PAUSE
-                        | PlaybackState.ACTION_FAST_FORWARD | PlaybackState.ACTION_REWIND | PlaybackState.ACTION_STOP).build());
-        session.setMetadata(new MediaMetadata.Builder().putString(MediaMetadata.METADATA_KEY_TITLE, title)
-                .putString(MediaMetadata.METADATA_KEY_ARTIST, "ZH Play · " + T.t("Browser")).build());
+                        | PlaybackState.ACTION_FAST_FORWARD | PlaybackState.ACTION_REWIND | PlaybackState.ACTION_STOP
+                        | (known ? PlaybackState.ACTION_SEEK_TO : 0)).build());
+        MediaMetadata.Builder md = new MediaMetadata.Builder().putString(MediaMetadata.METADATA_KEY_TITLE, title)
+                .putString(MediaMetadata.METADATA_KEY_ARTIST, artist.isEmpty() ? "ZH Play · " + T.t("Browser") : artist);
+        if (known) md.putLong(MediaMetadata.METADATA_KEY_DURATION, durMs);
+        if (art != null) md.putBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART, art);
+        session.setMetadata(md.build());
         NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         Notification.Builder b;
         if (Build.VERSION.SDK_INT >= 26) {
@@ -116,9 +175,9 @@ public class BrowserPlayService extends Service {
         } else b = new Notification.Builder(this);
         int f = PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0);
         b.setSmallIcon(R.drawable.lc_play)
-                .setLargeIcon(android.graphics.BitmapFactory.decodeResource(getResources(), R.drawable.zh_logo))
+                .setLargeIcon(art != null ? art : android.graphics.BitmapFactory.decodeResource(getResources(), R.drawable.zh_logo))
                 .setContentTitle(title.isEmpty() ? T.t("Browser") : title)
-                .setContentText(T.t(playing ? "Playing in the background" : "Paused"))
+                .setContentText(!artist.isEmpty() ? artist : T.t(playing ? "Playing in the background" : "Paused"))
                 .setOngoing(playing)
                 .setShowWhen(false)
                 .setVisibility(Notification.VISIBILITY_PUBLIC)
@@ -142,6 +201,7 @@ public class BrowserPlayService extends Service {
 
     @Override
     public void onDestroy() {
+        self = null;
         if (wake != null && wake.isHeld()) wake.release();
         if (session != null) session.release();
         super.onDestroy();

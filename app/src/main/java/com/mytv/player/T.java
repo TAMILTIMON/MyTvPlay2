@@ -35,6 +35,14 @@ public final class T {
     }
 
     static {
+        TA.put("Play / pause from the notification", "அறிவிப்பிலிருந்து இயக்கு / இடைநிறுத்து");
+        HI.put("Play / pause from the notification", "सूचना से चलाएँ / रोकें");
+        TA.put("Notifications are off for ZH Play, so the player controls (play / pause, timeline) can't be shown. Turn them on?", "ZH Play-க்கு அறிவிப்புகள் அணைக்கப்பட்டுள்ளன, அதனால் இயக்கக் கட்டுப்பாடுகளை (இயக்கு / இடைநிறுத்து, காலவரிசை) காட்ட முடியாது. இயக்கவா?");
+        HI.put("Notifications are off for ZH Play, so the player controls (play / pause, timeline) can't be shown. Turn them on?", "ZH Play के लिए सूचनाएँ बंद हैं, इसलिए प्लेयर कंट्रोल (चलाएँ / रोकें, टाइमलाइन) नहीं दिख सकते। चालू करें?");
+        TA.put("Open settings", "அமைப்புகளைத் திற");
+        HI.put("Open settings", "सेटिंग खोलें");
+        TA.put("Not now", "இப்போது வேண்டாம்");
+        HI.put("Not now", "अभी नहीं");
         TA.put("Starting the live picture…", "நேரலைப் படம் தொடங்குகிறது…");
         HI.put("Starting the live picture…", "लाइव तस्वीर शुरू हो रही है…");
         TA.put("If the TV asks \"Start now?\", press OK once", "டிவி \"இப்போது தொடங்கவா?\" என்று கேட்டால், ஒருமுறை OK அழுத்தவும்");
