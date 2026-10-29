@@ -103,30 +103,7 @@ public class ConnectActivity extends AppCompatActivity {
         phoneTiles.put("scan", UiKit.tile(this, "refresh-cw", T.t("Scan again"), T.t("find TVs on this Wi-Fi"), 0xFF8B5CF6, v -> startScan()));
         phoneTiles.put("address", UiKit.tile(this, "keyboard", T.t("Enter TV address"), T.t("type the TV's IP"), 0xFF3B82F6, v -> manual()));
         phoneTiles.put("group", UiKit.tile(this, "layers", T.t("TV group"), T.t("control several TVs at once"), 0xFF14B8A6, v -> TvGroup.manage(this, null)));
-        phoneTiles.put("browser", UiKit.tile(this, "search", T.t("Browser"), T.t("search & send videos to TV"), 0xFF22C55E,
-                v -> startActivity(new Intent(this, BrowserActivity.class))));
-        phoneTiles.put("player", UiKit.tile(this, "smartphone", T.t("Use this phone"), T.t("as a player"), 0xFFF97316,
-                v -> startActivity(new Intent(this, MainActivity.class).putExtra(MainActivity.EXTRA_PLAYER_HOME, true))));
-        phoneTiles.put("videos", UiKit.tile(this, "film", T.t("Videos"), T.t("on this phone"), 0xFF0EA5E9,
-                v -> startActivity(new Intent(this, PhoneLibraryActivity.class))));
-        phoneTiles.put("music", UiKit.tile(this, "list-music", T.t("Music"), T.t("on this phone"), 0xFFD946EF,
-                v -> startActivity(new Intent(this, PhoneLibraryActivity.class).putExtra(PhoneLibraryActivity.EXTRA_AUDIO, true))));
-        phoneTiles.put("features", UiKit.tile(this, "wand-sparkles", T.t("Features"), T.t("cutter, karaoke, converter…"), 0xFFF59E0B,
-                v -> startActivity(new Intent(this, ToolsActivity.class))));
-        phoneTiles.put("dj", UiKit.tile(this, "disc-3", T.t("DJ mixer"), T.t("two decks, sync, effects"), 0xFFEC4899,
-                v -> startActivity(new Intent(this, DjActivity.class))));
-        phoneTiles.put("editor", UiKit.tile(this, "audio-waveform", T.t("Song editor"), T.t("tracks, cut, effects"), 0xFF6366F1,
-                v -> startActivity(new Intent(this, EditorActivity.class))));
-        phoneTiles.put("board", UiKit.tile(this, "presentation", T.t("Whiteboard"), T.t("draw, shapes, rulers, formulas"), 0xFF10B981,
-                v -> startActivity(new Intent(this, PresentActivity.class).putExtra(PresentActivity.EXTRA_BOARD, true))));
-        phoneTiles.put("present", UiKit.tile(this, "presentation", T.t("Present"), T.t("PDF slides on the TV"), 0xFF8B5CF6, v -> {
-            if (Store.getStr("last_tv", "").isEmpty()) UiKit.makeToast(this, T.t("Connect to a TV first"), android.widget.Toast.LENGTH_SHORT).show();
-            else startActivity(new Intent(this, PresentActivity.class));
-        }));
-        phoneTiles.put("vpn", UiKit.tile(this, "lock", "VPN", T.t("WireGuard / Proton free"), 0xFF10B981, v -> WgVpn.panel(this)));
-        phoneTiles.put("eq", UiKit.tile(this, "sliders-vertical", T.t("Equalizer"), T.t("for the music player"), 0xFF22D3EE,
-                v -> startActivity(new Intent(this, PowerEqActivity.class))));
-        phoneTiles.put("settings", UiKit.tile(this, "settings", T.t("Settings"), T.t("language, theme, …"), 0xFF64748B, v -> SettingsDialog.show(this)));
+        FeatureBoard.add(this, phoneTiles, false);
         phoneBoard = new android.widget.FrameLayout(this);
         phoneBoard.addView(BoardLayout.build(this, phoneTiles, "phone_board"));
         root.addView(phoneBoard);

@@ -130,6 +130,10 @@
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden" />
 
         <activity
+            android:name=".FeaturesActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".PresentActivity"
             android:exported="false"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden" />

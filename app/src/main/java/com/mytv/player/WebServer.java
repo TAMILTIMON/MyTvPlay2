@@ -47,6 +47,16 @@ public class WebServer extends NanoHTTPD {
             Map<String, String> files = new HashMap<>();
             if (Method.POST.equals(s.getMethod())) s.parseBody(files);
             @SuppressWarnings("deprecation") Map<String, String> p = s.getParms();
+            // Files shared by a phone are fetched from that phone: use the address this request came from
+            // (the phone's own idea of its address can be a mobile-data / VPN one the TV can't reach).
+            for (String k : new String[]{"url", "urls"}) {
+                String v = p.get(k);
+                if (v != null && !v.isEmpty()) {
+                    StringBuilder fixed = new StringBuilder();
+                    for (String u : v.split("\n")) fixed.append(fixed.length() > 0 ? "\n" : "").append(phoneLink(u, s.getRemoteIpAddress()));
+                    p.put(k, fixed.toString());
+                }
+            }
 
             // ---- remote PIN ----
             if ("/pair".equals(uri)) {
@@ -691,6 +701,22 @@ public class WebServer extends NanoHTTPD {
     }
 
     /** Phone page, ping, and streams for the player itself are open; everything else needs the PIN token. */
+    /** http://<any>:8080/local/… or /fs/… (a file shared by the phone) → the same link on the sender's address. */
+    static String phoneLink(String u, String sender) {
+        try {
+            if (sender == null || sender.isEmpty() || sender.startsWith("127.") || sender.contains(":")) return u;
+            java.net.URI x = new java.net.URI(u.trim());
+            String path = x.getRawPath() == null ? "" : x.getRawPath();
+            if ("http".equals(x.getScheme()) && x.getPort() == RemoteService.PORT && (path.startsWith("/local/") || path.startsWith("/fs/"))
+                    && !sender.equals(x.getHost())) {
+                return "http://" + sender + ":" + RemoteService.PORT + path + (x.getRawQuery() == null ? "" : "?" + x.getRawQuery())
+                        + (x.getRawFragment() == null ? "" : "#" + x.getRawFragment());
+            }
+        } catch (Exception ignored) {
+        }
+        return u;
+    }
+
     private boolean allowed(IHTTPSession s, String uri, Map<String, String> p) {
         if (!Pair.enabled()) return true;
         if (uri.equals("/") || uri.equals("/index.html") || uri.equals("/ping") || uri.equals("/favicon.ico")) return true;

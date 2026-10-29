@@ -236,7 +236,7 @@ public final class SettingsDialog {
                         show(a);
                         break;
                     case 19:
-                        Updater.check(a, false);
+                        Updater.menu(a);                // check · earlier versions (roll back) · automatic updates
                         break;
                     case 20:
                         backupMenu(a);

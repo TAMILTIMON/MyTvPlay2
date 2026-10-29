@@ -11,7 +11,7 @@ android {
         minSdk 21
         targetSdk 34
         versionCode = (System.getenv('VCODE') ?: '34').toInteger()
-        versionName = '5.0.1' + (System.getenv('VCODE') ? '.' + System.getenv('VCODE') : '')
+        versionName = '5.3' + (System.getenv('VCODE') ? '.' + System.getenv('VCODE') : '')
     }
 
     // Two variants from the same code — every feature is in both:
@@ -21,6 +21,10 @@ android {
     productFlavors {
         full {
             dimension 'store'
+            // ONE fixed Android version code for the self-installed app: Android then accepts older builds too,
+            // so "Updates → Earlier versions" can roll back. (Higher than every earlier build, so they update to it.)
+            // Which build is newer comes from the build number at the end of the version name.
+            versionCode 2000000
         }
         play {
             dimension 'store'

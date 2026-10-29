@@ -38,6 +38,13 @@ public final class DjCore {
         public final long[] hot = {-1, -1, -1, -1};
         public volatile long loopA = -1, loopB = -1;
         public volatile float peak;               // level meter 0 … 1
+        /** Scratching (finger on the jog wheel): target speed in song frames per output frame, + / −; NaN = not scratching. */
+        public volatile float scratch = Float.NaN;
+        private double scrV;                      // the actual scratch speed (follows the finger smoothly — no clicks)
+
+        public int outRate() {
+            return outRate;
+        }
 
         private final int outRate;
         private final Bq lsL = new Bq(), lsR = new Bq(), mdL = new Bq(), mdR = new Bq(), hsL = new Bq(), hsR = new Bq(),
@@ -138,9 +145,22 @@ public final class DjCore {
             double bl = beatLen();
             int echoDelay = (int) Math.min(dlL.length - 1, bl > 0 ? bl * 0.75 / pitch * outRate / s.rate() : outRate * 0.375);
             long frames = s.frames();
+            float scr = scratch;
+            boolean scratching = !Float.isNaN(scr);
+            if (!scratching) scrV = playing ? step : 0;            // a scratch starts from the current speed
             for (int k = 0; k < n; k++) {
                 float l = 0, r = 0;
-                if (playing) {
+                if (scratching) {
+                    // the record follows the finger: forwards, backwards, or held still
+                    scrV += (scr - scrV) * 0.0035;
+                    if (pos < 0) pos = 0;
+                    if (pos > frames - 2) pos = frames - 2;
+                    long i = (long) pos;
+                    float t = (float) (pos - i);
+                    l = s.l(i) + (s.l(i + 1) - s.l(i)) * t;
+                    r = s.r(i) + (s.r(i + 1) - s.r(i)) * t;
+                    pos = Math.max(0, Math.min(frames - 2, pos + scrV));
+                } else if (playing) {
                     long i = (long) pos;
                     if (i >= frames - 1) {
                         playing = false;

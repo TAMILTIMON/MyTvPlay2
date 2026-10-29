@@ -111,6 +111,7 @@ public class DjActivity extends AppCompatActivity {
         ui[1] = new DeckUi(1, 0xFFF472B6);
         mixerView = mixer();
         arrange();
+        restoreLists();                      // each deck's song list from last time
         setContentView(root);
         Orient.apply(this, "dj_orient");
         refreshRec();
@@ -175,6 +176,9 @@ public class DjActivity extends AppCompatActivity {
         final Button[] hot = new Button[4];
         SeekBar pitch;
         float range = 0.08f;
+        TextView listTitle;
+        LinearLayout listRows;
+        JogWheel jog;
 
         DeckUi(final int i, int color) {
             this.i = i;
@@ -217,6 +221,16 @@ public class DjActivity extends AppCompatActivity {
             LinearLayout.LayoutParams wl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(70));
             wl.setMargins(0, dp(8), 0, dp(4));
             card.addView(wave, wl);
+            // the jog wheel / scratch disc
+            jog = new JogWheel(DjActivity.this, deck[i], color);
+            LinearLayout.LayoutParams jl = new LinearLayout.LayoutParams(dp(170), dp(170));
+            jl.gravity = Gravity.CENTER_HORIZONTAL;
+            jl.setMargins(0, dp(4), 0, dp(2));
+            card.addView(jog, jl);
+            TextView jh = Ui.text(DjActivity.this, 10, 0x88FFFFFF, false);
+            jh.setText(T.t("centre = scratch · ring = nudge"));
+            jh.setGravity(Gravity.CENTER);
+            card.addView(jh);
 
             LinearLayout r1 = new LinearLayout(DjActivity.this);
             play = small("Play", v -> {
@@ -296,6 +310,23 @@ public class DjActivity extends AppCompatActivity {
             });
             r3.addView(pitchT, new LinearLayout.LayoutParams(dp(64), ViewGroup.LayoutParams.WRAP_CONTENT));
             card.addView(r3);
+            // ---- this deck's song list (scrolls on its own)
+            LinearLayout lh = new LinearLayout(DjActivity.this);
+            lh.setGravity(Gravity.CENTER_VERTICAL);
+            lh.setPadding(0, dp(8), 0, dp(2));
+            listTitle = Ui.text(DjActivity.this, 12, 0xB3FFFFFF, true);
+            lh.addView(listTitle, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+            lh.addView(small("＋ " + T.t("Add songs"), v -> load(i)));
+            card.addView(lh);
+            final ScrollView ls = new ScrollView(DjActivity.this);
+            ls.setOnTouchListener((v, e) -> {                     // the list scrolls, not the whole screen
+                v.getParent().requestDisallowInterceptTouchEvent(true);
+                return false;
+            });
+            listRows = new LinearLayout(DjActivity.this);
+            listRows.setOrientation(LinearLayout.VERTICAL);
+            ls.addView(listRows);
+            card.addView(ls, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(170)));
         }
 
         int toProgress(float p) {
@@ -413,6 +444,8 @@ public class DjActivity extends AppCompatActivity {
         LinearLayout r = new LinearLayout(this);
         r.addView(small("Centre", v -> xf.setProgress(500)));
         r.addView(small("Auto-fade", v -> autoFade()));
+        autoDjBtn = small("Auto DJ: " + T.t("Off"), v -> setAutoDj(!autoDj));
+        r.addView(autoDjBtn);
         r.addView(knob("Master", 0xFFE5E7EB, -12, 6, 0, false, v -> masterDb = v));
         m.addView(r);
         return m;
@@ -466,54 +499,437 @@ public class DjActivity extends AppCompatActivity {
         toast(T.t("Auto-fade") + ": " + (ms / 1000) + " s");
     }
 
-    // ------------------------------------------------------------------ loading a song into a deck
+    // ------------------------------------------------------------------ each deck's song list
+    @SuppressWarnings("unchecked")
+    private final List<PhoneMedia.M>[] lists = new List[]{new ArrayList<PhoneMedia.M>(), new ArrayList<PhoneMedia.M>()};
+    private final int[] loadedIdx = {-1, -1};            // which list song is on the deck
+    private final boolean[] preparing = new boolean[2], ready = new boolean[2];
+    private boolean autoDj, autoStart;
+    private Button autoDjBtn;
+
+    /** Full-screen picker: tick several songs (search, select all) → "Add N songs"; or Files… / Folder… from storage. */
     private void load(final int i) {
         final List<PhoneMedia.M> all = PhoneMedia.query(this, true);
-        if (all.isEmpty()) {
-            toast(T.t("No music found on this phone."));
-            return;
-        }
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(16), dp(4), dp(16), 0);
+        final android.app.Dialog dlg = new android.app.Dialog(this);
+        dlg.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(0xFF0F0F14);
+        root.setPadding(dp(12), dp(10), dp(12), dp(10));
+        // top: title + search + select all / clear
+        TextView tt = Ui.text(this, 17, Color.WHITE, true);
+        tt.setText(T.t("Add songs to deck") + " " + (i == 0 ? "A" : "B"));
+        root.addView(tt);
+        LinearLayout sr = new LinearLayout(this);
+        sr.setGravity(Gravity.CENTER_VERTICAL);
         final EditText q = new EditText(this);
-        q.setHint(T.t("Search"));
+        q.setHint("🔍 " + T.t("Search"));
         q.setSingleLine(true);
-        box.addView(q);
+        q.setTextColor(Color.WHITE);
+        q.setHintTextColor(0x88FFFFFF);
+        sr.addView(q, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        final List<PhoneMedia.M> shown = new ArrayList<>();
+        final java.util.LinkedHashSet<PhoneMedia.M> picked = new java.util.LinkedHashSet<>();
         final android.widget.ListView lv = new android.widget.ListView(this);
-        final List<PhoneMedia.M> shown = new ArrayList<>(all);
-        final android.widget.ArrayAdapter<String> ad = new android.widget.ArrayAdapter<>(this, android.R.layout.simple_list_item_1, new ArrayList<String>());
-        Runnable fill = () -> {
+        lv.setChoiceMode(android.widget.ListView.CHOICE_MODE_MULTIPLE);
+        final Button addBtn = small("", null);
+        final Runnable paintAdd = () -> {
+            addBtn.setText("＋ " + T.t("Add") + " " + picked.size() + " " + T.t("songs to deck") + " " + (i == 0 ? "A" : "B"));
+            addBtn.setEnabled(!picked.isEmpty());
+            addBtn.setAlpha(picked.isEmpty() ? 0.5f : 1f);
+        };
+        sr.addView(small(T.t("Select all"), v -> {
+            for (int k = 0; k < shown.size(); k++) {
+                lv.setItemChecked(k, true);
+                picked.add(shown.get(k));
+            }
+            paintAdd.run();
+        }));
+        sr.addView(small(T.t("Clear"), v -> {
+            picked.clear();
+            lv.clearChoices();
+            lv.invalidateViews();
+            paintAdd.run();
+        }));
+        root.addView(sr);
+        // the songs, with tick boxes
+        final android.widget.ArrayAdapter<String> ad = new android.widget.ArrayAdapter<String>(this,
+                android.R.layout.simple_list_item_multiple_choice, new ArrayList<String>()) {
+            @Override
+            public View getView(int pos, View cv, ViewGroup parent) {
+                View v = super.getView(pos, cv, parent);
+                if (v instanceof TextView) ((TextView) v).setTextColor(Color.WHITE);
+                return v;
+            }
+        };
+        lv.setAdapter(ad);
+        final Runnable fill = () -> {
             ad.clear();
             shown.clear();
-            String s = q.getText().toString().toLowerCase(Locale.ROOT);
+            String f = q.getText().toString().toLowerCase(Locale.ROOT);
             for (PhoneMedia.M m : all) {
-                if (!s.isEmpty() && !m.title.toLowerCase(Locale.ROOT).contains(s) && !m.sub.toLowerCase(Locale.ROOT).contains(s)) continue;
+                if (!f.isEmpty() && !m.title.toLowerCase(Locale.ROOT).contains(f) && !m.sub.toLowerCase(Locale.ROOT).contains(f)) continue;
                 shown.add(m);
                 ad.add(m.title + "  ·  " + m.sub);
             }
+            for (int k = 0; k < shown.size(); k++) lv.setItemChecked(k, picked.contains(shown.get(k)));
         };
         fill.run();
         q.addTextChangedListener(new android.text.TextWatcher() {
             public void beforeTextChanged(CharSequence c, int a, int b, int d) { }
+
             public void onTextChanged(CharSequence c, int a, int b, int d) { }
+
             public void afterTextChanged(android.text.Editable e) {
                 fill.run();
             }
         });
-        lv.setAdapter(ad);
-        box.addView(lv, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(380)));
-        final AlertDialog d = new UiDialog(this).setTitle(T.t("Load deck") + " " + (i == 0 ? "A" : "B")).setView(box)
-                .setNegativeButton(T.t("Cancel"), null).show();
         lv.setOnItemClickListener((pa, v, pos, id) -> {
-            d.dismiss();
-            decode(i, shown.get(pos));
+            PhoneMedia.M m = shown.get(pos);
+            if (lv.isItemChecked(pos)) picked.add(m);
+            else picked.remove(m);
+            paintAdd.run();
         });
+        if (all.isEmpty()) {
+            TextView none = Ui.text(this, 13, 0x99FFFFFF, false);
+            none.setText(T.t("No music found in the phone's music library — use Files… or Folder… below."));
+            none.setPadding(dp(6), dp(20), dp(6), dp(20));
+            root.addView(none);
+        }
+        root.addView(lv, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
+        // bottom bar — always on screen
+        LinearLayout bar = new LinearLayout(this);
+        bar.setGravity(Gravity.CENTER_VERTICAL);
+        bar.setPadding(0, dp(6), 0, 0);
+        bar.addView(small("📄 " + T.t("Files…"), v -> {
+            dlg.dismiss();
+            pickFor = i;
+            startActivityForResult(new android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT)
+                    .addCategory(android.content.Intent.CATEGORY_OPENABLE).setType("audio/*")
+                    .putExtra(android.content.Intent.EXTRA_ALLOW_MULTIPLE, true), 81);
+        }));
+        bar.addView(small("📁 " + T.t("Folder…"), v -> {
+            dlg.dismiss();
+            pickFor = i;
+            startActivityForResult(new android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT_TREE), 82);
+        }));
+        bar.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1));
+        bar.addView(small(T.t("Cancel"), v -> dlg.dismiss()));
+        root.addView(bar);
+        addBtn.setBackground(Ui.gradient(this, 14));
+        addBtn.setOnClickListener(v -> {
+            if (picked.isEmpty()) return;
+            dlg.dismiss();
+            addToList(i, new ArrayList<>(picked));
+        });
+        root.addView(addBtn, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(48)));
+        paintAdd.run();
+        dlg.setContentView(root);
+        if (dlg.getWindow() != null) dlg.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+        dlg.show();
     }
 
+    private int pickFor;
+
+    private void addToList(int i, List<PhoneMedia.M> songs) {
+        if (songs.isEmpty()) {
+            toast(T.t("No songs found there"));
+            return;
+        }
+        boolean empty = deck[i].src == null && lists[i].isEmpty();
+        lists[i].addAll(songs);
+        saveLists();
+        paintList(i);
+        toast(songs.size() + " " + T.t("songs added to deck") + " " + (i == 0 ? "A" : "B"));
+        if (empty) decode(i, lists[i].get(0), 0, false);          // the first one straight onto the deck
+    }
+
+    /** Files… (several) or Folder… (all its songs, sub-folders too) from the phone's storage. */
+    @Override
+    protected void onActivityResult(int req, int res, android.content.Intent data) {
+        super.onActivityResult(req, res, data);
+        if ((req != 81 && req != 82) || res != RESULT_OK || data == null) return;
+        final int i = pickFor;
+        final int flags = android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION;
+        if (req == 81) {
+            List<android.net.Uri> us = new ArrayList<>();
+            if (data.getClipData() != null) for (int k = 0; k < data.getClipData().getItemCount(); k++) us.add(data.getClipData().getItemAt(k).getUri());
+            else if (data.getData() != null) us.add(data.getData());
+            List<PhoneMedia.M> songs = new ArrayList<>();
+            for (android.net.Uri u : us) {
+                try {
+                    getContentResolver().takePersistableUriPermission(u, flags);    // still works next time
+                } catch (Exception ignored) {
+                }
+                songs.add(song(u, LocalShare.displayName(this, u), ""));
+            }
+            addToList(i, songs);
+            return;
+        }
+        final android.net.Uri tree = data.getData();
+        if (tree == null) return;
+        try {
+            getContentResolver().takePersistableUriPermission(tree, flags);
+        } catch (Exception ignored) {
+        }
+        toast(T.t("Reading the folder…"));
+        new Thread(() -> {
+            final List<PhoneMedia.M> songs = new ArrayList<>();
+            String rootId = android.provider.DocumentsContract.getTreeDocumentId(tree);
+            walk(tree, rootId, "", songs, 0);
+            java.util.Collections.sort(songs, (x, y) -> (x.sub + "/" + x.title).compareToIgnoreCase(y.sub + "/" + y.title));
+            main.post(() -> addToList(i, songs));
+        }).start();
+    }
+
+    private static final java.util.Set<String> AUDIO_EXT = new java.util.HashSet<>(java.util.Arrays.asList(
+            "mp3", "m4a", "aac", "flac", "ogg", "opus", "wav", "wma", "amr", "mka", "aiff", "aif", "ape", "alac"));
+
+    /** All songs in a folder and its sub-folders (up to 6 levels, 3000 songs). */
+    private void walk(android.net.Uri tree, String docId, String folder, List<PhoneMedia.M> out, int depth) {
+        if (depth > 6 || out.size() >= 3000) return;
+        android.net.Uri kids = android.provider.DocumentsContract.buildChildDocumentsUriUsingTree(tree, docId);
+        String[] cols = {android.provider.DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                android.provider.DocumentsContract.Document.COLUMN_DISPLAY_NAME, android.provider.DocumentsContract.Document.COLUMN_MIME_TYPE};
+        try (android.database.Cursor c = getContentResolver().query(kids, cols, null, null, null)) {
+            if (c == null) return;
+            while (c.moveToNext()) {
+                String id = c.getString(0), name = c.getString(1), mime = c.getString(2);
+                if (android.provider.DocumentsContract.Document.MIME_TYPE_DIR.equals(mime)) {
+                    walk(tree, id, name, out, depth + 1);
+                } else {
+                    String ext = name == null || !name.contains(".") ? "" : name.substring(name.lastIndexOf('.') + 1).toLowerCase(Locale.ROOT);
+                    if ((mime != null && mime.startsWith("audio/")) || AUDIO_EXT.contains(ext)) {
+                        out.add(song(android.provider.DocumentsContract.buildDocumentUriUsingTree(tree, id), name, folder));
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    private static PhoneMedia.M song(android.net.Uri u, String name, String folder) {
+        PhoneMedia.M m = new PhoneMedia.M();
+        m.uri = u;
+        String n = name == null ? "Song" : name;
+        m.title = n.contains(".") ? n.substring(0, n.lastIndexOf('.')) : n;
+        m.sub = folder == null || folder.isEmpty() ? T.t("from storage") : folder;
+        return m;
+    }
+
+    /** The rows under a deck: ▶ for the song on the deck; tap = load it; hold = options. */
+    private void paintList(final int i) {
+        DeckUi u = ui[i];
+        if (u == null || u.listRows == null) return;
+        List<PhoneMedia.M> l = lists[i];
+        u.listTitle.setText(T.t("Songs") + " (" + l.size() + ")" + (autoDj ? "  ·  Auto DJ" : ""));
+        u.listRows.removeAllViews();
+        if (l.isEmpty()) {
+            TextView t = Ui.text(this, 12, 0x88FFFFFF, false);
+            t.setText(T.t("Add several songs — Auto DJ plays them one after another, crossfading A ⇄ B."));
+            t.setPadding(dp(4), dp(6), dp(4), dp(6));
+            u.listRows.addView(t);
+            return;
+        }
+        for (int k = 0; k < l.size(); k++) {
+            final int idx = k;
+            PhoneMedia.M m = l.get(k);
+            LinearLayout row = new LinearLayout(this);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(dp(6), dp(6), dp(6), dp(6));
+            boolean on = k == loadedIdx[i];
+            row.setBackground(on ? Ui.card(this, (u.color & 0x00FFFFFF) | 0x33000000, u.color, 10) : Ui.focusCard(this, 10));
+            TextView n = Ui.text(this, 12, on ? u.color : 0x88FFFFFF, true);
+            n.setText(on ? "▶" : String.valueOf(k + 1));
+            n.setGravity(Gravity.CENTER);
+            row.addView(n, new LinearLayout.LayoutParams(dp(26), ViewGroup.LayoutParams.WRAP_CONTENT));
+            LinearLayout col = new LinearLayout(this);
+            col.setOrientation(LinearLayout.VERTICAL);
+            TextView t = Ui.text(this, 13, Color.WHITE, on);
+            t.setText(m.title);
+            t.setSingleLine(true);
+            t.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            TextView sb = Ui.text(this, 11, 0x88FFFFFF, false);
+            sb.setText(m.sub);
+            sb.setSingleLine(true);
+            sb.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            col.addView(t);
+            col.addView(sb);
+            row.addView(col, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+            row.setOnClickListener(v -> decode(i, lists[i].get(idx), idx, false));
+            row.setOnLongClickListener(v -> {
+                songMenu(i, idx);
+                return true;
+            });
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            lp.setMargins(0, dp(2), 0, dp(2));
+            u.listRows.addView(row, lp);
+        }
+    }
+
+    private void songMenu(final int i, final int idx) {
+        final List<PhoneMedia.M> l = lists[i];
+        String other = i == 0 ? "B" : "A";
+        new UiDialog(this).setTitle(l.get(idx).title).setItems(new String[]{"▶  " + T.t("Load on this deck"), "⏭  " + T.t("Play next"),
+                "↑  " + T.t("Move up"), "↓  " + T.t("Move down"), "⇄  " + T.t("Move to deck") + " " + other, "🗑  " + T.t("Remove")}, (d, w) -> {
+            PhoneMedia.M m = l.get(idx);
+            int cur = loadedIdx[i];
+            switch (w) {
+                case 0: decode(i, m, idx, false); return;
+                case 1: {
+                    l.remove(idx);
+                    if (idx < cur) cur--;
+                    l.add(Math.min(l.size(), cur + 1), m);
+                    loadedIdx[i] = cur;
+                    break;
+                }
+                case 2:
+                    if (idx > 0) {
+                        l.add(idx - 1, l.remove(idx));
+                        if (cur == idx) loadedIdx[i] = idx - 1;
+                        else if (cur == idx - 1) loadedIdx[i] = idx;
+                    }
+                    break;
+                case 3:
+                    if (idx < l.size() - 1) {
+                        l.add(idx + 1, l.remove(idx));
+                        if (cur == idx) loadedIdx[i] = idx + 1;
+                        else if (cur == idx + 1) loadedIdx[i] = idx;
+                    }
+                    break;
+                case 4:
+                    l.remove(idx);
+                    if (idx < cur) loadedIdx[i] = cur - 1;
+                    else if (idx == cur) loadedIdx[i] = -1;
+                    lists[1 - i].add(m);
+                    paintList(1 - i);
+                    break;
+                default:
+                    l.remove(idx);
+                    if (idx < cur) loadedIdx[i] = cur - 1;
+                    else if (idx == cur) loadedIdx[i] = -1;
+            }
+            saveLists();
+            paintList(i);
+        }).show();
+    }
+
+    private void saveLists() {
+        try {
+            for (int i = 0; i < 2; i++) {
+                org.json.JSONArray a = new org.json.JSONArray();
+                for (PhoneMedia.M m : lists[i]) a.put(new org.json.JSONObject().put("u", m.uri.toString()).put("t", m.title).put("s", m.sub));
+                Store.putStr("dj_list_" + i, a.toString());
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void restoreLists() {
+        for (int i = 0; i < 2; i++) {
+            lists[i].clear();
+            try {
+                org.json.JSONArray a = new org.json.JSONArray(Store.getStr("dj_list_" + i, "[]"));
+                for (int k = 0; k < a.length(); k++) {
+                    PhoneMedia.M m = new PhoneMedia.M();
+                    m.uri = android.net.Uri.parse(a.getJSONObject(k).getString("u"));
+                    m.title = a.getJSONObject(k).optString("t");
+                    m.sub = a.getJSONObject(k).optString("s");
+                    lists[i].add(m);
+                }
+            } catch (Exception ignored) {
+            }
+            paintList(i);
+        }
+    }
+
+    // ------------------------------------------------------------------ Auto DJ: A ⇄ B, one song after another
+    private void setAutoDj(boolean on) {
+        autoDj = on;
+        autoDjBtn.setText("Auto DJ: " + T.t(on ? "On" : "Off"));
+        autoDjBtn.setBackground(on ? Ui.gradient(this, 14) : Ui.card(this, 0xFF26262E, 0, 14));
+        paintList(0);
+        paintList(1);
+        main.removeCallbacks(autoTick);
+        if (!on) return;
+        int live = xfade <= 0 ? 0 : 1;
+        if (!deck[0].playing && !deck[1].playing) {             // nothing playing yet: start the side you hear
+            if (deck[live].src != null) {
+                deck[live].playing = true;
+                ui[live].play.setText("❚❚");
+            } else if (!lists[live].isEmpty()) {
+                autoStart = true;
+                decode(live, lists[live].get(0), 0, false);
+            } else {
+                toast(T.t("Add songs to a deck first"));
+            }
+        }
+        main.post(autoTick);
+        toast("Auto DJ: " + T.t("the next song comes in with a crossfade near the end of each song"));
+    }
+
+    /** Fade length: 8 bars (32 beats) when the tempo is known, else 10 s — the same as Auto-fade. */
+    private long fadeMs(DjCore.Deck d) {
+        return d.bpm > 0 ? (long) (32 * 60000 / d.liveBpm()) : 10000;
+    }
+
+    /** The next song for deck `to`: its own list first, else the other deck's list. {list, index} or null. */
+    private int[] nextFor(int to) {
+        if (loadedIdx[to] + 1 < lists[to].size()) return new int[]{to, loadedIdx[to] + 1};
+        int from = 1 - to;
+        if (loadedIdx[from] + 1 < lists[from].size()) return new int[]{from, loadedIdx[from] + 1};
+        return null;
+    }
+
+    private final Runnable autoTick = new Runnable() {
+        public void run() {
+            if (!autoDj) return;
+            main.postDelayed(this, 400);
+            if (autoFading) return;
+            int live = xfade <= 0 ? 0 : 1, other = 1 - live;
+            DjCore.Deck L = deck[live];
+            if (L.src == null || !L.playing) return;
+            long remain = (long) ((L.length() - L.pos) * 1000.0 / Math.max(1, L.src.rate() * L.pitch));
+            long fade = Math.min(30000, fadeMs(L));
+            // 1. about half a minute before: get the next song ready on the other deck
+            if (remain < fade + 30000 && !ready[other] && !preparing[other]) {
+                int[] nx = nextFor(other);
+                if (nx != null) {
+                    PhoneMedia.M m = lists[nx[0]].get(nx[1]);
+                    if (nx[0] != other) {                       // taken from the other side's list: moves to this deck
+                        lists[nx[0]].remove(nx[1]);
+                        lists[other].add(Math.max(0, loadedIdx[other] + 1), m);
+                        paintList(nx[0]);
+                        saveLists();
+                        decode(other, m, Math.max(0, loadedIdx[other] + 1), true);
+                    } else decode(other, m, nx[1], true);
+                }
+            }
+            // 2. at the end: the other deck comes in on its first beat, in tempo, with the crossfade
+            if (remain <= fade + 300 && ready[other]) {
+                DjCore.Deck O = deck[other];
+                if (O.bpm > 0 && L.bpm > 0) O.syncTo(L);
+                O.pos = O.cue;
+                O.playing = true;
+                ui[other].play.setText("❚❚");
+                if (ui[other].pitch != null) ui[other].pitch.setProgress(ui[other].toProgress(O.pitch));
+                ready[other] = false;
+                autoFade();
+            }
+        }
+    };
+
     private void decode(final int i, final PhoneMedia.M m) {
+        decode(i, m, -1, false);
+    }
+
+    /** idx: its place in deck i's list (−1 = not from the list); auto: prepared by Auto DJ (don't stop the deck). */
+    private void decode(final int i, final PhoneMedia.M m, final int idx, final boolean auto) {
         final DjCore.Deck dk = deck[i];
         dk.playing = false;
+        ui[i].play.setText("▶");
+        preparing[i] = auto;
+        ready[i] = false;
         final DeckUi u = ui[i];
         u.name.setText(m.title);
         u.bpm.setText("… BPM");
@@ -571,11 +987,27 @@ public class DjActivity extends AppCompatActivity {
                     dk.bpm = bpm[0];
                     dk.firstBeat = bpm[1];
                     dk.cue = (long) bpm[1];
+                    if (idx >= 0) {
+                        loadedIdx[i] = idx;
+                        paintList(i);
+                    }
+                    if (preparing[i]) {
+                        preparing[i] = false;
+                        ready[i] = true;                // Auto DJ starts it at the right moment
+                    }
+                    if (autoStart) {                    // Auto DJ was switched on with nothing playing
+                        autoStart = false;
+                        dk.pos = dk.cue;
+                        dk.playing = true;
+                        ui[i].play.setText("❚❚");
+                    }
                 });
             } catch (final Exception e) {
                 main.post(() -> {
                     u.wave.message = "⚠ " + e.getMessage();
                     u.wave.invalidate();
+                    preparing[i] = false;
+                    if (idx >= 0 && autoDj) loadedIdx[i] = idx;      // Auto DJ skips a song that can't be read
                 });
             }
         }).start();
@@ -665,6 +1097,7 @@ public class DjActivity extends AppCompatActivity {
                     u.wave.setPlay(ms);
                     long rem = Math.max(0, u.wave.durMs - ms);
                     u.time.setText(WaveView.time(ms, false) + "  ·  −" + WaveView.time(rem, false) + (d.looping() ? "  ·  LOOP" : ""));
+                    if (u.jog != null) u.jog.invalidate();          // the platter turns with the music
                     u.bpm.setText(d.bpm > 0 ? String.format(Locale.US, "%.1f BPM", d.liveBpm()) : "… BPM");
                 }
                 u.play.setText(T.t(d.playing ? "Pause" : "Play"));

@@ -522,6 +522,8 @@ public class MainActivity extends AppCompatActivity {
                 rows.add(T.t("🔓   Allow the phone to start videos when this app is closed  (recommended)"));
                 actions.add(() -> Perms.openOverlaySettings(this));
             }
+            rows.add("✨   " + T.t("All features") + "  ·  " + T.t("whiteboard, DJ, song editor, music, VPN, updates…"));
+            actions.add(() -> startActivity(new Intent(this, FeaturesActivity.class)));
             rows.add("🌐   " + T.t("Browser · search the web & play links"));
             actions.add(() -> startActivity(new Intent(this, BrowserActivity.class)));
             if (Ui.isTv(this) && !Perms.accessOk(this)) {

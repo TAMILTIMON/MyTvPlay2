@@ -1,3 +1,36 @@
+ZH PLAY 5.3 — DJ: jog wheels (scratch), easier multi-song adding, files & folders
+==============================================================================
+* Jog wheel on both decks (like a DJ controller): the platter turns with the music (33⅓ rpm);
+  touch the centre to scratch — the sound follows your finger, forwards and backwards, a resting
+  finger holds the record; turn the outer ring to nudge the tempo (to line up beats). Smooth (no clicks).
+* Adding songs: a full-screen picker — tick several (search, Select all, Clear) and the
+  "Add N songs to deck A/B" button is always on screen (before, in landscape it fell off the bottom).
+* Files… (several audio files from anywhere) and Folder… (all songs in a folder and its sub-folders)
+  from the phone's storage — they still play next time.
+
+ZH PLAY 5.2 — DJ mixer: song lists on both decks, Auto DJ
+========================================================
+* Each deck has its own song list (kept for next time): "＋ Add songs" picks several at once
+  (search, select all shown). The list scrolls under the deck; ▶ marks the song on the deck;
+  tap a song = load it; hold = play next, move up / down, move to the other deck, remove.
+* Auto DJ (mixer, next to Auto-fade): plays the lists one song after another, A ⇄ B. About 30 s
+  before the end it prepares the other deck's next song; at the end it brings it in on its first
+  beat, in tempo (when both BPMs are known), with the 8-bar crossfade. If one side's list is
+  empty, the next song comes from the other list. Switching it on with nothing playing starts deck A.
+
+ZH PLAY 5.1 — one app, every option on the TV too; roll back to earlier versions
+================================================================================
+* "All features" on the TV home (and in the phone's player home): browser, videos, music, features,
+  DJ mixer, song editor, whiteboard, VPN, equalizer, updates, settings — customizable like the boards
+  (the TV keeps its own arrangement). The phone's start screen uses the same tiles.
+* Updates (All features → Updates, or Settings): Check for updates · Earlier versions (roll back) ·
+  Automatic updates On / Paused. Rolling back pauses automatic updates so it doesn't jump forward.
+* How rolling back is possible: the self-installed app now has one fixed Android version code
+  (2000000 — higher than all earlier builds, so they update to it normally); Android accepts an
+  older build with the same code. Which build is newer comes from the build number in the version
+  name. Rollback works to builds made from 5.1 on (older builds still have the old numbering).
+  The Google Play build keeps increasing version codes (Play requires it).
+
 ZH PLAY 5.0.1 — PDF slides / phone videos on the PC (and TV) fixed
 =================================================================
 * The phone told the PC / TV the wrong address of itself when mobile data or the VPN was on (a
