@@ -1002,12 +1002,19 @@ public class BrowserActivity extends AppCompatActivity {
     private Button tabsBtn;
 
     private void switchTo(WebView w) {
-        if (w == web) return;
+        if (w == null) return;
+        if (w == web && w.getParent() != null) return;
         snap(web);
         webBox.removeView(web);
+
+        if (w.getParent() instanceof ViewGroup) {
+            ((ViewGroup) w.getParent()).removeView(w);
+        }
+
         web = w;
-        if (w.getParent() == null) webBox.addView(w, 0, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+        webBox.addView(web, 0, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
+
         found.clear();
         updateVideos();
         tabsBtn.setText(String.valueOf(tabs.size()));
@@ -1520,32 +1527,43 @@ public class BrowserActivity extends AppCompatActivity {
         tabsView = new FrameLayout(this);
         tabsView.setBackgroundColor(Ui.BG);
         tabsView.setClickable(true);
+        tabsView.setFocusable(true);
+
         LinearLayout col = new LinearLayout(this);
         col.setOrientation(LinearLayout.VERTICAL);
         col.setPadding(Ui.dp(this, 12), Ui.dp(this, tv ? 16 : 22), Ui.dp(this, 12), Ui.dp(this, 8));
         tabsView.addView(col);
+
         LinearLayout top = new LinearLayout(this);
         top.setGravity(Gravity.CENTER_VERTICAL);
-        top.addView(navBtn("arrow-left", v -> root.removeView(tabsView)));
+        top.addView(navBtn("arrow-left", v -> {
+            root.removeView(tabsView);
+            tabsView = null;
+        }));
         TextView h = Ui.text(this, 19, Ui.TEXT, true);
         h.setText("  " + T.t("Tabs") + " · " + tabs.size());
         top.addView(h, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        
         Button closeAll = Ui.button(this, T.t("Close all"), false);
         closeAll.setOnClickListener(v -> {
             while (tabs.size() > 1) closeTab(tabs.get(tabs.size() - 1));
             home();
             root.removeView(tabsView);
+            tabsView = null;
         });
         top.addView(closeAll);
+
         Button add = Ui.button(this, "＋ " + T.t("New tab"), true);
         add.setOnClickListener(v -> {
             root.removeView(tabsView);
+            tabsView = null;
             newTab(null);
         });
         LinearLayout.LayoutParams al = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, Ui.dp(this, 40));
         al.setMargins(Ui.dp(this, 8), 0, 0, 0);
         top.addView(add, al);
         col.addView(top);
+
         android.widget.GridView g = new android.widget.GridView(this);
         g.setNumColumns(tv ? 4 : 2);
         g.setHorizontalSpacing(Ui.dp(this, 10));
@@ -1553,6 +1571,9 @@ public class BrowserActivity extends AppCompatActivity {
         g.setPadding(0, Ui.dp(this, 12), 0, 0);
         g.setSelector(Ui.listSelector(this));
         g.setDrawSelectorOnTop(true);
+        g.setFocusable(true);
+        g.setDescendantFocusability(ViewGroup.FOCUS_AFTER_DESCENDANTS);
+
         g.setAdapter(new android.widget.BaseAdapter() {
             public int getCount() { return tabs.size(); }
             public Object getItem(int p) { return tabs.get(p); }
@@ -1563,6 +1584,15 @@ public class BrowserActivity extends AppCompatActivity {
                 card.setOrientation(LinearLayout.VERTICAL);
                 card.setBackground(Ui.card(BrowserActivity.this, Ui.SOLID, w == web ? Ui.ACCENT : Ui.STROKE, 16));
                 card.setPadding(Ui.dp(BrowserActivity.this, 6), Ui.dp(BrowserActivity.this, 6), Ui.dp(BrowserActivity.this, 6), Ui.dp(BrowserActivity.this, 6));
+                card.setFocusable(false);
+
+                // Direct switch on card click
+                card.setOnClickListener(v -> {
+                    root.removeView(tabsView);
+                    tabsView = null;
+                    switchTo(w);
+                });
+
                 LinearLayout head = new LinearLayout(BrowserActivity.this);
                 head.setGravity(Gravity.CENTER_VERTICAL);
                 TextView t = Ui.text(BrowserActivity.this, 12, Ui.TEXT, true);
@@ -1572,29 +1602,39 @@ public class BrowserActivity extends AppCompatActivity {
                 t.setEllipsize(android.text.TextUtils.TruncateAt.END);
                 t.setPadding(Ui.dp(BrowserActivity.this, 4), 0, 0, 0);
                 head.addView(t, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+
                 ImageView x = UiKit.closeButton(BrowserActivity.this, v -> {
                     closeTab(w);
                     showTabs();
                 });
                 head.addView(x, new LinearLayout.LayoutParams(Ui.dp(BrowserActivity.this, 28), Ui.dp(BrowserActivity.this, 28)));
                 card.addView(head);
+
                 ImageView pic = new ImageView(BrowserActivity.this);
                 pic.setScaleType(ImageView.ScaleType.CENTER_CROP);
                 pic.setBackground(Ui.card(BrowserActivity.this, Ui.FIELD, 0, 10));
                 pic.setClipToOutline(true);
+                pic.setFocusable(false);
+                pic.setClickable(false);
+
                 Bitmap b = thumbs.get(w);
                 if (b != null) pic.setImageBitmap(b);
                 else pic.setImageDrawable(new UiKit.Icon(BrowserActivity.this, "globe", 32, Ui.DIM));
+
                 LinearLayout.LayoutParams pl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(BrowserActivity.this, tv ? 120 : 170));
                 pl.setMargins(0, Ui.dp(BrowserActivity.this, 6), 0, 0);
                 card.addView(pic, pl);
+
                 return card;
             }
         });
+
         g.setOnItemClickListener((pa, v, pos, id) -> {
             root.removeView(tabsView);
+            tabsView = null;
             switchTo(tabs.get(pos));
         });
+
         col.addView(g, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
         root.addView(tabsView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         g.requestFocus();
@@ -2416,6 +2456,11 @@ public class BrowserActivity extends AppCompatActivity {
 
     @Override
     public void onBackPressed() {
+        if (tabsView != null) {
+            root.removeView(tabsView);
+            tabsView = null;
+            return;
+        }
         if (locked && customView != null) {
             flashLock();
             UiKit.makeToast(this, T.t("Screen locked — tap the lock to unlock"), Toast.LENGTH_SHORT).show();
