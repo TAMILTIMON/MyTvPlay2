@@ -11,6 +11,8 @@ final class LucideIcons {
     static final Map<String, String> P = new HashMap<>();
 
     static {
+        P.put("headphones", "M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3");
+        P.put("timer", "M10,2L14,2 M12,14L15,11 M4.0,14.0a8.0,8.0 0 1,0 16.0,0a8.0,8.0 0 1,0 -16.0,0");
         P.put("clipboard-paste", "M11 14h10 M16 4h2a2 2 0 0 1 2 2v1.344 M17 18 l4-4-4-4 M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 1.793-1.113 M9.0,2.0h6.0a1.0,1.0 0 0 1 1.0,1.0v2.0a1.0,1.0 0 0 1 -1.0,1.0h-6.0a1.0,1.0 0 0 1 -1.0,-1.0v-2.0a1.0,1.0 0 0 1 1.0,-1.0z");
         P.put("crop", "M6 2v14a2 2 0 0 0 2 2h14 M18 22V8a2 2 0 0 0-2-2H2");
         P.put("trending-up", "M16 7h6v6 M22 7 l-8.5 8.5-5-5L2 17");

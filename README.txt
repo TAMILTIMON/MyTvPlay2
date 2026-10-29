@@ -1,3 +1,13 @@
+ZH PLAY 4.9 — browser: audio-only mode, sleep timer, fully dark
+==============================================================
+* Audio only (menu → Listening): videos on any page are hidden behind an "Audio mode" card while
+  the sound keeps playing; YouTube switches to its lowest quality (saves data and battery).
+  With Background play the screen can be off.
+* Sleep timer (menu → Listening): 10 / 15 / 30 / 45 / 60 / 90 / 120 min or custom — the sound fades
+  out over the last 10 s, playback stops and the browser closes. The menu shows the minutes left.
+* Dark mode now also darkens the browser's own bars (address bar, toolbar, menus) and the phone's
+  status and navigation bars; changing it re-draws the browser at once, keeping the tabs.
+
 ZH PLAY 4.8 — phone board, browser dark mode, whiteboard & drawing tools, TV groups
 ===================================================================================
 * Start screen ("This phone"): everything that works without a TV — Browser, Videos, Music,

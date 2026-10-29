@@ -62,8 +62,13 @@ public final class Ui {
 
     /** Call before super.onCreate() in every activity. */
     public static void apply(Activity a) {
+        apply(a, false);
+    }
+
+    /** forceDark: a screen that is dark whatever the app theme (the browser in dark mode). */
+    public static void apply(Activity a, boolean forceDark) {
         Store.init(a);
-        dark = isDark(a);
+        dark = forceDark || isDark(a);
         tvMode = isTv(a);
         a.setTheme(dark ? R.style.AppTheme : R.style.AppTheme_Light);
         int[] c = Palette.resolve(dark);

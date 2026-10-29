@@ -35,6 +35,34 @@ public final class T {
     }
 
     static {
+        TA.put("Listening", "கேட்டல்");
+        HI.put("Listening", "सुनना");
+        TA.put("Audio only", "ஒலி மட்டும்");
+        HI.put("Audio only", "सिर्फ़ ऑडियो");
+        TA.put("On — video hidden, sound playing", "இயக்கத்தில் — வீடியோ மறைவு, ஒலி இயங்குகிறது");
+        HI.put("On — video hidden, sound playing", "चालू — वीडियो छिपा, आवाज़ चल रही");
+        TA.put("Audio mode on — video hidden, sound keeps playing", "ஒலி பயன்முறை இயக்கம் — வீடியோ மறைவு, ஒலி தொடர்கிறது");
+        HI.put("Audio mode on — video hidden, sound keeps playing", "ऑडियो मोड चालू — वीडियो छिपा, आवाज़ चलती रहेगी");
+        TA.put("Audio mode off", "ஒலி பயன்முறை நிறுத்தம்");
+        HI.put("Audio mode off", "ऑडियो मोड बंद");
+        TA.put("Sleep timer", "தூக்க டைமர்");
+        HI.put("Sleep timer", "स्लीप टाइमर");
+        TA.put("min left", "நிமிடம் மீதம்");
+        HI.put("min left", "मिनट बाकी");
+        TA.put("minutes", "நிமிடங்கள்");
+        HI.put("minutes", "मिनट");
+        TA.put("Custom…", "தனிப்பயன்…");
+        HI.put("Custom…", "अपना समय…");
+        TA.put("Start", "தொடங்கு");
+        HI.put("Start", "शुरू करें");
+        TA.put("Sleep timer off", "தூக்க டைமர் நிறுத்தம்");
+        HI.put("Sleep timer off", "स्लीप टाइमर बंद");
+        TA.put("The browser closes in", "உலாவி மூடும் நேரம்");
+        HI.put("The browser closes in", "ब्राउज़र बंद होगा");
+        TA.put("sound fades out first", "முதலில் ஒலி மெதுவாகக் குறையும்");
+        HI.put("sound fades out first", "पहले आवाज़ धीरे-धीरे कम होगी");
+        TA.put("Sleep timer — browser closed", "தூக்க டைமர் — உலாவி மூடப்பட்டது");
+        HI.put("Sleep timer — browser closed", "स्लीप टाइमर — ब्राउज़र बंद");
         TA.put("This phone", "இந்த போன்");
         HI.put("This phone", "यह फ़ोन");
         TA.put("TV group", "டிவி குழு");

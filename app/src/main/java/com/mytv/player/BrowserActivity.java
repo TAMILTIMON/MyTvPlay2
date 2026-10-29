@@ -78,8 +78,14 @@ public class BrowserActivity extends AppCompatActivity {
     @SuppressLint("SetJavaScriptEnabled")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        Ui.apply(this);
+        Store.init(this);
+        Ui.apply(this, darkChrome());                 // browser in dark mode: its own bars dark too
         super.onCreate(savedInstanceState);
+        systemBars();
+        if (sleepAt > 0) {
+            if (sleepAt < SystemClock.elapsedRealtime()) sleepAt = 0;     // an old, expired timer
+            else main.post(sleepFire);                                   // still running (browser re-drawn)
+        }
         tv = Ui.isTv(this);
         root = new FrameLayout(this);
         root.setBackgroundColor(Ui.BG);
@@ -215,7 +221,10 @@ public class BrowserActivity extends AppCompatActivity {
 
         String start = getIntent().getStringExtra(EXTRA_URL);
         if (start != null && !start.isEmpty()) go(start);
-        else if (Store.getBool("b_restore", true) && !BrowserData.savedTabs().isEmpty()) restoreTabs();
+        else if ((Store.getBool("b_restore", true) || Store.getBool("b_restore_once", false)) && !BrowserData.savedTabs().isEmpty()) {
+            Store.putBool("b_restore_once", false);
+            restoreTabs();
+        }
         else home();
         if (tv) web.requestFocus();
         buildEqFab();
@@ -497,6 +506,141 @@ public class BrowserActivity extends AppCompatActivity {
         return Store.getInt("b_dark", 0);
     }
 
+    // ---------- audio-only mode ----------
+    /** Videos hidden behind an "Audio mode" card (sound keeps playing); YouTube at its lowest quality (saves data). */
+    static final String AUDIO_JS = "(function(){if(window.__zhAudio)return;window.__zhAudio=1;"
+            + "var st=document.createElement('style');st.id='zh-audio';"
+            + "st.textContent='video{opacity:0!important}.zh-am{position:absolute;inset:0;z-index:2147483646;display:flex;"
+            + "flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(135deg,#2a1f4d,#0b0913);"
+            + "color:#fff;font:600 15px/1.4 sans-serif;pointer-events:none;text-align:center}.zh-am b{font-size:44px;margin-bottom:6px}"
+            + ".zh-am small{opacity:.7;font-weight:400;font-size:12px}';"
+            + "(document.head||document.documentElement).appendChild(st);"
+            + "function tick(){document.querySelectorAll('video').forEach(function(v){var p=v.parentElement;if(!p)return;"
+            + "for(var i=0;i<p.children.length;i++)if(p.children[i].className==='zh-am')return;"
+            + "var d=document.createElement('div');d.className='zh-am';d.innerHTML='<b>🎧</b>Audio mode<small>video hidden · sound playing</small>';"
+            + "if(getComputedStyle(p).position==='static')p.style.position='relative';p.appendChild(d);});"
+            + "var mp=document.getElementById('movie_player');"
+            + "if(mp&&mp.setPlaybackQualityRange){try{mp.setPlaybackQualityRange('tiny','tiny');}catch(e){}}}"
+            + "tick();window.__zhAudioT=setInterval(tick,1500);})();";
+    static final String VIDEO_JS = "(function(){if(!window.__zhAudio)return;window.__zhAudio=0;clearInterval(window.__zhAudioT);"
+            + "var s=document.getElementById('zh-audio');if(s)s.remove();document.querySelectorAll('.zh-am').forEach(function(d){d.remove();});"
+            + "var mp=document.getElementById('movie_player');if(mp&&mp.setPlaybackQualityRange){try{mp.setPlaybackQualityRange('auto','auto');}catch(e){}}})();";
+
+    static boolean audioMode() {
+        return Store.getBool("b_audio", false);
+    }
+
+    private void setAudioMode(boolean on) {
+        Store.putBool("b_audio", on);
+        for (WebView t : tabs) t.evaluateJavascript(on ? AUDIO_JS : VIDEO_JS, null);
+        UiKit.makeToast(this, on ? "🎧 " + T.t("Audio mode on — video hidden, sound keeps playing") : T.t("Audio mode off"),
+                Toast.LENGTH_SHORT).show();
+    }
+
+    // ---------- sleep timer ----------
+    private static long sleepAt;                        // when the browser closes (0 = off)
+
+    private final Runnable sleepFire = new Runnable() {
+        public void run() {
+            long left = sleepAt - SystemClock.elapsedRealtime();
+            if (sleepAt == 0) return;
+            if (left > 10_000) {
+                main.postDelayed(this, Math.min(left - 10_000, 60_000));
+                return;
+            }
+            // the last 10 seconds: fade the sound out, then stop and close
+            for (WebView t : tabs) t.evaluateJavascript(FADE_JS, null);
+            main.postDelayed(() -> {
+                if (sleepAt == 0) return;
+                sleepAt = 0;
+                for (WebView t : tabs) t.evaluateJavascript("document.querySelectorAll('video,audio').forEach(function(m){m.pause();});", null);
+                BrowserPlayService.stop(BrowserActivity.this);
+                UiKit.makeToast(BrowserActivity.this, "⏲ " + T.t("Sleep timer — browser closed"), Toast.LENGTH_LONG).show();
+                saveTabs();
+                if (Build.VERSION.SDK_INT >= 21) finishAndRemoveTask();
+                else finish();
+            }, Math.max(0, left));
+        }
+    };
+    private static final String FADE_JS = "(function(){var k=0;var t=setInterval(function(){k++;"
+            + "document.querySelectorAll('video,audio').forEach(function(m){if(m.__zv===undefined)m.__zv=m.volume;"
+            + "m.volume=Math.max(0,m.__zv*(1-k/10));});if(k>=10)clearInterval(t);},1000);})();";
+
+    private String sleepLabel() {
+        if (sleepAt == 0) return T.t("Off");
+        long m = Math.max(0, (sleepAt - SystemClock.elapsedRealtime() + 59_999) / 60_000);
+        return m + " " + T.t("min left");
+    }
+
+    private void sleepTimer() {
+        final int[] mins = {0, 10, 15, 30, 45, 60, 90, 120, -1};
+        String[] names = new String[mins.length];
+        for (int i = 0; i < mins.length; i++)
+            names[i] = mins[i] == 0 ? T.t("Off") : mins[i] < 0 ? T.t("Custom…") : mins[i] + " " + T.t("minutes");
+        new UiDialog(this).setTitle("⏲ " + T.t("Sleep timer") + " · " + sleepLabel()).setItems(names, (d, w) -> {
+            if (mins[w] < 0) {
+                final EditText e = new EditText(this);
+                e.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+                e.setHint(T.t("minutes"));
+                new UiDialog(this).setTitle(T.t("Sleep timer")).setView(e).setPositiveButton(T.t("Start"), (d2, w2) -> {
+                    try {
+                        startSleep(Math.max(1, Math.min(600, Integer.parseInt(e.getText().toString().trim()))));
+                    } catch (Exception ignored) {
+                    }
+                }).setNegativeButton(T.t("Cancel"), null).show();
+                return;
+            }
+            startSleep(mins[w]);
+        }).show();
+    }
+
+    private void startSleep(int minutes) {
+        main.removeCallbacks(sleepFire);
+        if (minutes <= 0) {
+            sleepAt = 0;
+            UiKit.makeToast(this, T.t("Sleep timer off"), Toast.LENGTH_SHORT).show();
+            return;
+        }
+        sleepAt = SystemClock.elapsedRealtime() + minutes * 60_000L;
+        main.post(sleepFire);
+        UiKit.makeToast(this, "⏲ " + T.t("The browser closes in") + " " + minutes + " " + T.t("minutes")
+                + " (" + T.t("sound fades out first") + ")", Toast.LENGTH_LONG).show();
+    }
+
+    /** The browser's own bars: dark when website dark mode is On, or follows a dark phone. */
+    private boolean darkChrome() {
+        int m = darkMode();
+        if (m == 1) return true;
+        if (m == 2) return false;
+        int ui = getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK;
+        return ui == android.content.res.Configuration.UI_MODE_NIGHT_YES;
+    }
+
+    /** Status bar and navigation bar in the browser's colours, with matching (light / dark) icons. */
+    @SuppressWarnings("deprecation")
+    private void systemBars() {
+        android.view.Window w = getWindow();
+        int bar = Ui.dark() ? 0xFF0F0D16 : 0xFFF6F5FB;
+        w.addFlags(android.view.WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+        w.setStatusBarColor(bar);
+        w.setNavigationBarColor(bar);
+        if (Build.VERSION.SDK_INT >= 23) {
+            View d = w.getDecorView();
+            int f = d.getSystemUiVisibility();
+            f = Ui.dark() ? f & ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR : f | View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+            if (Build.VERSION.SDK_INT >= 26)
+                f = Ui.dark() ? f & ~View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR : f | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+            d.setSystemUiVisibility(f);
+        }
+    }
+
+    /** Re-draw the browser in the new colours, keeping the open tabs. */
+    private void redrawKeepingTabs() {
+        saveTabs();
+        Store.putBool("b_restore_once", true);
+        recreate();
+    }
+
     private boolean wantDark() {
         int m = darkMode();
         if (m == 2) return false;
@@ -573,6 +717,7 @@ public class BrowserActivity extends AppCompatActivity {
 
             @Override
             public void onPageFinished(WebView v, String url) {
+                if (audioMode() && url != null && !url.contains("tamilcastplay.local")) v.evaluateJavascript(AUDIO_JS, null);
                 if (cssDark() && url != null && !url.contains("tamilcastplay.local")) v.evaluateJavascript(DARK_JS, null);
                 if (url != null && url.startsWith("http") && !Store.getBool("b_private", false)) BrowserData.visit(v.getTitle(), url);
                 injectMedia(v);
@@ -1220,6 +1365,9 @@ public class BrowserActivity extends AppCompatActivity {
         boolean bm = cur != null && BrowserData.isBookmarked(cur);
         // {index in `it`, title, value under it, switch (-1 none / 0 / 1), red}
         Object[][] sections = {
+                {"§", T.t("Listening")},
+                {-2, T.t("Audio only"), T.t(audioMode() ? "On — video hidden, sound playing" : "Off"), audioMode() ? 1 : 0, false},
+                {-3, T.t("Sleep timer"), sleepLabel(), -1, false},
                 {"§", T.t("This page")},
                 {19, T.t("Reload"), null, -1, false},
                 {12, T.t("Find in page"), null, -1, false},
@@ -1250,6 +1398,21 @@ public class BrowserActivity extends AppCompatActivity {
                 continue;
             }
             int i = (Integer) sct[0];
+            if (i == -2) {                                              // audio only
+                list.addView(UiRows.row(this, "headphones", (String) sct[1], (String) sct[2], (Integer) sct[3], false, v -> {
+                    d.dismiss();
+                    setAudioMode(!audioMode());
+                    main.postDelayed(this::menu, 120);
+                }));
+                continue;
+            }
+            if (i == -3) {                                              // sleep timer
+                list.addView(UiRows.row(this, "timer", (String) sct[1], (String) sct[2], -1, false, v -> {
+                    d.dismiss();
+                    sleepTimer();
+                }));
+                continue;
+            }
             if (i == -1) {                                              // dark mode for websites
                 list.addView(UiRows.row(this, "moon", (String) sct[1], (String) sct[2], -1, false, v -> {
                     d.dismiss();
@@ -1261,6 +1424,7 @@ public class BrowserActivity extends AppCompatActivity {
                                     applyDark(t);
                                     t.evaluateJavascript(cssDark() ? DARK_JS : LIGHT_JS, null);
                                 }
+                                if (darkChrome() != Ui.dark()) redrawKeepingTabs();     // toolbar + system bars follow
                                 UiKit.makeToast(this, T.t("Dark mode for websites") + ": " + T.t(new String[]{"Follow the phone", "On", "Off"}[k]),
                                         Toast.LENGTH_SHORT).show();
                             }).show();
@@ -2224,6 +2388,8 @@ public class BrowserActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        main.removeCallbacks(sleepFire);
+        if (isFinishing()) sleepAt = 0;                 // closed by hand: nothing left to close later
         saveTabs();
         MusicFx.onChange = null;
         BrowserPlayService.control = null;
