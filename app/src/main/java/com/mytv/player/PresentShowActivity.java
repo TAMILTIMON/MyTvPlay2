@@ -74,7 +74,7 @@ public class PresentShowActivity extends AppCompatActivity {
 
     public static JSONObject state() throws Exception {
         return new JSONObject().put("open", inst != null).put("page", page).put("count", count).put("title", title)
-                .put("blank", blank).put("status", status).put("zoom", zoom);
+                .put("blank", blank).put("status", status).put("zoom", zoom).put("board", board).put("ink", true);
     }
 
     @Override
@@ -114,10 +114,43 @@ public class PresentShowActivity extends AppCompatActivity {
         load(i);
     }
 
+    // ---- whiteboard pages and ink elements (per page)
+    static volatile boolean board;
+    static volatile String paper = "white";
+    private static final float BOARD_W = 960f, BOARD_H = 540f;
+    private final java.util.HashMap<Integer, java.util.LinkedHashMap<String, JSONObject>> els = new java.util.HashMap<>();
+
+    private java.util.LinkedHashMap<String, JSONObject> pageEls(int pg) {
+        java.util.LinkedHashMap<String, JSONObject> m = els.get(pg);
+        if (m == null) {
+            m = new java.util.LinkedHashMap<>();
+            els.put(pg, m);
+        }
+        return m;
+    }
+
     private void load(Intent i) {
         final String url = i.getStringExtra(EXTRA_URL);
         if (url == null) return;
         title = i.getStringExtra(EXTRA_TITLE) == null ? "" : i.getStringExtra(EXTRA_TITLE);
+        els.clear();
+        if (url.startsWith("zhboard:")) {                       // a whiteboard from the phone: nothing to download
+            ++loadToken;
+            synchronized (pdfLock) {
+                closePdf();
+            }
+            board = true;
+            paper = url.substring(8).isEmpty() ? "white" : url.substring(8);
+            count = 1;
+            page = -1;
+            cache.evictAll();
+            lastKey = null;
+            status = "ready";
+            msg.setVisibility(View.GONE);
+            show(0);
+            return;
+        }
+        board = false;
         final int tok = ++loadToken;
         status = "loading";
         msg.setText(T.t("Opening the presentation…") + "\n" + title);
@@ -173,6 +206,7 @@ public class PresentShowActivity extends AppCompatActivity {
     private Bitmap render(int i) {
         String key = i + "@" + zoom + "," + zcx + "," + zcy;
         synchronized (pdfLock) {
+            if (board) return renderBoard(i, key);
             if (renderer == null || i < 0 || i >= count) return null;
             if (key.equals(lastKey) && lastBmp != null) return lastBmp;
             Bitmap c = zoom == 1f ? cache.get(i) : null;
@@ -205,6 +239,29 @@ public class PresentShowActivity extends AppCompatActivity {
         }
     }
 
+    /** A whiteboard page: the paper, drawn sharp at the current zoom. */
+    private Bitmap renderBoard(int i, String key) {
+        key = key + "|" + paper;
+        if (key.equals(lastKey) && lastBmp != null) return lastBmp;
+        int W = Math.max(1280, root.getWidth()), H = Math.max(720, root.getHeight());
+        float S = Math.min(W / BOARD_W, H / BOARD_H) * zoom;
+        float ox = BOARD_W * S <= W ? (W - BOARD_W * S) / 2 : Math.max(W - BOARD_W * S, Math.min(0, W / 2f - zcx * BOARD_W * S));
+        float oy = BOARD_H * S <= H ? (H - BOARD_H * S) / 2 : Math.max(H - BOARD_H * S, Math.min(0, H / 2f - zcy * BOARD_H * S));
+        Bitmap bm = Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888);
+        bm.eraseColor(Color.BLACK);
+        InkDraw.paper(new Canvas(bm), paper, new android.graphics.RectF(ox, oy, ox + BOARD_W * S, oy + BOARD_H * S), BOARD_H * S);
+        synchronized (tf) {
+            tf[0] = S;
+            tf[1] = ox;
+            tf[2] = oy;
+            tf[3] = BOARD_W;
+        }
+        pageH = BOARD_H;
+        lastKey = key;
+        lastBmp = bm;
+        return bm;
+    }
+
     private String lastKey;
     private Bitmap lastBmp;
     private float pageH;
@@ -217,7 +274,7 @@ public class PresentShowActivity extends AppCompatActivity {
         if (newPage) {
             zoom = 1f;
             zcx = zcy = 0.5f;
-            pointer.clearInk();
+            pointer.clearInk();                   // old-style strokes only; ink elements stay with their page
         }
         final int tok = loadToken, gen = ++renderGen;
         new Thread(() -> {
@@ -354,6 +411,36 @@ public class PresentShowActivity extends AppCompatActivity {
                 case "spot_off": pointer.spotOff(); break;
                 case "pen": pointer.pen(v, x, y); break;              // v = "id|#color", x / y = comma lists
                 case "pen_clear": pointer.clearInk(); break;
+                case "el": {                                         // add / update one ink element (JSON)
+                    JSONObject e = new JSONObject(v);
+                    java.util.LinkedHashMap<String, JSONObject> m = pageEls(e.optInt("pg", page));
+                    JSONObject old = m.get(e.optString("id"));
+                    if (e.optBoolean("app") && old != null && old.has("p")) {       // more points of a stroke
+                        org.json.JSONArray op = old.getJSONArray("p"), np = e.optJSONArray("p");
+                        if (np != null) for (int k = 0; k < np.length(); k++) op.put(np.get(k));
+                    } else m.put(e.optString("id"), e);
+                    pointer.invalidate();
+                    break;
+                }
+                case "del": {                                        // "id|page"
+                    String[] dp = v.split("\\|");
+                    pageEls(dp.length > 1 ? Integer.parseInt(dp[1]) : page).remove(dp[0]);
+                    pointer.invalidate();
+                    break;
+                }
+                case "clearpg":
+                    pageEls(v.isEmpty() ? page : Integer.parseInt(v)).clear();
+                    pointer.invalidate();
+                    break;
+                case "pages":                                        // whiteboard: number of pages
+                    if (board) count = Math.max(1, Integer.parseInt(v));
+                    break;
+                case "paper":
+                    paper = v;
+                    final int pg = page;
+                    page = -1;
+                    show(pg);
+                    break;
                 case "end": finish(); break;
                 default: break;
             }
@@ -427,6 +514,12 @@ public class PresentShowActivity extends AppCompatActivity {
 
         @Override
         protected void onDraw(Canvas c) {
+            float pageScreenH;
+            synchronized (tf) {
+                pageScreenH = tf[0] * pageH;
+            }
+            java.util.LinkedHashMap<String, JSONObject> m = els.get(page);
+            if (m != null) for (JSONObject e : new java.util.ArrayList<>(m.values())) InkDraw.draw(c, e, PresentShowActivity.this::toScreen, pageScreenH);
             float width = Math.max(4f, Ui.dp(getContext(), 3) * (float) Math.sqrt(zoom));
             ink.setStrokeWidth(width);
             for (java.util.Map.Entry<String, java.util.List<float[]>> e : strokes.entrySet()) {

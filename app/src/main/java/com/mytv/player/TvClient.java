@@ -26,9 +26,16 @@ public final class TvClient {
 
     public static void setToken(String ip, String t) {
         Store.putStr("tok_" + ip, t == null ? "" : t);
+        if (t != null && !t.isEmpty()) TvGroup.remember(ip);
     }
 
     public static JSONObject post(String ip, String path, Map<String, String> params) throws Exception {
+        TvGroup.fanOut(ip, path, params);           // a TV group: the same action on the other TVs too
+        return postDirect(ip, path, params);
+    }
+
+    /** One TV only (used for the group copies). */
+    public static JSONObject postDirect(String ip, String path, Map<String, String> params) throws Exception {
         StringBuilder body = new StringBuilder();
         for (Map.Entry<String, String> e : params.entrySet()) {
             if (body.length() > 0) body.append('&');

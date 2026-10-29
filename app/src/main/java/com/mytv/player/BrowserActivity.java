@@ -8,6 +8,7 @@ import android.graphics.Paint;
 import android.graphics.Path;
 import android.net.Uri;
 import android.content.Intent;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -490,9 +491,52 @@ public class BrowserActivity extends AppCompatActivity {
 
     /** All the WebView settings and listeners, for every tab. */
     @SuppressLint("SetJavaScriptEnabled")
+    // ---------- dark mode for web pages ----------
+    /** 0 = follow the phone, 1 = always dark, 2 = off. */
+    static int darkMode() {
+        return Store.getInt("b_dark", 0);
+    }
+
+    private boolean wantDark() {
+        int m = darkMode();
+        if (m == 2) return false;
+        if (m == 1) return true;
+        int ui = getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK;
+        return ui == android.content.res.Configuration.UI_MODE_NIGHT_YES || Ui.dark();
+    }
+
+    /** True when the engine can't darken by itself (old Android / light app theme): a page style does it. */
+    private boolean cssDark() {
+        if (!wantDark()) return false;
+        if (Build.VERSION.SDK_INT >= 33) return !Ui.dark();       // the engine darkens only under a dark app theme
+        return Build.VERSION.SDK_INT < 29;
+    }
+
+    @SuppressWarnings("deprecation")
+    private void applyDark(WebView w) {
+        boolean on = wantDark();
+        WebSettings st = w.getSettings();
+        try {
+            if (Build.VERSION.SDK_INT >= 33) st.setAlgorithmicDarkeningAllowed(on);
+            else if (Build.VERSION.SDK_INT >= 29) st.setForceDark(on ? WebSettings.FORCE_DARK_ON : WebSettings.FORCE_DARK_OFF);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    /** Style for engines that can't darken: invert the page, keep photos / videos natural; sites with their own dark look are left alone. */
+    private static final String DARK_JS = "(function(){if(document.getElementById('zh-dark'))return;"
+            + "if(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches){var bg=getComputedStyle(document.body||document.documentElement).backgroundColor;"
+            + "var m=bg.match(/\\d+/g);if(m&&(+m[0]+ +m[1]+ +m[2])<200)return;}"
+            + "var s=document.createElement('style');s.id='zh-dark';"
+            + "s.textContent='html{filter:invert(1) hue-rotate(180deg)!important;background:#fff!important}"
+            + "img,video,picture,canvas,iframe,svg image,[style*=\"background-image\"]{filter:invert(1) hue-rotate(180deg)!important}';"
+            + "(document.head||document.documentElement).appendChild(s);})();";
+    private static final String LIGHT_JS = "(function(){var s=document.getElementById('zh-dark');if(s)s.remove();})();";
+
     private void configure(final WebView web) {
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);
+        applyDark(web);
         s.setGeolocationEnabled(true);
         s.setSupportMultipleWindows(true);                  // pop-ups come to onCreateWindow (blocked unless allowed)
         s.setJavaScriptCanOpenWindowsAutomatically(true);
@@ -529,6 +573,7 @@ public class BrowserActivity extends AppCompatActivity {
 
             @Override
             public void onPageFinished(WebView v, String url) {
+                if (cssDark() && url != null && !url.contains("tamilcastplay.local")) v.evaluateJavascript(DARK_JS, null);
                 if (url != null && url.startsWith("http") && !Store.getBool("b_private", false)) BrowserData.visit(v.getTitle(), url);
                 injectMedia(v);
                 saveTabs();
@@ -1191,6 +1236,7 @@ public class BrowserActivity extends AppCompatActivity {
                 {4, "VPN", WgVpn.status(this), -1, false},
                 {18, T.t("Clear data"), T.t("History, cookies, cache"), -1, true},
                 {"§", T.t("Customize")},
+                {-1, T.t("Dark mode for websites"), T.t(new String[]{"Follow the phone", "On", "Off"}[darkMode()]), -1, false},
                 {3, T.t("Appearance"), T.t(BrowserLook.BG_NAMES[java.util.Arrays.asList(BrowserLook.BG_IDS).indexOf(BrowserLook.bg()) < 0 ? 0
                         : java.util.Arrays.asList(BrowserLook.BG_IDS).indexOf(BrowserLook.bg())]), -1, false},
                 {9, T.t("Background play"), T.t("Keep playing with the screen off"), Store.getBool("b_bgplay", true) ? 1 : 0, false},
@@ -1204,6 +1250,23 @@ public class BrowserActivity extends AppCompatActivity {
                 continue;
             }
             int i = (Integer) sct[0];
+            if (i == -1) {                                              // dark mode for websites
+                list.addView(UiRows.row(this, "moon", (String) sct[1], (String) sct[2], -1, false, v -> {
+                    d.dismiss();
+                    new UiDialog(this).setTitle(T.t("Dark mode for websites")).setSingleChoiceItems(
+                            new String[]{T.t("Follow the phone"), T.t("On"), T.t("Off")}, darkMode(), (d2, k) -> {
+                                Store.putInt("b_dark", k);
+                                d2.dismiss();
+                                for (WebView t : tabs) {
+                                    applyDark(t);
+                                    t.evaluateJavascript(cssDark() ? DARK_JS : LIGHT_JS, null);
+                                }
+                                UiKit.makeToast(this, T.t("Dark mode for websites") + ": " + T.t(new String[]{"Follow the phone", "On", "Off"}[k]),
+                                        Toast.LENGTH_SHORT).show();
+                            }).show();
+                }));
+                continue;
+            }
             if (i == 15 && tv) continue;                               // "Open on TV" only from the phone
             final Runnable run = (Runnable) it[i][2];
             final boolean isToggle = (Integer) sct[3] >= 0;

@@ -1,3 +1,18 @@
+ZH PLAY 4.8 — phone board, browser dark mode, whiteboard & drawing tools, TV groups
+===================================================================================
+* Start screen ("This phone"): everything that works without a TV — Browser, Videos, Music,
+  Features, DJ mixer, Song editor, Whiteboard, VPN, Equalizer, Settings, TV group … — with
+  ✎ Customize (drag order, hide, size, sections), saved separately from the remote's board.
+* Browser: dark mode for websites — Follow the phone / On / Off (menu → Customize).
+* Whiteboard (no PDF needed): papers White, Chalkboard, Grid, Lined, Dotted, Graph; pages
+  (add / delete; Next on the last page adds one); on the TV / PC / TV group, or on the phone alone.
+* Drawing tools for whiteboard AND slides: Pen, Highlighter, Eraser, Shapes (line, arrow,
+  rectangle, circle, triangle), Ruler (cm ticks, length, angle), Text with a math-symbol keypad
+  and ready formulas; 6 colours, 3 sizes, undo / redo, clear page. Each page keeps its drawing.
+* TV group: pair several TVs, choose them, "Control together" — play, keys, volume, present,
+  search … go to every TV of the group; Cast screen streams to all of them (a slow TV skips
+  to the next full picture instead of holding the others back).
+
 ZH PLAY 4.7 — live zoom on the TV, address suggestions, new menu style
 =====================================================================
 * Present: the TV follows the pinch live (scales the picture at once, redraws it sharp when the

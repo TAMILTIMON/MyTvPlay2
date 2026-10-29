@@ -53,6 +53,8 @@ public class CastScreenService extends Service {
     private Surface surface;
     private Socket sock;
     private DataOutputStream out;
+    private BufferedOutputStream primaryOut;
+    private final java.util.List<GroupOut.Peer> peers = new java.util.concurrent.CopyOnWriteArrayList<>();
     private volatile boolean alive;
     private AudioRecord rec;
     private boolean hd, sound;
@@ -123,13 +125,44 @@ public class CastScreenService extends Service {
                 }
             }
             if (sock == null) throw new Exception(T.t("The TV didn't answer"));
-            out = new DataOutputStream(new BufferedOutputStream(sock.getOutputStream(), 1 << 16));
+            primaryOut = new BufferedOutputStream(sock.getOutputStream(), 1 << 16);
+            out = new DataOutputStream(primaryOut);
             // first line: the pairing token, so only paired phones can show their screen
             String token = TvClient.token(tv);
             byte[] t = ((token == null ? "" : token) + "\n").getBytes("UTF-8");
             MirrorProto.write(out, MirrorProto.BYE + 1, false, 0, t, 0, t.length);   // type 10 = hello
-            main.post(() -> notifyNow(T.t("Casting your screen to the TV")));
-            status = T.t("Casting your screen to the TV");
+            // a TV group: the same picture to every other TV of the group
+            for (String other : TvGroup.others(tv)) {
+                try {
+                    HashMap<String, String> op = new HashMap<>();
+                    op.put("token", "");
+                    TvClient.postDirect(other, "/mirror", op);
+                    Socket os = null;
+                    for (int i = 0; i < 15 && os == null && alive; i++) {
+                        try {
+                            Socket x = new Socket();
+                            x.connect(new InetSocketAddress(other, MirrorProto.PORT), 800);
+                            x.setTcpNoDelay(true);
+                            x.setSendBufferSize(1 << 20);
+                            os = x;
+                        } catch (Exception e) {
+                            Thread.sleep(300);
+                        }
+                    }
+                    if (os == null) continue;
+                    GroupOut.Peer peer = new GroupOut.Peer(other, os);
+                    String ot = TvClient.token(other);
+                    byte[] oh = ((ot == null ? "" : ot) + "\n").getBytes("UTF-8");
+                    MirrorProto.write(peer.out, MirrorProto.BYE + 1, false, 0, oh, 0, oh.length);
+                    peers.add(peer);
+                } catch (Exception ignored) {
+                }
+            }
+            if (!peers.isEmpty()) out = new DataOutputStream(new GroupOut(primaryOut, peers));
+            final String msg = peers.isEmpty() ? T.t("Casting your screen to the TV")
+                    : T.t("Casting your screen to") + " " + (peers.size() + 1) + " " + T.t("TVs");
+            main.post(() -> notifyNow(msg));
+            status = msg;
             if (sound && Build.VERSION.SDK_INT >= 29
                     && checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
                 new Thread(this::audioLoop, "cast-audio").start();
@@ -326,6 +359,12 @@ public class CastScreenService extends Service {
         running = false;
         try {
             if (out != null) MirrorProto.write(out, MirrorProto.BYE, false, 0, new byte[0], 0, 0);
+            try {
+                Thread.sleep(150);                 // let the group TVs receive "bye" too
+            } catch (Exception ignored) {
+            }
+            for (GroupOut.Peer pr : peers) pr.close();
+            peers.clear();
         } catch (Exception ignored) {
         }
         try {

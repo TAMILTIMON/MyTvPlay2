@@ -8,6 +8,7 @@ import android.graphics.Color;
 import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Path;
+import android.graphics.RectF;
 import android.graphics.pdf.PdfRenderer;
 import android.net.Uri;
 import android.os.Bundle;
@@ -38,6 +39,9 @@ import android.widget.TextView;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -47,46 +51,62 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * Phone: presenter for a PDF on the TV / Linux PC. Pinch to zoom (sharp on the big screen), two-finger pan,
- * double-tap = whole slide; tools: Laser · Pen (colours) · Spotlight · Move; black / white screen,
- * slide overview, go to slide, timer, volume keys = next / previous, rotation.
+ * Phone: presenter for PDF slides — or a whiteboard (no PDF) — on the TV / PC / a TV group.
+ * Pinch to zoom (sharp on the big screen), two-finger pan, double-tap; tools: Laser · Pen · Highlighter · Eraser ·
+ * Shapes (line, arrow, rectangle, circle, triangle) · Ruler (cm + angle) · Text (math symbols, formulas) · Spotlight · Move;
+ * colours, sizes, undo / redo, clear page; each page keeps its own drawing; whiteboard papers and pages.
  */
 public class PresentActivity extends AppCompatActivity {
-    public static final String EXTRA_IP = "ip";
-    private static final int LASER = 0, PEN = 1, SPOT = 2, MOVE = 3;
-    private static final int[] PEN_COLORS = {0xFFEF4444, 0xFFFACC15, 0xFF22C55E, 0xFF3B82F6, 0xFFFFFFFF};
+    public static final String EXTRA_IP = "ip", EXTRA_BOARD = "board";
+    private static final int LASER = 0, PEN = 1, HL = 2, ERASE = 3, SHAPE = 4, RULER = 5, TEXT = 6, SPOT = 7, MOVE = 8;
+    private static final String[][] TOOLS = {{"🔴", "Laser"}, {"✏", "Pen"}, {"🖍", "Highlighter"}, {"🧽", "Eraser"}, {"⬜", "Shapes"},
+            {"📏", "Ruler"}, {"T", "Text"}, {"🔦", "Spotlight"}, {"✋", "Move"}};
+    private static final int[] COLORS = {0xFFEF4444, 0xFFFACC15, 0xFF22C55E, 0xFF3B82F6, 0xFFFFFFFF, 0xFF111827};
+    private static final String[] SHAPES = {"line", "arrow", "rect", "oval", "tri"};
+    private static final String[] SHAPE_NAMES = {"Line", "Arrow", "Rectangle", "Circle", "Triangle"};
+    private static final String[] SYMBOLS = {"²", "³", "√", "π", "θ", "α", "β", "γ", "Δ", "Σ", "∫", "∞", "±", "×", "÷", "≠", "≈", "≤", "≥",
+            "°", "½", "→", "⇒", "∠", "⊥", "∥", "µ", "Ω", "λ"};
+    private static final String[] FORMULAS = {"a² + b² = c²", "x = (−b ± √(b² − 4ac)) / 2a", "(a + b)² = a² + 2ab + b²",
+            "(a − b)² = a² − 2ab + b²", "a² − b² = (a + b)(a − b)", "A = πr²", "C = 2πr", "Area of triangle = ½ × b × h",
+            "Volume of cylinder = πr²h", "y = mx + c", "sin²θ + cos²θ = 1", "tan θ = sin θ / cos θ", "v = u + at", "s = ut + ½at²",
+            "v² = u² + 2as", "F = ma", "E = mc²", "P = VI", "V = IR", "ρ = m / V", "mean = Σx / n"};
 
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService net = Executors.newSingleThreadExecutor();
     private final ExecutorService draw = Executors.newSingleThreadExecutor();
     private String ip, title = "";
+    private boolean board;
+    private String paper = "white";
     private PdfRenderer renderer;
     private ParcelFileDescriptor pfd;
     private int page, count;
     private final LruCache<String, Bitmap> thumbs = new LruCache<>(40);
 
-    // zoom (slide coordinates 0…1; zoom 1 = whole slide)
     private float zoom = 1f, zcx = 0.5f, zcy = 0.5f;
     private float pageW = 960, pageH = 540;
-    private int tool = LASER, penColor = PEN_COLORS[0], blankMode, strokeN;
-    private String strokeId;
-    private final List<Float> penX = new ArrayList<>(), penY = new ArrayList<>();
-    private long lastPen, lastPointer, lastZoom;
-    private final LinkedHashMap<String, Object[]> ink = new LinkedHashMap<>();     // id → {colour, List<float[]>}
+    private int tool = LASER, color = COLORS[0], size = 1, blankMode, idN;
+    private String shape = "arrow";
 
-    private LinearLayout root, slideBox, controls;
+    // ink: page → id → element; undo / redo of {op "add"/"del"/"clear", page, element or list}
+    private final HashMap<Integer, LinkedHashMap<String, JSONObject>> ink = new HashMap<>();
+    private final List<Object[]> undo = new ArrayList<>(), redo = new ArrayList<>();
+    private JSONObject drawing;              // the element under the finger
+    private final JSONArray pendingPts = new JSONArray();
+    private long lastSend, lastPointer, lastZoom;
+    private float downX, downY;
+
+    private LinearLayout root, slideBox, controls, optRow, boardRow;
     private FrameLayout stage;
     private ImageView cur, next;
     private Ink overlay;
     private TextView counter, timer, status, titleT, zoomT;
-    private LinearLayout strip, penRow;
-    private Button blankBtn;
-    private final Button[] toolBtns = new Button[4];
+    private LinearLayout strip;
+    private Button blankBtn, sizeBtn, paperBtn;
+    private final Button[] toolBtns = new Button[TOOLS.length];
     private long started, pausedAt, pausedTotal;
-    private boolean timerPaused;
+    private boolean timerPaused, multi;
     private ScaleGestureDetector pinch;
     private GestureDetector taps;
-    private boolean multi;
     private float lastMidX, lastMidY;
 
     private int dp(float v) {
@@ -99,13 +119,50 @@ public class PresentActivity extends AppCompatActivity {
         super.onCreate(b);
         ip = getIntent().getStringExtra(EXTRA_IP);
         if (ip == null || ip.isEmpty()) ip = Store.getStr("last_tv", "");
+        board = getIntent().getBooleanExtra(EXTRA_BOARD, false);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(0xFF0B0B0F);
         root.setPadding(dp(10), dp(10), dp(10), dp(8));
+        buildTop();
+        buildSlide();
+        buildControls();
+        stage = new FrameLayout(this);
+        root.addView(stage, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
+        arrange();
+        setContentView(root);
+        Orient.apply(this, "present_orient");
+        setTool(board ? PEN : LASER);
+        paintBlank();
+        pinch = new ScaleGestureDetector(this, new ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            @Override
+            public boolean onScale(ScaleGestureDetector d) {
+                float[] f = toSlide(d.getFocusX(), d.getFocusY());
+                float nz = Math.max(1f, Math.min(8f, zoom * d.getScaleFactor()));
+                float k = 1f - zoom / nz;
+                setZoom(nz, zcx + (f[0] - zcx) * k, zcy + (f[1] - zcy) * k);
+                return true;
+            }
+        });
+        taps = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
+            @Override
+            public boolean onDoubleTap(MotionEvent e) {
+                if (tool != LASER && tool != MOVE && tool != SPOT) return false;      // drawing tools: no zoom jumps
+                if (zoom > 1.01f) setZoom(1f, 0.5f, 0.5f);
+                else {
+                    float[] f = toSlide(e.getX(), e.getY());
+                    setZoom(2.5f, f[0], f[1]);
+                }
+                return true;
+            }
+        });
+        if (board) startBoard();
+        else pick();
+    }
 
-        // top: back · title / status · timer · rotation · End
+    // ------------------------------------------------------------------ building the screen
+    private void buildTop() {
         LinearLayout top = new LinearLayout(this);
         top.setGravity(Gravity.CENTER_VERTICAL);
         top.addView(UiKit.darkButton(this, "arrow-left", 38, false, v -> finish()));
@@ -113,7 +170,7 @@ public class PresentActivity extends AppCompatActivity {
         tc.setOrientation(LinearLayout.VERTICAL);
         tc.setPadding(dp(8), 0, 0, 0);
         titleT = Ui.text(this, 15, Color.WHITE, true);
-        titleT.setText(T.t("Present"));
+        titleT.setText(T.t(board ? "Whiteboard" : "Present"));
         titleT.setSingleLine(true);
         titleT.setEllipsize(android.text.TextUtils.TruncateAt.END);
         status = Ui.text(this, 11, 0xB3FFFFFF, false);
@@ -121,7 +178,7 @@ public class PresentActivity extends AppCompatActivity {
         tc.addView(titleT);
         tc.addView(status);
         top.addView(tc, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
-        timer = Ui.text(this, 17, 0xFFFBBF24, true);
+        timer = Ui.text(this, 16, 0xFFFBBF24, true);
         timer.setPadding(dp(6), 0, dp(6), 0);
         timer.setContentDescription(T.t("Timer — tap to pause, hold to reset"));
         timer.setOnClickListener(v -> {
@@ -146,10 +203,11 @@ public class PresentActivity extends AppCompatActivity {
             finish();
         });
         end.setBackground(Ui.card(this, 0xFFDC2626, 0, 14));
-        top.addView(end, new LinearLayout.LayoutParams(dp(64), dp(38)));
+        top.addView(end, new LinearLayout.LayoutParams(dp(60), dp(38)));
         root.addView(top);
+    }
 
-        // the slide (gestures) with ink overlay
+    private void buildSlide() {
         slideBox = new LinearLayout(this);
         slideBox.setOrientation(LinearLayout.VERTICAL);
         FrameLayout frame = new FrameLayout(this);
@@ -169,42 +227,58 @@ public class PresentActivity extends AppCompatActivity {
         zoomT.setGravity(Gravity.CENTER);
         zoomT.setPadding(0, dp(3), 0, 0);
         slideBox.addView(zoomT);
+    }
 
-        // controls
+    private void buildControls() {
         controls = new LinearLayout(this);
         controls.setOrientation(LinearLayout.VERTICAL);
+        // tools (scrolls sideways)
+        HorizontalScrollView ts = new HorizontalScrollView(this);
+        ts.setHorizontalScrollBarEnabled(false);
         LinearLayout tools = new LinearLayout(this);
-        String[][] tn = {{"🔴", "Laser"}, {"✏", "Pen"}, {"🔦", "Spotlight"}, {"✋", "Move"}};
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < TOOLS.length; i++) {
             final int k = i;
-            toolBtns[i] = small(tn[i][0] + " " + T.t(tn[i][1]), v -> setTool(k));
-            tools.addView(toolBtns[i], new LinearLayout.LayoutParams(0, dp(40), 1));
-        }
-        controls.addView(tools);
-        penRow = new LinearLayout(this);
-        penRow.setGravity(Gravity.CENTER_VERTICAL);
-        for (final int col : PEN_COLORS) {
-            View dot = new View(this);
-            dot.setBackground(Ui.card(this, col, 0x66FFFFFF, 14));
-            dot.setOnClickListener(v -> {
-                penColor = col;
-                paintPen();
+            toolBtns[i] = small(TOOLS[i][0] + " " + T.t(TOOLS[i][1]), v -> {
+                if (k == SHAPE && tool == SHAPE) pickShape();
+                setTool(k);
             });
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(30), dp(30));
-            lp.setMargins(dp(6), dp(4), dp(6), dp(4));
-            penRow.addView(dot, lp);
+            toolBtns[i].setPadding(dp(10), 0, dp(10), 0);
+            tools.addView(toolBtns[i]);
         }
-        penRow.addView(small("🧹 " + T.t("Clear ink"), v -> {
-            ink.clear();
-            overlay.invalidate();
-            send("pen_clear", "");
-        }), new LinearLayout.LayoutParams(0, dp(36), 1));
-        controls.addView(penRow);
-
+        ts.addView(tools);
+        controls.addView(ts);
+        // colours · size · undo · redo · clear
+        optRow = new LinearLayout(this);
+        optRow.setGravity(Gravity.CENTER_VERTICAL);
+        for (final int col : COLORS) {
+            View dot = new View(this);
+            dot.setBackground(Ui.card(this, col, 0x66FFFFFF, 13));
+            dot.setContentDescription(T.t("Colour"));
+            dot.setOnClickListener(v -> {
+                color = col;
+                paintOpts();
+            });
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(26), dp(26));
+            lp.setMargins(dp(4), dp(4), dp(4), dp(4));
+            optRow.addView(dot, lp);
+        }
+        sizeBtn = small("", v -> {
+            size = (size + 1) % 3;
+            paintOpts();
+        });
+        optRow.addView(sizeBtn, new LinearLayout.LayoutParams(dp(54), dp(36)));
+        optRow.addView(small("↶", v -> undo()), new LinearLayout.LayoutParams(dp(40), dp(36)));
+        optRow.addView(small("↷", v -> redo()), new LinearLayout.LayoutParams(dp(40), dp(36)));
+        optRow.addView(small("🧹", v -> clearPage()), new LinearLayout.LayoutParams(dp(40), dp(36)));
+        HorizontalScrollView os = new HorizontalScrollView(this);
+        os.setHorizontalScrollBarEnabled(false);
+        os.addView(optRow);
+        controls.addView(os);
+        // previous · next slide / page
         LinearLayout nav = new LinearLayout(this);
         nav.setGravity(Gravity.CENTER_VERTICAL);
-        nav.setPadding(0, dp(4), 0, dp(4));
-        nav.addView(small("◀  " + T.t("Previous"), v -> go(page - 1)), new LinearLayout.LayoutParams(0, dp(58), 1));
+        nav.setPadding(0, dp(2), 0, dp(2));
+        nav.addView(small("◀  " + T.t("Previous"), v -> go(page - 1)), new LinearLayout.LayoutParams(0, dp(52), 1));
         LinearLayout mid = new LinearLayout(this);
         mid.setOrientation(LinearLayout.VERTICAL);
         mid.setGravity(Gravity.CENTER);
@@ -212,71 +286,50 @@ public class PresentActivity extends AppCompatActivity {
         next.setScaleType(ImageView.ScaleType.FIT_CENTER);
         next.setBackground(Ui.card(this, 0xFF16161C, 0, 8));
         next.setContentDescription(T.t("Next slide"));
-        mid.addView(next, new LinearLayout.LayoutParams(dp(88), dp(50)));
+        mid.addView(next, new LinearLayout.LayoutParams(dp(80), dp(45)));
         counter = Ui.text(this, 12, Color.WHITE, true);
         mid.addView(counter);
         LinearLayout.LayoutParams ml = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         ml.setMargins(dp(6), 0, dp(6), 0);
         nav.addView(mid, ml);
-        Button nx = small(T.t("Next") + "  ▶", v -> go(page + 1));
+        Button nx = small(T.t("Next") + "  ▶", v -> {
+            if (board && page == count - 1) addPage();          // whiteboard: "next" on the last page = a new page
+            else go(page + 1);
+        });
         nx.setBackground(Ui.gradient(this, 14));
-        nav.addView(nx, new LinearLayout.LayoutParams(0, dp(58), 1));
+        nav.addView(nx, new LinearLayout.LayoutParams(0, dp(52), 1));
         controls.addView(nav);
-
+        // zoom · blank · overview · go to
         LinearLayout row2 = new LinearLayout(this);
-        row2.addView(small("−", v -> setZoom(zoom / 1.5f, zcx, zcy)), new LinearLayout.LayoutParams(0, dp(40), 0.6f));
-        row2.addView(small(T.t("Fit"), v -> setZoom(1f, 0.5f, 0.5f)), new LinearLayout.LayoutParams(0, dp(40), 0.8f));
-        row2.addView(small("＋", v -> setZoom(zoom * 1.5f, zcx, zcy)), new LinearLayout.LayoutParams(0, dp(40), 0.6f));
+        row2.addView(small("−", v -> setZoom(zoom / 1.5f, zcx, zcy)), new LinearLayout.LayoutParams(0, dp(38), 0.6f));
+        row2.addView(small(T.t("Fit"), v -> setZoom(1f, 0.5f, 0.5f)), new LinearLayout.LayoutParams(0, dp(38), 0.8f));
+        row2.addView(small("＋", v -> setZoom(zoom * 1.5f, zcx, zcy)), new LinearLayout.LayoutParams(0, dp(38), 0.6f));
         blankBtn = small("", v -> {
             blankMode = (blankMode + 1) % 3;
             send("blank", String.valueOf(blankMode));
             paintBlank();
         });
-        row2.addView(blankBtn, new LinearLayout.LayoutParams(0, dp(40), 1.2f));
-        row2.addView(small("▦ " + T.t("All slides"), v -> overview()), new LinearLayout.LayoutParams(0, dp(40), 1.2f));
-        row2.addView(small("#", v -> goToNumber()), new LinearLayout.LayoutParams(0, dp(40), 0.5f));
+        row2.addView(blankBtn, new LinearLayout.LayoutParams(0, dp(38), 1.2f));
+        row2.addView(small("▦ " + T.t("All"), v -> overview()), new LinearLayout.LayoutParams(0, dp(38), 0.9f));
+        row2.addView(small("#", v -> goToNumber()), new LinearLayout.LayoutParams(0, dp(38), 0.5f));
         controls.addView(row2);
+        // whiteboard: paper · add page · delete page
+        boardRow = new LinearLayout(this);
+        paperBtn = small("", v -> pickPaper());
+        boardRow.addView(paperBtn, new LinearLayout.LayoutParams(0, dp(38), 1.4f));
+        boardRow.addView(small("＋ " + T.t("Page"), v -> addPage()), new LinearLayout.LayoutParams(0, dp(38), 1f));
+        boardRow.addView(small("🗑 " + T.t("Page"), v -> deletePage()), new LinearLayout.LayoutParams(0, dp(38), 1f));
+        boardRow.setVisibility(board ? View.VISIBLE : View.GONE);
+        controls.addView(boardRow);
         HorizontalScrollView hs = new HorizontalScrollView(this);
         hs.setHorizontalScrollBarEnabled(false);
         strip = new LinearLayout(this);
         hs.addView(strip);
-        LinearLayout.LayoutParams sl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(62));
+        LinearLayout.LayoutParams sl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(56));
         sl.setMargins(0, dp(4), 0, 0);
         controls.addView(hs, sl);
-
-        stage = new FrameLayout(this);
-        root.addView(stage, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
-        arrange();
-        setContentView(root);
-        Orient.apply(this, "present_orient");
-        setTool(LASER);
-        paintBlank();
-
-        pinch = new ScaleGestureDetector(this, new ScaleGestureDetector.SimpleOnScaleGestureListener() {
-            @Override
-            public boolean onScale(ScaleGestureDetector d) {
-                float[] f = toSlide(d.getFocusX(), d.getFocusY());
-                float nz = Math.max(1f, Math.min(8f, zoom * d.getScaleFactor()));
-                float k = 1f - zoom / nz;              // keep the point under the fingers in place
-                setZoom(nz, zcx + (f[0] - zcx) * k, zcy + (f[1] - zcy) * k);
-                return true;
-            }
-        });
-        taps = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
-            @Override
-            public boolean onDoubleTap(MotionEvent e) {
-                if (zoom > 1.01f) setZoom(1f, 0.5f, 0.5f);
-                else {
-                    float[] f = toSlide(e.getX(), e.getY());
-                    setZoom(2.5f, f[0], f[1]);
-                }
-                return true;
-            }
-        });
-        pick();
     }
 
-    /** Portrait: slide over controls. Landscape: slide left, controls right. */
     private void arrange() {
         for (View v : new View[]{slideBox, controls}) if (v.getParent() != null) ((ViewGroup) v.getParent()).removeView(v);
         stage.removeAllViews();
@@ -317,7 +370,7 @@ public class PresentActivity extends AppCompatActivity {
         b.setPadding(dp(4), 0, dp(4), 0);
         b.setMinWidth(0);
         b.setMinimumWidth(0);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(40));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(38));
         lp.setMargins(dp(2), dp(2), dp(2), dp(2));
         b.setLayoutParams(lp);
         return b;
@@ -325,17 +378,29 @@ public class PresentActivity extends AppCompatActivity {
 
     private void setTool(int t) {
         tool = t;
-        for (int i = 0; i < 4; i++) toolBtns[i].setBackground(i == t ? Ui.card(this, 0xFF0E7490, 0, 14) : Ui.card(this, 0xFF26262E, 0, 14));
-        penRow.setVisibility(t == PEN ? View.VISIBLE : View.GONE);
-        paintPen();
+        for (int i = 0; i < toolBtns.length; i++)
+            toolBtns[i].setBackground(i == t ? Ui.card(this, 0xFF0E7490, 0, 14) : Ui.card(this, 0xFF26262E, 0, 14));
+        toolBtns[SHAPE].setText(t == SHAPE ? "⬜ " + T.t(SHAPE_NAMES[java.util.Arrays.asList(SHAPES).indexOf(shape)]) + " ▾" : "⬜ " + T.t("Shapes"));
+        boolean drawing = t == PEN || t == HL || t == SHAPE || t == RULER || t == TEXT || t == ERASE;
+        ((View) optRow.getParent()).setVisibility(drawing || board ? View.VISIBLE : View.GONE);
+        paintOpts();
     }
 
-    private void paintPen() {
-        for (int i = 0; i < PEN_COLORS.length; i++) {
-            View d = penRow.getChildAt(i);
-            d.setScaleX(PEN_COLORS[i] == penColor ? 1.25f : 1f);
-            d.setScaleY(PEN_COLORS[i] == penColor ? 1.25f : 1f);
+    private void pickShape() {
+        new UiDialog(this).setTitle(T.t("Shapes")).setItems(tr(SHAPE_NAMES), (d, w) -> {
+            shape = SHAPES[w];
+            setTool(SHAPE);
+        }).show();
+    }
+
+    private void paintOpts() {
+        for (int i = 0; i < COLORS.length; i++) {
+            View d = optRow.getChildAt(i);
+            d.setScaleX(COLORS[i] == color ? 1.3f : 1f);
+            d.setScaleY(COLORS[i] == color ? 1.3f : 1f);
         }
+        sizeBtn.setText(new String[]{"• S", "● M", "⬤ L"}[size]);
+        if (paperBtn != null) paperBtn.setText("📄 " + T.t(InkDraw.PAPER_NAMES[Math.max(0, java.util.Arrays.asList(InkDraw.PAPERS).indexOf(paper))]));
     }
 
     private void paintBlank() {
@@ -345,7 +410,105 @@ public class PresentActivity extends AppCompatActivity {
         blankBtn.setTextColor(blankMode == 2 ? Color.BLACK : Color.WHITE);
     }
 
-    // ------------------------------------------------------------------ choosing and sending the PDF
+    private static String[] tr(String[] a) {
+        String[] o = new String[a.length];
+        for (int i = 0; i < a.length; i++) o[i] = T.t(a[i]);
+        return o;
+    }
+
+    // ------------------------------------------------------------------ whiteboard
+    private void startBoard() {
+        paper = Store.getStr("wb_paper", "white");
+        if ("chalk".equals(paper)) color = COLORS[4];
+        else color = COLORS[5];
+        pageW = 960;
+        pageH = 540;
+        count = 1;
+        page = 0;
+        title = T.t("Whiteboard");
+        started = SystemClock.elapsedRealtime();
+        buildStrip();
+        refresh();
+        main.post(tick);
+        paintOpts();
+        if (ip == null || ip.isEmpty()) {
+            status.setText(T.t("Not connected — drawing on this phone only"));
+            return;
+        }
+        status.setText(T.t("Opening on the TV…"));
+        net.execute(() -> {
+            try {
+                HashMap<String, String> p = new HashMap<>();
+                p.put("url", "zhboard:" + paper);
+                p.put("title", title);
+                JSONObject r = TvClient.post(ip, "/present", p);
+                String m = r.optBoolean("ok", true) ? T.t("Whiteboard on the TV") + (TvGroup.on() ? " · " + TvGroup.label() : "") : r.optString("msg");
+                try {
+                    Thread.sleep(1200);
+                    JSONObject st = TvClient.post(ip, "/presentstate", new HashMap<String, String>());
+                    if (!st.has("ink")) m = "⚠ " + T.t("Update ZH Play on the TV for the whiteboard");
+                } catch (Exception ignored) {
+                }
+                final String m2 = m;
+                main.post(() -> status.setText(m2));
+            } catch (Exception e) {
+                main.post(() -> status.setText("⚠ " + T.t("Cannot reach the TV") + " — " + T.t("drawing on this phone only")));
+            }
+        });
+    }
+
+    private void pickPaper() {
+        new UiDialog(this).setTitle(T.t("Paper")).setItems(tr(InkDraw.PAPER_NAMES), (d, w) -> {
+            paper = InkDraw.PAPERS[w];
+            Store.putStr("wb_paper", paper);
+            if ("chalk".equals(paper) && color == COLORS[5]) color = COLORS[4];
+            if (!"chalk".equals(paper) && color == COLORS[4]) color = COLORS[5];
+            send("paper", paper);
+            thumbs.evictAll();
+            buildStrip();
+            paintOpts();
+            refresh();
+        }).show();
+    }
+
+    private void addPage() {
+        count++;
+        send("pages", String.valueOf(count));
+        buildStrip();
+        go(count - 1);
+    }
+
+    private void deletePage() {
+        if (count <= 1) {
+            clearPage();
+            return;
+        }
+        new UiDialog(this).setTitle(T.t("Delete this page?")).setPositiveButton(T.t("Delete"), (d, w) -> {
+            // move the later pages' drawings one page up, on the phone and on the TV
+            for (int pg = page; pg < count; pg++) {
+                send("clearpg", String.valueOf(pg));
+                LinkedHashMap<String, JSONObject> nextInk = ink.remove(pg + 1);
+                if (nextInk != null) {
+                    ink.put(pg, nextInk);
+                    for (JSONObject e : nextInk.values()) {
+                        try {
+                            e.put("pg", pg);
+                        } catch (Exception ignored) {
+                        }
+                        sendEl(e, false);
+                    }
+                } else ink.remove(pg);
+            }
+            count--;
+            undo.clear();
+            redo.clear();
+            send("pages", String.valueOf(count));
+            buildStrip();
+            go(Math.min(page, count - 1), true);
+        }).setNegativeButton(T.t("Cancel"), null).show();
+    }
+
+    // ------------------------------------------------------------------ PDF
     private void pick() {
         Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("application/pdf");
         startActivityForResult(i, 91);
@@ -381,12 +544,18 @@ public class PresentActivity extends AppCompatActivity {
         zoom = 1f;
         zcx = zcy = 0.5f;
         ink.clear();
+        undo.clear();
+        redo.clear();
         started = SystemClock.elapsedRealtime();
         pausedTotal = 0;
         buildStrip();
         refresh();
         main.removeCallbacks(tick);
         main.post(tick);
+        if (ip == null || ip.isEmpty()) {
+            status.setText(T.t("Not connected — on this phone only"));
+            return;
+        }
         status.setText(T.t("Opening on the TV…"));
         final String shareUrl = LocalShare.share(this, u, title + ".pdf");
         net.execute(() -> {
@@ -394,12 +563,12 @@ public class PresentActivity extends AppCompatActivity {
                 HashMap<String, String> p = new HashMap<>();
                 p.put("url", shareUrl);
                 p.put("title", title);
-                org.json.JSONObject r = TvClient.post(ip, "/present", p);
-                String m = r.optBoolean("ok", true) ? T.t("On the TV — ") + count + " " + T.t("slides") : r.optString("msg");
-                // an older ZH Play on the TV doesn't know zoom / pen / spotlight: say so instead of silently ignoring
+                JSONObject r = TvClient.post(ip, "/present", p);
+                String m = r.optBoolean("ok", true) ? T.t("On the TV — ") + count + " " + T.t("slides") + (TvGroup.on() ? " · " + TvGroup.label() : "")
+                        : r.optString("msg");
                 try {
                     Thread.sleep(1500);
-                    org.json.JSONObject st = TvClient.post(ip, "/presentstate", new HashMap<String, String>());
+                    JSONObject st = TvClient.post(ip, "/presentstate", new HashMap<String, String>());
                     if (!st.has("zoom")) m = "⚠ " + T.t("Update ZH Play on the TV for zoom, pen and spotlight");
                 } catch (Exception ignored) {
                 }
@@ -411,8 +580,7 @@ public class PresentActivity extends AppCompatActivity {
         });
     }
 
-    // ------------------------------------------------------------------ the slide on the phone (same zoom as the TV)
-    /** page→preview transform: {scale, offsetX, offsetY}. */
+    // ------------------------------------------------------------------ the page on the phone (same zoom as the TV)
     private float[] transform(int W, int H) {
         float S = Math.min(W / pageW, H / pageH) * zoom;
         float cx = zcx * pageW * S, cy = zcy * pageH * S;
@@ -433,36 +601,39 @@ public class PresentActivity extends AppCompatActivity {
 
     private volatile int drawGen;
 
-    /** Draws the current view of the slide (zoomed part sharp) and the next-slide preview. */
     private void refresh() {
-        if (renderer == null) return;
+        if (renderer == null && !board) return;
         final int W = cur.getWidth(), H = cur.getHeight();
         if (W <= 0 || H <= 0) {
             main.postDelayed(this::refresh, 100);
             return;
         }
         final int i = page, gen = ++drawGen;
-        final float z = zoom, cx = zcx, cy = zcy;
+        final float z = zoom;
         draw.execute(() -> {
             if (gen != drawGen) return;
-            Bitmap bm;
-            synchronized (this) {
-                if (renderer == null) return;
-                PdfRenderer.Page p = renderer.openPage(i);
-                pageW = p.getWidth();
-                pageH = p.getHeight();
+            Bitmap bm = Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888);
+            bm.eraseColor(0xFF16161C);
+            Canvas c = new Canvas(bm);
+            if (board) {
                 float[] t = transform(W, H);
-                bm = Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888);
-                bm.eraseColor(0xFF16161C);
-                Canvas c = new Canvas(bm);
-                Paint white = new Paint();
-                white.setColor(Color.WHITE);
-                c.drawRect(t[1], t[2], t[1] + pageW * t[0], t[2] + pageH * t[0], white);
-                Matrix m = new Matrix();
-                m.setScale(t[0], t[0]);
-                m.postTranslate(t[1], t[2]);
-                p.render(bm, null, m, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);
-                p.close();
+                InkDraw.paper(c, paper, new RectF(t[1], t[2], t[1] + pageW * t[0], t[2] + pageH * t[0]), pageH * t[0]);
+            } else {
+                synchronized (this) {
+                    if (renderer == null) return;
+                    PdfRenderer.Page p = renderer.openPage(i);
+                    pageW = p.getWidth();
+                    pageH = p.getHeight();
+                    float[] t = transform(W, H);
+                    Paint white = new Paint();
+                    white.setColor(Color.WHITE);
+                    c.drawRect(t[1], t[2], t[1] + pageW * t[0], t[2] + pageH * t[0], white);
+                    Matrix m = new Matrix();
+                    m.setScale(t[0], t[0]);
+                    m.postTranslate(t[1], t[2]);
+                    p.render(bm, null, m, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);
+                    p.close();
+                }
             }
             final Bitmap nb = i + 1 < count ? thumb(i + 1) : null;
             main.post(() -> {
@@ -471,19 +642,25 @@ public class PresentActivity extends AppCompatActivity {
                 next.setImageBitmap(nb);
                 overlay.invalidate();
                 counter.setText((i + 1) + " / " + count);
-                zoomT.setText(z > 1.01f ? String.format(Locale.US, "%.1f×  ·  %s", z, T.t("double-tap = whole slide"))
-                        : T.t("Pinch to zoom · double-tap to zoom in"));
-                for (int k = 0; k < strip.getChildCount(); k++) {
-                    strip.getChildAt(k).setAlpha(k == i ? 1f : 0.5f);
-                }
+                zoomT.setText(z > 1.01f ? String.format(Locale.US, "%.1f×  ·  %s", z, T.t("Fit = whole page"))
+                        : T.t("Pinch to zoom · two fingers move the page"));
+                for (int k = 0; k < strip.getChildCount(); k++) strip.getChildAt(k).setAlpha(k == i ? 1f : 0.5f);
             });
         });
     }
 
     private Bitmap thumb(int i) {
-        String k = String.valueOf(i);
+        String k = i + "|" + paper;
         Bitmap c = thumbs.get(k);
-        if (c != null || renderer == null || i < 0 || i >= count) return c;
+        if (c != null || i < 0 || i >= count) return c;
+        if (board) {
+            Bitmap bm = Bitmap.createBitmap(160, 90, Bitmap.Config.ARGB_8888);
+            Canvas cv = new Canvas(bm);
+            InkDraw.paper(cv, paper, new RectF(0, 0, 160, 90), 90);
+            LinkedHashMap<String, JSONObject> m = ink.get(i);
+            if (m != null) for (JSONObject e : new ArrayList<>(m.values())) InkDraw.draw(cv, e, (fx, fy) -> new float[]{fx * 160, fy * 90}, 90);
+            return bm;                                   // drawings change: not cached
+        }
         synchronized (this) {
             if (renderer == null) return null;
             PdfRenderer.Page p = renderer.openPage(i);
@@ -506,7 +683,7 @@ public class PresentActivity extends AppCompatActivity {
             t.setBackground(Ui.card(this, 0xFF26262E, 0, 6));
             t.setContentDescription(T.t("Slide") + " " + (i + 1));
             t.setOnClickListener(v -> go(k));
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(96), dp(56));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(88), dp(50));
             lp.setMargins(dp(3), 0, dp(3), 0);
             strip.addView(t, lp);
             draw.execute(() -> {
@@ -517,13 +694,25 @@ public class PresentActivity extends AppCompatActivity {
     }
 
     private void go(int i) {
+        go(i, false);
+    }
+
+    private void go(int i, boolean force) {
         if (count == 0) return;
         i = Math.max(0, Math.min(count - 1, i));
-        if (i == page && i != 0) return;
+        if (i == page && !force && i != 0) return;
+        if (board && i != page && page >= 0 && page < strip.getChildCount()) {    // the page we leave: fresh thumbnail
+            final int old = page;
+            draw.execute(() -> {
+                final Bitmap bm = thumb(old);
+                main.post(() -> {
+                    if (old < strip.getChildCount()) ((ImageView) strip.getChildAt(old)).setImageBitmap(bm);
+                });
+            });
+        }
         page = i;
-        zoom = 1f;                     // a new slide starts whole and without ink (same on the TV)
+        zoom = 1f;                             // each page keeps its drawing; the view starts whole
         zcx = zcy = 0.5f;
-        ink.clear();
         refresh();
         send("goto", String.valueOf(i));
         if (strip.getChildCount() > i) {
@@ -542,7 +731,7 @@ public class PresentActivity extends AppCompatActivity {
         }
         refresh();
         long now = SystemClock.uptimeMillis();
-        if (now - lastZoom > 60) {                      // the TV re-draws the zoomed part sharp
+        if (now - lastZoom > 60) {
             lastZoom = now;
             sendZoom();
         } else {
@@ -557,15 +746,15 @@ public class PresentActivity extends AppCompatActivity {
         send("zoom", String.format(Locale.US, "%.3f,%.4f,%.4f", zoom, zcx, zcy));
     }
 
-    // ------------------------------------------------------------------ gestures on the slide
+    // ------------------------------------------------------------------ gestures
     private boolean touch(View v, MotionEvent e) {
         pinch.onTouchEvent(e);
         taps.onTouchEvent(e);
         int a = e.getActionMasked();
-        if (e.getPointerCount() >= 2) {                  // two fingers: zoom (pinch) and pan
+        if (e.getPointerCount() >= 2) {                       // two fingers: zoom and move the page (any tool)
             float mx = (e.getX(0) + e.getX(1)) / 2, my = (e.getY(0) + e.getY(1)) / 2;
             if (!multi || a == MotionEvent.ACTION_POINTER_DOWN) {
-                endOneFinger();
+                cancelOneFinger();
                 multi = true;
             } else if (a == MotionEvent.ACTION_MOVE && zoom > 1f) {
                 float[] t = transform(cur.getWidth(), cur.getHeight());
@@ -581,7 +770,17 @@ public class PresentActivity extends AppCompatActivity {
         }
         float[] f = toSlide(e.getX(), e.getY());
         switch (tool) {
-            case PEN: pen(a, f); break;
+            case PEN:
+            case HL: stroke(a, f); break;
+            case SHAPE:
+            case RULER: shape(a, f); break;
+            case ERASE: erase(f); break;
+            case TEXT:
+                if (a == MotionEvent.ACTION_DOWN) {
+                    downX = e.getX();
+                    downY = e.getY();
+                } else if (a == MotionEvent.ACTION_UP && Math.hypot(e.getX() - downX, e.getY() - downY) < dp(12)) textAt(f);
+                break;
             case SPOT: pointer("spot", a, f); break;
             case MOVE:
                 if (a == MotionEvent.ACTION_DOWN) {
@@ -599,16 +798,19 @@ public class PresentActivity extends AppCompatActivity {
         return true;
     }
 
-    private void endOneFinger() {
-        if (tool == PEN) flushPen();
-        else if (tool == SPOT) send("spot_off", "");
-        else if (tool == LASER) send("pointer_off", "");
+    /** A second finger came down: the one-finger action stops (a stroke in progress is removed). */
+    private void cancelOneFinger() {
+        if (drawing != null) {
+            removeEl(page, drawing.optString("id"), false);
+            drawing = null;
+        }
+        if (tool == SPOT) send("spot_off", "");
+        if (tool == LASER) send("pointer_off", "");
         overlay.laser = null;
         overlay.spot = null;
         overlay.invalidate();
     }
 
-    /** Laser / spotlight: follows the finger (~25 updates a second), hidden on release. */
     private void pointer(final String cmd, int a, float[] f) {
         if (a == MotionEvent.ACTION_UP || a == MotionEvent.ACTION_CANCEL) {
             send(cmd + "_off", "");
@@ -627,75 +829,239 @@ public class PresentActivity extends AppCompatActivity {
         net.execute(() -> post(cmd, "", String.format(Locale.US, "%.4f", fx), String.format(Locale.US, "%.4f", fy)));
     }
 
-    /** Pen: points are sent in small batches while drawing. */
-    private void pen(int a, float[] f) {
-        if (a == MotionEvent.ACTION_DOWN) {
-            strokeId = "s" + (++strokeN);
-            List<float[]> pts = new ArrayList<>();
-            ink.put(strokeId, new Object[]{penColor, pts});
-            penX.clear();
-            penY.clear();
+    // ------------------------------------------------------------------ ink elements
+    private int width() {
+        if (tool == HL) return new int[]{18, 28, 40}[size];
+        return new int[]{3, 6, 11}[size];
+    }
+
+    private JSONObject newEl(String t) {
+        JSONObject e = new JSONObject();
+        try {
+            e.put("id", "e" + (++idN) + "_" + (SystemClock.uptimeMillis() % 100000));
+            e.put("pg", page);
+            e.put("t", t);
+            e.put("c", String.format("#%06X", color & 0xFFFFFF));
+            e.put("w", width());
+            e.put("p", new JSONArray());
+        } catch (Exception ignored) {
         }
-        if (strokeId == null) return;
-        Object[] st = ink.get(strokeId);
-        if (st == null) return;
-        @SuppressWarnings("unchecked") List<float[]> pts = (List<float[]>) st[1];
-        pts.add(f);
-        penX.add(f[0]);
-        penY.add(f[1]);
+        return e;
+    }
+
+    private LinkedHashMap<String, JSONObject> pageInk(int pg) {
+        LinkedHashMap<String, JSONObject> m = ink.get(pg);
+        if (m == null) {
+            m = new LinkedHashMap<>();
+            ink.put(pg, m);
+        }
+        return m;
+    }
+
+    private void stroke(int a, float[] f) {
+        try {
+            if (a == MotionEvent.ACTION_DOWN) {
+                drawing = newEl(tool == HL ? "hl" : "pen");
+                drawing.getJSONArray("p").put(r4(f[0])).put(r4(f[1]));
+                pageInk(page).put(drawing.getString("id"), drawing);
+                sendEl(drawing, false);
+                lastSend = SystemClock.uptimeMillis();
+            } else if (drawing != null && (a == MotionEvent.ACTION_MOVE || a == MotionEvent.ACTION_UP)) {
+                drawing.getJSONArray("p").put(r4(f[0])).put(r4(f[1]));
+                pendingPts.put(r4(f[0])).put(r4(f[1]));
+                long now = SystemClock.uptimeMillis();
+                if (now - lastSend > 50 || a == MotionEvent.ACTION_UP) {     // points in small batches
+                    lastSend = now;
+                    JSONObject app = new JSONObject().put("id", drawing.getString("id")).put("pg", page).put("app", true)
+                            .put("p", new JSONArray(pendingPts.toString()));
+                    while (pendingPts.length() > 0) pendingPts.remove(0);
+                    sendEl(app, false);
+                }
+                if (a == MotionEvent.ACTION_UP) {
+                    pushUndo("add", page, drawing);
+                    drawing = null;
+                }
+            }
+        } catch (Exception ignored) {
+        }
         overlay.invalidate();
-        long now = SystemClock.uptimeMillis();
-        if (a == MotionEvent.ACTION_UP || a == MotionEvent.ACTION_CANCEL || now - lastPen > 50) {
-            lastPen = now;
-            flushPen();
-        }
-        if (a == MotionEvent.ACTION_UP || a == MotionEvent.ACTION_CANCEL) strokeId = null;
     }
 
-    private void flushPen() {
-        if (strokeId == null || penX.isEmpty()) return;
-        StringBuilder xs = new StringBuilder(), ys = new StringBuilder();
-        for (int k = 0; k < penX.size(); k++) {
-            xs.append(k > 0 ? "," : "").append(String.format(Locale.US, "%.4f", penX.get(k)));
-            ys.append(k > 0 ? "," : "").append(String.format(Locale.US, "%.4f", penY.get(k)));
+    private void shape(int a, float[] f) {
+        try {
+            if (a == MotionEvent.ACTION_DOWN) {
+                drawing = newEl(tool == RULER ? "ruler" : shape);
+                drawing.put("p", new JSONArray().put(r4(f[0])).put(r4(f[1])).put(r4(f[0])).put(r4(f[1])));
+                pageInk(page).put(drawing.getString("id"), drawing);
+            } else if (drawing != null) {
+                JSONArray p = drawing.getJSONArray("p");
+                p.put(2, r4(f[0]));
+                p.put(3, r4(f[1]));
+                long now = SystemClock.uptimeMillis();
+                if (now - lastSend > 60 || a == MotionEvent.ACTION_UP) {     // the shape follows the finger on the TV
+                    lastSend = now;
+                    sendEl(drawing, false);
+                }
+                if (a == MotionEvent.ACTION_UP) {
+                    boolean tiny = Math.hypot(p.getDouble(2) - p.getDouble(0), p.getDouble(3) - p.getDouble(1)) < 0.01;
+                    if (tiny) removeEl(page, drawing.getString("id"), false);
+                    else pushUndo("add", page, drawing);
+                    drawing = null;
+                }
+            }
+        } catch (Exception ignored) {
         }
-        penX.clear();
-        penY.clear();
-        final String id = strokeId + "|" + String.format("#%06X", penColor & 0xFFFFFF), x = xs.toString(), y = ys.toString();
-        net.execute(() -> post("pen", id, x, y));
+        overlay.invalidate();
     }
 
-    /** Ink, laser and spotlight on the phone's preview (same places as on the big screen). */
+    private void erase(float[] f) {
+        LinkedHashMap<String, JSONObject> m = ink.get(page);
+        if (m == null) return;
+        String hit = null;
+        for (JSONObject e : m.values()) if (InkDraw.distance(e, f[0], f[1]) < 0.018) hit = e.optString("id");
+        if (hit != null) {
+            JSONObject e = m.get(hit);
+            removeEl(page, hit, true);
+            pushUndo("del", page, e);
+        }
+    }
+
+    private void textAt(final float[] f) {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(18), dp(6), dp(18), 0);
+        final EditText e = new EditText(this);
+        e.setHint(T.t("Text or a formula"));
+        e.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+        box.addView(e);
+        GridLayout keys = new GridLayout(this);
+        keys.setColumnCount(8);
+        for (final String sy : SYMBOLS) {
+            TextView k = Ui.text(this, 18, Ui.TEXT, false);
+            k.setText(sy);
+            k.setGravity(Gravity.CENTER);
+            k.setBackground(Ui.focusCard(this, 8));
+            k.setOnClickListener(v -> e.getText().insert(Math.max(0, e.getSelectionStart()), sy));
+            GridLayout.LayoutParams lp = new GridLayout.LayoutParams();
+            lp.width = dp(36);
+            lp.height = dp(38);
+            keys.addView(k, lp);
+        }
+        box.addView(keys);
+        Button fm = small("∑ " + T.t("Formulas"), v -> new UiDialog(this).setTitle(T.t("Formulas")).setItems(FORMULAS, (d, w) ->
+                e.getText().insert(Math.max(0, e.getSelectionStart()), FORMULAS[w])).show());
+        box.addView(fm);
+        ScrollView sv = new ScrollView(this);
+        sv.addView(box);
+        new UiDialog(this).setTitle(T.t("Text")).setView(sv).setPositiveButton(T.t("Place"), (d, w) -> {
+            String s = e.getText().toString().trim();
+            if (s.isEmpty()) return;
+            try {
+                JSONObject el = newEl("text");
+                el.put("p", new JSONArray().put(r4(f[0])).put(r4(f[1])));
+                el.put("s", s);
+                el.put("z", new int[]{40, 56, 80}[size]);
+                pageInk(page).put(el.getString("id"), el);
+                sendEl(el, false);
+                pushUndo("add", page, el);
+                overlay.invalidate();
+            } catch (Exception ignored) {
+            }
+        }).setNegativeButton(T.t("Cancel"), null).show();
+    }
+
+    private void removeEl(int pg, String id, boolean tell) {
+        LinkedHashMap<String, JSONObject> m = ink.get(pg);
+        if (m != null) m.remove(id);
+        send("del", id + "|" + pg);
+        overlay.invalidate();
+    }
+
+    private void pushUndo(String op, int pg, Object what) {
+        undo.add(new Object[]{op, pg, what});
+        if (undo.size() > 200) undo.remove(0);
+        redo.clear();
+    }
+
+    @SuppressWarnings("unchecked")
+    private void undo() {
+        if (undo.isEmpty()) return;
+        Object[] u = undo.remove(undo.size() - 1);
+        apply(u, true);
+        redo.add(u);
+    }
+
+    private void redo() {
+        if (redo.isEmpty()) return;
+        Object[] u = redo.remove(redo.size() - 1);
+        apply(u, false);
+        undo.add(u);
+    }
+
+    /** reverse = undo. */
+    @SuppressWarnings("unchecked")
+    private void apply(Object[] u, boolean reverse) {
+        String op = (String) u[0];
+        int pg = (Integer) u[1];
+        if ("clear".equals(op)) {
+            List<JSONObject> all = (List<JSONObject>) u[2];
+            if (reverse) for (JSONObject e : all) {
+                pageInk(pg).put(e.optString("id"), e);
+                sendEl(e, false);
+            }
+            else {
+                pageInk(pg).clear();
+                send("clearpg", String.valueOf(pg));
+            }
+        } else {
+            JSONObject e = (JSONObject) u[2];
+            boolean add = "add".equals(op) != reverse;
+            if (add) {
+                pageInk(pg).put(e.optString("id"), e);
+                sendEl(e, false);
+            } else removeEl(pg, e.optString("id"), true);
+        }
+        if (pg != page) go(pg);
+        overlay.invalidate();
+    }
+
+    private void clearPage() {
+        LinkedHashMap<String, JSONObject> m = ink.get(page);
+        if (m == null || m.isEmpty()) {
+            send("pen_clear", "");
+            return;
+        }
+        pushUndo("clear", page, new ArrayList<>(m.values()));
+        m.clear();
+        send("clearpg", String.valueOf(page));
+        send("pen_clear", "");
+        overlay.invalidate();
+    }
+
+    private static double r4(float v) {
+        return Math.round(v * 10000) / 10000.0;
+    }
+
+    private void sendEl(JSONObject e, boolean unused) {
+        final String js = e.toString();
+        net.execute(() -> post("el", js, null, null));
+    }
+
+    /** Ink, laser and spotlight on the phone (same places as on the big screen). */
     final class Ink extends View {
         float[] laser, spot;
         private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG), dark = new Paint();
 
         Ink(Context c) {
             super(c);
-            p.setStyle(Paint.Style.STROKE);
-            p.setStrokeCap(Paint.Cap.ROUND);
-            p.setStrokeJoin(Paint.Join.ROUND);
             dark.setColor(0xB3000000);
         }
 
         @Override
         protected void onDraw(Canvas c) {
-            p.setStyle(Paint.Style.STROKE);
-            p.setStrokeWidth(dp(2.5f) * (float) Math.sqrt(zoom));
-            for (Object[] st : ink.values()) {
-                @SuppressWarnings("unchecked") List<float[]> pts = (List<float[]>) st[1];
-                if (pts.isEmpty()) continue;
-                p.setColor((Integer) st[0]);
-                Path path = new Path();
-                float[] s0 = toScreen(pts.get(0)[0], pts.get(0)[1]);
-                path.moveTo(s0[0], s0[1]);
-                for (int k = 1; k < pts.size(); k++) {
-                    float[] sp = toScreen(pts.get(k)[0], pts.get(k)[1]);
-                    path.lineTo(sp[0], sp[1]);
-                }
-                if (pts.size() == 1) path.lineTo(s0[0] + 0.1f, s0[1]);
-                c.drawPath(path, p);
-            }
+            float[] t = transform(getWidth(), getHeight());
+            LinkedHashMap<String, JSONObject> m = ink.get(page);
+            if (m != null) for (JSONObject e : new ArrayList<>(m.values())) InkDraw.draw(c, e, PresentActivity.this::toScreen, pageH * t[0]);
             if (spot != null) {
                 float[] sp = toScreen(spot[0], spot[1]);
                 Path hole = new Path();
@@ -723,7 +1089,8 @@ public class PresentActivity extends AppCompatActivity {
         g.setColumnCount(Orient.landscape(this) ? 4 : 3);
         g.setPadding(dp(8), dp(8), dp(8), dp(8));
         sv.addView(g);
-        final AlertDialog d = new UiDialog(this).setTitle(count + " " + T.t("slides")).setView(sv).setNegativeButton(T.t("Close"), null).show();
+        final AlertDialog d = new UiDialog(this).setTitle(count + " " + T.t(board ? "pages" : "slides")).setView(sv)
+                .setNegativeButton(T.t("Close"), null).show();
         for (int i = 0; i < count && i < 300; i++) {
             final int k = i;
             LinearLayout cell = new LinearLayout(this);
@@ -761,12 +1128,13 @@ public class PresentActivity extends AppCompatActivity {
         }).setNegativeButton(T.t("Cancel"), null).show();
     }
 
-    // ------------------------------------------------------------------ talking to the TV / PC
+    // ------------------------------------------------------------------ talking to the TV / PC (and the TV group)
     private void send(final String c, final String v) {
         net.execute(() -> post(c, v, null, null));
     }
 
     private void post(String c, String v, String x, String y) {
+        if (ip == null || ip.isEmpty()) return;
         try {
             HashMap<String, String> p = new HashMap<>();
             p.put("c", c);

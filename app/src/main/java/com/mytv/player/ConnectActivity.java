@@ -85,22 +85,51 @@ public class ConnectActivity extends AppCompatActivity {
         status.setPadding(Ui.dp(this, 4), Ui.dp(this, 8), 0, Ui.dp(this, 16));
         root.addView(status);
 
+        // ---- this phone's own board (works without a TV) — customizable like the remote's board
+        LinearLayout oh = new LinearLayout(this);
+        oh.setGravity(Gravity.CENTER_VERTICAL);
         TextView ol = Ui.text(this, 13, Ui.DIM, true);
-        ol.setText(T.t("More").toUpperCase(java.util.Locale.ROOT));
+        ol.setText(T.t("This phone").toUpperCase(java.util.Locale.ROOT));
         ol.setLetterSpacing(0.15f);
         ol.setPadding(0, Ui.dp(this, 8), 0, Ui.dp(this, 6));
-        root.addView(ol);
-        root.addView(UiKit.grid(this, 2,
-                UiKit.tile(this, "refresh-cw", T.t("Scan again"), T.t("find TVs on this Wi-Fi"), 0xFF8B5CF6, v -> startScan()),
-                UiKit.tile(this, "keyboard", T.t("Enter TV address"), T.t("type the TV's IP"), 0xFF3B82F6, v -> manual()),
-                UiKit.tile(this, "search", T.t("Browser"), T.t("search & send videos to TV"), 0xFF22C55E,
-                        v -> startActivity(new Intent(ConnectActivity.this, BrowserActivity.class))),
-                UiKit.tile(this, "smartphone", T.t("Use this phone"), T.t("as a player"), 0xFFF97316,
-                        v -> startActivity(new Intent(ConnectActivity.this, MainActivity.class).putExtra(MainActivity.EXTRA_PLAYER_HOME, true))),
-                UiKit.tile(this, "film", T.t("Videos"), T.t("on this phone"), 0xFF0EA5E9,
-                        v -> startActivity(new Intent(ConnectActivity.this, PhoneLibraryActivity.class))),
-                UiKit.tile(this, "list-music", T.t("Music"), T.t("on this phone"), 0xFFD946EF,
-                        v -> startActivity(new Intent(ConnectActivity.this, PhoneLibraryActivity.class).putExtra(PhoneLibraryActivity.EXTRA_AUDIO, true)))));
+        oh.addView(ol, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        TextView cz = Ui.text(this, 12, Ui.ACCENT, true);
+        cz.setText("✎ " + T.t("Customize"));
+        cz.setPadding(Ui.dp(this, 10), Ui.dp(this, 8), Ui.dp(this, 4), Ui.dp(this, 6));
+        cz.setOnClickListener(v -> customizePhoneBoard());
+        oh.addView(cz);
+        root.addView(oh);
+        phoneTiles = new java.util.LinkedHashMap<>();
+        phoneTiles.put("scan", UiKit.tile(this, "refresh-cw", T.t("Scan again"), T.t("find TVs on this Wi-Fi"), 0xFF8B5CF6, v -> startScan()));
+        phoneTiles.put("address", UiKit.tile(this, "keyboard", T.t("Enter TV address"), T.t("type the TV's IP"), 0xFF3B82F6, v -> manual()));
+        phoneTiles.put("group", UiKit.tile(this, "layers", T.t("TV group"), T.t("control several TVs at once"), 0xFF14B8A6, v -> TvGroup.manage(this, null)));
+        phoneTiles.put("browser", UiKit.tile(this, "search", T.t("Browser"), T.t("search & send videos to TV"), 0xFF22C55E,
+                v -> startActivity(new Intent(this, BrowserActivity.class))));
+        phoneTiles.put("player", UiKit.tile(this, "smartphone", T.t("Use this phone"), T.t("as a player"), 0xFFF97316,
+                v -> startActivity(new Intent(this, MainActivity.class).putExtra(MainActivity.EXTRA_PLAYER_HOME, true))));
+        phoneTiles.put("videos", UiKit.tile(this, "film", T.t("Videos"), T.t("on this phone"), 0xFF0EA5E9,
+                v -> startActivity(new Intent(this, PhoneLibraryActivity.class))));
+        phoneTiles.put("music", UiKit.tile(this, "list-music", T.t("Music"), T.t("on this phone"), 0xFFD946EF,
+                v -> startActivity(new Intent(this, PhoneLibraryActivity.class).putExtra(PhoneLibraryActivity.EXTRA_AUDIO, true))));
+        phoneTiles.put("features", UiKit.tile(this, "wand-sparkles", T.t("Features"), T.t("cutter, karaoke, converter…"), 0xFFF59E0B,
+                v -> startActivity(new Intent(this, ToolsActivity.class))));
+        phoneTiles.put("dj", UiKit.tile(this, "disc-3", T.t("DJ mixer"), T.t("two decks, sync, effects"), 0xFFEC4899,
+                v -> startActivity(new Intent(this, DjActivity.class))));
+        phoneTiles.put("editor", UiKit.tile(this, "audio-waveform", T.t("Song editor"), T.t("tracks, cut, effects"), 0xFF6366F1,
+                v -> startActivity(new Intent(this, EditorActivity.class))));
+        phoneTiles.put("board", UiKit.tile(this, "presentation", T.t("Whiteboard"), T.t("draw, shapes, rulers, formulas"), 0xFF10B981,
+                v -> startActivity(new Intent(this, PresentActivity.class).putExtra(PresentActivity.EXTRA_BOARD, true))));
+        phoneTiles.put("present", UiKit.tile(this, "presentation", T.t("Present"), T.t("PDF slides on the TV"), 0xFF8B5CF6, v -> {
+            if (Store.getStr("last_tv", "").isEmpty()) UiKit.makeToast(this, T.t("Connect to a TV first"), android.widget.Toast.LENGTH_SHORT).show();
+            else startActivity(new Intent(this, PresentActivity.class));
+        }));
+        phoneTiles.put("vpn", UiKit.tile(this, "lock", "VPN", T.t("WireGuard / Proton free"), 0xFF10B981, v -> WgVpn.panel(this)));
+        phoneTiles.put("eq", UiKit.tile(this, "sliders-vertical", T.t("Equalizer"), T.t("for the music player"), 0xFF22D3EE,
+                v -> startActivity(new Intent(this, PowerEqActivity.class))));
+        phoneTiles.put("settings", UiKit.tile(this, "settings", T.t("Settings"), T.t("language, theme, …"), 0xFF64748B, v -> SettingsDialog.show(this)));
+        phoneBoard = new android.widget.FrameLayout(this);
+        phoneBoard.addView(BoardLayout.build(this, phoneTiles, "phone_board"));
+        root.addView(phoneBoard);
         if (false) {
         Button rescan = Ui.button(this, T.t("Scan again"), true);
         rescan.setOnClickListener(new View.OnClickListener() {
@@ -253,6 +282,27 @@ public class ConnectActivity extends AppCompatActivity {
         startActivity(new Intent(this, NativeRemoteActivity.class)
                 .putExtra(NativeRemoteActivity.EXTRA_IP, ip)
                 .putExtra(NativeRemoteActivity.EXTRA_NAME, name));
+    }
+
+    private java.util.LinkedHashMap<String, View> phoneTiles;
+    private android.widget.FrameLayout phoneBoard;
+
+    private void customizePhoneBoard() {
+        java.util.LinkedHashMap<String, String> names = new java.util.LinkedHashMap<>();
+        for (java.util.Map.Entry<String, View> e : phoneTiles.entrySet()) {
+            View t = e.getValue().findViewWithTag("title");
+            names.put(e.getKey(), t instanceof TextView ? ((TextView) t).getText().toString() : e.getKey());
+        }
+        BoardLayout.customize(this, names, () -> {
+            phoneBoard.removeAllViews();
+            phoneBoard.addView(BoardLayout.build(this, phoneTiles, "phone_board"));
+        }, "phone_board");
+    }
+
+    @Override
+    protected void onActivityResult(int req, int res, Intent data) {
+        super.onActivityResult(req, res, data);
+        WgVpn.onResult(this, req, res, data);
     }
 
     private void manual() {

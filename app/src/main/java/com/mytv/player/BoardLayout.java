@@ -31,7 +31,8 @@ public final class BoardLayout {
     private BoardLayout() {
     }
 
-    private static final String KEY = "board_v2";
+    private static final String KEY = "board_v2";        // the TV remote's board; the phone's own board has its own key
+    private static String key = KEY;
     static final String[] SIZES = {"Small (4 per row)", "Medium (3 per row)", "Large (2 per row)", "List"};
     private static final int[] COLS = {4, 3, 2, 1};
 
@@ -44,7 +45,7 @@ public final class BoardLayout {
     static Layout load(List<String> allIds) {
         Layout l = new Layout();
         try {
-            JSONObject o = new JSONObject(Store.getStr(KEY, "{}"));
+            JSONObject o = new JSONObject(Store.getStr(key, "{}"));
             JSONArray a = o.optJSONArray("order"), h = o.optJSONArray("hidden");
             if (a != null) for (int i = 0; i < a.length(); i++) {
                 String id = a.getString(i);
@@ -63,18 +64,24 @@ public final class BoardLayout {
             JSONArray a = new JSONArray(), h = new JSONArray();
             for (String s : l.order) a.put(s);
             for (String s : l.hidden) h.put(s);
-            Store.putStr(KEY, new JSONObject().put("order", a).put("hidden", h).put("size", l.size).toString());
+            Store.putStr(key, new JSONObject().put("order", a).put("hidden", h).put("size", l.size).toString());
         } catch (Exception ignored) {
         }
     }
 
     /** The board for these tiles (id → tile view), in the saved order, with sections. */
     public static View build(Activity a, LinkedHashMap<String, View> tiles) {
+        return build(a, tiles, KEY);
+    }
+
+    /** A board saved under its own name (e.g. "phone_board" for the phone's start screen). */
+    public static View build(Activity a, LinkedHashMap<String, View> tiles, String boardKey) {
+        key = boardKey;
         try {
             return buildUnsafe(a, tiles);
         } catch (Throwable e) {
             // something in a saved layout is wrong: forget it and show the normal board
-            Store.putStr(KEY, "{}");
+            Store.putStr(key, "{}");
             for (View t : tiles.values()) if (t.getParent() != null) ((ViewGroup) t.getParent()).removeView(t);
             return UiKit.grid(a, 3, tiles.values().toArray(new View[0]));
         }
@@ -117,6 +124,11 @@ public final class BoardLayout {
     // ------------------------------------------------------------------ the Customize screen
     /** names: id → title (for the list). onSave runs after "Save" (rebuild the board). */
     public static void customize(final Activity a, final LinkedHashMap<String, String> names, final Runnable onSave) {
+        customize(a, names, onSave, KEY);
+    }
+
+    public static void customize(final Activity a, final LinkedHashMap<String, String> names, final Runnable onSave, String boardKey) {
+        key = boardKey;
         try {
             customizeUnsafe(a, names, onSave);
         } catch (Throwable e) {
