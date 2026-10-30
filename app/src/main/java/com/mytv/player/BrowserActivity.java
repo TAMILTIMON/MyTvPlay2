@@ -56,7 +56,6 @@ public class BrowserActivity extends AppCompatActivity {
 
     private WebView web;
     private EditText bar;
-    private Button videosBtn;
     private ProgressBar loading;
     private CursorView cursor;
     private FrameLayout root, webBox;
@@ -96,8 +95,7 @@ public class BrowserActivity extends AppCompatActivity {
         Shield.init(this);
         final boolean narrow = getResources().getConfiguration().screenWidthDp < 600 && !tv;
 
-        // ---- top: VPN, then the address bar
-        col.addView(buildVpnBar());
+        // ---- top: toolbar (address bar, compact VPN button, Shield, Videos tracker, Tabs)
         LinearLayout tb = new LinearLayout(this);
         tb.setGravity(Gravity.CENTER_VERTICAL);
         int p = Ui.dp(this, 8);
@@ -172,6 +170,14 @@ public class BrowserActivity extends AppCompatActivity {
         LinearLayout.LayoutParams olp = new LinearLayout.LayoutParams(0, Ui.dp(this, 46), 1);
         olp.setMargins(Ui.dp(this, 4), 0, Ui.dp(this, 6), 0);
         tb.addView(omni, olp);
+
+        // Compact VPN Logo Button
+        vpnIcon = UiKit.roundButton(this, "lock", 42, false, v -> WgVpn.panel(this));
+        vpnIcon.setContentDescription("VPN");
+        LinearLayout.LayoutParams vpnLp = new LinearLayout.LayoutParams(Ui.dp(this, 42), Ui.dp(this, 42));
+        vpnLp.setMargins(0, 0, Ui.dp(this, 4), 0);
+        tb.addView(vpnIcon, vpnLp);
+
         // Brave-style shield with the number of blocked ads / trackers on this page
         FrameLayout sh = new FrameLayout(this);
         shieldIcon = UiKit.roundButton(this, "shield-check", 42, false, v -> shieldPanel());
@@ -181,13 +187,23 @@ public class BrowserActivity extends AppCompatActivity {
         shieldBadge.setPadding(Ui.dp(this, 4), 0, Ui.dp(this, 4), 0);
         shieldBadge.setBackground(Ui.card(this, SHIELD_ORANGE, 0, 9));
         sh.addView(shieldBadge, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, Ui.dp(this, 18), Gravity.TOP | Gravity.END));
-        tb.addView(sh);
-        videosBtn = Ui.button(this, "🎬", true);
-        videosBtn.setOnClickListener(v -> showVideos());
-        videosBtn.setTextSize(13);
-        LinearLayout.LayoutParams vlp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, Ui.dp(this, 40));
-        vlp.setMargins(Ui.dp(this, 6), 0, 0, 0);
-        tb.addView(videosBtn, vlp);
+        LinearLayout.LayoutParams shLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        shLp.setMargins(0, 0, Ui.dp(this, 4), 0);
+        tb.addView(sh, shLp);
+
+        // Compact Videos Button with Ad-Tracker Badge Style
+        FrameLayout vidBox = new FrameLayout(this);
+        videosIcon = UiKit.roundButton(this, "film", 42, false, v -> showVideos());
+        videosIcon.setContentDescription(T.t("Videos on page"));
+        vidBox.addView(videosIcon, new FrameLayout.LayoutParams(Ui.dp(this, 42), Ui.dp(this, 42)));
+        videosBadge = Ui.text(this, 10, Color.WHITE, true);
+        videosBadge.setGravity(Gravity.CENTER);
+        videosBadge.setPadding(Ui.dp(this, 4), 0, Ui.dp(this, 4), 0);
+        videosBadge.setBackground(Ui.card(this, Ui.ACCENT, 0, 9));
+        videosBadge.setVisibility(View.GONE);
+        vidBox.addView(videosBadge, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, Ui.dp(this, 18), Gravity.TOP | Gravity.END));
+        tb.addView(vidBox);
+
         tabsBtn = tabCounter();
         if (!narrow) {
             LinearLayout.LayoutParams tl = new LinearLayout.LayoutParams(Ui.dp(this, 40), Ui.dp(this, 40));
@@ -1164,9 +1180,10 @@ public class BrowserActivity extends AppCompatActivity {
     // modern browser chrome
     // =====================================================================
     private static final int SHIELD_ORANGE = 0xFFFB542B;
-    private ImageView siteIcon, reloadBtn, shieldIcon, vpnIcon;
-    private TextView shieldBadge, findCount, vpnTitle, vpnSub;
-    private Button vpnGo;
+    private static final int VPN_GREEN = 0xFF10B981;
+
+    private ImageView siteIcon, reloadBtn, shieldIcon, vpnIcon, videosIcon;
+    private TextView shieldBadge, videosBadge, findCount;
     private volatile boolean pageLoading;
     private final java.util.Map<WebView, String> hosts = java.util.Collections.synchronizedMap(new java.util.WeakHashMap<WebView, String>());
     private final java.util.Map<WebView, Integer> pageBlocked = java.util.Collections.synchronizedMap(new java.util.WeakHashMap<WebView, Integer>());
@@ -1202,54 +1219,11 @@ public class BrowserActivity extends AppCompatActivity {
         return b;
     }
 
-    private static final int VPN_GREEN = 0xFF10B981;
-
-    private LinearLayout buildVpnBar() {
-        LinearLayout row = new LinearLayout(this);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        int p = Ui.dp(this, 8);
-        row.setPadding(p, p + Ui.dp(this, tv ? 4 : 10), p, Ui.dp(this, 2));
-        row.setBackgroundColor(Ui.BAR);
-        row.setClickable(true);
-        row.setFocusable(true);
-        row.setOnClickListener(v -> WgVpn.panel(this));
-        vpnIcon = new ImageView(this);
-        vpnIcon.setScaleType(ImageView.ScaleType.CENTER);
-        vpnIcon.setContentDescription("VPN");
-        row.addView(vpnIcon, new LinearLayout.LayoutParams(Ui.dp(this, 36), Ui.dp(this, 36)));
-        LinearLayout col = new LinearLayout(this);
-        col.setOrientation(LinearLayout.VERTICAL);
-        vpnTitle = Ui.text(this, 13, Ui.TEXT, true);
-        vpnTitle.setText("VPN");
-        vpnSub = Ui.text(this, 11, Ui.DIM, false);
-        vpnSub.setSingleLine(true);
-        vpnSub.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        col.addView(vpnTitle);
-        col.addView(vpnSub);
-        LinearLayout.LayoutParams cl = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
-        cl.setMargins(Ui.dp(this, 8), 0, Ui.dp(this, 8), 0);
-        row.addView(col, cl);
-        vpnGo = small("", v -> {
-            if (!WgVpn.hasProfile()) WgVpn.panel(this);
-            else if (WgVpn.on()) {
-                WgVpn.disconnect(this);
-                UiKit.makeToast(this, T.t("VPN off"), Toast.LENGTH_SHORT).show();
-            } else WgVpn.connect(this);
-        });
-        vpnGo.setTextSize(13);
-        row.addView(vpnGo);
-        return row;
-    }
-
     private void updateVpnBar() {
-        if (vpnTitle == null) return;
+        if (vpnIcon == null) return;
         boolean on = WgVpn.on();
         int tint = on ? VPN_GREEN : Ui.DIM;
-        vpnIcon.setImageDrawable(new UiKit.Icon(this, "lock", 18, tint));
-        vpnTitle.setTextColor(on ? VPN_GREEN : Ui.TEXT);
-        vpnTitle.setText("VPN" + (on ? " · " + T.t("On") : ""));
-        vpnSub.setText(WgVpn.status(this));
-        vpnGo.setText(T.t(!WgVpn.hasProfile() ? "Setup" : on ? "Disconnect" : "Connect"));
+        vpnIcon.setImageDrawable(new UiKit.Icon(this, "lock", 20, tint));
     }
 
     /** Phone: back · forward · home · tabs · menu at the bottom (like Chrome / Brave on phones). */
@@ -1910,7 +1884,14 @@ public class BrowserActivity extends AppCompatActivity {
     }
 
     private void updateVideos() {
-        videosBtn.setText(String.valueOf(found.size()));
+        if (videosBadge == null) return;
+        int count = found.size();
+        if (count > 0) {
+            videosBadge.setText(count > 99 ? "99+" : String.valueOf(count));
+            videosBadge.setVisibility(View.VISIBLE);
+        } else {
+            videosBadge.setVisibility(View.GONE);
+        }
     }
 
     private void showVideos() {
@@ -1922,7 +1903,7 @@ public class BrowserActivity extends AppCompatActivity {
         String[] names = new String[us.size()];
         for (int i = 0; i < names.length; i++) names[i] = found.get(us.get(i));
         new UiDialog(this).setTitle(T.t("Videos on this page"))
-                .setItems(names, (d, w) -> offer(us.get(w), found.get(us.get(w)))).show();
+                .setItems(names, (d, w) -> offer(us.get(w), found.get(us.get(us.indexOf(names[w])) != null ? us.get(w) : us.get(0)))).show();
     }
 
     // ---------- play / send ----------
