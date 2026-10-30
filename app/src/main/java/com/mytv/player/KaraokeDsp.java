@@ -23,6 +23,13 @@ public final class KaraokeDsp {
     public volatile float width = 1f;           // music stereo width 0…2
     public volatile float voiceLevel = 0.3f;    // MIX: guide voice left in
     public volatile float gainDb = 0f;          // output
+    public volatile float oversub = 1.4f;       // take extra voice out of the music (leftover singer)
+    public volatile float formant = 0.7f;       // extra pull in the speech band (300–3400 Hz)
+    public volatile float smear = 0.4f;         // catch reverb around the voice (neighbour bins)
+    public volatile float residual = 0.55f;     // second pass on leftover centre in the vocal range
+    public volatile float harmonics = 0.45f;    // lock onto the singer's pitch and its overtones
+    public volatile float smooth = 0.45f;       // time-smooth the mask (fewer artifacts)
+    public volatile float drums = 0.35f;        // keep centred snare / clap attacks in the music
     public volatile int mode = MUSIC;
 
     private final int rate;
@@ -37,6 +44,9 @@ public final class KaraokeDsp {
     private int qHead, qSize;
     private final Shelf bassL = new Shelf(), bassR = new Shelf(), trebL = new Shelf(), trebR = new Shelf();
     private float sBass = Float.NaN, sTreb = Float.NaN;
+    private final float[] prevMask = new float[N / 2 + 1], prevMag = new float[N / 2 + 1];
+    private final float[] mask = new float[N / 2 + 1], work = new float[N / 2 + 1];
+    private float smoothF0;
 
     public KaraokeDsp(int rate) {
         this.rate = rate;
@@ -59,6 +69,9 @@ public final class KaraokeDsp {
         qSize = 0;
         for (int i = 0; i < H; i++) push(0, 0, 0);
         fill = 0;
+        java.util.Arrays.fill(prevMask, 0);
+        java.util.Arrays.fill(prevMag, 0);
+        smoothF0 = 0;
         for (Shelf s : new Shelf[]{bassL, bassR, trebL, trebR}) s.z1 = s.z2 = 0;
     }
 
@@ -111,6 +124,12 @@ public final class KaraokeDsp {
         return t * t * (3 - 2 * t);
     }
 
+    /** Extra weight in the speech / singer formant band so leftover lyrics come out of the music. */
+    private float speech(float hz) {
+        float lo = smooth(hz, 250f, 400f), hi = 1f - smooth(hz, 3200f, 4200f);
+        return lo * hi;
+    }
+
     private void analyse() {
         for (int i = 0; i < N; i++) {
             re[i] = inL[i] * win[i];
@@ -118,27 +137,81 @@ public final class KaraokeDsp {
         }
         fft(re, im, false);      // L in the real part, R in the imaginary part → both spectra at once
         float s = strength, f = focus, binHz = rate / (float) N;
-        for (int k = 0; k <= N / 2; k++) {
+        float fo = formant, sm = smear, rs = residual, hm = harmonics, tm = smooth, dr = drums;
+        int bins = N / 2;
+        float bestF0 = 0, bestScore = 0;
+        for (int k = 0; k <= bins; k++) {
             int nk = (N - k) % N;
             float lr = (re[k] + re[nk]) * 0.5f, li = (im[k] - im[nk]) * 0.5f;
             float rr = (im[k] + im[nk]) * 0.5f, ri = (re[nk] - re[k]) * 0.5f;
             float bd = band(k * binHz);
-            if (bd <= 0f || s <= 0f) {             // outside the vocal range: nothing to take out
-                vr[k] = 0;
-                vi[k] = 0;
-                if (k > 0 && k < N / 2) {
-                    vr[N - k] = 0;
-                    vi[N - k] = 0;
-                }
-                continue;
-            }
             float ml = (float) Math.sqrt(lr * lr + li * li), mr = (float) Math.sqrt(rr * rr + ri * ri);
+            float mag = 0.5f * (ml + mr);
             float dx = lr - rr, dy = li - ri;
             float dl = (float) Math.sqrt(dx * dx + dy * dy);
             float c = ml + mr < 1e-6f ? 0 : Math.max(0, 1f - dl / (ml + mr));
+            float pMid = mag * mag, pSide = (dl * 0.5f) * (dl * 0.5f);
+            float wiener = pMid / (pMid + (0.6f + f * 0.25f) * pSide + 1e-12f);
             float cp = f == 2f ? c * c : f == 1f ? c : f == 3f ? c * c * c : f == 4f ? (c * c) * (c * c) : (float) Math.pow(c, f);
-            float gain = s * bd * cp;
-            float mre = (lr + rr) * 0.5f * gain, mim = (li + ri) * 0.5f * gain;
+            float sp = 1f + fo * 1.15f * speech(k * binHz);
+            float g = (bd <= 0f || s <= 0f) ? 0f : Math.min(1f, s * bd * cp * (float) Math.sqrt(Math.max(0, wiener)) * sp);
+            // centred snare / clap: a sudden jump across a bin is an attack, not a singer
+            if (dr > 0 && mag > prevMag[k] * 2.4f + 80f) g *= 1f - dr * 0.85f;
+            prevMag[k] = mag;
+            mask[k] = g;
+            float hz = k * binHz;
+            if (hz >= 80 && hz <= 380 && c > 0.55f && mag > bestScore) {
+                bestScore = mag;
+                bestF0 = hz;
+            }
+        }
+        if (bestF0 > 0) smoothF0 = smoothF0 <= 0 ? bestF0 : smoothF0 * 0.72f + bestF0 * 0.28f;
+        if (hm > 0 && smoothF0 >= 70) {
+            for (int h = 1; h <= 12; h++) {
+                float hz = smoothF0 * h;
+                if (hz > highCut) break;
+                int k = Math.round(hz / binHz);
+                if (k < 1 || k >= bins) continue;
+                float boost = hm * (h == 1 ? 0.55f : 0.38f / h) * band(hz);
+                mask[k] = Math.min(1f, mask[k] + boost);
+                if (k + 1 <= bins) mask[k + 1] = Math.min(1f, mask[k + 1] + boost * 0.45f);
+                if (k - 1 >= 0) mask[k - 1] = Math.min(1f, mask[k - 1] + boost * 0.45f);
+            }
+        }
+        // reverb lives in neighbouring bins — smear the mask so the tail comes out of the music too
+        if (sm > 0) {
+            work[0] = mask[0];
+            work[bins] = mask[bins];
+            for (int k = 1; k < bins; k++)
+                work[k] = mask[k] * (1f - sm) + sm * 0.5f * (mask[k - 1] + mask[k + 1]);
+            System.arraycopy(work, 0, mask, 0, bins + 1);
+        }
+        if (tm > 0) {
+            for (int k = 0; k <= bins; k++) {
+                mask[k] = prevMask[k] * tm + mask[k] * (1f - tm);
+                prevMask[k] = mask[k];
+            }
+        } else {
+            System.arraycopy(mask, 0, prevMask, 0, bins + 1);
+        }
+        for (int k = 0; k <= bins; k++) {
+            int nk = (N - k) % N;
+            float lr = (re[k] + re[nk]) * 0.5f, li = (im[k] - im[nk]) * 0.5f;
+            float rr = (im[k] + im[nk]) * 0.5f, ri = (re[nk] - re[k]) * 0.5f;
+            float g = mask[k];
+            float mre = (lr + rr) * 0.5f * g, mim = (li + ri) * 0.5f * g;
+            if (rs > 0 && g < 0.92f) {
+                float lr2 = lr - mre, li2 = li - mim, rr2 = rr - mre, ri2 = ri - mim;
+                float ml = (float) Math.sqrt(lr2 * lr2 + li2 * li2), mr = (float) Math.sqrt(rr2 * rr2 + ri2 * ri2);
+                float dx = lr2 - rr2, dy = li2 - ri2;
+                float dl = (float) Math.sqrt(dx * dx + dy * dy);
+                float c2 = ml + mr < 1e-6f ? 0 : Math.max(0, 1f - dl / (ml + mr));
+                float extra = rs * band(k * binHz) * c2 * c2 * (1f + 0.6f * speech(k * binHz));
+                if (extra > 0) {
+                    mre += (lr2 + rr2) * 0.5f * extra;
+                    mim += (li2 + ri2) * 0.5f * extra;
+                }
+            }
             vr[k] = mre;
             vi[k] = mim;
             if (k > 0 && k < N / 2) {
@@ -175,7 +248,8 @@ public final class KaraokeDsp {
             ol = v;
             or = v;
         } else {
-            float ml = l - v, mr = r - v;
+            float os = Math.max(1f, oversub);
+            float ml = l - v * os, mr = r - v * os;
             if (width != 1f) {
                 float mm = (ml + mr) * 0.5f, ms = (ml - mr) * 0.5f * width;
                 ml = mm + ms;
@@ -236,8 +310,9 @@ public final class KaraokeDsp {
             float l = qL[qHead], r = qR[qHead], v = qV[qHead];
             qHead = (qHead + 1) % qL.length;
             qSize--;
+            float os = Math.max(1f, oversub);
             pv = Math.max(pv, Math.abs(v));
-            pm = Math.max(pm, Math.max(Math.abs(l - v), Math.abs(r - v)));
+            pm = Math.max(pm, Math.max(Math.abs(l - v * os), Math.abs(r - v * os)));
         }
         out2[0] = pv / 32768f;
         out2[1] = pm / 32768f;
