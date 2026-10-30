@@ -96,11 +96,12 @@ public class BrowserActivity extends AppCompatActivity {
         Shield.init(this);
         final boolean narrow = getResources().getConfiguration().screenWidthDp < 600 && !tv;
 
-        // ---- top: address bar (Chrome / Brave / Edge style)
+        // ---- top: VPN, then the address bar
+        col.addView(buildVpnBar());
         LinearLayout tb = new LinearLayout(this);
         tb.setGravity(Gravity.CENTER_VERTICAL);
         int p = Ui.dp(this, 8);
-        tb.setPadding(p, p + Ui.dp(this, tv ? 4 : 14), p, p);
+        tb.setPadding(p, Ui.dp(this, 4), p, p);
         tb.setBackgroundColor(Ui.BAR);
         if (!narrow) {
             tb.addView(navBtn("arrow-left", v -> { if (web.canGoBack()) web.goBack(); }));
@@ -227,6 +228,8 @@ public class BrowserActivity extends AppCompatActivity {
         }
         else home();
         if (tv) web.requestFocus();
+        WgVpn.onChange = () -> main.post(this::updateVpnBar);
+        updateVpnBar();
         buildEqFab();
         // equalizer changes (also from the equalizer screen) apply to the pages live
         MusicFx.onChange = () -> main.post(() -> {
@@ -1161,8 +1164,9 @@ public class BrowserActivity extends AppCompatActivity {
     // modern browser chrome
     // =====================================================================
     private static final int SHIELD_ORANGE = 0xFFFB542B;
-    private ImageView siteIcon, reloadBtn, shieldIcon;
-    private TextView shieldBadge, findCount;
+    private ImageView siteIcon, reloadBtn, shieldIcon, vpnIcon;
+    private TextView shieldBadge, findCount, vpnTitle, vpnSub;
+    private Button vpnGo;
     private volatile boolean pageLoading;
     private final java.util.Map<WebView, String> hosts = java.util.Collections.synchronizedMap(new java.util.WeakHashMap<WebView, String>());
     private final java.util.Map<WebView, Integer> pageBlocked = java.util.Collections.synchronizedMap(new java.util.WeakHashMap<WebView, Integer>());
@@ -1196,6 +1200,56 @@ public class BrowserActivity extends AppCompatActivity {
         b.setBackground(in);
         b.setOnClickListener(v -> showTabs());
         return b;
+    }
+
+    private static final int VPN_GREEN = 0xFF10B981;
+
+    private LinearLayout buildVpnBar() {
+        LinearLayout row = new LinearLayout(this);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        int p = Ui.dp(this, 8);
+        row.setPadding(p, p + Ui.dp(this, tv ? 4 : 10), p, Ui.dp(this, 2));
+        row.setBackgroundColor(Ui.BAR);
+        row.setClickable(true);
+        row.setFocusable(true);
+        row.setOnClickListener(v -> WgVpn.panel(this));
+        vpnIcon = new ImageView(this);
+        vpnIcon.setScaleType(ImageView.ScaleType.CENTER);
+        vpnIcon.setContentDescription("VPN");
+        row.addView(vpnIcon, new LinearLayout.LayoutParams(Ui.dp(this, 36), Ui.dp(this, 36)));
+        LinearLayout col = new LinearLayout(this);
+        col.setOrientation(LinearLayout.VERTICAL);
+        vpnTitle = Ui.text(this, 13, Ui.TEXT, true);
+        vpnTitle.setText("VPN");
+        vpnSub = Ui.text(this, 11, Ui.DIM, false);
+        vpnSub.setSingleLine(true);
+        vpnSub.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        col.addView(vpnTitle);
+        col.addView(vpnSub);
+        LinearLayout.LayoutParams cl = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
+        cl.setMargins(Ui.dp(this, 8), 0, Ui.dp(this, 8), 0);
+        row.addView(col, cl);
+        vpnGo = small("", v -> {
+            if (!WgVpn.hasProfile()) WgVpn.panel(this);
+            else if (WgVpn.on()) {
+                WgVpn.disconnect(this);
+                UiKit.makeToast(this, T.t("VPN off"), Toast.LENGTH_SHORT).show();
+            } else WgVpn.connect(this);
+        });
+        vpnGo.setTextSize(13);
+        row.addView(vpnGo);
+        return row;
+    }
+
+    private void updateVpnBar() {
+        if (vpnTitle == null) return;
+        boolean on = WgVpn.on();
+        int tint = on ? VPN_GREEN : Ui.DIM;
+        vpnIcon.setImageDrawable(new UiKit.Icon(this, "lock", 18, tint));
+        vpnTitle.setTextColor(on ? VPN_GREEN : Ui.TEXT);
+        vpnTitle.setText("VPN" + (on ? " · " + T.t("On") : ""));
+        vpnSub.setText(WgVpn.status(this));
+        vpnGo.setText(T.t(!WgVpn.hasProfile() ? "Setup" : on ? "Disconnect" : "Connect"));
     }
 
     /** Phone: back · forward · home · tabs · menu at the bottom (like Chrome / Brave on phones). */
@@ -1413,7 +1467,7 @@ public class BrowserActivity extends AppCompatActivity {
                 {"house", T.t("Exit browser"), (Runnable) () -> Ui.goHome(this, tv)}};
         // ---- quick buttons on top, then grouped settings-style rows (like Brave)
         LinearLayout quick = new LinearLayout(this);
-        for (int i : new int[]{0, 20, 6, 8, 2}) {
+        for (int i : new int[]{0, 1, 20, 6, 8}) {
             final Runnable run = (Runnable) it[i][2];
             LinearLayout c = new LinearLayout(this);
             c.setOrientation(LinearLayout.VERTICAL);
@@ -1422,9 +1476,13 @@ public class BrowserActivity extends AppCompatActivity {
             c.setBackground(Ui.focusCard(this, 16));
             c.setFocusable(true);
             c.setClickable(true);
-            c.addView(UiKit.icon(this, (String) it[i][0], 22, Ui.ACCENT), new LinearLayout.LayoutParams(Ui.dp(this, 28), Ui.dp(this, 28)));
+            int ic = (i == 1 && priv) ? SHIELD_ORANGE : Ui.ACCENT;
+            c.addView(UiKit.icon(this, (String) it[i][0], 22, ic), new LinearLayout.LayoutParams(Ui.dp(this, 28), Ui.dp(this, 28)));
             TextView t = Ui.text(this, 11, Ui.TEXT, false);
-            t.setText(i == 20 ? T.t("Tabs") + " (" + tabs.size() + ")" : (String) it[i][1]);
+            String label = (String) it[i][1];
+            if (i == 20) label = T.t("Tabs") + " (" + tabs.size() + ")";
+            else if (i == 1) label = T.t(priv ? "Private: On" : "Private tab");
+            t.setText(label);
             t.setGravity(Gravity.CENTER);
             t.setSingleLine(true);
             t.setPadding(Ui.dp(this, 2), Ui.dp(this, 4), Ui.dp(this, 2), 0);
@@ -1432,6 +1490,7 @@ public class BrowserActivity extends AppCompatActivity {
             c.setOnClickListener(v -> {
                 d.dismiss();
                 run.run();
+                if (i == 1) main.postDelayed(this::menu, 120);
             });
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
             lp.setMargins(Ui.dp(this, 3), 0, Ui.dp(this, 3), 0);
@@ -2393,7 +2452,10 @@ public class BrowserActivity extends AppCompatActivity {
     @Override
     protected void onActivityResult(int req, int res, android.content.Intent data) {
         super.onActivityResult(req, res, data);
-        if (WgVpn.onResult(this, req, res, data)) return;
+        if (WgVpn.onResult(this, req, res, data)) {
+            updateVpnBar();
+            return;
+        }
         if (req == 73) {
             if (res == RESULT_OK && data != null && data.getData() != null) {
                 try {
@@ -2416,6 +2478,12 @@ public class BrowserActivity extends AppCompatActivity {
         if (u == null) return;
         if (data.getBooleanExtra(BrowserLibraryActivity.RESULT_NEW_TAB, false)) newTab(u);
         else go(u);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        updateVpnBar();
     }
 
     @Override
@@ -2521,6 +2589,7 @@ public class BrowserActivity extends AppCompatActivity {
         if (isFinishing()) sleepAt = 0;                 // closed by hand: nothing left to close later
         saveTabs();
         MusicFx.onChange = null;
+        WgVpn.onChange = null;
         BrowserPlayService.control = null;
         BrowserPlayService.stop(this);
 

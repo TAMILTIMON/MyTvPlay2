@@ -501,6 +501,8 @@ public final class T {
         HI.put("Connect", "कनेक्ट");
         TA.put("Disconnect", "துண்டி");
         HI.put("Disconnect", "डिस्कनेक्ट");
+        TA.put("Setup", "அமை");
+        HI.put("Setup", "सेटअप");
         TA.put("VPN on", "VPN இயக்கத்தில்");
         HI.put("VPN on", "VPN चालू");
         TA.put("VPN off", "VPN நிறுத்தப்பட்டது");

@@ -38,8 +38,16 @@ public final class WgVpn {
 
         public void onStateChange(Tunnel.State s) {
             state = s;
+            fire();
         }
     };
+    /** Browser / remote refresh the VPN line when the tunnel goes up or down. */
+    static volatile Runnable onChange;
+
+    private static void fire() {
+        Runnable r = onChange;
+        if (r != null) r.run();
+    }
 
     private static synchronized Backend backend(Context c) {
         if (backend == null) backend = new GoBackend(c.getApplicationContext());
@@ -194,7 +202,10 @@ public final class WgVpn {
                 msg = T.t("VPN didn't connect") + ": " + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage());
             }
             final String m = msg;
-            h.post(() -> UiKit.makeToast(a, m, Toast.LENGTH_LONG).show());
+            h.post(() -> {
+                UiKit.makeToast(a, m, Toast.LENGTH_LONG).show();
+                fire();
+            });
         }).start();
     }
 
@@ -205,6 +216,7 @@ public final class WgVpn {
             } catch (Throwable ignored) {
                 state = Tunnel.State.DOWN;
             }
+            fire();
         }).start();
     }
 
