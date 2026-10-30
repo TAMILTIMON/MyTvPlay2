@@ -12,7 +12,6 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
-import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
@@ -35,7 +34,7 @@ import java.util.Locale;
  * listen live to any of them (instant A/B), adjust filters and EQ while it plays, then save the full song.
  */
 public class KaraokeActivity extends AppCompatActivity {
-    public static final String EXTRA_URI = "uri", EXTRA_TITLE = "title", EXTRA_PROJECT = "project";
+    public static final String EXTRA_URI = "uri", EXTRA_TITLE = "title";
     private static final int PEAKS = 4000;
 
     private final Handler main = new Handler(Looper.getMainLooper());
@@ -47,14 +46,11 @@ public class KaraokeActivity extends AppCompatActivity {
     private boolean mono;
 
     private WaveView wave;
-    private WaveView.Lane laneO, laneV, laneM, laneX;
+    private WaveView.Lane laneO, laneV, laneM;
     private TextView status, timeT;
     private ProgressBar prog;
     private Button playBtn, abBtn;
     private final Button[] modeBtns = new Button[4];
-    private final ImageView[] lanePlay = new ImageView[4];
-    private KaraokeProjects.P project;
-    private boolean keepPcm;
     private final KaraokeDsp live = new KaraokeDsp(44100);   // replaced after decoding with the real rate
     private KaraokeDsp dsp;
     private volatile boolean playing, ready;
@@ -71,25 +67,15 @@ public class KaraokeActivity extends AppCompatActivity {
     protected void onCreate(Bundle b) {
         Ui.apply(this);
         super.onCreate(b);
-        String pid = getIntent().getStringExtra(EXTRA_PROJECT);
-        if (pid != null) {
-            for (KaraokeProjects.P x : KaraokeProjects.list(this)) if (pid.equals(x.id)) project = x;
-        }
-        if (project != null) {
-            songTitle = project.title;
-            uri = project.uri.isEmpty() ? Uri.parse("file://project") : Uri.parse(project.uri);
-        } else {
-            String u = getIntent().getStringExtra(EXTRA_URI);
-            uri = u == null ? Uri.parse("") : Uri.parse(u);
-            songTitle = getIntent().getStringExtra(EXTRA_TITLE);
-        }
+        uri = Uri.parse(getIntent().getStringExtra(EXTRA_URI));
+        songTitle = getIntent().getStringExtra(EXTRA_TITLE);
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(0xFF0B0B0F);
         root.setPadding(dp(12), dp(14), dp(12), 0);
         LinearLayout top = new LinearLayout(this);
         top.setGravity(Gravity.CENTER_VERTICAL);
-        top.addView(UiKit.darkButton(this, "arrow-left", 42, false, v -> confirmClose()));
+        top.addView(UiKit.darkButton(this, "arrow-left", 42, false, v -> finish()));
         LinearLayout tt = new LinearLayout(this);
         tt.setOrientation(LinearLayout.VERTICAL);
         tt.setPadding(dp(10), 0, 0, 0);
@@ -102,10 +88,6 @@ public class KaraokeActivity extends AppCompatActivity {
         tt.addView(t1);
         tt.addView(t2);
         top.addView(tt, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
-        top.addView(UiKit.darkButton(this, "save", 42, false, v -> saveProject(false)));
-        View sp = new View(this);
-        top.addView(sp, new LinearLayout.LayoutParams(dp(6), 1));
-        top.addView(UiKit.darkButton(this, "folder", 42, false, v -> saveProject(true)));
         root.addView(top);
 
         ScrollView sv = new ScrollView(this);
@@ -121,35 +103,14 @@ public class KaraokeActivity extends AppCompatActivity {
         prog.setMax(1000);
         p.addView(prog);
 
-        // layers + play/pause on the left of the graph
+        // three layers
         wave = new WaveView(this);
         laneO = wave.lane(T.t("ORIGINAL"), 0xE6FFFFFF);
-        laneV = wave.lane(T.t("VOICE"), 0xFFF472B6);
-        laneM = wave.lane(T.t("KARAOKE"), 0xFF22D3EE);
-        laneX = wave.lane(T.t("MIX"), 0xFFA78BFA);
+        laneV = wave.lane(T.t("VOICE (taken out)"), 0xFFF472B6);
+        laneM = wave.lane(T.t("MUSIC (karaoke)"), 0xFF22D3EE);
         wave.message = T.t("Reading the song…");
         wave.onSeek = ms -> seekTo(ms * rate / 1000);
-        LinearLayout graph = new LinearLayout(this);
-        graph.setGravity(Gravity.CENTER_VERTICAL);
-        LinearLayout plays = new LinearLayout(this);
-        plays.setOrientation(LinearLayout.VERTICAL);
-        View rulerPad = new View(this);
-        plays.addView(rulerPad, new LinearLayout.LayoutParams(dp(48), dp(14)));
-        int[] laneModes = {KaraokeDsp.ORIGINAL, KaraokeDsp.VOICE, KaraokeDsp.MUSIC, KaraokeDsp.MIX};
-        int[] laneTint = {0xE6FFFFFF, 0xFFF472B6, 0xFF22D3EE, 0xFFA78BFA};
-        String[] laneHint = {T.t("Original"), T.t("Voice only"), T.t("Karaoke"), T.t("Mix")};
-        for (int i = 0; i < 4; i++) {
-            final int m = laneModes[i];
-            ImageView b = UiKit.darkButton(this, "play", 44, false, v -> playLane(m));
-            b.setContentDescription(laneHint[i]);
-            b.setColorFilter(laneTint[i]);
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(48), 0, 1);
-            plays.addView(b, lp);
-            lanePlay[i] = b;
-        }
-        graph.addView(plays, new LinearLayout.LayoutParams(dp(52), dp(280)));
-        graph.addView(wave, new LinearLayout.LayoutParams(0, dp(280), 1));
-        p.addView(graph);
+        p.addView(wave, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(240)));
         LinearLayout zr = new LinearLayout(this);
         zr.setGravity(Gravity.CENTER_VERTICAL);
         zr.addView(UiKit.icon(this, "search", 18, 0xB3FFFFFF));
@@ -210,9 +171,7 @@ public class KaraokeActivity extends AppCompatActivity {
         hs.setHorizontalScrollBarEnabled(false);
         LinearLayout pr = new LinearLayout(this);
         hs.addView(pr);
-        String[] pn = {"Standard", "Strong", "Maximum clarity", "Gentle", "Male voice", "Female voice",
-                "Keep backing vocals", "Keep bass & drums", "Studio mix", "Live / reverb", "Duet", "Rap / spoken",
-                "Choir / group", "Whisper / quiet", "Karaoke TV"};
+        String[] pn = {"Standard", "Strong", "Gentle", "Male voice", "Female voice", "Keep backing vocals", "Keep bass & drums"};
         for (int i = 0; i < pn.length; i++) {
             final int k = i;
             Button c = new Button(this);
@@ -237,28 +196,15 @@ public class KaraokeActivity extends AppCompatActivity {
         p.addView(adj);
         buildSliders();
 
-        // export + project
+        // export
         p.addView(section(T.t("Save (whole song)")));
         LinearLayout ex = new LinearLayout(this);
         ex.addView(exportBtn(T.t("Karaoke"), KaraokeDsp.MUSIC, true));
         ex.addView(exportBtn(T.t("Voice only"), KaraokeDsp.VOICE, false));
         ex.addView(exportBtn(T.t("Mix"), KaraokeDsp.MIX, false));
         p.addView(ex);
-        LinearLayout ex2 = new LinearLayout(this);
-        ex2.setPadding(0, dp(8), 0, 0);
-        Button saveP = Ui.button(this, T.t("Save project"), false);
-        saveP.setTextSize(13);
-        saveP.setOnClickListener(v -> saveProject(false));
-        Button closeP = Ui.button(this, T.t("Save & close"), true);
-        closeP.setTextSize(13);
-        closeP.setOnClickListener(v -> saveProject(true));
-        LinearLayout.LayoutParams el = new LinearLayout.LayoutParams(0, dp(46), 1);
-        el.setMargins(dp(3), 0, dp(3), 0);
-        ex2.addView(saveP, el);
-        ex2.addView(closeP, el);
-        p.addView(ex2);
         TextView note = Ui.text(this, 11, 0x80FFFFFF, false);
-        note.setText(T.t("Play buttons on the left of the graph listen to Original, Voice, Karaoke or Mix. If the singer is still in the karaoke track, raise Leftover vocals and Speech band, try Maximum clarity or Live / reverb, then listen to Voice only to check. Save project keeps the song and your settings so you can close and finish later. Centre-panned instruments (snare, some synths) can follow the voice a little — Protect drums and Centre focus help."));
+        note.setText(T.t("How it works: for every frequency the song is checked for sound that is the same in the left and right speaker (the lead singer usually is) and inside the vocal range. That part is the Voice layer; Music = Original − Voice. Instruments panned to one side, bass below the low cut and cymbals above the high cut stay in the music. Live or mono recordings, and songs with reverb on the voice, leave some voice behind — listen with Voice only to check."));
         note.setPadding(dp(2), dp(12), dp(2), 0);
         p.addView(note);
 
@@ -345,17 +291,9 @@ public class KaraokeActivity extends AppCompatActivity {
 
     // current values (copied into the live engine)
     private float sStrength = 1f, sLow = 120f, sHigh = 8000f, sFocus = 2f, sBass = 0f, sTreble = 0f, sWidth = 1f, sVoice = 0.3f, sGain = 0f;
-    private float sOver = 1.4f, sFormant = 0.7f, sSmear = 0.4f, sResid = 0.55f, sHarm = 0.45f, sSmooth = 0.45f, sDrums = 0.35f;
 
     private void buildSliders() {
         slider(T.t("Vocal removal"), 0f, 1f, "%", () -> sStrength, v -> sStrength = v, false);
-        slider(T.t("Leftover vocals"), 1f, 2.2f, "x", () -> sOver, v -> sOver = v, false);
-        slider(T.t("Speech band"), 0f, 1.5f, "%", () -> sFormant, v -> sFormant = v, false);
-        slider(T.t("Reverb catch"), 0f, 1f, "%", () -> sSmear, v -> sSmear = v, false);
-        slider(T.t("Second pass"), 0f, 1f, "%", () -> sResid, v -> sResid = v, false);
-        slider(T.t("Pitch lock"), 0f, 1f, "%", () -> sHarm, v -> sHarm = v, false);
-        slider(T.t("Smooth mask"), 0f, 0.85f, "%", () -> sSmooth, v -> sSmooth = v, false);
-        slider(T.t("Protect drums"), 0f, 1f, "%", () -> sDrums, v -> sDrums = v, false);
         slider(T.t("Vocal range from"), 60f, 500f, "Hz", () -> sLow, v -> sLow = v, true);
         slider(T.t("Vocal range to"), 2500f, 16000f, "Hz", () -> sHigh, v -> sHigh = v, true);
         slider(T.t("Centre focus"), 1f, 4f, "x", () -> sFocus, v -> sFocus = v, false);
@@ -376,13 +314,6 @@ public class KaraokeActivity extends AppCompatActivity {
         d.width = sWidth;
         d.voiceLevel = sVoice;
         d.gainDb = sGain;
-        d.oversub = sOver;
-        d.formant = sFormant;
-        d.smear = sSmear;
-        d.residual = sResid;
-        d.harmonics = sHarm;
-        d.smooth = sSmooth;
-        d.drums = sDrums;
     }
 
     private void applySettings() {
@@ -390,30 +321,15 @@ public class KaraokeActivity extends AppCompatActivity {
     }
 
     private void loadSettings() {
-        if (project != null) {
-            sStrength = project.strength; sLow = project.low; sHigh = project.high; sFocus = project.focus;
-            sBass = project.bass; sTreble = project.treble; sWidth = project.width; sVoice = project.voice;
-            sGain = project.gain; sOver = project.oversub; sFormant = project.formant; sSmear = project.smear;
-            sResid = project.residual; sHarm = project.harmonics; sSmooth = project.smooth; sDrums = project.drums;
-            live.mode = project.mode;
-        } else {
-            sStrength = Store.getInt("k_str", 100) / 100f;
-            sLow = Store.getInt("k_low", 120);
-            sHigh = Store.getInt("k_high", 8000);
-            sFocus = Store.getInt("k_focus", 20) / 10f;
-            sBass = Store.getInt("k_bass", 0) / 10f;
-            sTreble = Store.getInt("k_treb", 0) / 10f;
-            sWidth = Store.getInt("k_width", 100) / 100f;
-            sVoice = Store.getInt("k_voice", 30) / 100f;
-            sGain = Store.getInt("k_gain", 0) / 10f;
-            sOver = Store.getInt("k_over", 140) / 100f;
-            sFormant = Store.getInt("k_form", 70) / 100f;
-            sSmear = Store.getInt("k_smear", 40) / 100f;
-            sResid = Store.getInt("k_resid", 55) / 100f;
-            sHarm = Store.getInt("k_harm", 45) / 100f;
-            sSmooth = Store.getInt("k_sm", 45) / 100f;
-            sDrums = Store.getInt("k_drum", 35) / 100f;
-        }
+        sStrength = Store.getInt("k_str", 100) / 100f;
+        sLow = Store.getInt("k_low", 120);
+        sHigh = Store.getInt("k_high", 8000);
+        sFocus = Store.getInt("k_focus", 20) / 10f;
+        sBass = Store.getInt("k_bass", 0) / 10f;
+        sTreble = Store.getInt("k_treb", 0) / 10f;
+        sWidth = Store.getInt("k_width", 100) / 100f;
+        sVoice = Store.getInt("k_voice", 30) / 100f;
+        sGain = Store.getInt("k_gain", 0) / 10f;
         for (Runnable r : sliderRefresh) r.run();
         applySettings();
     }
@@ -428,52 +344,17 @@ public class KaraokeActivity extends AppCompatActivity {
         Store.putInt("k_width", Math.round(sWidth * 100));
         Store.putInt("k_voice", Math.round(sVoice * 100));
         Store.putInt("k_gain", Math.round(sGain * 10));
-        Store.putInt("k_over", Math.round(sOver * 100));
-        Store.putInt("k_form", Math.round(sFormant * 100));
-        Store.putInt("k_smear", Math.round(sSmear * 100));
-        Store.putInt("k_resid", Math.round(sResid * 100));
-        Store.putInt("k_harm", Math.round(sHarm * 100));
-        Store.putInt("k_sm", Math.round(sSmooth * 100));
-        Store.putInt("k_drum", Math.round(sDrums * 100));
-    }
-
-    private void defaults() {
-        sStrength = 1f; sLow = 120f; sHigh = 8000f; sFocus = 2f; sBass = 0f; sTreble = 0f; sWidth = 1f; sGain = 0f;
-        sOver = 1.4f; sFormant = 0.7f; sSmear = 0.4f; sResid = 0.55f; sHarm = 0.45f; sSmooth = 0.45f; sDrums = 0.35f;
     }
 
     private void preset(int k) {
-        defaults();
+        sStrength = 1f; sLow = 120f; sHigh = 8000f; sFocus = 2f; sBass = 0f; sTreble = 0f; sWidth = 1f; sGain = 0f;
         switch (k) {
-            case 1: // Strong
-                sFocus = 1.35f; sLow = 90f; sHigh = 11000f; sOver = 1.7f; sFormant = 1.0f; sResid = 0.75f; break;
-            case 2: // Maximum clarity
-                sFocus = 1.15f; sLow = 80f; sHigh = 12000f; sOver = 1.95f; sFormant = 1.25f; sSmear = 0.65f;
-                sResid = 0.85f; sHarm = 0.7f; sSmooth = 0.35f; sDrums = 0.2f; break;
-            case 3: // Gentle
-                sStrength = 0.75f; sFocus = 3f; sOver = 1.15f; sFormant = 0.35f; sResid = 0.25f; break;
-            case 4: // Male
-                sLow = 80f; sHigh = 6000f; sFormant = 0.85f; sHarm = 0.6f; break;
-            case 5: // Female
-                sLow = 170f; sHigh = 10000f; sFormant = 0.95f; sHarm = 0.55f; break;
-            case 6: // keep backing vocals
-                sFocus = 3.6f; sStrength = 0.88f; sOver = 1.2f; sSmear = 0.15f; break;
-            case 7: // keep bass & drums
-                sLow = 220f; sHigh = 6500f; sBass = 3f; sDrums = 0.85f; sOver = 1.35f; break;
-            case 8: // Studio
-                sFocus = 2.4f; sOver = 1.5f; sSmear = 0.2f; sHarm = 0.5f; sDrums = 0.45f; sWidth = 1.15f; break;
-            case 9: // Live / reverb
-                sFocus = 1.25f; sOver = 1.85f; sSmear = 0.8f; sResid = 0.8f; sFormant = 1.1f; sSmooth = 0.55f; break;
-            case 10: // Duet
-                sFocus = 1.5f; sOver = 1.55f; sFormant = 0.9f; sHarm = 0.3f; break;
-            case 11: // Rap / spoken
-                sLow = 80f; sHigh = 5000f; sFormant = 1.3f; sOver = 1.75f; sHarm = 0.25f; sSmear = 0.25f; break;
-            case 12: // Choir
-                sFocus = 1.2f; sOver = 1.6f; sSmear = 0.55f; sHarm = 0.2f; sFormant = 0.8f; break;
-            case 13: // Whisper
-                sStrength = 1f; sFocus = 1.1f; sOver = 2.0f; sFormant = 1.35f; sResid = 0.9f; sLow = 100f; break;
-            case 14: // Karaoke TV
-                sOver = 1.65f; sFormant = 1.0f; sWidth = 1.25f; sBass = 2f; sTreble = 1.5f; sVoice = 0.18f; break;
+            case 1: sFocus = 1.2f; sLow = 90f; sHigh = 11000f; break;              // Strong
+            case 2: sStrength = 0.75f; sFocus = 3f; break;                         // Gentle
+            case 3: sLow = 80f; sHigh = 6000f; break;                              // Male voice
+            case 4: sLow = 170f; sHigh = 10000f; break;                            // Female voice
+            case 5: sFocus = 4f; sStrength = 0.9f; break;                          // keep backing vocals (wider)
+            case 6: sLow = 220f; sHigh = 6500f; sBass = 3f; break;                 // keep bass & drums
             default: break;
         }
         for (Runnable r : sliderRefresh) r.run();
@@ -484,35 +365,6 @@ public class KaraokeActivity extends AppCompatActivity {
 
     // ------------------------------------------------------------------ decoding once
     private void prepare() {
-        if (project != null && project.pcm().exists()) {
-            status.setText(T.t("Opening saved project…"));
-            new Thread(() -> {
-                pcm = project.pcm();
-                keepPcm = true;
-                rate = project.rate;
-                frames = project.frames;
-                mono = project.mono;
-                final float[] peaks = peaksFromPcm();
-                main.post(() -> {
-                    dsp = new KaraokeDsp(rate);
-                    apply(dsp);
-                    dsp.mode = project.mode;
-                    laneO.peaks = peaks;
-                    wave.durMs = Math.max(1, frames * 1000 / Math.max(1, rate));
-                    wave.message = null;
-                    wave.invalidate();
-                    ready = true;
-                    playFrame = Math.max(0, Math.min(frames, project.playFrame));
-                    wave.setPlay(cur() * 1000 / Math.max(1, rate));
-                    updateTime();
-                    status.setText(mono ? T.t("This song is mono (one channel): the voice can't be separated from the music.")
-                            : T.t("Working out the voice and music layers…"));
-                    refreshButtons();
-                    recomputeLayers();
-                });
-            }).start();
-            return;
-        }
         status.setText(T.t("Reading the song…"));
         new Thread(() -> {
             try {
