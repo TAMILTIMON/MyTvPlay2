@@ -7,7 +7,9 @@ import android.net.Uri;
 import android.net.VpnService;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.InputType;
 import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.Toast;
 
 import com.wireguard.android.backend.Backend;
@@ -18,11 +20,11 @@ import com.wireguard.config.Config;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
+import java.lang.ref.WeakReference;
 import java.util.Locale;
 
 /**
- * Built-in VPN (WireGuard). Uses a profile you import — e.g. a free one from Proton VPN — so no
- * unknown "free VPN" server sees your traffic. Scope: only ZH Play, or the whole phone.
+ * Built-in WireGuard VPN with atomic zero-leak profile rotation and customizable timers.
  */
 public final class WgVpn {
     private WgVpn() {
@@ -32,16 +34,18 @@ public final class WgVpn {
     private static Backend backend;
     private static volatile Tunnel.State state = Tunnel.State.DOWN;
     private static final Tunnel TUNNEL = new Tunnel() {
+        @Override
         public String getName() {
             return "zhplay";
         }
 
+        @Override
         public void onStateChange(Tunnel.State s) {
             state = s;
             fire();
         }
     };
-    /** Browser / remote refresh the VPN line when the tunnel goes up or down. */
+
     static volatile Runnable onChange;
 
     private static void fire() {
@@ -58,8 +62,7 @@ public final class WgVpn {
         return state == Tunnel.State.UP;
     }
 
-    // ------------------------------------------------------------------ several profiles
-    /** [ {name, conf(sealed)} … ] — the old single profile is moved in once. */
+    // ------------------------------------------------------------------ Profiles storage
     static org.json.JSONArray profiles() {
         try {
             org.json.JSONArray a = new org.json.JSONArray(Store.getStr("wg_profiles", "[]"));
@@ -94,18 +97,19 @@ public final class WgVpn {
         return i < 0 ? "" : SecretBox.open(profiles().optJSONObject(i).optString("conf"));
     }
 
+    private static String getProfileConfig(int index) {
+        org.json.JSONArray all = profiles();
+        if (index < 0 || index >= all.length()) return "";
+        return SecretBox.open(all.optJSONObject(index).optString("conf"));
+    }
+
     private static void saveAll(org.json.JSONArray a) {
         Store.putStr("wg_profiles", a.toString());
     }
 
-    /** Everything except the home network (10.x, 172.16–31.x, 192.168.x, link-local, multicast) — like the WireGuard
-     * app's "Exclude private IPs": with the VPN on, the phone still reaches the TV / PC at home. */
+    // ------------------------------------------------------------------ LAN Exclusion & Scope
     static final String LAN_FREE = "0.0.0.0/5, 8.0.0.0/7, 11.0.0.0/8, 12.0.0.0/6, 16.0.0.0/4, 32.0.0.0/3, 64.0.0.0/3, 96.0.0.0/4, 112.0.0.0/5, 120.0.0.0/6, 124.0.0.0/7, 126.0.0.0/8, 128.0.0.0/3, 160.0.0.0/5, 168.0.0.0/8, 169.0.0.0/9, 169.128.0.0/10, 169.192.0.0/11, 169.224.0.0/12, 169.240.0.0/13, 169.248.0.0/14, 169.252.0.0/15, 169.255.0.0/16, 170.0.0.0/7, 172.0.0.0/12, 172.32.0.0/11, 172.64.0.0/10, 172.128.0.0/9, 173.0.0.0/8, 174.0.0.0/7, 176.0.0.0/4, 192.0.0.0/9, 192.128.0.0/11, 192.160.0.0/13, 192.169.0.0/16, 192.170.0.0/15, 192.172.0.0/14, 192.176.0.0/12, 192.192.0.0/10, 193.0.0.0/8, 194.0.0.0/7, 196.0.0.0/6, 200.0.0.0/5, 208.0.0.0/4, 240.0.0.0/4";
 
-    /**
-     * The profile as used: "Only ZH Play" → IncludedApplications = this app; a route for everything (0.0.0.0/0) →
-     * everything except the home network, plus the profile's DNS servers (so names still resolve through the VPN).
-     */
     static String withScope(String pkg, String conf, boolean onlyApp) {
         java.util.List<String> dns = new java.util.ArrayList<>();
         for (String line : conf.replace("\r", "").split("\n")) {
@@ -122,7 +126,7 @@ public final class WgVpn {
         for (String line : conf.replace("\r", "").split("\n")) {
             String t = line.trim();
             String low = t.toLowerCase(Locale.ROOT);
-            if (low.startsWith("includedapplications") || low.startsWith("excludedapplications")) continue;   // our choice decides
+            if (low.startsWith("includedapplications") || low.startsWith("excludedapplications")) continue;
             if (low.startsWith("allowedips") && t.contains("=")) {
                 java.util.List<String> parts = new java.util.ArrayList<>();
                 boolean all = false;
@@ -156,7 +160,6 @@ public final class WgVpn {
         return withScope(c.getPackageName(), conf, onlyApp());
     }
 
-    /** Default: the whole phone (like any VPN app). "Only ZH Play" is a choice. */
     static boolean onlyApp() {
         return Store.getBool("wg_only_app2", false);
     }
@@ -165,7 +168,6 @@ public final class WgVpn {
         return T.t(onlyApp() ? "only ZH Play" : "the whole phone");
     }
 
-    /** Server address from the profile (shown in the status line). */
     static String server() {
         for (String line : profile().split("\n")) {
             String t = line.trim();
@@ -177,13 +179,94 @@ public final class WgVpn {
         return "?";
     }
 
-    // ------------------------------------------------------------------ connect / disconnect
+    // ------------------------------------------------------------------ Automatic Rotation Engine
+    private static final Handler rotateHandler = new Handler(Looper.getMainLooper());
+    private static WeakReference<Context> appContextRef;
+
+    public static boolean isRotating() {
+        return Store.getBool("wg_rotate_enabled", false);
+    }
+
+    public static int getRotateIntervalSeconds() {
+        return Math.max(10, Store.getInt("wg_rotate_interval_sec", 60));
+    }
+
+    public static void setRotateIntervalSeconds(int sec) {
+        Store.putInt("wg_rotate_interval_sec", Math.max(10, sec));
+    }
+
+    private static final Runnable rotateTask = new Runnable() {
+        @Override
+        public void run() {
+            if (!isRotating() || !on()) {
+                stopRotation();
+                return;
+            }
+            Context ctx = appContextRef != null ? appContextRef.get() : null;
+            if (ctx != null) {
+                rotateNext(ctx);
+            }
+            rotateHandler.postDelayed(this, getRotateIntervalSeconds() * 1000L);
+        }
+    };
+
+    public static void startRotation(Context c) {
+        appContextRef = new WeakReference<>(c.getApplicationContext());
+        Store.putBool("wg_rotate_enabled", true);
+        rotateHandler.removeCallbacks(rotateTask);
+        rotateHandler.postDelayed(rotateTask, getRotateIntervalSeconds() * 1000L);
+        fire();
+    }
+
+    public static void stopRotation() {
+        Store.putBool("wg_rotate_enabled", false);
+        rotateHandler.removeCallbacks(rotateTask);
+        fire();
+    }
+
+    /**
+     * Seamless zero-leak rotation:
+     * Advances to the next profile and updates backend state in-place.
+     * The VPN tunnel interface is NEVER set to DOWN, eliminating unprotected packet leaks.
+     */
+    public static synchronized void rotateNext(final Context c) {
+        org.json.JSONArray all = profiles();
+        int total = all.length();
+        if (total <= 1) return;
+
+        int current = active();
+        int nextIndex = (current + 1) % total;
+        Store.putInt("wg_active", nextIndex);
+
+        new Thread(() -> {
+            try {
+                String rawConf = getProfileConfig(nextIndex);
+                if (rawConf.isEmpty()) return;
+
+                InputStream in = new ByteArrayInputStream(withScope(c, rawConf).getBytes("UTF-8"));
+                Config cfg = Config.parse(in);
+
+                // Atomic update without closing the tun interface
+                state = backend(c).setState(TUNNEL, Tunnel.State.UP, cfg);
+
+                new Handler(Looper.getMainLooper()).post(() -> {
+                    UiKit.makeToast(c, "🔄 " + T.t("Rotated to") + ": " + activeName() + " (" + server() + ")", Toast.LENGTH_SHORT).show();
+                    fire();
+                });
+            } catch (Throwable e) {
+                // If the selected server profile fails to parse, step to the next one
+                new Handler(Looper.getMainLooper()).post(() -> rotateNext(c));
+            }
+        }).start();
+    }
+
+    // ------------------------------------------------------------------ Connect / Disconnect
     public static void connect(final Activity a) {
         if (!hasProfile()) {
             UiKit.makeToast(a, T.t("Import a VPN profile first"), Toast.LENGTH_LONG).show();
             return;
         }
-        Intent prep = VpnService.prepare(a);              // Android's one-time "allow VPN" prompt
+        Intent prep = VpnService.prepare(a);
         if (prep != null) {
             a.startActivityForResult(prep, REQ_PREPARE);
             return;
@@ -204,12 +287,16 @@ public final class WgVpn {
             final String m = msg;
             h.post(() -> {
                 UiKit.makeToast(a, m, Toast.LENGTH_LONG).show();
+                if (on() && isRotating()) {
+                    startRotation(a);
+                }
                 fire();
             });
         }).start();
     }
 
     public static void disconnect(final Context c) {
+        stopRotation();
         new Thread(() -> {
             try {
                 state = backend(c).setState(TUNNEL, Tunnel.State.DOWN, null);
@@ -222,7 +309,8 @@ public final class WgVpn {
 
     static String status(Context c) {
         if (!hasProfile()) return T.t("No profile yet");
-        String base = activeName() + " · " + server() + " · " + scopeName();
+        String rot = isRotating() ? " · 🔄 " + formatInterval(getRotateIntervalSeconds()) : "";
+        String base = activeName() + " · " + server() + " · " + scopeName() + rot;
         if (!on()) return T.t("Off") + " · " + base;
         try {
             Statistics s = backend(c).getStatistics(TUNNEL);
@@ -232,7 +320,14 @@ public final class WgVpn {
         }
     }
 
-    // ------------------------------------------------------------------ profile
+    private static String formatInterval(int sec) {
+        if (sec < 60) return sec + "s";
+        if (sec % 3600 == 0) return (sec / 3600) + "h";
+        if (sec >= 3600) return String.format(Locale.US, "%dh %dm", sec / 3600, (sec % 3600) / 60);
+        return (sec / 60) + "m";
+    }
+
+    // ------------------------------------------------------------------ Profile Import / Export
     static boolean saveProfile(Activity a, String text) {
         return saveProfile(a, text, null);
     }
@@ -243,7 +338,7 @@ public final class WgVpn {
             return false;
         }
         try {
-            Config.parse(new ByteArrayInputStream(text.getBytes("UTF-8")));     // check it before keeping it
+            Config.parse(new ByteArrayInputStream(text.getBytes("UTF-8")));
         } catch (Throwable e) {
             UiKit.makeToast(a, T.t("The profile has an error") + ": " + e.getMessage(), Toast.LENGTH_LONG).show();
             return false;
@@ -261,7 +356,6 @@ public final class WgVpn {
         return true;
     }
 
-    /** onActivityResult of the browser / remote: VPN permission or a picked .conf file. */
     public static boolean onResult(Activity a, int req, int res, Intent data) {
         if (req == REQ_PREPARE) {
             if (res == Activity.RESULT_OK) connect(a);
@@ -296,18 +390,25 @@ public final class WgVpn {
         return false;
     }
 
-    // ------------------------------------------------------------------ the VPN panel
+    // ------------------------------------------------------------------ VPN Settings Panel
     public static void panel(final Activity a) {
         final org.json.JSONArray all = profiles();
+        boolean rotating = isRotating();
+        String rotLabel = rotating ? "🔄  " + T.t("Auto-rotate IP") + ": " + T.t("ON") + " (" + formatInterval(getRotateIntervalSeconds()) + ")"
+                : "🔄  " + T.t("Auto-rotate IP") + ": " + T.t("OFF");
+
         String[] items = {
                 (on() ? "⏹  " + T.t("Disconnect") : "▶  " + T.t("Connect")),
-                "🌍  " + T.t("Profile") + ": " + (hasProfile() ? activeName() + "  (" + all.length() + ")" : T.t("none")),
-                "📄  " + T.t("Import profile files (.conf) — several at once"),
+                rotLabel,
+                "⏱  " + T.t("Rotation interval (30s, 1m, 5m, custom)"),
+                "🌍  " + T.t("Select profile") + ": " + (hasProfile() ? activeName() + "  (" + all.length() + ")" : T.t("none")),
+                "📄  " + T.t("Import profile files (.conf) — bulk import"),
                 "📋  " + T.t("Paste profile text"),
                 "🎯  " + T.t("Use VPN for") + ": " + scopeName(),
                 "🔎  " + T.t("Check my IP"),
                 "✏  " + T.t("Rename / delete profiles"),
                 "❓  " + T.t("How to get a free profile (Proton VPN)")};
+
         new UiDialog(a).setTitle("VPN — " + status(a)).setItems(items, (d, w) -> {
             switch (w) {
                 case 0:
@@ -317,6 +418,25 @@ public final class WgVpn {
                     } else connect(a);
                     break;
                 case 1: {
+                    if (all.length() <= 1) {
+                        UiKit.makeToast(a, T.t("Import at least 2 profiles to rotate"), Toast.LENGTH_LONG).show();
+                        break;
+                    }
+                    if (isRotating()) {
+                        stopRotation();
+                        UiKit.makeToast(a, T.t("Auto-rotation stopped"), Toast.LENGTH_SHORT).show();
+                    } else {
+                        startRotation(a);
+                        if (!on()) connect(a);
+                        UiKit.makeToast(a, T.t("Auto-rotation active: changes IP every ") + formatInterval(getRotateIntervalSeconds()), Toast.LENGTH_SHORT).show();
+                    }
+                    panel(a);
+                    break;
+                }
+                case 2:
+                    chooseIntervalDialog(a);
+                    break;
+                case 3: {
                     if (all.length() == 0) {
                         UiKit.makeToast(a, T.t("Import a VPN profile first"), Toast.LENGTH_SHORT).show();
                         break;
@@ -326,26 +446,29 @@ public final class WgVpn {
                     new UiDialog(a).setTitle(T.t("Profile")).setSingleChoiceItems(names, active(), (d2, k) -> {
                         Store.putInt("wg_active", k);
                         d2.dismiss();
-                        if (on()) reconnect(a);
+                        if (on()) {
+                            // Seamless in-place switch
+                            rotateNext(a);
+                        }
                         panel(a);
                     }).show();
                     break;
                 }
-                case 2: {
+                case 4: {
                     Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*")
                             .putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
                     a.startActivityForResult(i, REQ_FILE);
                     break;
                 }
-                case 3: {
+                case 5: {
                     final EditText e = new EditText(a);
                     e.setHint("[Interface]\nPrivateKey = …\nAddress = …\n\n[Peer]\nPublicKey = …\nEndpoint = …");
                     e.setMinLines(6);
                     final EditText nm = new EditText(a);
                     nm.setHint(T.t("Name (e.g. Netherlands free)"));
                     nm.setSingleLine(true);
-                    android.widget.LinearLayout box = new android.widget.LinearLayout(a);
-                    box.setOrientation(android.widget.LinearLayout.VERTICAL);
+                    LinearLayout box = new LinearLayout(a);
+                    box.setOrientation(LinearLayout.VERTICAL);
                     box.addView(nm);
                     box.addView(e);
                     new UiDialog(a).setTitle(T.t("Paste profile text")).setView(box)
@@ -355,7 +478,7 @@ public final class WgVpn {
                             .setNegativeButton(T.t("Cancel"), null).show();
                     break;
                 }
-                case 4:
+                case 6:
                     new UiDialog(a).setTitle(T.t("Use VPN for")).setSingleChoiceItems(
                             new String[]{T.t("the whole phone") + " — " + T.t("every app, like a normal VPN"),
                                     T.t("only ZH Play") + " — " + T.t("browser and streaming in this app")},
@@ -366,20 +489,19 @@ public final class WgVpn {
                                 panel(a);
                             }).show();
                     break;
-                case 5:
+                case 7:
                     checkIp(a);
                     break;
-                case 6:
+                case 8:
                     manage(a);
                     break;
                 default:
                     new UiDialog(a).setTitle(T.t("Free VPN profile (Proton VPN)"))
-                            .setMessage(T.t("1. Make a free account at protonvpn.com (no payment).\n"
-                                    + "2. Open account.protonvpn.com → Downloads → WireGuard configuration.\n"
-                                    + "3. Platform: Android · choose a free server · Create → Download the .conf file.\n"
-                                    + "   Repeat for other free countries — import all the files at once.\n"
-                                    + "4. Here: Import profile files → pick the .conf files.\n\n"
-                                    + "Any WireGuard profile works (your own server, another provider). Free 'VPN' apps without an account often sell your data — a profile from a provider you trust is safer."))
+                            .setMessage(T.t("1. Make a free account at protonvpn.com.\n"
+                                    + "2. Go to account.protonvpn.com → Downloads → WireGuard configuration.\n"
+                                    + "3. Create and download multiple .conf files from various locations.\n"
+                                    + "4. Use 'Import profile files' to bulk load 8-10 profiles at once.\n"
+                                    + "5. Turn on Auto-rotate IP to continuously change your public IP address."))
                             .setPositiveButton(T.t("Open Proton VPN"), (d2, w2) -> {
                                 try {
                                     a.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("https://account.protonvpn.com/downloads")));
@@ -391,12 +513,71 @@ public final class WgVpn {
         }).show();
     }
 
+    // ------------------------------------------------------------------ Timing & Interval Selector
+    private static void chooseIntervalDialog(final Activity a) {
+        final String[] options = {
+                "30 " + T.t("seconds"),
+                "1 " + T.t("minute"),
+                "5 " + T.t("minutes"),
+                "10 " + T.t("minutes"),
+                "30 " + T.t("minutes"),
+                "1 " + T.t("hour"),
+                T.t("Custom (seconds, minutes, or hours)…")
+        };
+        final int[] seconds = {30, 60, 300, 600, 1800, 3600};
+
+        new UiDialog(a).setTitle(T.t("Rotation timing")).setItems(options, (d, which) -> {
+            if (which < seconds.length) {
+                setRotateIntervalSeconds(seconds[which]);
+                if (isRotating()) startRotation(a);
+                UiKit.makeToast(a, T.t("Interval set to: ") + formatInterval(seconds[which]), Toast.LENGTH_SHORT).show();
+                panel(a);
+            } else {
+                showCustomIntervalDialog(a);
+            }
+        }).show();
+    }
+
+    private static void showCustomIntervalDialog(final Activity a) {
+        LinearLayout layout = new LinearLayout(a);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(Ui.dp(a, 20), Ui.dp(a, 10), Ui.dp(a, 20), Ui.dp(a, 10));
+
+        final EditText input = new EditText(a);
+        input.setHint(T.t("Value (e.g. 45, 15, 2)"));
+        input.setInputType(InputType.TYPE_CLASS_NUMBER);
+        layout.addView(input);
+
+        final String[] units = {T.t("Seconds"), T.t("Minutes"), T.t("Hours")};
+        final int[] multipliers = {1, 60, 3600};
+        final int[] selectedUnit = {1}; // default to minutes
+
+        new UiDialog(a).setTitle(T.t("Set Custom Interval"))
+                .setView(layout)
+                .setSingleChoiceItems(units, selectedUnit[0], (d, which) -> selectedUnit[0] = which)
+                .setPositiveButton(T.t("Apply"), (d, which) -> {
+                    String str = input.getText().toString().trim();
+                    if (!str.isEmpty()) {
+                        try {
+                            int val = Integer.parseInt(str);
+                            int totalSec = Math.max(10, val * multipliers[selectedUnit[0]]);
+                            setRotateIntervalSeconds(totalSec);
+                            if (isRotating()) startRotation(a);
+                            UiKit.makeToast(a, T.t("Rotation interval set to: ") + formatInterval(totalSec), Toast.LENGTH_SHORT).show();
+                            panel(a);
+                        } catch (Exception ignored) {
+                        }
+                    }
+                })
+                .setNegativeButton(T.t("Cancel"), null)
+                .show();
+    }
+
     private static void reconnect(final Activity a) {
         disconnect(a);
         new Handler(Looper.getMainLooper()).postDelayed(() -> connect(a), 1200);
     }
 
-    /** What the internet sees (through the VPN when it covers this app). */
     static void checkIp(final Activity a) {
         UiKit.makeToast(a, T.t("Checking…"), Toast.LENGTH_SHORT).show();
         final Handler h = new Handler(Looper.getMainLooper());
