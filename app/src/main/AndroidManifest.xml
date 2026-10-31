@@ -333,6 +333,7 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+        <!-- home-screen widget (phone) -->
         <receiver
             android:name=".TvWidget"
             android:exported="true"
@@ -345,6 +346,7 @@
                 android:resource="@xml/widget_info" />
         </receiver>
 
+        <!-- full TV remote on the home screen (resizable) -->
         <receiver
             android:name=".PadWidget"
             android:exported="true"
@@ -357,6 +359,7 @@
                 android:resource="@xml/widget_pad_info" />
         </receiver>
 
+        <!-- "Hey Google, play … on ZH Play" -->
         <activity
             android:name=".VoiceSearchActivity"
             android:excludeFromRecents="true"

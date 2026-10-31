@@ -183,7 +183,7 @@ public class BrowserActivity extends AppCompatActivity {
         vpnLp.setMargins(0, 0, Ui.dp(this, 4), 0);
         topBar.addView(vpnIcon, vpnLp);
 
-        // Brave-style shield with the number of blocked ads / trackers on this page
+        // Brave-style shield with blocked trackers count
         FrameLayout sh = new FrameLayout(this);
         shieldIcon = UiKit.roundButton(this, "shield-check", 42, false, v -> shieldPanel());
         sh.addView(shieldIcon, new FrameLayout.LayoutParams(Ui.dp(this, 42), Ui.dp(this, 42)));
@@ -262,18 +262,21 @@ public class BrowserActivity extends AppCompatActivity {
     }
 
     // ---------------------------------------------------------------- Picture-in-Picture (PiP)
+    // Script overrides the Page Visibility API and intercepts programmatic pause attempts
     private static final String RESUME_VIDEO_JS =
             "(function() {"
             + "  try {"
-            + "    Object.defineProperty(document, 'hidden', { value: false, writable: true });"
-            + "    Object.defineProperty(document, 'visibilityState', { value: 'visible', writable: true });"
+            + "    Object.defineProperty(document, 'hidden', { value: false, writable: true, configurable: true });"
+            + "    Object.defineProperty(document, 'visibilityState', { value: 'visible', writable: true, configurable: true });"
             + "    document.dispatchEvent(new Event('visibilitychange'));"
+            + "  } catch (e) {}"
+            + "  try {"
+            + "    var mp = document.getElementById('movie_player');"
+            + "    if (mp && mp.playVideo) { mp.playVideo(); }"
             + "  } catch (e) {}"
             + "  document.querySelectorAll('video').forEach(function(v) {"
             + "    if (v.paused) { v.play().catch(function() {}); }"
             + "  });"
-            + "  var mp = document.getElementById('movie_player');"
-            + "  if (mp && mp.playVideo) { mp.playVideo(); }"
             + "})();";
 
     public void resumeMediaForPip() {
@@ -287,7 +290,7 @@ public class BrowserActivity extends AppCompatActivity {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return false;
         try {
             PictureInPictureParams.Builder b = new PictureInPictureParams.Builder();
-            View target = customView != null ? customView : webBox;
+            View target = (customView != null && customView.getWidth() > 0) ? customView : webBox;
             int w = target != null ? target.getWidth() : 0;
             int h = target != null ? target.getHeight() : 0;
             if (w > 0 && h > 0) {
@@ -342,6 +345,7 @@ public class BrowserActivity extends AppCompatActivity {
             resumeMediaForPip();
             main.postDelayed(this::resumeMediaForPip, 300);
             main.postDelayed(this::resumeMediaForPip, 800);
+            main.postDelayed(this::resumeMediaForPip, 1500);
         } else {
             if (topBar != null) topBar.setVisibility(View.VISIBLE);
             if (bottomBar != null) bottomBar.setVisibility(View.VISIBLE);
@@ -839,6 +843,7 @@ public class BrowserActivity extends AppCompatActivity {
         s.setSupportMultipleWindows(true);
         s.setJavaScriptCanOpenWindowsAutomatically(true);
         s.setDomStorageEnabled(true);
+        // Do not require user tap to resume or play videos (crucial for PiP playback)
         s.setMediaPlaybackRequiresUserGesture(false);
         s.setLoadWithOverviewMode(true);
         s.setUseWideViewPort(true);
@@ -2544,7 +2549,6 @@ public class BrowserActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         updateVpnBar();
-        // Ensure web engine and video resumes execution when returning to app
         resumeMediaForPip();
     }
 
@@ -2553,7 +2557,7 @@ public class BrowserActivity extends AppCompatActivity {
         super.onPause();
         saveTabs();
 
-        // When entering PiP mode, keep WebView active and running
+        // Prevent web engine from suspending while in PiP
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInPictureInPictureMode()) {
             if (web != null) {
                 web.onResume();
