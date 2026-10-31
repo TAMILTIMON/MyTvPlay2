@@ -270,7 +270,6 @@ public class BrowserActivity extends AppCompatActivity {
             int h = (customView != null ? customView : webBox).getHeight();
             if (w > 0 && h > 0) {
                 float r = (float) w / (float) h;
-                // Rational aspect ratio must be between 1:2.39 (0.41841) and 2.39:1 (2.39)
                 if (r >= 0.42f && r <= 2.38f) {
                     b.setAspectRatio(new Rational(Math.round(r * 1000), 1000));
                 } else {
@@ -291,7 +290,6 @@ public class BrowserActivity extends AppCompatActivity {
     @Override
     protected void onUserLeaveHint() {
         super.onUserLeaveHint();
-        // Automatically transition into PiP mode if video is actively playing or in full screen
         if ((pagePlaying || customView != null) && !tv) {
             enterPipMode();
         }
@@ -300,7 +298,11 @@ public class BrowserActivity extends AppCompatActivity {
     @Override
     public void onPictureInPictureModeChanged(boolean isInPictureInPictureMode, Configuration newConfig) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig);
-        if (isInPictureInPictureMode) {
+        handlePipChange(isInPictureInPictureMode);
+    }
+
+    private void handlePipChange(boolean inPip) {
+        if (inPip) {
             if (topBar != null) topBar.setVisibility(View.GONE);
             if (bottomBar != null) bottomBar.setVisibility(View.GONE);
             if (findBar != null) findBar.setVisibility(View.GONE);
@@ -585,7 +587,7 @@ public class BrowserActivity extends AppCompatActivity {
         actions.setOrientation(LinearLayout.HORIZONTAL);
 
         if (!tv && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            ImageView pip = UiKit.darkButton(this, "picture-in-picture", 48, false, v -> {
+            ImageView pip = UiKit.darkButton(this, "maximize", 48, false, v -> {
                 if (!locked) enterPipMode();
             });
             pip.setContentDescription(T.t("Picture in Picture"));
@@ -1501,7 +1503,7 @@ public class BrowserActivity extends AppCompatActivity {
                     UiKit.makeToast(this, T.t("Copied"), Toast.LENGTH_SHORT).show();
                 }},
                 {"house", T.t("Exit browser"), (Runnable) () -> Ui.goHome(this, tv)},
-                {"picture-in-picture", T.t("Picture in Picture"), (Runnable) () -> {
+                {"maximize", T.t("Picture in Picture"), (Runnable) () -> {
                     if (!enterPipMode()) {
                         UiKit.makeToast(this, T.t("PiP is not supported or no video is playing"), Toast.LENGTH_SHORT).show();
                     }
@@ -2641,7 +2643,7 @@ public class BrowserActivity extends AppCompatActivity {
         super.onDestroy();
     }
 
-static final class CursorView extends View {
+    static final class CursorView extends View {
         float x = -1, y = -1;
         private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG), edge = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Path arrow = new Path();
