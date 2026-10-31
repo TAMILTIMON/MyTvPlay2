@@ -106,12 +106,6 @@
         <activity
             android:name=".TvInfoActivity"
             android:exported="false" />
-	
-	<activity
-    	   android:name=".BrowserActivity"
-           android:supportsPictureInPicture="true"
-           android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation"
-           android:exported="true" />
 
         <activity
             android:name=".LibraryActivity"
@@ -229,10 +223,11 @@
 
         <activity
             android:name=".BrowserActivity"
-            android:configChanges="orientation|screenSize|keyboardHidden|keyboard|navigation|screenLayout|uiMode"
+            android:configChanges="orientation|screenSize|smallestScreenSize|keyboardHidden|keyboard|navigation|screenLayout|uiMode"
             android:exported="false"
             android:label="ZH Play Browser"
             android:launchMode="singleTask"
+            android:supportsPictureInPicture="true"
             android:taskAffinity="com.tamil.castplay.browser"
             android:windowSoftInputMode="adjustResize" />
 
@@ -258,7 +253,6 @@
             android:configChanges="orientation|screenSize|keyboardHidden|keyboard|navigation|smallestScreenSize|screenLayout|uiMode"
             android:exported="true"
             android:launchMode="singleTop">
-            <!-- "Open with ZH Play" for video/audio files and streams from other apps -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -297,7 +291,6 @@
                 android:value="Local network remote control web page for the TV player" />
         </service>
 
-        <!-- optional: lets the phone remote work in every app on the TV -->
         <service
             android:name=".TvAccess"
             android:exported="true"
@@ -311,7 +304,6 @@
                 android:resource="@xml/tv_access" />
         </service>
 
-        <!-- phone: control the TV from the notification bar / lock screen -->
         <service
             android:name=".TvControlService"
             android:exported="false"
@@ -321,7 +313,6 @@
                 android:value="Media-style notification that remote-controls a TV on the local network" />
         </service>
 
-        <!-- lets the remote show / control videos playing in other apps -->
         <service
             android:name=".MediaWatch"
             android:exported="true"
@@ -342,7 +333,6 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
-        <!-- home-screen widget (phone) -->
         <receiver
             android:name=".TvWidget"
             android:exported="true"
@@ -355,7 +345,6 @@
                 android:resource="@xml/widget_info" />
         </receiver>
 
-        <!-- full TV remote on the home screen (resizable) -->
         <receiver
             android:name=".PadWidget"
             android:exported="true"
@@ -368,7 +357,6 @@
                 android:resource="@xml/widget_pad_info" />
         </receiver>
 
-        <!-- "Hey Google, play … on ZH Play" -->
         <activity
             android:name=".VoiceSearchActivity"
             android:excludeFromRecents="true"
