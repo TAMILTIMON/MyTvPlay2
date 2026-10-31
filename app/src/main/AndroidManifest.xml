@@ -106,6 +106,12 @@
         <activity
             android:name=".TvInfoActivity"
             android:exported="false" />
+	
+	<activity
+    	   android:name=".BrowserActivity"
+           android:supportsPictureInPicture="true"
+           android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation"
+           android:exported="true" />
 
         <activity
             android:name=".LibraryActivity"

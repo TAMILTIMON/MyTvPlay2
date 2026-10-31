@@ -2641,9 +2641,9 @@ public class BrowserActivity extends AppCompatActivity {
         super.onDestroy();
     }
 
-    static final class CursorView extends View {
+static final class CursorView extends View {
         float x = -1, y = -1;
-        private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG), edge = new Paint(Paint.ANTI_FLAG_NONE | Paint.ANTI_ALIAS_FLAG);
+        private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG), edge = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Path arrow = new Path();
 
         CursorView(android.content.Context c) {
