@@ -262,21 +262,44 @@ public class BrowserActivity extends AppCompatActivity {
     }
 
     // ---------------------------------------------------------------- Picture-in-Picture (PiP)
+    private static final String RESUME_VIDEO_JS =
+            "(function() {"
+            + "  try {"
+            + "    Object.defineProperty(document, 'hidden', { value: false, writable: true });"
+            + "    Object.defineProperty(document, 'visibilityState', { value: 'visible', writable: true });"
+            + "    document.dispatchEvent(new Event('visibilitychange'));"
+            + "  } catch (e) {}"
+            + "  document.querySelectorAll('video').forEach(function(v) {"
+            + "    if (v.paused) { v.play().catch(function() {}); }"
+            + "  });"
+            + "  var mp = document.getElementById('movie_player');"
+            + "  if (mp && mp.playVideo) { mp.playVideo(); }"
+            + "})();";
+
+    public void resumeMediaForPip() {
+        if (web != null) {
+            web.onResume();
+            web.evaluateJavascript(RESUME_VIDEO_JS, null);
+        }
+    }
+
     public boolean enterPipMode() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return false;
         try {
             PictureInPictureParams.Builder b = new PictureInPictureParams.Builder();
-            int w = (customView != null ? customView : webBox).getWidth();
-            int h = (customView != null ? customView : webBox).getHeight();
+            View target = customView != null ? customView : webBox;
+            int w = target != null ? target.getWidth() : 0;
+            int h = target != null ? target.getHeight() : 0;
             if (w > 0 && h > 0) {
                 float r = (float) w / (float) h;
+                // Ratio must be within Android's strict bounds [1:2.39, 2.39:1]
                 if (r >= 0.42f && r <= 2.38f) {
                     b.setAspectRatio(new Rational(Math.round(r * 1000), 1000));
                 } else {
                     b.setAspectRatio(new Rational(16, 9));
                 }
                 Rect rect = new Rect();
-                (customView != null ? customView : webBox).getGlobalVisibleRect(rect);
+                target.getGlobalVisibleRect(rect);
                 b.setSourceRectHint(rect);
             } else {
                 b.setAspectRatio(new Rational(16, 9));
@@ -315,6 +338,10 @@ public class BrowserActivity extends AppCompatActivity {
             View pipBtn = root.findViewWithTag("fs_pip");
             if (pipBtn != null) pipBtn.setVisibility(View.GONE);
             hideSuggest();
+
+            resumeMediaForPip();
+            main.postDelayed(this::resumeMediaForPip, 300);
+            main.postDelayed(this::resumeMediaForPip, 800);
         } else {
             if (topBar != null) topBar.setVisibility(View.VISIBLE);
             if (bottomBar != null) bottomBar.setVisibility(View.VISIBLE);
@@ -325,6 +352,8 @@ public class BrowserActivity extends AppCompatActivity {
             if (eq != null) eq.setVisibility(Store.getBool("b_eq", true) ? View.VISIBLE : View.GONE);
             View pipBtn = root.findViewWithTag("fs_pip");
             if (pipBtn != null) pipBtn.setVisibility(View.VISIBLE);
+
+            resumeMediaForPip();
         }
     }
 
@@ -415,7 +444,7 @@ public class BrowserActivity extends AppCompatActivity {
         v.evaluateJavascript(BrowserMedia.eqCall(), null);
     }
 
-    // ---------------------------------------------------------------- equalizer panel over the page (video keeps playing)
+    // ---------------------------------------------------------------- equalizer panel over the page
     private void eqSheet() {
         final android.app.Dialog d = new android.app.Dialog(this);
         d.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
@@ -582,7 +611,6 @@ public class BrowserActivity extends AppCompatActivity {
         lp.setMargins(Ui.dp(this, 20), Ui.dp(this, 24), 0, 0);
         root.addView(lockBtn, lp);
 
-        // Action icons on the top-right: PiP + Equalizer
         LinearLayout actions = new LinearLayout(this);
         actions.setOrientation(LinearLayout.HORIZONTAL);
 
@@ -2516,12 +2544,21 @@ public class BrowserActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         updateVpnBar();
+        // Ensure web engine and video resumes execution when returning to app
+        resumeMediaForPip();
     }
 
     @Override
     protected void onPause() {
         super.onPause();
         saveTabs();
+
+        // When entering PiP mode, keep WebView active and running
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInPictureInPictureMode()) {
+            if (web != null) {
+                web.onResume();
+            }
+        }
     }
 
     private void hideCustom() {
