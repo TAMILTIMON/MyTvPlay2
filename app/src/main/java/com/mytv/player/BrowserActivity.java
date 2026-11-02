@@ -258,6 +258,15 @@ public class BrowserActivity extends AppCompatActivity {
         videosBadge.setVisibility(View.GONE);
         vidBox.addView(videosBadge, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, Ui.dp(this, 18), Gravity.TOP | Gravity.END));
         topBar.addView(vidBox);
+        // PiP button in the address bar — shown when a video is playing (like Brave)
+        if (!tv && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            pipBarBtn = UiKit.roundButton(this, "maximize", 42, false, v -> enterPipMode());
+            pipBarBtn.setContentDescription(T.t("Picture in Picture"));
+            pipBarBtn.setVisibility(View.GONE);
+            LinearLayout.LayoutParams pipLp = new LinearLayout.LayoutParams(Ui.dp(this, 42), Ui.dp(this, 42));
+            pipLp.setMargins(0, 0, Ui.dp(this, 4), 0);
+            topBar.addView(pipBarBtn, pipLp);
+        }
 
         tabsBtn = tabCounter();
         if (!narrow) {
@@ -508,27 +517,67 @@ public class BrowserActivity extends AppCompatActivity {
             web.evaluateJavascript(RESUME_VIDEO_JS, null);
             if (isInPictureInPictureMode()) {
                 web.evaluateJavascript(PIP_BLOCK_PAUSE_JS, null);
-                if (customView == null) web.evaluateJavascript(PIP_FILL_JS, null);
             }
         }
     }
 
+    /** Get the playing video's screen rect and enter PiP — like Brave:
+     *  Android's compositor grabs that surface directly, no DOM changes needed. */
     public boolean enterPipMode() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return false;
+        if (customView != null) {
+            // YouTube / any site in its own fullscreen (onShowCustomView): the customView IS the video surface.
+            // Android grabs it directly — perfect quality, no DOM work needed.
+            return enterPipDirect(customView);
+        }
+        // Not in site fullscreen: ask JS for the playing video's bounding rect in screen coordinates.
+        // We launch PiP immediately with a 16:9 guess, then update with the real rect once JS replies.
+        enterPipDirect(null);       // start PiP now so the transition is instant
+        if (web != null) {
+            web.evaluateJavascript(
+                "(function(){try{"
+                + "var vs=[].slice.call(document.querySelectorAll('video'));"
+                + "var v=vs.filter(function(x){return !x.paused&&x.readyState>=2;})[0]"
+                + "||vs.sort(function(a,b){return b.clientWidth*b.clientHeight-a.clientWidth*a.clientHeight;})[0];"
+                + "if(!v)return null;"
+                + "var r=v.getBoundingClientRect();"
+                + "return JSON.stringify({l:Math.round(r.left),t:Math.round(r.top),r:Math.round(r.right),b:Math.round(r.bottom)});"
+                + "}catch(e){return null;}})()",
+                val -> {
+                    if (val == null || val.equals("null")) return;
+                    try {
+                        // strip surrounding JS quotes if any
+                        String j = val.startsWith("\"") ? val.substring(1, val.length()-1) : val;
+                        org.json.JSONObject o = new org.json.JSONObject(j);
+                        int[] loc = new int[2]; webBox.getLocationOnScreen(loc);
+                        float density = getResources().getDisplayMetrics().density;
+                        // JS gives CSS px; multiply by density for screen px, then add WebView's screen position
+                        Rect vr = new Rect(
+                            loc[0] + Math.round(o.getInt("l") * density),
+                            loc[1] + Math.round(o.getInt("t") * density),
+                            loc[0] + Math.round(o.getInt("r") * density),
+                            loc[1] + Math.round(o.getInt("b") * density));
+                        if (vr.width() > 0 && vr.height() > 0 && isInPictureInPictureMode()) {
+                            float ar = (float)vr.width()/vr.height();
+                            ar = Math.max(0.42f, Math.min(2.38f, ar));
+                            PictureInPictureParams.Builder b2 = new PictureInPictureParams.Builder()
+                                .setAspectRatio(new Rational(Math.round(ar * 1000), 1000))
+                                .setSourceRectHint(vr);
+                            setPictureInPictureParams(b2.build());
+                        }
+                    } catch (Exception ignored) {}
+                });
+        }
+        return true;
+    }
+
+    private boolean enterPipDirect(View target) {
         try {
             PictureInPictureParams.Builder b = new PictureInPictureParams.Builder();
-            if (customView == null && web != null) web.evaluateJavascript(PIP_FILL_JS, null);   // the video fills the window
-            View target = (customView != null && customView.getWidth() > 0) ? customView : null;   // normal page: a 16:9 window
-            int w = target != null ? target.getWidth() : 0;
-            int h = target != null ? target.getHeight() : 0;
-            if (w > 0 && h > 0) {
-                float r = (float) w / (float) h;
-                // Ratio must be within Android's strict bounds [1:2.39, 2.39:1]
-                if (r >= 0.42f && r <= 2.38f) {
-                    b.setAspectRatio(new Rational(Math.round(r * 1000), 1000));
-                } else {
-                    b.setAspectRatio(new Rational(16, 9));
-                }
+            if (target != null && target.getWidth() > 0 && target.getHeight() > 0) {
+                float r = (float) target.getWidth() / target.getHeight();
+                r = Math.max(0.42f, Math.min(2.38f, r));
+                b.setAspectRatio(new Rational(Math.round(r * 1000), 1000));
                 Rect rect = new Rect();
                 target.getGlobalVisibleRect(rect);
                 b.setSourceRectHint(rect);
@@ -578,7 +627,6 @@ public class BrowserActivity extends AppCompatActivity {
             if (web != null) {
                 inPipSession = true;
                 web.evaluateJavascript(PIP_BLOCK_PAUSE_JS, null);
-                if (customView == null) web.evaluateJavascript(PIP_FILL_JS, null);
             }
             resumeMediaForPip();
             main.postDelayed(this::resumeMediaForPip, 400);
@@ -587,7 +635,6 @@ public class BrowserActivity extends AppCompatActivity {
             if (web != null) {
                 inPipSession = false;
                 web.evaluateJavascript(PIP_UNBLOCK_PAUSE_JS, null);
-                web.evaluateJavascript(PIP_UNFILL_JS, null);
             }
             if (topBar != null) topBar.setVisibility(View.VISIBLE);
             if (bottomBar != null) bottomBar.setVisibility(View.VISIBLE);
@@ -655,6 +702,9 @@ public class BrowserActivity extends AppCompatActivity {
         else if (title != null) title = title.replaceAll("\\s*-\\s*YouTube$", "");
         pageMedia = has;
         pageVideo = playing && video;
+        if (pipBarBtn != null) {
+            pipBarBtn.setVisibility(!tv && playing && video && !audioMode() ? View.VISIBLE : View.GONE);
+        }
         if (listenBack && playing) {                     // from Music: playing → back to where you were
             listenBack = false;
             UiKit.makeToast(this, "🎧 " + T.t("Playing in the background — use the notification to pause"), Toast.LENGTH_LONG).show();
@@ -1548,7 +1598,7 @@ public class BrowserActivity extends AppCompatActivity {
     private static final int SHIELD_ORANGE = 0xFFFB542B;
     private static final int VPN_GREEN = 0xFF10B981;
 
-    private ImageView siteIcon, reloadBtn, shieldIcon, vpnIcon, videosIcon;
+    private ImageView siteIcon, reloadBtn, shieldIcon, vpnIcon, videosIcon, pipBarBtn;
     private TextView shieldBadge, videosBadge, findCount;
     private volatile boolean pageLoading;
     private final java.util.Map<WebView, String> hosts = java.util.Collections.synchronizedMap(new java.util.WeakHashMap<WebView, String>());

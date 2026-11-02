@@ -1,3 +1,15 @@
+ZH PLAY 5.7.6 — PiP works like Brave: no DOM changes, JS source-rect hint
+==========================================================================
+* PiP in address bar button: appears (like Brave) whenever a video is playing.
+* enterPipMode now works exactly like Brave: JS asks the playing video for its
+  getBoundingClientRect(), converts to screen coordinates, and passes it to
+  Android via setSourceRectHint + setAspectRatio. Android's compositor grabs
+  that surface directly — no DOM changes, no CSS fighting YouTube's containers.
+* When YouTube is in its own fullscreen (onShowCustomView), the customView surface
+  is used directly — perfect quality, instant transition.
+* All PIP_FILL_JS / PIP_UNFILL_JS DOM manipulation removed from the PiP path:
+  it is no longer needed and was causing the black-video and displaced-video bugs.
+
 ZH PLAY 5.7.5 — YouTube fullscreen fills screen; pinch-to-zoom works; PiP→fullscreen fixed
 =========================================================================================
 * YouTube fullscreen black bars: a CSS rule is injected that removes YouTube's max-height
