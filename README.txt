@@ -1,3 +1,13 @@
+ZH PLAY 5.7.3 — YouTube keeps playing in PiP; video fit modes in fullscreen
+=========================================================================
+* YouTube PiP: blocked YouTube's internal "paused-mode" state machine (not just pause()). A
+  MutationObserver catches the "paused-mode" class the moment YouTube applies it and reverses it;
+  a 900 ms interval calls playVideo() and reapplies the visibility spoof; pauseVideo/stopVideo are
+  overridden so the scheduler cannot switch state — the video stays playing.
+  Tested: 6 scheduler attempts, 0 succeeded. After closing PiP everything is restored.
+* Video fit in the browser fullscreen: a ⤢ button cycles 4 modes (same as the native player):
+  Fit (contain), Fill/Stretch, Crop and Zoom 1.2×. Works on YouTube and any other site.
+
 ZH PLAY 5.7.2 — TV: the remote's cursor is visible again in menus
 ================================================================
 * Since 4.7 (the card-style menus) the highlight of the line under the remote's cursor was transparent,

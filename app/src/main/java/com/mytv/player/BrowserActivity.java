@@ -59,6 +59,32 @@ public class BrowserActivity extends AppCompatActivity {
     public static final String EXTRA_URL = "url";
     /** Opened from Music to LISTEN: audio only; the browser steps back once the sound starts. */
     public static final String EXTRA_LISTEN = "listen";
+    private int videoFitMode = 0;                   // 0=contain, 1=cover, 2=fill, 3=zoom
+    private static final String[] FIT_JS = {
+            // 0 Fit (contain): black bars, the whole video always visible
+            "(function(){document.querySelectorAll('video').forEach(function(v){v.style.setProperty('object-fit','contain','important');v.style.setProperty('width','100%','important');v.style.setProperty('height','100%','important');v.style.setProperty('transform','none','important');});})();",
+            // 1 Fill / Stretch: video is stretched to exactly fill the screen (anamorphic)
+            "(function(){document.querySelectorAll('video').forEach(function(v){v.style.setProperty('object-fit','fill','important');v.style.setProperty('width','100%','important');v.style.setProperty('height','100%','important');v.style.setProperty('transform','none','important');});})();",
+            // 2 Crop (cover): fills the screen, the outside is cropped — no bars, correct aspect ratio
+            "(function(){document.querySelectorAll('video').forEach(function(v){v.style.setProperty('object-fit','cover','important');v.style.setProperty('width','100%','important');v.style.setProperty('height','100%','important');v.style.setProperty('transform','none','important');});})();",
+            // 3 Zoom (1.2×): scales up by 20 % so letterbox bars are hidden
+            "(function(){document.querySelectorAll('video').forEach(function(v){v.style.setProperty('object-fit','contain','important');v.style.setProperty('width','100%','important');v.style.setProperty('height','100%','important');v.style.setProperty('transform','scale(1.2)','important');v.style.setProperty('transform-origin','center','important');});})();"
+    };
+    private static final String[] FIT_NAMES = {"Fit", "Fill / Stretch", "Crop", "Zoom 1.2×"};
+    private static final String[] FIT_ICONS = {"maximize-2", "move-horizontal", "crop", "zoom-in"};
+
+    private void cycleVideoFit() {
+        videoFitMode = (videoFitMode + 1) % FIT_JS.length;
+        applyVideoFit();
+    }
+
+    private void applyVideoFit() {
+        if (web != null) web.evaluateJavascript(FIT_JS[videoFitMode], null);
+        UiKit.makeToast(this, T.t("Video fit") + ": " + T.t(FIT_NAMES[videoFitMode]), Toast.LENGTH_SHORT).show();
+        View btn = root.findViewWithTag("fs_fit");
+        if (btn instanceof ImageView) UiKit.setIcon(this, (ImageView) btn, FIT_ICONS[videoFitMode], 22, android.graphics.Color.WHITE);
+    }
+
     private boolean listenBack;
 
     private WebView web;
@@ -338,48 +364,44 @@ public class BrowserActivity extends AppCompatActivity {
             + "  });"
             + "})();";
 
-    /** While in PiP, block YouTube's automatic pause() so it cannot stop the video. */
+    /**
+     * PiP keep-alive for YouTube: YouTube uses an internal state machine whose scheduler bypasses
+     * blocking HTMLMediaElement.pause — it checks its own playerState before honouring play().
+     * Fix: MutationObserver catches the "paused-mode" class + a 900 ms interval calls playVideo()
+     * while overriding pauseVideo/stopVideo so the scheduler cannot switch state.
+     */
     private static final String PIP_BLOCK_PAUSE_JS =
-            "(function(){"
-            + "  if (window._zhPipBlock) return;"
-            + "  window._zhPipBlock = true;"
-            + "  try {"
-            + "    if (!window._zhOrigPause) window._zhOrigPause = HTMLMediaElement.prototype.pause;"
-            + "    HTMLMediaElement.prototype.pause = function() {"
-            + "      // Ignore pause while we are in forced PiP play mode"
-            + "    };"
-            + "  } catch(e) {}"
-            + "  try {"
-            + "    var mp = document.getElementById('movie_player');"
-            + "    if (mp && !mp._zhPausedPatched) {"
-            + "      mp._zhPausedPatched = true;"
-            + "      if (typeof mp.pauseVideo === 'function') {"
-            + "        mp._zhOrigPauseVideo = mp.pauseVideo;"
-            + "        mp.pauseVideo = function() {};"
-            + "      }"
-            + "    }"
-            + "  } catch(e) {}"
-            + "  // Re-apply visibility spoof"
-            + "  try {"
-            + "    Object.defineProperty(document, 'hidden', { get: function(){ return false; }, configurable: true });"
-            + "    Object.defineProperty(document, 'visibilityState', { get: function(){ return 'visible'; }, configurable: true });"
-            + "  } catch(e) {}"
+            "(function(){\n"
+            + "  if(window._zhPipGuard){clearInterval(window._zhPipGuard);window._zhPipGuard=null;}\n"
+            + "  function spoof(){try{Object.defineProperty(document,'hidden',{get:function(){return false;},configurable:true});}catch(e){}"
+            + "try{Object.defineProperty(document,'visibilityState',{get:function(){return 'visible';},configurable:true});}catch(e){}}\n"
+            + "  spoof();\n"
+            + "  try{if(!window._zhOrig){window._zhOrig=HTMLMediaElement.prototype.pause;"
+            + "HTMLMediaElement.prototype.pause=function(){if(!window._zhPipGuard)window._zhOrig.call(this);};}}catch(e){}\n"
+            + "  function patchYt(){var mp=document.getElementById('movie_player');"
+            + "if(!mp||mp._zhYtP)return;mp._zhYtP=true;"
+            + "['pauseVideo','stopVideo'].forEach(function(fn){if(typeof mp[fn]==='function'){"
+            + "mp['_O_'+fn]=mp[fn];mp[fn]=function(){if(!window._zhPipGuard&&mp['_O_'+fn])mp['_O_'+fn].call(mp);};}});}\n"
+            + "  patchYt();\n"
+            + "  try{if(window._zhMO)window._zhMO.disconnect();"
+            + "window._zhMO=new MutationObserver(function(){patchYt();"
+            + "var m=document.getElementById('movie_player');"
+            + "if(m&&m.classList.contains('paused-mode')&&typeof m.playVideo==='function')m.playVideo();});"
+            + "var m0=document.getElementById('movie_player');"
+            + "if(m0)window._zhMO.observe(m0,{attributes:true,attributeFilter:['class']});}catch(e){}\n"
+            + "  window._zhPipGuard=setInterval(function(){spoof();"
+            + "try{var m=document.getElementById('movie_player');if(m&&typeof m.playVideo==='function')m.playVideo();}catch(e){}"
+            + "document.querySelectorAll('video').forEach(function(v){"
+            + "try{if(v.paused&&!v.ended){var p=v.play();if(p&&p.catch)p.catch(function(){});}}catch(e){}});},900);\n"
             + "})();";
 
     private static final String PIP_UNBLOCK_PAUSE_JS =
             "(function(){"
-            + "  try {"
-            + "    if (window._zhOrigPause) {"
-            + "      HTMLMediaElement.prototype.pause = window._zhOrigPause;"
-            + "      window._zhOrigPause = null;"
-            + "    }"
-            + "    window._zhPipBlock = false;"
-            + "    var mp = document.getElementById('movie_player');"
-            + "    if (mp && mp._zhOrigPauseVideo) {"
-            + "      mp.pauseVideo = mp._zhOrigPauseVideo;"
-            + "      mp._zhPausedPatched = false;"
-            + "    }"
-            + "  } catch(e) {}"
+            + "if(window._zhPipGuard){clearInterval(window._zhPipGuard);window._zhPipGuard=null;}"
+            + "if(window._zhMO){window._zhMO.disconnect();window._zhMO=null;}"
+            + "try{if(window._zhOrig){HTMLMediaElement.prototype.pause=window._zhOrig;window._zhOrig=null;}}catch(e){}"
+            + "try{var m=document.getElementById('movie_player');if(m&&m._zhYtP){m._zhYtP=false;"
+            + "['pauseVideo','stopVideo'].forEach(function(fn){if(m['_O_'+fn])m[fn]=m['_O_'+fn];});}}catch(e){}"
             + "})();";
 
     public void resumeMediaForPip() {
@@ -450,6 +472,8 @@ public class BrowserActivity extends AppCompatActivity {
             if (eq != null) eq.setVisibility(View.GONE);
             View pipBtn = root.findViewWithTag("fs_pip");
             if (pipBtn != null) pipBtn.setVisibility(View.GONE);
+            View fitBtn = root.findViewWithTag("fs_fit");
+            if (fitBtn != null) fitBtn.setVisibility(View.GONE);
             hideSuggest();
 
             // Block YouTube's pause + force play a few times, then soft keep-alive
@@ -459,8 +483,6 @@ public class BrowserActivity extends AppCompatActivity {
             }
             resumeMediaForPip();
             main.postDelayed(this::resumeMediaForPip, 400);
-            main.postDelayed(this::resumeMediaForPip, 1000);
-            main.postDelayed(this::resumeMediaForPip, 2000);
             main.postDelayed(pipKeepAlive, 3000);
         } else {
             if (web != null) {
@@ -476,6 +498,8 @@ public class BrowserActivity extends AppCompatActivity {
             if (eq != null) eq.setVisibility(Store.getBool("b_eq", true) ? View.VISIBLE : View.GONE);
             View pipBtn = root.findViewWithTag("fs_pip");
             if (pipBtn != null) pipBtn.setVisibility(View.VISIBLE);
+            View fitBtnR = root.findViewWithTag("fs_fit");
+            if (fitBtnR != null) fitBtnR.setVisibility(View.VISIBLE);
 
             resumeMediaForPip();
         }
@@ -762,6 +786,16 @@ public class BrowserActivity extends AppCompatActivity {
         LinearLayout.LayoutParams eqLp = new LinearLayout.LayoutParams(Ui.dp(this, 48), Ui.dp(this, 48));
         eqLp.setMargins(Ui.dp(this, 8), 0, 0, 0);
         if (Store.getBool("b_eq", true)) actions.addView(eq, eqLp);
+
+        // Video fit button: cycles Fit → Fill → Crop → Zoom (same 4 modes as the native player)
+        final ImageView fit = UiKit.darkButton(this, "maximize-2", 48, false, v -> {
+            if (!locked) cycleVideoFit();
+        });
+        fit.setContentDescription(T.t("Video fit"));
+        fit.setTag("fs_fit");
+        LinearLayout.LayoutParams fitLp = new LinearLayout.LayoutParams(Ui.dp(this, 48), Ui.dp(this, 48));
+        fitLp.setMargins(Ui.dp(this, 8), 0, 0, 0);
+        actions.addView(fit, fitLp);
 
         FrameLayout.LayoutParams el = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, Ui.dp(this, 48), Gravity.TOP | Gravity.END);
         el.setMargins(0, Ui.dp(this, 24), Ui.dp(this, 20), 0);

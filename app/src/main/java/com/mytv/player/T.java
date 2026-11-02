@@ -35,6 +35,16 @@ public final class T {
     }
 
     static {
+        TA.put("Video fit", "வீடியோ பொருத்தம்");
+        HI.put("Video fit", "वीडियो फ़िट");
+        TA.put("Fit", "பொருத்து");
+        HI.put("Fit", "फ़िट");
+        TA.put("Fill / Stretch", "நிரப்பு / நீட்டு");
+        HI.put("Fill / Stretch", "भरें / स्ट्रेच");
+        TA.put("Crop", "வெட்டு");
+        HI.put("Crop", "क्रॉप");
+        TA.put("Zoom 1.2×", "பெரிதாக்கு 1.2×");
+        HI.put("Zoom 1.2×", "ज़ूम 1.2×");
         TA.put("Links", "இணைப்புகள்");
         HI.put("Links", "लिंक");
         TA.put("Add link / M3U", "இணைப்பு / M3U சேர்");

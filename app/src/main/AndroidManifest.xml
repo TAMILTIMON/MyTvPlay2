@@ -143,13 +143,11 @@
         <activity
             android:name=".PresentActivity"
             android:exported="false"
-            android:label="ZH Presenter"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden" />
 
         <activity
             android:name=".PresentShowActivity"
             android:exported="false"
-            android:label="ZH Presenter"
             android:launchMode="singleTop"
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:theme="@style/PlayerTheme" />
@@ -192,7 +190,6 @@
         <activity
             android:name=".MusicActivity"
             android:exported="false"
-            android:label="ZH Music"
             android:launchMode="singleTop"
             android:screenOrientation="portrait" />
 
@@ -228,7 +225,7 @@
             android:name=".BrowserActivity"
             android:configChanges="orientation|screenSize|smallestScreenSize|keyboardHidden|keyboard|navigation|screenLayout|uiMode"
             android:exported="false"
-            android:label="ZH Browser"
+            android:label="ZH Play Browser"
             android:launchMode="singleTask"
             android:supportsPictureInPicture="true"
             android:taskAffinity="com.tamil.castplay.browser"
@@ -255,7 +252,6 @@
             android:name=".PlayerActivity"
             android:configChanges="orientation|screenSize|keyboardHidden|keyboard|navigation|smallestScreenSize|screenLayout|uiMode"
             android:exported="true"
-            android:label="ZH Picture"
             android:launchMode="singleTop">
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
