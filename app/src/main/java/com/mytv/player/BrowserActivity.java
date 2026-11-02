@@ -1077,38 +1077,41 @@ public class BrowserActivity extends AppCompatActivity {
             }
         }, "ZHDl");
         // Text selection → Search in new tab (keeps system Copy / Share / Web search)
-        web.setActionModeCallback(new ActionMode.Callback() {
-            @Override
-            public boolean onCreateActionMode(ActionMode mode, Menu menu) {
-                menu.add(0, 0x5e11, 50, T.t("Search in new tab"));
-                return true;
-            }
+        // View.setActionModeCallback requires API 23+
+        if (Build.VERSION.SDK_INT >= 23) {
+            web.setActionModeCallback(new ActionMode.Callback() {
+                @Override
+                public boolean onCreateActionMode(ActionMode mode, Menu menu) {
+                    menu.add(0, 0x5e11, 50, T.t("Search in new tab"));
+                    return true;
+                }
 
-            @Override
-            public boolean onPrepareActionMode(ActionMode mode, Menu menu) {
-                return false;
-            }
+                @Override
+                public boolean onPrepareActionMode(ActionMode mode, Menu menu) {
+                    return false;
+                }
 
-            @Override
-            public boolean onActionItemClicked(ActionMode mode, MenuItem item) {
-                if (item.getItemId() != 0x5e11) return false;
-                web.evaluateJavascript("(function(){try{return window.getSelection().toString()}catch(e){return ''}})()", v -> {
-                    String q = v == null ? "" : v.trim();
-                    if (q.length() >= 2 && q.charAt(0) == '"' && q.charAt(q.length() - 1) == '"')
-                        q = q.substring(1, q.length() - 1);
-                    q = q.replace("\\n", " ").replace("\\\"", "\"").trim();
-                    if (q.isEmpty()) return;
-                    final String query = q;
-                    main.post(() -> newTab("https://www.google.com/search?q=" + Uri.encode(query)));
-                });
-                mode.finish();
-                return true;
-            }
+                @Override
+                public boolean onActionItemClicked(ActionMode mode, MenuItem item) {
+                    if (item.getItemId() != 0x5e11) return false;
+                    web.evaluateJavascript("(function(){try{return window.getSelection().toString()}catch(e){return ''}})()", v -> {
+                        String q = v == null ? "" : v.trim();
+                        if (q.length() >= 2 && q.charAt(0) == '"' && q.charAt(q.length() - 1) == '"')
+                            q = q.substring(1, q.length() - 1);
+                        q = q.replace("\\n", " ").replace("\\\"", "\"").trim();
+                        if (q.isEmpty()) return;
+                        final String query = q;
+                        main.post(() -> newTab("https://www.google.com/search?q=" + Uri.encode(query)));
+                    });
+                    mode.finish();
+                    return true;
+                }
 
-            @Override
-            public void onDestroyActionMode(ActionMode mode) {
-            }
-        });
+                @Override
+                public void onDestroyActionMode(ActionMode mode) {
+                }
+            });
+        }
         web.setOnLongClickListener(v -> {
             WebView.HitTestResult h = web.getHitTestResult();
             String u = h.getExtra();
