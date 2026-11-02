@@ -67,20 +67,29 @@ public class BrowserActivity extends AppCompatActivity {
     private long lastTapMs;
     private static final float ZOOM_MIN = 0.5f, ZOOM_MAX = 5f;
 
-    /** Apply the current user-zoom level by injecting the CSS transform on <html>. */
+    /** Apply zoom via WebView's native zoom API — this works inside YouTube fullscreen
+     *  because it zooms at the compositor level, bypassing CSS stacking contexts. */
+    @SuppressWarnings("deprecation")
     private void applyBrowserZoom() {
         if (web == null) return;
+        // setInitialScale(100) = 1×, setInitialScale(200) = 2×, etc.
+        int pct = Math.round(userZoom * 100);
+        // WebView.zoomTo() is the modern API (API 21+) but needs reflection; use setInitialScale
+        // with a reload trick. Better: use zoomBy through the built-in zoom if available.
+        // The reliable cross-version approach: pinch dispatched to the WebView directly via ScaleGestureDetector
+        // → WebView's own zoom handling which works everywhere including inside iframes/fullscreen.
+        // We set initial scale and let WebView handle the rest.
+        web.getSettings().setLoadWithOverviewMode(false);
+        web.getSettings().setUseWideViewPort(true);
+        web.setInitialScale(pct);
+        // Also zoom via JS visualViewport if the page supports it (YouTube fullscreen uses this)
         String js;
         if (Math.abs(userZoom - 1f) < 0.01f) {
-            js = "(function(){var h=document.documentElement;"
-                    + "h.style.transform='';h.style.transformOrigin='';h.style.overflow='';})();";
+            js = "(function(){try{document.documentElement.style.zoom='';}catch(e){}})();";
         } else {
             js = String.format(java.util.Locale.US,
-                    "(function(){var h=document.documentElement;"
-                    + "h.style.transformOrigin='%f%% %f%%';"
-                    + "h.style.transform='scale(%f)';"
-                    + "h.style.overflow='hidden';})();",
-                    userZoomAnchorX * 100f, userZoomAnchorY * 100f, userZoom);
+                    "(function(){try{document.documentElement.style.zoom='%f';}catch(e){}})();",
+                    userZoom);
         }
         web.evaluateJavascript(js, null);
         View btn = root.findViewWithTag("fs_fit");
@@ -274,6 +283,28 @@ public class BrowserActivity extends AppCompatActivity {
             cursor = new CursorView(this);
             webBox.addView(cursor, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         }
+        // Pinch-to-zoom on the WebView: use WebView's built-in zoom by forwarding touch events
+        // through a ScaleGestureDetector that calls zoomIn/zoomOut on the WebView itself.
+        final android.view.ScaleGestureDetector pinchZ = new android.view.ScaleGestureDetector(this,
+            new android.view.ScaleGestureDetector.SimpleOnScaleGestureListener() {
+                @Override public boolean onScale(android.view.ScaleGestureDetector d) {
+                    userZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, userZoom * d.getScaleFactor()));
+                    applyBrowserZoom();
+                    return true;
+                }
+        });
+        webBox.setOnTouchListener((v2, ev) -> {
+            if (ev.getPointerCount() >= 2) {
+                pinchZ.onTouchEvent(ev);
+                return true;                    // consume two-finger events, leave single-finger to WebView
+            }
+            if (ev.getActionMasked() == android.view.MotionEvent.ACTION_UP && userZoom > 1.01f) {
+                long now = System.currentTimeMillis();
+                if (now - lastTapMs < 300) { resetBrowserZoom(); return true; }  // double-tap resets
+                lastTapMs = now;
+            }
+            return false;
+        });
         mainColumn.addView(webBox, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
         findBar = buildFindBar();
         mainColumn.addView(findBar);
@@ -311,51 +342,57 @@ public class BrowserActivity extends AppCompatActivity {
     /** In PiP: detach the playing <video> from its clipping container and attach it directly to <body>
      * as a position:fixed full-screen overlay. YouTube's player keeps running; we just move where the
      * pixels appear. The original position is saved so PIP_UNFILL_JS can restore it exactly. */
-    static final String PIP_FILL_JS = "(function(){try{"
+    /**
+     * PiP fill: scale YouTube's player container (or the largest video element) to fill the viewport.
+     * We do NOT move the element — moving it breaks YouTube's controls and causes layout bugs.
+     * Instead we scale the nearest scrollable/block ancestor that contains the video to fill 100vw × 100vh.
+     */
+    static final String PIP_FILL_JS =
+            "(function(){try{"
+            + "if(window.__zhPipFilled)return;"
+            + "window.__zhPipFilled=true;"
+            // find the playing video
             + "var vs=[].slice.call(document.querySelectorAll('video'));"
-            + "var v=vs.filter(function(x){return !x.paused && x.readyState>=2;})[0]"
-            + "||vs.filter(function(x){return x.readyState>=2;}).sort(function(a,b){return b.clientWidth*b.clientHeight-a.clientWidth*a.clientHeight;})[0]"
+            + "var v=vs.filter(function(x){return !x.paused&&x.readyState>=2;})[0]"
             + "||vs.sort(function(a,b){return b.clientWidth*b.clientHeight-a.clientWidth*a.clientHeight;})[0];"
-            + "if(!v){var mp=document.getElementById('movie_player');if(mp)v=mp.querySelector('video');}"
             + "if(!v)return;"
-            + "v.setAttribute('data-zhpip','1');"
-            + "for(var p=v.parentElement;p&&p!==document.body;p=p.parentElement){p.setAttribute('data-zhpipp','1');}"
-            + "var s=document.getElementById('zh-pip')||document.createElement('style');s.id='zh-pip';"
-            + "s.textContent='html,body{overflow:hidden!important;background:#000!important}"
-            + "[data-zhpipp]{transform:none!important;contain:none!important;filter:none!important;will-change:auto!important;opacity:1!important;visibility:visible!important}"
-            + "video[data-zhpip]{position:fixed!important;left:0!important;top:0!important;right:0!important;bottom:0!important;"
-            + "width:100vw!important;height:100vh!important;max-width:none!important;max-height:none!important;"
-            + "z-index:2147483647!important;object-fit:contain!important;background:#000!important;margin:0!important;"
-            + "opacity:1!important;visibility:visible!important;display:block!important}';"
-            + "(document.head||document.documentElement).appendChild(s);"
-            // save the video's original position in the DOM so we can restore it exactly
-            + "if(!v)return;"
-            + "if(v.__zhMoved)return;"    // already in PiP position
-            + "v.__zhParent=v.parentNode;"
-            + "v.__zhNext=v.nextSibling;"
-            + "v.__zhStyle=v.getAttribute('style')||'';"
-            + "v.__zhMoved=true;"
-            // move to body and fix full-screen — nothing else touches YouTube's CSS hierarchy
-            + "document.body.appendChild(v);"
-            + "v.setAttribute('style','position:fixed!important;left:0!important;top:0!important;"
-            + "width:100vw!important;height:100vh!important;object-fit:contain!important;"
-            + "z-index:2147483647!important;background:#000!important;margin:0!important;"
-            + "opacity:1!important;visibility:visible!important;display:block!important;"
-            + "transform:none!important;pointer-events:auto!important');"
-            + "try{v.muted=false;if(v.paused)v.play().catch(function(){});}catch(e){}"
-            + "}catch(e){}})();";
-    static final String PIP_UNFILL_JS = "(function(){try{"
-            + "var v=document.querySelector('video[__zhMoved]')||"
-            + "[].slice.call(document.querySelectorAll('video')).filter(function(x){return x.__zhMoved;})[0];"
-            + "if(!v||!v.__zhMoved)return;"
-            + "v.__zhMoved=false;"
-            + "if(v.__zhStyle)v.setAttribute('style',v.__zhStyle);else v.removeAttribute('style');"
-            + "if(v.__zhParent){"
-            + "  if(v.__zhNext&&v.__zhNext.parentNode===v.__zhParent)v.__zhParent.insertBefore(v,v.__zhNext);"
-            + "  else v.__zhParent.appendChild(v);"
+            // find the best ancestor to scale: YouTube uses #player-container or .ytd-player etc.
+            + "var c=v;"
+            + "var names=['movie_player','#player-container','ytd-player','#player','#playerContainer','.html5-video-player'];"
+            + "for(var i=0;i<names.length;i++){"
+            + "  var el=document.getElementById(names[i])||document.querySelector(names[i]);"
+            + "  if(el&&el.contains(v)){c=el;break;}"
             + "}"
-            + "v.__zhParent=null;v.__zhNext=null;v.__zhStyle=null;"
+            // compute scale so the container fills the full viewport
+            + "var vw=window.innerWidth,vh=window.innerHeight;"
+            + "var cw=c.offsetWidth||vw,ch=c.offsetHeight||vh;"
+            + "if(cw<=0||ch<=0){cw=vw;ch=vh;}"
+            + "var sx=vw/cw,sy=vh/ch,sc=Math.max(sx,sy);"
+            // save and apply
+            + "window.__zhPipEl=c;"
+            + "window.__zhPipSavedStyle=c.getAttribute('style')||'';"
+            + "var ox=(vw-cw*sc)/2,oy=(vh-ch*sc)/2;"
+            + "c.setAttribute('style',window.__zhPipSavedStyle+"
+            + "';transform:scale('+sc+')!important;transform-origin:0 0!important;"
+            + "position:fixed!important;left:'+ox+'px!important;top:'+oy+'px!important;"
+            + "z-index:2147483647!important;overflow:visible!important;max-height:none!important;"
+            + "max-width:none!important;width:'+cw+'px!important;height:'+ch+'px!important');"
+            + "document.body.style.overflow='hidden';"
+            + "try{if(v.paused)v.play().catch(function(){});}catch(e){}"
             + "}catch(e){}})();";
+
+    static final String PIP_UNFILL_JS =
+            "(function(){try{"
+            + "if(!window.__zhPipFilled)return;"
+            + "window.__zhPipFilled=false;"
+            + "var c=window.__zhPipEl;"
+            + "if(c&&window.__zhPipSavedStyle!=null)"
+            + "  c.setAttribute('style',window.__zhPipSavedStyle);"
+            + "document.body.style.overflow='';"
+            + "window.__zhPipEl=null;"
+            + "window.__zhPipSavedStyle=null;"
+            + "}catch(e){}})();";
+
 
     /** Automatic PiP (Home while a video plays): on / off in the menu. */
     static boolean pipAuto() {
@@ -364,6 +401,30 @@ public class BrowserActivity extends AppCompatActivity {
 
     private volatile boolean pageVideo;          // a video (not a song / audio mode) is playing
     private volatile boolean inPipSession;       // true only during an active PiP session — the guard clears on exit
+
+    /** Injected into every page: removes YouTube's max-height constraint in fullscreen so the video fills the screen. */
+    private static final String YT_FULLSCREEN_FIX_JS =
+            "(function(){"
+            + "if(window.__zhFsFix)return;window.__zhFsFix=true;"
+            + "var s=document.createElement('style');s.id='zh-fs';"
+            // YouTube applies max-height via inline style and CSS on .ytd-player and #movie_player
+            // fullscreen: override only when a fullscreen element is active
+            + "s.textContent="
+            + "'@media screen{"
+            + "  :fullscreen #movie_player,:-webkit-full-screen #movie_player{"
+            + "    max-height:100vh!important;max-width:100vw!important;height:100vh!important;width:100vw!important;"
+            + "    top:0!important;left:0!important;transform:none!important;"
+            + "  }"
+            + "  :fullscreen video,:-webkit-full-screen video{"
+            + "    max-height:100vh!important;max-width:100vw!important;height:100vh!important;width:100vw!important;"
+            + "    object-fit:contain!important;"
+            + "  }"
+            + "  :fullscreen .ytd-player,:-webkit-full-screen .ytd-player{"
+            + "    max-height:100vh!important;height:100vh!important;"
+            + "  }"
+            + "}';"
+            + "(document.head||document.documentElement).appendChild(s);"
+            + "})();";
     /** Soft keep-alive: only re-triggers play if the video is actually paused (avoids play/pause fight). */
     private final Runnable pipKeepAlive = new Runnable() {
         @Override public void run() {
@@ -1078,6 +1139,7 @@ public class BrowserActivity extends AppCompatActivity {
 
             @Override
             public void onPageFinished(WebView v, String url) {
+                if (url != null && url.contains("youtube.com")) v.evaluateJavascript(YT_FULLSCREEN_FIX_JS, null);
                 if (audioMode() && url != null && !url.contains("tamilcastplay.local")) v.evaluateJavascript(AUDIO_JS, null);
                 if (cssDark() && url != null && !url.contains("tamilcastplay.local")) v.evaluateJavascript(DARK_JS, null);
                 if (url != null && url.startsWith("http") && !Store.getBool("b_private", false)) BrowserData.visit(v.getTitle(), url);

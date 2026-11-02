@@ -1,3 +1,14 @@
+ZH PLAY 5.7.5 — YouTube fullscreen fills screen; pinch-to-zoom works; PiP→fullscreen fixed
+=========================================================================================
+* YouTube fullscreen black bars: a CSS rule is injected that removes YouTube's max-height
+  constraint only while fullscreen is active — the video now fills the full screen.
+* Pinch-to-zoom: the ScaleGestureDetector is now actually attached to webBox (it was lost
+  in a merge). CSS zoom is applied at the document root, which works inside YouTube's nested
+  containers. Two-finger pinch anywhere in the browser zooms; double-tap resets.
+* PiP → fullscreen: the player container is scaled with transform:scale() instead of moving
+  the <video> element to <body> (which broke the controls and left it stranded in the middle
+  of the screen when returning from PiP).
+
 ZH PLAY 5.7.4 — YouTube PiP: video visible, pause works; pinch-to-zoom in browser
 =============================================================================
 * PiP YouTube video visible: the <video> element is moved directly to <body> (bypassing YouTube's
