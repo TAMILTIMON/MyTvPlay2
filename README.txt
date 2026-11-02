@@ -1,3 +1,15 @@
+ZH PLAY 5.7.2 — TV: the remote's cursor is visible again in menus
+================================================================
+* Since 4.7 (the card-style menus) the highlight of the line under the remote's cursor was transparent,
+  so on the TV you couldn't see which option you were on (e.g. Settings / player quality 480p ↔ 1080p).
+  Now every list menu shows the line under the cursor as a tinted card with an accent outline, and a
+  choice list opens on the option that is currently chosen. The TV's video / music grid too.
+
+ZH PLAY 5.7.1 — new logo everywhere
+==================================
+* The new logo now also in: the logo badges (opening animation, headers, TV home — black badge instead
+  of white), the home-screen widgets, the phone's web remote page and its tab icon, the browser's start page.
+
 ZH PLAY 5.7 — new logo, Music links & YouTube listening, PiP fixed, VPN fixes
 ==========================================================================
 (built on your Gemini changes: picture-in-picture, VPN button, IP rotation — kept)

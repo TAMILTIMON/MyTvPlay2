@@ -125,7 +125,11 @@ public class PhoneLibraryActivity extends AppCompatActivity {
 
         grid = new GridView(this);
         mode = Store.getInt(audio ? "lib_view_a" : "lib_view_v", 1);
-        grid.setSelector(new android.graphics.drawable.ColorDrawable(0));
+        // TV remote: a visible cursor on the grid (on a phone you tap, so the card's own press effect is enough)
+        if (Ui.isTv(this)) {
+            grid.setSelector(UiDialog.focusHighlight(this));
+            grid.setDrawSelectorOnTop(true);
+        } else grid.setSelector(new android.graphics.drawable.ColorDrawable(0));
         grid.setClipToPadding(false);
         grid.setPadding(0, 0, 0, dp(audio ? 96 : 20));
         ad = new BaseAdapter() {

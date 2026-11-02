@@ -96,6 +96,22 @@ public class UiDialog extends AlertDialog.Builder {
         });
     }
 
+    /** A tinted card with an accent outline on the line under the cursor (focused / selected / pressed). */
+    static android.graphics.drawable.Drawable focusHighlight(Context c) {
+        android.graphics.drawable.GradientDrawable on = new android.graphics.drawable.GradientDrawable();
+        on.setCornerRadius(Ui.dp(c, 14));
+        on.setColor((Ui.ACCENT & 0x00FFFFFF) | 0x3A000000);
+        on.setStroke(Ui.dp(c, 2), Ui.ACCENT);
+        android.graphics.drawable.InsetDrawable inset = new android.graphics.drawable.InsetDrawable(on,
+                Ui.dp(c, 12), Ui.dp(c, 2), Ui.dp(c, 12), Ui.dp(c, 2));
+        android.graphics.drawable.StateListDrawable sl = new android.graphics.drawable.StateListDrawable();
+        sl.addState(new int[]{android.R.attr.state_focused}, inset);
+        sl.addState(new int[]{android.R.attr.state_selected}, inset);
+        sl.addState(new int[]{android.R.attr.state_pressed}, inset);
+        sl.addState(new int[]{}, new android.graphics.drawable.ColorDrawable(0));
+        return sl;
+    }
+
     /** No grey lines between the card rows. */
     @Override
     public AlertDialog create() {
@@ -105,9 +121,16 @@ public class UiDialog extends AlertDialog.Builder {
             if (lv != null) {
                 lv.setDivider(null);
                 lv.setDividerHeight(0);
-                lv.setSelector(new android.graphics.drawable.ColorDrawable(0));
+                // the cursor: with a TV remote (D-pad) this highlight is the only way to see which line is chosen
+                lv.setSelector(focusHighlight(ctx));
+                lv.setDrawSelectorOnTop(true);                 // over the card rows, so their backgrounds can't hide it
                 lv.setPadding(0, Ui.dp(ctx, 4), 0, Ui.dp(ctx, 8));
                 lv.setClipToPadding(false);
+                if (Ui.isTv(ctx)) {                            // start on the chosen option (e.g. the current quality)
+                    lv.requestFocus();
+                    int sel = lv.getCheckedItemPosition();
+                    if (sel >= 0) lv.setSelection(sel);
+                }
             }
         });
         return d;
