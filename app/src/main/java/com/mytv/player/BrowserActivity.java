@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 package com.mytv.player;
 
 import android.annotation.SuppressLint;
@@ -2990,6 +2989,3 @@ public class BrowserActivity extends AppCompatActivity {
         }
     }
 }
-=======
-PLACEHOLDER_WILL_REPLACE_WITH_FULL
->>>>>>> 684a5e9a57710c86ef5d3b7b27a0ec34dea825f4
