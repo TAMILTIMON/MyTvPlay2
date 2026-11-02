@@ -230,7 +230,6 @@
             android:exported="false"
             android:label="ZH Browser"
             android:launchMode="singleTask"
-            android:supportsPictureInPicture="true"
             android:taskAffinity="com.tamil.castplay.browser"
             android:windowSoftInputMode="adjustResize" />
 

@@ -1,7 +1,6 @@
 package com.mytv.player;
 
 import android.annotation.SuppressLint;
-import android.app.PictureInPictureParams;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
@@ -9,14 +8,12 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
-import android.graphics.Rect;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
-import android.util.Rational;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
@@ -84,7 +81,7 @@ public class BrowserActivity extends AppCompatActivity {
             + "(document.head||document.documentElement).appendChild(s);})();"
     };
     private static final String[] FIT_NAMES = {"Fit", "Fill / Stretch", "Crop", "Zoom 1.2×"};
-    private static final String[] FIT_ICONS = {"maximize-2", "move-horizontal", "crop", "zoom-in"};
+    private static final String[] FIT_ICONS = {"ratio", "move-horizontal", "crop", "zoom-in"};
 
     private void cycleVideoFit() {
         videoFitMode = (videoFitMode + 1) % FIT_JS.length;
@@ -310,287 +307,11 @@ public class BrowserActivity extends AppCompatActivity {
         });
     }
 
-    // ---------------------------------------------------------------- Picture-in-Picture (PiP)
-    // Script overrides the Page Visibility API and intercepts programmatic pause attempts
     /** The ZH Play logo (orange தீ on black) for the start page — embedded, the page has no files of its own. */
     private static final String START_LOGO = "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";
 
     /** In PiP: the playing video fills the small window (YouTube's player is otherwise a strip in the page). */
-    static final String PIP_FILL_JS = "(function(){try{"
-            + "var vs=[].slice.call(document.querySelectorAll('video'));"
-            + "var v=vs.filter(function(x){return !x.paused && x.readyState>=2;})[0]"
-            + "||vs.filter(function(x){return x.readyState>=2;}).sort(function(a,b){return b.clientWidth*b.clientHeight-a.clientWidth*a.clientHeight;})[0]"
-            + "||vs.sort(function(a,b){return b.clientWidth*b.clientHeight-a.clientWidth*a.clientHeight;})[0];"
-            + "if(!v){var mp=document.getElementById('movie_player');if(mp)v=mp.querySelector('video');}"
-            + "if(!v)return;"
-            + "v.setAttribute('data-zhpip','1');"
-            + "for(var p=v.parentElement;p&&p!==document.body;p=p.parentElement){p.setAttribute('data-zhpipp','1');}"
-            + "var s=document.getElementById('zh-pip')||document.createElement('style');s.id='zh-pip';"
-            + "s.textContent='html,body{overflow:hidden!important;background:#000!important}"
-            + "[data-zhpipp]{transform:none!important;contain:none!important;filter:none!important;will-change:auto!important;opacity:1!important;visibility:visible!important}"
-            + "video[data-zhpip]{position:fixed!important;left:0!important;top:0!important;right:0!important;bottom:0!important;"
-            + "width:100vw!important;height:100vh!important;max-width:none!important;max-height:none!important;"
-            + "z-index:2147483647!important;object-fit:contain!important;background:#000!important;margin:0!important;"
-            + "opacity:1!important;visibility:visible!important;display:block!important}';"
-            + "(document.head||document.documentElement).appendChild(s);"
-            + "window.scrollTo(0,0);"
-            + "try{v.muted=false;if(v.paused)v.play().catch(function(){});}catch(e){}"
-            + "}catch(e){}})();";
-    static final String PIP_UNFILL_JS = "(function(){var s=document.getElementById('zh-pip');if(s)s.remove();"
-            + "[].slice.call(document.querySelectorAll('[data-zhpip],[data-zhpipp]')).forEach(function(e){"
-            + "e.removeAttribute('data-zhpip');e.removeAttribute('data-zhpipp');});})();";
-
-    /** Automatic PiP (Home while a video plays): on / off in the menu. */
-    static boolean pipAuto() {
-        return Store.getBool("b_pip", true);
-    }
-
     private volatile boolean pageVideo;          // a video (not a song / audio mode) is playing
-    /** True from just before enterPictureInPictureMode until PiP fully exits (covers the onPause race). */
-    private volatile boolean pipActive;
-
-    /** Spoof visibility + play only if paused. */
-    private static final String RESUME_VIDEO_JS =
-            "(function() {"
-            + "  try {"
-            + "    Object.defineProperty(document, 'hidden', { get: function(){ return false; }, configurable: true });"
-            + "    Object.defineProperty(document, 'visibilityState', { get: function(){ return 'visible'; }, configurable: true });"
-            + "    Object.defineProperty(document, 'webkitHidden', { get: function(){ return false; }, configurable: true });"
-            + "    try { window.dispatchEvent(new Event('focus')); } catch(e) {}"
-            + "  } catch (e) {}"
-            + "  try {"
-            + "    var mp = document.getElementById('movie_player');"
-            + "    if (mp) {"
-            + "      if (typeof mp.playVideo === 'function') mp.playVideo();"
-            + "      if (typeof mp.play === 'function') mp.play();"
-            + "      if (typeof mp.unMute === 'function') mp.unMute();"
-            + "    }"
-            + "  } catch (e) {}"
-            + "  document.querySelectorAll('video').forEach(function(v) {"
-            + "    try {"
-            + "      v.muted = false;"
-            + "      if (v.paused || v.ended) {"
-            + "        var p = v.play();"
-            + "        if (p && typeof p.catch === 'function') p.catch(function(){});"
-            + "      }"
-            + "    } catch (e) {}"
-            + "  });"
-            + "})();";
-
-    /**
-     * PiP guard for YouTube — no tight play/pause loop.
-     * - Blocks pause() / pauseVideo() / stopVideo while in PiP
-     * - MutationObserver on paused-mode class → one delayed playVideo()
-     * - pause event → one delayed play (rate-limited 400ms)
-     * - NO setInterval hammer
-     */
-    private static final String PIP_BLOCK_PAUSE_JS =
-            "(function(){"
-            + "  if (window._zhPipBlock) return;"
-            + "  window._zhPipBlock = true;"
-            + "  window._zhPipLastPlay = 0;"
-            + "  function forcePlay() {"
-            + "    var now = Date.now();"
-            + "    if (now - window._zhPipLastPlay < 400) return;"
-            + "    window._zhPipLastPlay = now;"
-            + "    try {"
-            + "      var mp = document.getElementById('movie_player');"
-            + "      if (mp && typeof mp.playVideo === 'function') mp.playVideo();"
-            + "    } catch(e) {}"
-            + "    document.querySelectorAll('video').forEach(function(v) {"
-            + "      try { v.muted = false; if (v.paused || v.ended) { var p = v.play(); if (p && p.catch) p.catch(function(){}); } } catch(e) {}"
-            + "    });"
-            + "  }"
-            + "  try {"
-            + "    if (!window._zhOrigPause) window._zhOrigPause = HTMLMediaElement.prototype.pause;"
-            + "    HTMLMediaElement.prototype.pause = function() {"
-            + "      if (window._zhPipBlock) return;"
-            + "      return window._zhOrigPause.apply(this, arguments);"
-            + "    };"
-            + "  } catch(e) {}"
-            + "  function patchYt() {"
-            + "    var mp = document.getElementById('movie_player');"
-            + "    if (!mp || mp._zhYtP) return;"
-            + "    mp._zhYtP = true;"
-            + "    ['pauseVideo','stopVideo'].forEach(function(fn) {"
-            + "      if (typeof mp[fn] === 'function') {"
-            + "        mp['_O_'+fn] = mp[fn].bind(mp);"
-            + "        mp[fn] = function() { if (!window._zhPipBlock && mp['_O_'+fn]) mp['_O_'+fn](); };"
-            + "      }"
-            + "    });"
-            + "  }"
-            + "  patchYt();"
-            + "  try {"
-            + "    if (window._zhMO) window._zhMO.disconnect();"
-            + "    window._zhMO = new MutationObserver(function() {"
-            + "      patchYt();"
-            + "      var m = document.getElementById('movie_player');"
-            + "      if (m && m.classList.contains('paused-mode')) setTimeout(forcePlay, 80);"
-            + "    });"
-            + "    var m0 = document.getElementById('movie_player');"
-            + "    if (m0) window._zhMO.observe(m0, { attributes: true, attributeFilter: ['class'] });"
-            + "    else window._zhMO.observe(document.documentElement, { childList: true, subtree: true });"
-            + "  } catch(e) {}"
-            + "  function attach(v) {"
-            + "    if (v._zhPipListener) return;"
-            + "    v._zhPipListener = true;"
-            + "    v.addEventListener('pause', function() {"
-            + "      if (!window._zhPipBlock) return;"
-            + "      setTimeout(forcePlay, 80);"
-            + "    });"
-            + "  }"
-            + "  document.querySelectorAll('video').forEach(attach);"
-            + "  try {"
-            + "    var obs2 = new MutationObserver(function(){ document.querySelectorAll('video').forEach(attach); });"
-            + "    obs2.observe(document.documentElement, { childList: true, subtree: true });"
-            + "    window._zhPipObs2 = obs2;"
-            + "  } catch(e) {}"
-            + "  try {"
-            + "    Object.defineProperty(document, 'hidden', { get: function(){ return false; }, configurable: true });"
-            + "    Object.defineProperty(document, 'visibilityState', { get: function(){ return 'visible'; }, configurable: true });"
-            + "    Object.defineProperty(document, 'webkitHidden', { get: function(){ return false; }, configurable: true });"
-            + "  } catch(e) {}"
-            + "})();";
-
-    private static final String PIP_UNBLOCK_PAUSE_JS =
-            "(function(){"
-            + "  try {"
-            + "    window._zhPipBlock = false;"
-            + "    if (window._zhOrigPause) {"
-            + "      HTMLMediaElement.prototype.pause = window._zhOrigPause;"
-            + "      window._zhOrigPause = null;"
-            + "    }"
-            + "    if (window._zhMO) { try { window._zhMO.disconnect(); } catch(e) {} window._zhMO = null; }"
-            + "    if (window._zhPipObs2) { try { window._zhPipObs2.disconnect(); } catch(e) {} window._zhPipObs2 = null; }"
-            + "    var m = document.getElementById('movie_player');"
-            + "    if (m && m._zhYtP) {"
-            + "      m._zhYtP = false;"
-            + "      ['pauseVideo','stopVideo'].forEach(function(fn){ if (m['_O_'+fn]) m[fn] = m['_O_'+fn]; });"
-            + "    }"
-            + "    document.querySelectorAll('video').forEach(function(v){ v._zhPipListener = false; });"
-            + "  } catch(e) {}"
-            + "})();";
-
-    public void resumeMediaForPip() {
-        if (web != null) {
-            try { web.onResume(); } catch (Exception ignored) {}
-            web.evaluateJavascript(RESUME_VIDEO_JS, null);
-            if (isInPictureInPictureMode()) {
-                web.evaluateJavascript(PIP_BLOCK_PAUSE_JS, null);
-                if (customView == null) web.evaluateJavascript(PIP_FILL_JS, null);
-            }
-        }
-    }
-
-    public boolean enterPipMode() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return false;
-        try {
-            // Install pause-guard BEFORE the activity is paused (Brave-style: keep engine alive)
-            pipActive = true;
-            if (web != null) {
-                try { web.onResume(); } catch (Exception ignored) {}
-                web.evaluateJavascript(PIP_BLOCK_PAUSE_JS, null);
-                if (customView == null) web.evaluateJavascript(PIP_FILL_JS, null);
-                web.evaluateJavascript(RESUME_VIDEO_JS, null);
-            }
-
-            PictureInPictureParams.Builder b = new PictureInPictureParams.Builder();
-            View target = (customView != null && customView.getWidth() > 0) ? customView : null;
-            int w = target != null ? target.getWidth() : 0;
-            int h = target != null ? target.getHeight() : 0;
-            if (w > 0 && h > 0) {
-                float r = (float) w / (float) h;
-                // Ratio must be within Android's strict bounds [1:2.39, 2.39:1]
-                if (r >= 0.42f && r <= 2.38f) {
-                    b.setAspectRatio(new Rational(Math.round(r * 1000), 1000));
-                } else {
-                    b.setAspectRatio(new Rational(16, 9));
-                }
-                Rect rect = new Rect();
-                target.getGlobalVisibleRect(rect);
-                b.setSourceRectHint(rect);
-            } else {
-                b.setAspectRatio(new Rational(16, 9));
-            }
-            if (Build.VERSION.SDK_INT >= 31) {
-                try { b.setSeamlessResizeEnabled(true); } catch (Throwable ignored) {}
-            }
-            boolean ok = enterPictureInPictureMode(b.build());
-            if (!ok) {
-                pipActive = false;
-            } else if (web != null) {
-                // Activity will onPause immediately — keep the WebView running
-                try { web.onResume(); } catch (Exception ignored) {}
-            }
-            return ok;
-        } catch (Exception e) {
-            pipActive = false;
-            return false;
-        }
-    }
-
-    @Override
-    protected void onUserLeaveHint() {
-        super.onUserLeaveHint();
-        // only for a playing VIDEO (songs / audio mode keep playing quietly in the background), and only if switched on
-        if (!tv && pipAuto() && !audioMode() && (customView != null || (pagePlaying && pageVideo))) {
-            enterPipMode();
-        }
-    }
-
-    @Override
-    public void onPictureInPictureModeChanged(boolean isInPictureInPictureMode, Configuration newConfig) {
-        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig);
-        handlePipChange(isInPictureInPictureMode);
-    }
-
-    private void handlePipChange(boolean inPip) {
-        pipActive = inPip;
-        if (inPip) {
-            if (topBar != null) topBar.setVisibility(View.GONE);
-            if (bottomBar != null) bottomBar.setVisibility(View.GONE);
-            if (findBar != null) findBar.setVisibility(View.GONE);
-            if (loading != null) loading.setVisibility(View.GONE);
-            if (eqFab != null) eqFab.setVisibility(View.GONE);
-            if (lockBtn != null) lockBtn.setVisibility(View.GONE);
-            if (lockLayer != null) lockLayer.setVisibility(View.GONE);
-            View eq = root.findViewWithTag("fs_eq");
-            if (eq != null) eq.setVisibility(View.GONE);
-            View pipBtn = root.findViewWithTag("fs_pip");
-            if (pipBtn != null) pipBtn.setVisibility(View.GONE);
-            View fitBtn = root.findViewWithTag("fs_fit");
-            if (fitBtn != null) fitBtn.setVisibility(View.GONE);
-            hideSuggest();
-
-            // Install pause-blocker + event recovery; a few delayed resumes only (no interval loop)
-            if (web != null) {
-                web.evaluateJavascript(PIP_BLOCK_PAUSE_JS, null);
-                if (customView == null) web.evaluateJavascript(PIP_FILL_JS, null);
-            }
-            resumeMediaForPip();
-            main.postDelayed(this::resumeMediaForPip, 500);
-            main.postDelayed(this::resumeMediaForPip, 1500);
-            main.postDelayed(this::resumeMediaForPip, 3000);
-        } else {
-            if (web != null) {
-                web.evaluateJavascript(PIP_UNBLOCK_PAUSE_JS, null);
-                web.evaluateJavascript(PIP_UNFILL_JS, null);
-            }
-            if (topBar != null) topBar.setVisibility(View.VISIBLE);
-            if (bottomBar != null) bottomBar.setVisibility(View.VISIBLE);
-            if (eqFab != null) eqFab.setVisibility(pageMedia && Store.getBool("b_eq", true) && customView == null ? View.VISIBLE : View.GONE);
-            if (lockBtn != null) lockBtn.setVisibility(customView != null ? View.VISIBLE : View.GONE);
-            if (lockLayer != null) lockLayer.setVisibility(View.VISIBLE);
-            View eq = root.findViewWithTag("fs_eq");
-            if (eq != null) eq.setVisibility(Store.getBool("b_eq", true) ? View.VISIBLE : View.GONE);
-            View pipBtn = root.findViewWithTag("fs_pip");
-            if (pipBtn != null) pipBtn.setVisibility(View.VISIBLE);
-            View fitBtnR = root.findViewWithTag("fs_fit");
-            if (fitBtnR != null) fitBtnR.setVisibility(View.VISIBLE);
-
-            resumeMediaForPip();
-        }
-    }
 
     // ---------------------------------------------------------------- open tabs kept between starts
     private void restoreTabs() {
@@ -859,15 +580,6 @@ public class BrowserActivity extends AppCompatActivity {
         LinearLayout actions = new LinearLayout(this);
         actions.setOrientation(LinearLayout.HORIZONTAL);
 
-        if (!tv && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            ImageView pip = UiKit.darkButton(this, "maximize", 48, false, v -> {
-                if (!locked) enterPipMode();
-            });
-            pip.setContentDescription(T.t("Picture in Picture"));
-            pip.setTag("fs_pip");
-            actions.addView(pip, new LinearLayout.LayoutParams(Ui.dp(this, 48), Ui.dp(this, 48)));
-        }
-
         ImageView eq = UiKit.darkButton(this, "sliders-vertical", 48, false, v -> {
             if (!locked) eqSheet();
         });
@@ -877,8 +589,8 @@ public class BrowserActivity extends AppCompatActivity {
         eqLp.setMargins(Ui.dp(this, 8), 0, 0, 0);
         if (Store.getBool("b_eq", true)) actions.addView(eq, eqLp);
 
-        // Video fit button: cycles Fit → Fill → Crop → Zoom (same 4 modes as the native player)
-        final ImageView fit = UiKit.darkButton(this, "maximize-2", 48, false, v -> {
+        // Video fit button: only in fullscreen — cycles Fit → Fill → Crop → Zoom
+        final ImageView fit = UiKit.darkButton(this, FIT_ICONS[videoFitMode], 48, false, v -> {
             if (!locked) cycleVideoFit();
         });
         fit.setContentDescription(T.t("Video fit"));
@@ -909,10 +621,15 @@ public class BrowserActivity extends AppCompatActivity {
         locked = false;
         if (lockLayer != null) root.removeView(lockLayer);
         if (lockBtn != null) root.removeView(lockBtn);
-        View eq = root.findViewWithTag("fs_eq");
-        if (eq != null && eq.getParent() instanceof ViewGroup) ((ViewGroup) eq.getParent()).removeView(eq);
-        View pip = root.findViewWithTag("fs_pip");
-        if (pip != null && pip.getParent() instanceof ViewGroup) ((ViewGroup) pip.getParent()).removeView(pip);
+        // Remove fullscreen action buttons (and their parent bar if empty)
+        for (String tag : new String[]{"fs_eq", "fs_pip", "fs_fit"}) {
+            View v = root.findViewWithTag(tag);
+            if (v != null && v.getParent() instanceof ViewGroup) {
+                ViewGroup p = (ViewGroup) v.getParent();
+                p.removeView(v);
+                if (p.getChildCount() == 0 && p.getParent() == root) root.removeView(p);
+            }
+        }
         lockLayer = null;
         lockBtn = null;
         if (!tv && oldOrientation != -2) {
@@ -1793,12 +1510,7 @@ public class BrowserActivity extends AppCompatActivity {
                     if (cm != null) cm.setPrimaryClip(android.content.ClipData.newPlainText("url", cur));
                     UiKit.makeToast(this, T.t("Copied"), Toast.LENGTH_SHORT).show();
                 }},
-                {"house", T.t("Exit browser"), (Runnable) () -> Ui.goHome(this, tv)},
-                {"maximize", T.t("Picture in Picture"), (Runnable) () -> {
-                    if (!enterPipMode()) {
-                        UiKit.makeToast(this, T.t("PiP is not supported or no video is playing"), Toast.LENGTH_SHORT).show();
-                    }
-                }}
+                {"house", T.t("Exit browser"), (Runnable) () -> Ui.goHome(this, tv)}
         };
 
         LinearLayout quick = new LinearLayout(this);
@@ -1839,8 +1551,6 @@ public class BrowserActivity extends AppCompatActivity {
         boolean bm = cur != null && BrowserData.isBookmarked(cur);
         Object[][] sections = {
                 {"§", T.t("Listening & Viewing")},
-                {23, T.t("Picture in Picture"), T.t("Floating video window — open now"), -1, false},
-                {-4, T.t("Automatic Picture in Picture"), T.t(pipAuto() ? "On — Home while a video plays" : "Off"), pipAuto() ? 1 : 0, false},
                 {-2, T.t("Audio only"), T.t(audioMode() ? "On — video hidden, sound playing" : "Off"), audioMode() ? 1 : 0, false},
                 {-3, T.t("Sleep timer"), sleepLabel(), -1, false},
                 {"§", T.t("This page")},
@@ -1874,7 +1584,6 @@ public class BrowserActivity extends AppCompatActivity {
                 continue;
             }
             int i = (Integer) sct[0];
-            if (i == 23 && tv) continue;
             if (i == -5) {                                              // add this page to Music → Links
                 list.addView(UiRows.row(this, "list-music", (String) sct[1], (String) sct[2], -1, false, v -> {
                     d.dismiss();
@@ -1887,15 +1596,6 @@ public class BrowserActivity extends AppCompatActivity {
                     String t = !pageSong.isEmpty() ? pageSong : web.getTitle();
                     UiKit.makeToast(this, MusicLinks.add(t, MusicLinks.isYouTube(u) ? u : (found.isEmpty() ? u : found.keySet().iterator().next()), "")
                             ? "✓ " + T.t("Added to Music → Links") : T.t("Already in Links"), Toast.LENGTH_SHORT).show();
-                }));
-                continue;
-            }
-            if (i == -4) {                                              // automatic PiP on / off
-                list.addView(UiRows.row(this, "maximize", (String) sct[1], (String) sct[2], (Integer) sct[3], false, v -> {
-                    d.dismiss();
-                    Store.putBool("b_pip", !pipAuto());
-                    UiKit.makeToast(this, T.t("Automatic Picture in Picture") + ": " + T.t(pipAuto() ? "On" : "Off"), Toast.LENGTH_SHORT).show();
-                    main.postDelayed(this::menu, 120);
                 }));
                 continue;
             }
@@ -2328,10 +2028,6 @@ public class BrowserActivity extends AppCompatActivity {
                 main.post(() -> UiKit.makeToast(this, m2, Toast.LENGTH_LONG).show());
             }).start());
         }
-        labels.add("⧉  " + T.t("Picture in Picture"));
-        acts.add(() -> {
-            if (!enterPipMode()) UiKit.makeToast(this, T.t("Start the video first"), Toast.LENGTH_SHORT).show();
-        });
         labels.add("ℹ  " + T.t("Why no download?"));
         acts.add(() -> new UiDialog(this).setTitle(T.t("Why no download?"))
                 .setMessage(T.t("YouTube protects its videos (encrypted, changing stream addresses) and its terms don't allow downloading. "
@@ -2896,37 +2592,12 @@ public class BrowserActivity extends AppCompatActivity {
         if (web != null) {
             try { web.onResume(); } catch (Exception ignored) {}
         }
-        if (pipActive || (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInPictureInPictureMode())) {
-            resumeMediaForPip();
-        }
     }
 
     @Override
     protected void onPause() {
-        // Do NOT suspend the WebView while entering or staying in PiP.
-        // Race: isInPictureInPictureMode() is often still false here right after enterPictureInPictureMode().
-        // Brave / Chrome keep the renderer running; we do the same via pipActive.
-        boolean inPip = pipActive
-                || (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInPictureInPictureMode());
         super.onPause();
         saveTabs();
-        if (inPip && web != null) {
-            try { web.onResume(); } catch (Exception ignored) {}
-            web.evaluateJavascript(PIP_BLOCK_PAUSE_JS, null);
-            web.evaluateJavascript(RESUME_VIDEO_JS, null);
-        }
-    }
-
-    @Override
-    protected void onStop() {
-        super.onStop();
-        // In PiP the activity is stopped but the small window stays visible — keep media alive
-        if (pipActive || (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInPictureInPictureMode())) {
-            if (web != null) {
-                try { web.onResume(); } catch (Exception ignored) {}
-                web.evaluateJavascript(RESUME_VIDEO_JS, null);
-            }
-        }
     }
 
     private void hideCustom() {
