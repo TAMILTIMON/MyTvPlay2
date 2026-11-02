@@ -143,11 +143,13 @@
         <activity
             android:name=".PresentActivity"
             android:exported="false"
+            android:label="ZH Presenter"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden" />
 
         <activity
             android:name=".PresentShowActivity"
             android:exported="false"
+            android:label="ZH Presenter"
             android:launchMode="singleTop"
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:theme="@style/PlayerTheme" />
@@ -190,6 +192,7 @@
         <activity
             android:name=".MusicActivity"
             android:exported="false"
+            android:label="ZH Music"
             android:launchMode="singleTop"
             android:screenOrientation="portrait" />
 
@@ -223,12 +226,26 @@
 
         <activity
             android:name=".BrowserActivity"
-            android:configChanges="orientation|screenSize|keyboardHidden|keyboard|navigation|screenLayout|uiMode"
-            android:exported="false"
-            android:label="ZH Play Browser"
+            android:configChanges="orientation|screenSize|smallestScreenSize|keyboardHidden|keyboard|navigation|screenLayout|uiMode"
+            android:exported="true"
+            android:label="ZH Browser"
             android:launchMode="singleTask"
             android:taskAffinity="com.tamil.castplay.browser"
-            android:windowSoftInputMode="adjustResize" />
+            android:windowSoftInputMode="adjustResize">
+            <!-- Text selection "Web search" and system search -->
+            <intent-filter>
+                <action android:name="android.intent.action.WEB_SEARCH" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <!-- Open http(s) links in ZH Browser -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+            </intent-filter>
+        </activity>
 
         <activity
             android:name=".ConnectActivity"
@@ -251,8 +268,8 @@
             android:name=".PlayerActivity"
             android:configChanges="orientation|screenSize|keyboardHidden|keyboard|navigation|smallestScreenSize|screenLayout|uiMode"
             android:exported="true"
+            android:label="ZH Picture"
             android:launchMode="singleTop">
-            <!-- "Open with ZH Play" for video/audio files and streams from other apps -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -291,7 +308,6 @@
                 android:value="Local network remote control web page for the TV player" />
         </service>
 
-        <!-- optional: lets the phone remote work in every app on the TV -->
         <service
             android:name=".TvAccess"
             android:exported="true"
@@ -305,7 +321,6 @@
                 android:resource="@xml/tv_access" />
         </service>
 
-        <!-- phone: control the TV from the notification bar / lock screen -->
         <service
             android:name=".TvControlService"
             android:exported="false"
@@ -315,7 +330,6 @@
                 android:value="Media-style notification that remote-controls a TV on the local network" />
         </service>
 
-        <!-- lets the remote show / control videos playing in other apps -->
         <service
             android:name=".MediaWatch"
             android:exported="true"

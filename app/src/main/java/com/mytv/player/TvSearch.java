@@ -76,7 +76,10 @@ public final class TvSearch {
     public static String youtubePlay(Context c, String q) {
         String p = ytPkg(c);
         if (p == null) return "YouTube is not installed on the TV";
-        String[] v = firstVideo(q);
+        // a YouTube link (from the phone's browser / Music): exactly that video, no search
+        java.util.regex.Matcher lm = java.util.regex.Pattern.compile(
+                "(?:youtube\\.com/(?:watch\\?(?:.*&)?v=|shorts/|live/|embed/)|youtu\\.be/)([A-Za-z0-9_-]{11})").matcher(q);
+        String[] v = lm.find() ? new String[]{lm.group(1), ""} : firstVideo(q);
         if (v == null) return youtube(c, q);
         String url = "https://www.youtube.com/watch?v=" + v[0];
         if (launch(c, "-a android.intent.action.VIEW -d " + sh(url) + " -p " + p,

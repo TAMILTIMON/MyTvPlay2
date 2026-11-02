@@ -163,14 +163,14 @@ public class BrowserPlayService extends Service {
                         | PlaybackState.ACTION_FAST_FORWARD | PlaybackState.ACTION_REWIND | PlaybackState.ACTION_STOP
                         | (known ? PlaybackState.ACTION_SEEK_TO : 0)).build());
         MediaMetadata.Builder md = new MediaMetadata.Builder().putString(MediaMetadata.METADATA_KEY_TITLE, title)
-                .putString(MediaMetadata.METADATA_KEY_ARTIST, artist.isEmpty() ? "ZH Play · " + T.t("Browser") : artist);
+                .putString(MediaMetadata.METADATA_KEY_ARTIST, artist.isEmpty() ? "ZH Browser" : artist);
         if (known) md.putLong(MediaMetadata.METADATA_KEY_DURATION, durMs);
         if (art != null) md.putBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART, art);
         session.setMetadata(md.build());
         NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         Notification.Builder b;
         if (Build.VERSION.SDK_INT >= 26) {
-            nm.createNotificationChannel(new NotificationChannel(CH, "Browser media", NotificationManager.IMPORTANCE_LOW));
+            nm.createNotificationChannel(new NotificationChannel(CH, "ZH Browser", NotificationManager.IMPORTANCE_LOW));
             b = new Notification.Builder(this, CH);
         } else b = new Notification.Builder(this);
         int f = PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0);

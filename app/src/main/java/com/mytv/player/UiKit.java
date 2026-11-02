@@ -173,11 +173,11 @@ public final class UiKit {
         return b;
     }
 
-    /** The ZH Play logo on a white badge (the black "H" stays visible on dark screens too). */
+    /** The ZH Play logo (orange தீ on black) on a black badge. */
     public static FrameLayout logoBadge(Context c, int sizeDp, boolean round) {
         FrameLayout f = new FrameLayout(c);
         GradientDrawable g = new GradientDrawable();
-        g.setColor(Color.WHITE);
+        g.setColor(Color.BLACK);
         if (round) g.setShape(GradientDrawable.OVAL);
         else g.setCornerRadius(Ui.dp(c, sizeDp * 0.24f));
         f.setBackground(g);

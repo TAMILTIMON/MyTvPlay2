@@ -1,3 +1,45 @@
+ZH PLAY 5.7.3 — YouTube keeps playing in PiP; video fit modes in fullscreen
+=========================================================================
+* YouTube PiP: blocked YouTube's internal "paused-mode" state machine (not just pause()). A
+  MutationObserver catches the "paused-mode" class the moment YouTube applies it and reverses it;
+  a 900 ms interval calls playVideo() and reapplies the visibility spoof; pauseVideo/stopVideo are
+  overridden so the scheduler cannot switch state — the video stays playing.
+  Tested: 6 scheduler attempts, 0 succeeded. After closing PiP everything is restored.
+* Video fit in the browser fullscreen: a ⤢ button cycles 4 modes (same as the native player):
+  Fit (contain), Fill/Stretch, Crop and Zoom 1.2×. Works on YouTube and any other site.
+
+ZH PLAY 5.7.2 — TV: the remote's cursor is visible again in menus
+================================================================
+* Since 4.7 (the card-style menus) the highlight of the line under the remote's cursor was transparent,
+  so on the TV you couldn't see which option you were on (e.g. Settings / player quality 480p ↔ 1080p).
+  Now every list menu shows the line under the cursor as a tinted card with an accent outline, and a
+  choice list opens on the option that is currently chosen. The TV's video / music grid too.
+
+ZH PLAY 5.7.1 — new logo everywhere
+==================================
+* The new logo now also in: the logo badges (opening animation, headers, TV home — black badge instead
+  of white), the home-screen widgets, the phone's web remote page and its tab icon, the browser's start page.
+
+ZH PLAY 5.7 — new logo, Music links & YouTube listening, PiP fixed, VPN fixes
+==========================================================================
+(built on your Gemini changes: picture-in-picture, VPN button, IP rotation — kept)
+* New logo and TV banner (தீ · ZH PLAY · more than remote): app icons, adaptive icon (fits every
+  launcher shape), in-app logo, TV banner, the Linux app.
+* Music → Links (new tab): add a song / radio address, an .m3u / .m3u8 playlist (from a link or a file)
+  or a YouTube video. Links play in the music player; YouTube plays as AUDIO in the background
+  (the browser in audio-only mode steps back by itself; the notification has play / pause + timeline).
+  Hold a link: Play on TV · Rename · Remove. Browser: menu → "Add to Music", or long-press a media link.
+* Music player: 🌙 sleep timer button on the player screen (it was hidden in the ⋮ menu).
+* Browser, YouTube: the Videos button shows "YT" on video pages and offers Listen (audio only), Add to Music,
+  Play on TV (exactly that video in the YouTube app), Picture in Picture. (No YouTube download: protected
+  streams, against YouTube's terms — other sites' videos can be downloaded and converted as before.)
+* Picture in Picture: works for YouTube (the video fills the window, 16:9; the page comes back afterwards);
+  automatic PiP only for VIDEOS (not songs / audio mode) and can be switched off (menu → Automatic PiP).
+* VPN: choosing a profile connects exactly that one; rotation tries each profile once and stops with a
+  message instead of retrying forever; at least 1 minute between switches; no pop-up at every switch; the
+  help explains that each switch reconnects briefly (use Android's Always-on + Block connections for none).
+* Autoplay follows Site settings again (a global line overrode it).
+
 ZH PLAY 5.6 — browser music in the notification like a music player
 ==================================================================
 * YouTube (or any page) playing in the ZH Play browser now shows a full media notification:

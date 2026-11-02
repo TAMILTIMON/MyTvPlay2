@@ -77,6 +77,7 @@ public class MusicActivity extends AppCompatActivity {
             MusicLib.setFav(m.uri.toString(), !MusicLib.isFav(m.uri.toString()));
             render();
         });
+        topBtn(top, "moon", v -> MusicDialogs.sleep(this, this::render));         // sleep timer (it was only in the ⋮ menu)
         topBtn(top, "sliders-horizontal", v -> MusicDialogs.equalizer(this));
         lyrBtn = topBtn(top, "mic-vocal", v -> toggleLyrics());
         topBtn(top, "cast", v -> toTv());
