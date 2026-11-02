@@ -14,17 +14,13 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
-import android.view.ActionMode;
 import android.view.Gravity;
 import android.view.KeyEvent;
-import android.view.Menu;
-import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
-import android.app.SearchManager;
 import android.webkit.CookieManager;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
@@ -290,15 +286,14 @@ public class BrowserActivity extends AppCompatActivity {
 
         configure(web);
 
+        String start = getIntent().getStringExtra(EXTRA_URL);
         listenBack = getIntent().getBooleanExtra(EXTRA_LISTEN, false);
-        if (!handleOpenIntent(getIntent(), false)) {
-            if ((Store.getBool("b_restore", true) || Store.getBool("b_restore_once", false)) && !BrowserData.savedTabs().isEmpty()) {
-                Store.putBool("b_restore_once", false);
-                restoreTabs();
-            } else {
-                home();
-            }
+        if (start != null && !start.isEmpty()) go(start);
+        else if ((Store.getBool("b_restore", true) || Store.getBool("b_restore_once", false)) && !BrowserData.savedTabs().isEmpty()) {
+            Store.putBool("b_restore_once", false);
+            restoreTabs();
         }
+        else home();
         if (tv) web.requestFocus();
         WgVpn.onChange = () -> main.post(this::updateVpnBar);
         updateVpnBar();
@@ -1076,39 +1071,6 @@ public class BrowserActivity extends AppCompatActivity {
                 main.post(() -> UiKit.makeToast(BrowserActivity.this, T.t("Can't download this") + ": " + why, Toast.LENGTH_LONG).show());
             }
         }, "ZHDl");
-        // Text selection → Search in new tab (keeps system Copy / Share / Web search)
-        web.setActionModeCallback(new ActionMode.Callback() {
-            @Override
-            public boolean onCreateActionMode(ActionMode mode, Menu menu) {
-                menu.add(0, 0x5e11, 50, T.t("Search in new tab"));
-                return true;
-            }
-
-            @Override
-            public boolean onPrepareActionMode(ActionMode mode, Menu menu) {
-                return false;
-            }
-
-            @Override
-            public boolean onActionItemClicked(ActionMode mode, MenuItem item) {
-                if (item.getItemId() != 0x5e11) return false;
-                web.evaluateJavascript("(function(){try{return window.getSelection().toString()}catch(e){return ''}})()", v -> {
-                    String q = v == null ? "" : v.trim();
-                    if (q.length() >= 2 && q.charAt(0) == '"' && q.charAt(q.length() - 1) == '"')
-                        q = q.substring(1, q.length() - 1);
-                    q = q.replace("\\n", " ").replace("\\\"", "\"").trim();
-                    if (q.isEmpty()) return;
-                    final String query = q;
-                    main.post(() -> newTab("https://www.google.com/search?q=" + Uri.encode(query)));
-                });
-                mode.finish();
-                return true;
-            }
-
-            @Override
-            public void onDestroyActionMode(ActionMode mode) {
-            }
-        });
         web.setOnLongClickListener(v -> {
             WebView.HitTestResult h = web.getHitTestResult();
             String u = h.getExtra();
@@ -2111,11 +2073,6 @@ public class BrowserActivity extends AppCompatActivity {
                 }
             });
         }
-        // Seedr: works for magnets / .torrent (and any link Seedr can fetch)
-        if (Formats.isTorrent(url) || (url != null && url.startsWith("http"))) {
-            labels.add("☁ " + T.t("Send to Seedr"));
-            acts.add(() -> sendToSeedr(url));
-        }
         labels.add(T.t(tv ? "▶ Play on this TV" : "▶ Play on this phone"));
         acts.add(() -> {
             List<Store.Item> one = new ArrayList<>();
@@ -2371,56 +2328,10 @@ public class BrowserActivity extends AppCompatActivity {
     protected void onNewIntent(android.content.Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
+        String u = intent.getStringExtra(EXTRA_URL);
         listenBack = intent.getBooleanExtra(EXTRA_LISTEN, false);
         if (listenBack) setAudioMode(true);
-        handleOpenIntent(intent, true);
-    }
-
-    /** Handle EXTRA_URL, VIEW http(s), and WEB_SEARCH. Returns true if something was opened. */
-    private boolean handleOpenIntent(Intent intent, boolean preferNewTab) {
-        if (intent == null) return false;
-        String action = intent.getAction();
-        if (Intent.ACTION_WEB_SEARCH.equals(action)) {
-            String q = intent.getStringExtra(SearchManager.QUERY);
-            if (q != null && !q.trim().isEmpty()) {
-                String url = "https://www.google.com/search?q=" + Uri.encode(q.trim());
-                if (preferNewTab) newTab(url); else go(url);
-                return true;
-            }
-        }
-        if (Intent.ACTION_VIEW.equals(action) && intent.getData() != null) {
-            String u = intent.getData().toString();
-            if (u.startsWith("http://") || u.startsWith("https://")) {
-                if (preferNewTab) newTab(u); else go(u);
-                return true;
-            }
-        }
-        String u = intent.getStringExtra(EXTRA_URL);
-        if (u != null && !u.isEmpty()) {
-            if (preferNewTab) newTab(u); else go(u);
-            return true;
-        }
-        return false;
-    }
-
-    /** Copy link and open the logged-in Seedr tab (or a new one). Cookies keep the session. */
-    private void sendToSeedr(String url) {
-        if (url == null || url.isEmpty()) return;
-        copy(url);
-        // Prefer an existing Seedr tab so the user stays on their logged-in page
-        for (WebView w : tabs) {
-            try {
-                String u = w.getUrl();
-                if (u != null && u.toLowerCase(Locale.US).contains("seedr.cc")) {
-                    switchTo(w);
-                    UiKit.makeToast(this, T.t("Link copied — paste into Seedr"), Toast.LENGTH_LONG).show();
-                    return;
-                }
-            } catch (Throwable ignored) {
-            }
-        }
-        newTab("https://www.seedr.cc/");
-        UiKit.makeToast(this, T.t("Link copied — paste into Seedr"), Toast.LENGTH_LONG).show();
+        if (u != null && !u.isEmpty()) newTab(u);
     }
 
     private LinearLayout suggestBox;
