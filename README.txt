@@ -1,3 +1,15 @@
+ZH PLAY 5.7.4 — YouTube PiP: video visible, pause works; pinch-to-zoom in browser
+=============================================================================
+* PiP YouTube video visible: the <video> element is moved directly to <body> (bypassing YouTube's
+  clipping containers: overflow:hidden, clip-path, transform wrappers) as position:fixed at full
+  screen. Restores exactly to its original parent on exit. Tested in a simulated YouTube DOM.
+* Pause works after PiP: the 900 ms keep-alive guard now clears correctly when PiP ends, so
+  manually pausing after returning works normally.
+* Video fit modes replaced with pinch-to-zoom: a ScaleGestureDetector on the WebView container
+  handles two-finger pinch anywhere in the browser (normal view, YouTube, all sites). The ⤢
+  button in fullscreen resets zoom when zoomed (or shows a "Pinch to zoom" hint). CSS object-fit
+  was removed — it fought with YouTube's CSS hierarchy and caused the black-video bug.
+
 ZH PLAY 5.7.3 — YouTube keeps playing in PiP; video fit modes in fullscreen
 =========================================================================
 * YouTube PiP: blocked YouTube's internal "paused-mode" state machine (not just pause()). A

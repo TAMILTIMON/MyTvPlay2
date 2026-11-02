@@ -59,30 +59,42 @@ public class BrowserActivity extends AppCompatActivity {
     public static final String EXTRA_URL = "url";
     /** Opened from Music to LISTEN: audio only; the browser steps back once the sound starts. */
     public static final String EXTRA_LISTEN = "listen";
-    private int videoFitMode = 0;                   // 0=contain, 1=cover, 2=fill, 3=zoom
-    private static final String[] FIT_JS = {
-            // 0 Fit (contain): black bars, the whole video always visible
-            "(function(){document.querySelectorAll('video').forEach(function(v){v.style.setProperty('object-fit','contain','important');v.style.setProperty('width','100%','important');v.style.setProperty('height','100%','important');v.style.setProperty('transform','none','important');});})();",
-            // 1 Fill / Stretch: video is stretched to exactly fill the screen (anamorphic)
-            "(function(){document.querySelectorAll('video').forEach(function(v){v.style.setProperty('object-fit','fill','important');v.style.setProperty('width','100%','important');v.style.setProperty('height','100%','important');v.style.setProperty('transform','none','important');});})();",
-            // 2 Crop (cover): fills the screen, the outside is cropped — no bars, correct aspect ratio
-            "(function(){document.querySelectorAll('video').forEach(function(v){v.style.setProperty('object-fit','cover','important');v.style.setProperty('width','100%','important');v.style.setProperty('height','100%','important');v.style.setProperty('transform','none','important');});})();",
-            // 3 Zoom (1.2×): scales up by 20 % so letterbox bars are hidden
-            "(function(){document.querySelectorAll('video').forEach(function(v){v.style.setProperty('object-fit','contain','important');v.style.setProperty('width','100%','important');v.style.setProperty('height','100%','important');v.style.setProperty('transform','scale(1.2)','important');v.style.setProperty('transform-origin','center','important');});})();"
-    };
-    private static final String[] FIT_NAMES = {"Fit", "Fill / Stretch", "Crop", "Zoom 1.2×"};
-    private static final String[] FIT_ICONS = {"maximize-2", "move-horizontal", "crop", "zoom-in"};
+    // ---- Browser pinch-to-zoom (works on YouTube and every site) ----
+    // WebView already has built-in pinch-zoom but it doesn't work in fullscreen mode (the system WebView
+    // intercepts touch events for the address bar area). We attach a ScaleGestureDetector to webBox
+    // so pinch-zoom works everywhere, and a reset-zoom button in fullscreen.
+    private float userZoom = 1f, userZoomAnchorX, userZoomAnchorY;
+    private long lastTapMs;
+    private static final float ZOOM_MIN = 0.5f, ZOOM_MAX = 5f;
 
-    private void cycleVideoFit() {
-        videoFitMode = (videoFitMode + 1) % FIT_JS.length;
-        applyVideoFit();
+    /** Apply the current user-zoom level by injecting the CSS transform on <html>. */
+    private void applyBrowserZoom() {
+        if (web == null) return;
+        String js;
+        if (Math.abs(userZoom - 1f) < 0.01f) {
+            js = "(function(){var h=document.documentElement;"
+                    + "h.style.transform='';h.style.transformOrigin='';h.style.overflow='';})();";
+        } else {
+            js = String.format(java.util.Locale.US,
+                    "(function(){var h=document.documentElement;"
+                    + "h.style.transformOrigin='%f%% %f%%';"
+                    + "h.style.transform='scale(%f)';"
+                    + "h.style.overflow='hidden';})();",
+                    userZoomAnchorX * 100f, userZoomAnchorY * 100f, userZoom);
+        }
+        web.evaluateJavascript(js, null);
+        View btn = root.findViewWithTag("fs_fit");
+        if (btn instanceof ImageView) {
+            boolean zoomed = userZoom > 1.01f;
+            UiKit.setIcon(this, (ImageView) btn, zoomed ? "zoom-out" : "zoom-in", 22, zoomed ? Ui.ACCENT : android.graphics.Color.WHITE);
+            btn.setContentDescription(T.t(zoomed ? "Reset zoom" : "Pinch to zoom"));
+        }
     }
 
-    private void applyVideoFit() {
-        if (web != null) web.evaluateJavascript(FIT_JS[videoFitMode], null);
-        UiKit.makeToast(this, T.t("Video fit") + ": " + T.t(FIT_NAMES[videoFitMode]), Toast.LENGTH_SHORT).show();
-        View btn = root.findViewWithTag("fs_fit");
-        if (btn instanceof ImageView) UiKit.setIcon(this, (ImageView) btn, FIT_ICONS[videoFitMode], 22, android.graphics.Color.WHITE);
+    private void resetBrowserZoom() {
+        userZoom = 1f;
+        applyBrowserZoom();
+        UiKit.makeToast(this, T.t("Zoom reset"), Toast.LENGTH_SHORT).show();
     }
 
     private boolean listenBack;
@@ -296,7 +308,9 @@ public class BrowserActivity extends AppCompatActivity {
     /** The ZH Play logo (orange தீ on black) for the start page — embedded, the page has no files of its own. */
     private static final String START_LOGO = "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";
 
-    /** In PiP: the playing video fills the small window (YouTube's player is otherwise a strip in the page). */
+    /** In PiP: detach the playing <video> from its clipping container and attach it directly to <body>
+     * as a position:fixed full-screen overlay. YouTube's player keeps running; we just move where the
+     * pixels appear. The original position is saved so PIP_UNFILL_JS can restore it exactly. */
     static final String PIP_FILL_JS = "(function(){try{"
             + "var vs=[].slice.call(document.querySelectorAll('video'));"
             + "var v=vs.filter(function(x){return !x.paused && x.readyState>=2;})[0]"
@@ -314,12 +328,34 @@ public class BrowserActivity extends AppCompatActivity {
             + "z-index:2147483647!important;object-fit:contain!important;background:#000!important;margin:0!important;"
             + "opacity:1!important;visibility:visible!important;display:block!important}';"
             + "(document.head||document.documentElement).appendChild(s);"
-            + "window.scrollTo(0,0);"
+            // save the video's original position in the DOM so we can restore it exactly
+            + "if(!v)return;"
+            + "if(v.__zhMoved)return;"    // already in PiP position
+            + "v.__zhParent=v.parentNode;"
+            + "v.__zhNext=v.nextSibling;"
+            + "v.__zhStyle=v.getAttribute('style')||'';"
+            + "v.__zhMoved=true;"
+            // move to body and fix full-screen — nothing else touches YouTube's CSS hierarchy
+            + "document.body.appendChild(v);"
+            + "v.setAttribute('style','position:fixed!important;left:0!important;top:0!important;"
+            + "width:100vw!important;height:100vh!important;object-fit:contain!important;"
+            + "z-index:2147483647!important;background:#000!important;margin:0!important;"
+            + "opacity:1!important;visibility:visible!important;display:block!important;"
+            + "transform:none!important;pointer-events:auto!important');"
             + "try{v.muted=false;if(v.paused)v.play().catch(function(){});}catch(e){}"
             + "}catch(e){}})();";
-    static final String PIP_UNFILL_JS = "(function(){var s=document.getElementById('zh-pip');if(s)s.remove();"
-            + "[].slice.call(document.querySelectorAll('[data-zhpip],[data-zhpipp]')).forEach(function(e){"
-            + "e.removeAttribute('data-zhpip');e.removeAttribute('data-zhpipp');});})();";
+    static final String PIP_UNFILL_JS = "(function(){try{"
+            + "var v=document.querySelector('video[__zhMoved]')||"
+            + "[].slice.call(document.querySelectorAll('video')).filter(function(x){return x.__zhMoved;})[0];"
+            + "if(!v||!v.__zhMoved)return;"
+            + "v.__zhMoved=false;"
+            + "if(v.__zhStyle)v.setAttribute('style',v.__zhStyle);else v.removeAttribute('style');"
+            + "if(v.__zhParent){"
+            + "  if(v.__zhNext&&v.__zhNext.parentNode===v.__zhParent)v.__zhParent.insertBefore(v,v.__zhNext);"
+            + "  else v.__zhParent.appendChild(v);"
+            + "}"
+            + "v.__zhParent=null;v.__zhNext=null;v.__zhStyle=null;"
+            + "}catch(e){}})();";
 
     /** Automatic PiP (Home while a video plays): on / off in the menu. */
     static boolean pipAuto() {
@@ -327,6 +363,7 @@ public class BrowserActivity extends AppCompatActivity {
     }
 
     private volatile boolean pageVideo;          // a video (not a song / audio mode) is playing
+    private volatile boolean inPipSession;       // true only during an active PiP session — the guard clears on exit
     /** Soft keep-alive: only re-triggers play if the video is actually paused (avoids play/pause fight). */
     private final Runnable pipKeepAlive = new Runnable() {
         @Override public void run() {
@@ -478,6 +515,7 @@ public class BrowserActivity extends AppCompatActivity {
 
             // Block YouTube's pause + force play a few times, then soft keep-alive
             if (web != null) {
+                inPipSession = true;
                 web.evaluateJavascript(PIP_BLOCK_PAUSE_JS, null);
                 if (customView == null) web.evaluateJavascript(PIP_FILL_JS, null);
             }
@@ -486,6 +524,7 @@ public class BrowserActivity extends AppCompatActivity {
             main.postDelayed(pipKeepAlive, 3000);
         } else {
             if (web != null) {
+                inPipSession = false;
                 web.evaluateJavascript(PIP_UNBLOCK_PAUSE_JS, null);
                 web.evaluateJavascript(PIP_UNFILL_JS, null);
             }
@@ -787,11 +826,14 @@ public class BrowserActivity extends AppCompatActivity {
         eqLp.setMargins(Ui.dp(this, 8), 0, 0, 0);
         if (Store.getBool("b_eq", true)) actions.addView(eq, eqLp);
 
-        // Video fit button: cycles Fit → Fill → Crop → Zoom (same 4 modes as the native player)
-        final ImageView fit = UiKit.darkButton(this, "maximize-2", 48, false, v -> {
-            if (!locked) cycleVideoFit();
+        // Zoom button: reset-to-100% if zoomed; shows a pinch hint if at 100%
+        final ImageView fit = UiKit.darkButton(this, "zoom-in", 48, false, v -> {
+            if (!locked) {
+                if (userZoom > 1.01f) resetBrowserZoom();
+                else UiKit.makeToast(BrowserActivity.this, T.t("Pinch to zoom"), Toast.LENGTH_SHORT).show();
+            }
         });
-        fit.setContentDescription(T.t("Video fit"));
+        fit.setContentDescription(T.t("Pinch to zoom"));
         fit.setTag("fs_fit");
         LinearLayout.LayoutParams fitLp = new LinearLayout.LayoutParams(Ui.dp(this, 48), Ui.dp(this, 48));
         fitLp.setMargins(Ui.dp(this, 8), 0, 0, 0);
