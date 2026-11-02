@@ -1,38 +1,3 @@
-ZH PLAY 5.7.6 — PiP works like Brave: no DOM changes, JS source-rect hint
-==========================================================================
-* PiP in address bar button: appears (like Brave) whenever a video is playing.
-* enterPipMode now works exactly like Brave: JS asks the playing video for its
-  getBoundingClientRect(), converts to screen coordinates, and passes it to
-  Android via setSourceRectHint + setAspectRatio. Android's compositor grabs
-  that surface directly — no DOM changes, no CSS fighting YouTube's containers.
-* When YouTube is in its own fullscreen (onShowCustomView), the customView surface
-  is used directly — perfect quality, instant transition.
-* All PIP_FILL_JS / PIP_UNFILL_JS DOM manipulation removed from the PiP path:
-  it is no longer needed and was causing the black-video and displaced-video bugs.
-
-ZH PLAY 5.7.5 — YouTube fullscreen fills screen; pinch-to-zoom works; PiP→fullscreen fixed
-=========================================================================================
-* YouTube fullscreen black bars: a CSS rule is injected that removes YouTube's max-height
-  constraint only while fullscreen is active — the video now fills the full screen.
-* Pinch-to-zoom: the ScaleGestureDetector is now actually attached to webBox (it was lost
-  in a merge). CSS zoom is applied at the document root, which works inside YouTube's nested
-  containers. Two-finger pinch anywhere in the browser zooms; double-tap resets.
-* PiP → fullscreen: the player container is scaled with transform:scale() instead of moving
-  the <video> element to <body> (which broke the controls and left it stranded in the middle
-  of the screen when returning from PiP).
-
-ZH PLAY 5.7.4 — YouTube PiP: video visible, pause works; pinch-to-zoom in browser
-=============================================================================
-* PiP YouTube video visible: the <video> element is moved directly to <body> (bypassing YouTube's
-  clipping containers: overflow:hidden, clip-path, transform wrappers) as position:fixed at full
-  screen. Restores exactly to its original parent on exit. Tested in a simulated YouTube DOM.
-* Pause works after PiP: the 900 ms keep-alive guard now clears correctly when PiP ends, so
-  manually pausing after returning works normally.
-* Video fit modes replaced with pinch-to-zoom: a ScaleGestureDetector on the WebView container
-  handles two-finger pinch anywhere in the browser (normal view, YouTube, all sites). The ⤢
-  button in fullscreen resets zoom when zoomed (or shows a "Pinch to zoom" hint). CSS object-fit
-  was removed — it fought with YouTube's CSS hierarchy and caused the black-video bug.
-
 ZH PLAY 5.7.3 — YouTube keeps playing in PiP; video fit modes in fullscreen
 =========================================================================
 * YouTube PiP: blocked YouTube's internal "paused-mode" state machine (not just pause()). A

@@ -35,12 +35,6 @@ public final class T {
     }
 
     static {
-        TA.put("Pinch to zoom", "கிள்ளி பெரிதாக்கு");
-        HI.put("Pinch to zoom", "पिंच करके ज़ूम करें");
-        TA.put("Reset zoom", "ஜூம் மீட்டமை");
-        HI.put("Reset zoom", "ज़ूम रीसेट करें");
-        TA.put("Zoom reset", "ஜூம் மீட்டமைக்கப்பட்டது");
-        HI.put("Zoom reset", "ज़ूम रीसेट हुआ");
         TA.put("Video fit", "வீடியோ பொருத்தம்");
         HI.put("Video fit", "वीडियो फ़िट");
         TA.put("Fit", "பொருத்து");

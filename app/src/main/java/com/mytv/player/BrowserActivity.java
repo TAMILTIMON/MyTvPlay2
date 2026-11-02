@@ -20,6 +20,7 @@ import android.util.Rational;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
+import android.view.ScaleGestureDetector;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
@@ -59,51 +60,47 @@ public class BrowserActivity extends AppCompatActivity {
     public static final String EXTRA_URL = "url";
     /** Opened from Music to LISTEN: audio only; the browser steps back once the sound starts. */
     public static final String EXTRA_LISTEN = "listen";
-    // ---- Browser pinch-to-zoom (works on YouTube and every site) ----
-    // WebView already has built-in pinch-zoom but it doesn't work in fullscreen mode (the system WebView
-    // intercepts touch events for the address bar area). We attach a ScaleGestureDetector to webBox
-    // so pinch-zoom works everywhere, and a reset-zoom button in fullscreen.
-    private float userZoom = 1f, userZoomAnchorX, userZoomAnchorY;
-    private long lastTapMs;
-    private static final float ZOOM_MIN = 0.5f, ZOOM_MAX = 5f;
+    private int videoFitMode = 0;                   // 0=contain, 1=fill, 2=cover, 3=zoom 1.2x
+    /**
+     * Safe fit CSS for YouTube: never force width/height (that hides the video).
+     * Only object-fit + transform on the video element.
+     */
+    private static final String[] FIT_JS = {
+            // 0 Fit (contain)
+            "(function(){var s=document.getElementById('zh-fit')||document.createElement('style');s.id='zh-fit';"
+            + "s.textContent='video{object-fit:contain!important;transform:none!important}';"
+            + "(document.head||document.documentElement).appendChild(s);})();",
+            // 1 Fill / Stretch
+            "(function(){var s=document.getElementById('zh-fit')||document.createElement('style');s.id='zh-fit';"
+            + "s.textContent='video{object-fit:fill!important;transform:none!important}';"
+            + "(document.head||document.documentElement).appendChild(s);})();",
+            // 2 Crop (cover)
+            "(function(){var s=document.getElementById('zh-fit')||document.createElement('style');s.id='zh-fit';"
+            + "s.textContent='video{object-fit:cover!important;transform:none!important}';"
+            + "(document.head||document.documentElement).appendChild(s);})();",
+            // 3 Zoom 1.2x (keeps contain, scales up)
+            "(function(){var s=document.getElementById('zh-fit')||document.createElement('style');s.id='zh-fit';"
+            + "s.textContent='video{object-fit:contain!important;transform:scale(1.2)!important;transform-origin:center center!important}';"
+            + "(document.head||document.documentElement).appendChild(s);})();"
+    };
+    private static final String[] FIT_NAMES = {"Fit", "Fill / Stretch", "Crop", "Zoom 1.2×"};
+    private static final String[] FIT_ICONS = {"maximize-2", "move-horizontal", "crop", "zoom-in"};
 
-    /** Apply zoom via WebView's native zoom API — this works inside YouTube fullscreen
-     *  because it zooms at the compositor level, bypassing CSS stacking contexts. */
-    @SuppressWarnings("deprecation")
-    private void applyBrowserZoom() {
-        if (web == null) return;
-        // setInitialScale(100) = 1×, setInitialScale(200) = 2×, etc.
-        int pct = Math.round(userZoom * 100);
-        // WebView.zoomTo() is the modern API (API 21+) but needs reflection; use setInitialScale
-        // with a reload trick. Better: use zoomBy through the built-in zoom if available.
-        // The reliable cross-version approach: pinch dispatched to the WebView directly via ScaleGestureDetector
-        // → WebView's own zoom handling which works everywhere including inside iframes/fullscreen.
-        // We set initial scale and let WebView handle the rest.
-        web.getSettings().setLoadWithOverviewMode(false);
-        web.getSettings().setUseWideViewPort(true);
-        web.setInitialScale(pct);
-        // Also zoom via JS visualViewport if the page supports it (YouTube fullscreen uses this)
-        String js;
-        if (Math.abs(userZoom - 1f) < 0.01f) {
-            js = "(function(){try{document.documentElement.style.zoom='';}catch(e){}})();";
-        } else {
-            js = String.format(java.util.Locale.US,
-                    "(function(){try{document.documentElement.style.zoom='%f';}catch(e){}})();",
-                    userZoom);
-        }
-        web.evaluateJavascript(js, null);
-        View btn = root.findViewWithTag("fs_fit");
-        if (btn instanceof ImageView) {
-            boolean zoomed = userZoom > 1.01f;
-            UiKit.setIcon(this, (ImageView) btn, zoomed ? "zoom-out" : "zoom-in", 22, zoomed ? Ui.ACCENT : android.graphics.Color.WHITE);
-            btn.setContentDescription(T.t(zoomed ? "Reset zoom" : "Pinch to zoom"));
-        }
+    private void cycleVideoFit() {
+        videoFitMode = (videoFitMode + 1) % FIT_JS.length;
+        applyVideoFit();
     }
 
-    private void resetBrowserZoom() {
-        userZoom = 1f;
-        applyBrowserZoom();
-        UiKit.makeToast(this, T.t("Zoom reset"), Toast.LENGTH_SHORT).show();
+    private void applyVideoFit() {
+        // Prefer Android-side scale on the fullscreen host (reliable on YouTube)
+        if (customZoomHost instanceof ZoomLayout) {
+            ((ZoomLayout) customZoomHost).setFitMode(videoFitMode);
+        }
+        // Gentle CSS only — never width/height 100%
+        if (web != null) web.evaluateJavascript(FIT_JS[videoFitMode], null);
+        UiKit.makeToast(this, T.t("Video fit") + ": " + T.t(FIT_NAMES[videoFitMode]), Toast.LENGTH_SHORT).show();
+        View btn = root.findViewWithTag("fs_fit");
+        if (btn instanceof ImageView) UiKit.setIcon(this, (ImageView) btn, FIT_ICONS[videoFitMode], 22, android.graphics.Color.WHITE);
     }
 
     private boolean listenBack;
@@ -115,6 +112,7 @@ public class BrowserActivity extends AppCompatActivity {
     private FrameLayout root, webBox;
     private LinearLayout mainColumn, topBar;
     private View customView;
+    private View customZoomHost; // pinch-zoom + fit host for fullscreen video
     private WebChromeClient.CustomViewCallback customCb;
     private final Map<String, String> found = new LinkedHashMap<>();
     private final Handler main = new Handler(Looper.getMainLooper());
@@ -258,15 +256,6 @@ public class BrowserActivity extends AppCompatActivity {
         videosBadge.setVisibility(View.GONE);
         vidBox.addView(videosBadge, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, Ui.dp(this, 18), Gravity.TOP | Gravity.END));
         topBar.addView(vidBox);
-        // PiP button in the address bar — shown when a video is playing (like Brave)
-        if (!tv && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            pipBarBtn = UiKit.roundButton(this, "maximize", 42, false, v -> enterPipMode());
-            pipBarBtn.setContentDescription(T.t("Picture in Picture"));
-            pipBarBtn.setVisibility(View.GONE);
-            LinearLayout.LayoutParams pipLp = new LinearLayout.LayoutParams(Ui.dp(this, 42), Ui.dp(this, 42));
-            pipLp.setMargins(0, 0, Ui.dp(this, 4), 0);
-            topBar.addView(pipBarBtn, pipLp);
-        }
 
         tabsBtn = tabCounter();
         if (!narrow) {
@@ -292,28 +281,6 @@ public class BrowserActivity extends AppCompatActivity {
             cursor = new CursorView(this);
             webBox.addView(cursor, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         }
-        // Pinch-to-zoom on the WebView: use WebView's built-in zoom by forwarding touch events
-        // through a ScaleGestureDetector that calls zoomIn/zoomOut on the WebView itself.
-        final android.view.ScaleGestureDetector pinchZ = new android.view.ScaleGestureDetector(this,
-            new android.view.ScaleGestureDetector.SimpleOnScaleGestureListener() {
-                @Override public boolean onScale(android.view.ScaleGestureDetector d) {
-                    userZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, userZoom * d.getScaleFactor()));
-                    applyBrowserZoom();
-                    return true;
-                }
-        });
-        webBox.setOnTouchListener((v2, ev) -> {
-            if (ev.getPointerCount() >= 2) {
-                pinchZ.onTouchEvent(ev);
-                return true;                    // consume two-finger events, leave single-finger to WebView
-            }
-            if (ev.getActionMasked() == android.view.MotionEvent.ACTION_UP && userZoom > 1.01f) {
-                long now = System.currentTimeMillis();
-                if (now - lastTapMs < 300) { resetBrowserZoom(); return true; }  // double-tap resets
-                lastTapMs = now;
-            }
-            return false;
-        });
         mainColumn.addView(webBox, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
         findBar = buildFindBar();
         mainColumn.addView(findBar);
@@ -348,60 +315,30 @@ public class BrowserActivity extends AppCompatActivity {
     /** The ZH Play logo (orange தீ on black) for the start page — embedded, the page has no files of its own. */
     private static final String START_LOGO = "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";
 
-    /** In PiP: detach the playing <video> from its clipping container and attach it directly to <body>
-     * as a position:fixed full-screen overlay. YouTube's player keeps running; we just move where the
-     * pixels appear. The original position is saved so PIP_UNFILL_JS can restore it exactly. */
-    /**
-     * PiP fill: scale YouTube's player container (or the largest video element) to fill the viewport.
-     * We do NOT move the element — moving it breaks YouTube's controls and causes layout bugs.
-     * Instead we scale the nearest scrollable/block ancestor that contains the video to fill 100vw × 100vh.
-     */
-    static final String PIP_FILL_JS =
-            "(function(){try{"
-            + "if(window.__zhPipFilled)return;"
-            + "window.__zhPipFilled=true;"
-            // find the playing video
+    /** In PiP: the playing video fills the small window (YouTube's player is otherwise a strip in the page). */
+    static final String PIP_FILL_JS = "(function(){try{"
             + "var vs=[].slice.call(document.querySelectorAll('video'));"
-            + "var v=vs.filter(function(x){return !x.paused&&x.readyState>=2;})[0]"
+            + "var v=vs.filter(function(x){return !x.paused && x.readyState>=2;})[0]"
+            + "||vs.filter(function(x){return x.readyState>=2;}).sort(function(a,b){return b.clientWidth*b.clientHeight-a.clientWidth*a.clientHeight;})[0]"
             + "||vs.sort(function(a,b){return b.clientWidth*b.clientHeight-a.clientWidth*a.clientHeight;})[0];"
+            + "if(!v){var mp=document.getElementById('movie_player');if(mp)v=mp.querySelector('video');}"
             + "if(!v)return;"
-            // find the best ancestor to scale: YouTube uses #player-container or .ytd-player etc.
-            + "var c=v;"
-            + "var names=['movie_player','#player-container','ytd-player','#player','#playerContainer','.html5-video-player'];"
-            + "for(var i=0;i<names.length;i++){"
-            + "  var el=document.getElementById(names[i])||document.querySelector(names[i]);"
-            + "  if(el&&el.contains(v)){c=el;break;}"
-            + "}"
-            // compute scale so the container fills the full viewport
-            + "var vw=window.innerWidth,vh=window.innerHeight;"
-            + "var cw=c.offsetWidth||vw,ch=c.offsetHeight||vh;"
-            + "if(cw<=0||ch<=0){cw=vw;ch=vh;}"
-            + "var sx=vw/cw,sy=vh/ch,sc=Math.max(sx,sy);"
-            // save and apply
-            + "window.__zhPipEl=c;"
-            + "window.__zhPipSavedStyle=c.getAttribute('style')||'';"
-            + "var ox=(vw-cw*sc)/2,oy=(vh-ch*sc)/2;"
-            + "c.setAttribute('style',window.__zhPipSavedStyle+"
-            + "';transform:scale('+sc+')!important;transform-origin:0 0!important;"
-            + "position:fixed!important;left:'+ox+'px!important;top:'+oy+'px!important;"
-            + "z-index:2147483647!important;overflow:visible!important;max-height:none!important;"
-            + "max-width:none!important;width:'+cw+'px!important;height:'+ch+'px!important');"
-            + "document.body.style.overflow='hidden';"
-            + "try{if(v.paused)v.play().catch(function(){});}catch(e){}"
+            + "v.setAttribute('data-zhpip','1');"
+            + "for(var p=v.parentElement;p&&p!==document.body;p=p.parentElement){p.setAttribute('data-zhpipp','1');}"
+            + "var s=document.getElementById('zh-pip')||document.createElement('style');s.id='zh-pip';"
+            + "s.textContent='html,body{overflow:hidden!important;background:#000!important}"
+            + "[data-zhpipp]{transform:none!important;contain:none!important;filter:none!important;will-change:auto!important;opacity:1!important;visibility:visible!important}"
+            + "video[data-zhpip]{position:fixed!important;left:0!important;top:0!important;right:0!important;bottom:0!important;"
+            + "width:100vw!important;height:100vh!important;max-width:none!important;max-height:none!important;"
+            + "z-index:2147483647!important;object-fit:contain!important;background:#000!important;margin:0!important;"
+            + "opacity:1!important;visibility:visible!important;display:block!important}';"
+            + "(document.head||document.documentElement).appendChild(s);"
+            + "window.scrollTo(0,0);"
+            + "try{v.muted=false;if(v.paused)v.play().catch(function(){});}catch(e){}"
             + "}catch(e){}})();";
-
-    static final String PIP_UNFILL_JS =
-            "(function(){try{"
-            + "if(!window.__zhPipFilled)return;"
-            + "window.__zhPipFilled=false;"
-            + "var c=window.__zhPipEl;"
-            + "if(c&&window.__zhPipSavedStyle!=null)"
-            + "  c.setAttribute('style',window.__zhPipSavedStyle);"
-            + "document.body.style.overflow='';"
-            + "window.__zhPipEl=null;"
-            + "window.__zhPipSavedStyle=null;"
-            + "}catch(e){}})();";
-
+    static final String PIP_UNFILL_JS = "(function(){var s=document.getElementById('zh-pip');if(s)s.remove();"
+            + "[].slice.call(document.querySelectorAll('[data-zhpip],[data-zhpipp]')).forEach(function(e){"
+            + "e.removeAttribute('data-zhpip');e.removeAttribute('data-zhpipp');});})();";
 
     /** Automatic PiP (Home while a video plays): on / off in the menu. */
     static boolean pipAuto() {
@@ -409,47 +346,16 @@ public class BrowserActivity extends AppCompatActivity {
     }
 
     private volatile boolean pageVideo;          // a video (not a song / audio mode) is playing
-    private volatile boolean inPipSession;       // true only during an active PiP session — the guard clears on exit
+    /** True from just before enterPictureInPictureMode until PiP fully exits (covers the onPause race). */
+    private volatile boolean pipActive;
 
-    /** Injected into every page: removes YouTube's max-height constraint in fullscreen so the video fills the screen. */
-    private static final String YT_FULLSCREEN_FIX_JS =
-            "(function(){"
-            + "if(window.__zhFsFix)return;window.__zhFsFix=true;"
-            + "var s=document.createElement('style');s.id='zh-fs';"
-            // YouTube applies max-height via inline style and CSS on .ytd-player and #movie_player
-            // fullscreen: override only when a fullscreen element is active
-            + "s.textContent="
-            + "'@media screen{"
-            + "  :fullscreen #movie_player,:-webkit-full-screen #movie_player{"
-            + "    max-height:100vh!important;max-width:100vw!important;height:100vh!important;width:100vw!important;"
-            + "    top:0!important;left:0!important;transform:none!important;"
-            + "  }"
-            + "  :fullscreen video,:-webkit-full-screen video{"
-            + "    max-height:100vh!important;max-width:100vw!important;height:100vh!important;width:100vw!important;"
-            + "    object-fit:contain!important;"
-            + "  }"
-            + "  :fullscreen .ytd-player,:-webkit-full-screen .ytd-player{"
-            + "    max-height:100vh!important;height:100vh!important;"
-            + "  }"
-            + "}';"
-            + "(document.head||document.documentElement).appendChild(s);"
-            + "})();";
-    /** Soft keep-alive: only re-triggers play if the video is actually paused (avoids play/pause fight). */
-    private final Runnable pipKeepAlive = new Runnable() {
-        @Override public void run() {
-            if (!isInPictureInPictureMode()) return;
-            resumeMediaForPip();
-            main.postDelayed(this, 2500);
-        }
-    };
-
-    /** Spoof visibility + force play only when paused. */
+    /** Spoof visibility + play only if paused. */
     private static final String RESUME_VIDEO_JS =
             "(function() {"
             + "  try {"
             + "    Object.defineProperty(document, 'hidden', { get: function(){ return false; }, configurable: true });"
             + "    Object.defineProperty(document, 'visibilityState', { get: function(){ return 'visible'; }, configurable: true });"
-            + "    document.dispatchEvent(new Event('visibilitychange'));"
+            + "    Object.defineProperty(document, 'webkitHidden', { get: function(){ return false; }, configurable: true });"
             + "    try { window.dispatchEvent(new Event('focus')); } catch(e) {}"
             + "  } catch (e) {}"
             + "  try {"
@@ -472,43 +378,97 @@ public class BrowserActivity extends AppCompatActivity {
             + "})();";
 
     /**
-     * PiP keep-alive for YouTube: YouTube uses an internal state machine whose scheduler bypasses
-     * blocking HTMLMediaElement.pause — it checks its own playerState before honouring play().
-     * Fix: MutationObserver catches the "paused-mode" class + a 900 ms interval calls playVideo()
-     * while overriding pauseVideo/stopVideo so the scheduler cannot switch state.
+     * PiP guard for YouTube — no tight play/pause loop.
+     * - Blocks pause() / pauseVideo() / stopVideo while in PiP
+     * - MutationObserver on paused-mode class → one delayed playVideo()
+     * - pause event → one delayed play (rate-limited 400ms)
+     * - NO setInterval hammer
      */
     private static final String PIP_BLOCK_PAUSE_JS =
-            "(function(){\n"
-            + "  if(window._zhPipGuard){clearInterval(window._zhPipGuard);window._zhPipGuard=null;}\n"
-            + "  function spoof(){try{Object.defineProperty(document,'hidden',{get:function(){return false;},configurable:true});}catch(e){}"
-            + "try{Object.defineProperty(document,'visibilityState',{get:function(){return 'visible';},configurable:true});}catch(e){}}\n"
-            + "  spoof();\n"
-            + "  try{if(!window._zhOrig){window._zhOrig=HTMLMediaElement.prototype.pause;"
-            + "HTMLMediaElement.prototype.pause=function(){if(!window._zhPipGuard)window._zhOrig.call(this);};}}catch(e){}\n"
-            + "  function patchYt(){var mp=document.getElementById('movie_player');"
-            + "if(!mp||mp._zhYtP)return;mp._zhYtP=true;"
-            + "['pauseVideo','stopVideo'].forEach(function(fn){if(typeof mp[fn]==='function'){"
-            + "mp['_O_'+fn]=mp[fn];mp[fn]=function(){if(!window._zhPipGuard&&mp['_O_'+fn])mp['_O_'+fn].call(mp);};}});}\n"
-            + "  patchYt();\n"
-            + "  try{if(window._zhMO)window._zhMO.disconnect();"
-            + "window._zhMO=new MutationObserver(function(){patchYt();"
-            + "var m=document.getElementById('movie_player');"
-            + "if(m&&m.classList.contains('paused-mode')&&typeof m.playVideo==='function')m.playVideo();});"
-            + "var m0=document.getElementById('movie_player');"
-            + "if(m0)window._zhMO.observe(m0,{attributes:true,attributeFilter:['class']});}catch(e){}\n"
-            + "  window._zhPipGuard=setInterval(function(){spoof();"
-            + "try{var m=document.getElementById('movie_player');if(m&&typeof m.playVideo==='function')m.playVideo();}catch(e){}"
-            + "document.querySelectorAll('video').forEach(function(v){"
-            + "try{if(v.paused&&!v.ended){var p=v.play();if(p&&p.catch)p.catch(function(){});}}catch(e){}});},900);\n"
+            "(function(){"
+            + "  if (window._zhPipBlock) return;"
+            + "  window._zhPipBlock = true;"
+            + "  window._zhPipLastPlay = 0;"
+            + "  function forcePlay() {"
+            + "    var now = Date.now();"
+            + "    if (now - window._zhPipLastPlay < 400) return;"
+            + "    window._zhPipLastPlay = now;"
+            + "    try {"
+            + "      var mp = document.getElementById('movie_player');"
+            + "      if (mp && typeof mp.playVideo === 'function') mp.playVideo();"
+            + "    } catch(e) {}"
+            + "    document.querySelectorAll('video').forEach(function(v) {"
+            + "      try { v.muted = false; if (v.paused || v.ended) { var p = v.play(); if (p && p.catch) p.catch(function(){}); } } catch(e) {}"
+            + "    });"
+            + "  }"
+            + "  try {"
+            + "    if (!window._zhOrigPause) window._zhOrigPause = HTMLMediaElement.prototype.pause;"
+            + "    HTMLMediaElement.prototype.pause = function() {"
+            + "      if (window._zhPipBlock) return;"
+            + "      return window._zhOrigPause.apply(this, arguments);"
+            + "    };"
+            + "  } catch(e) {}"
+            + "  function patchYt() {"
+            + "    var mp = document.getElementById('movie_player');"
+            + "    if (!mp || mp._zhYtP) return;"
+            + "    mp._zhYtP = true;"
+            + "    ['pauseVideo','stopVideo'].forEach(function(fn) {"
+            + "      if (typeof mp[fn] === 'function') {"
+            + "        mp['_O_'+fn] = mp[fn].bind(mp);"
+            + "        mp[fn] = function() { if (!window._zhPipBlock && mp['_O_'+fn]) mp['_O_'+fn](); };"
+            + "      }"
+            + "    });"
+            + "  }"
+            + "  patchYt();"
+            + "  try {"
+            + "    if (window._zhMO) window._zhMO.disconnect();"
+            + "    window._zhMO = new MutationObserver(function() {"
+            + "      patchYt();"
+            + "      var m = document.getElementById('movie_player');"
+            + "      if (m && m.classList.contains('paused-mode')) setTimeout(forcePlay, 80);"
+            + "    });"
+            + "    var m0 = document.getElementById('movie_player');"
+            + "    if (m0) window._zhMO.observe(m0, { attributes: true, attributeFilter: ['class'] });"
+            + "    else window._zhMO.observe(document.documentElement, { childList: true, subtree: true });"
+            + "  } catch(e) {}"
+            + "  function attach(v) {"
+            + "    if (v._zhPipListener) return;"
+            + "    v._zhPipListener = true;"
+            + "    v.addEventListener('pause', function() {"
+            + "      if (!window._zhPipBlock) return;"
+            + "      setTimeout(forcePlay, 80);"
+            + "    });"
+            + "  }"
+            + "  document.querySelectorAll('video').forEach(attach);"
+            + "  try {"
+            + "    var obs2 = new MutationObserver(function(){ document.querySelectorAll('video').forEach(attach); });"
+            + "    obs2.observe(document.documentElement, { childList: true, subtree: true });"
+            + "    window._zhPipObs2 = obs2;"
+            + "  } catch(e) {}"
+            + "  try {"
+            + "    Object.defineProperty(document, 'hidden', { get: function(){ return false; }, configurable: true });"
+            + "    Object.defineProperty(document, 'visibilityState', { get: function(){ return 'visible'; }, configurable: true });"
+            + "    Object.defineProperty(document, 'webkitHidden', { get: function(){ return false; }, configurable: true });"
+            + "  } catch(e) {}"
             + "})();";
 
     private static final String PIP_UNBLOCK_PAUSE_JS =
             "(function(){"
-            + "if(window._zhPipGuard){clearInterval(window._zhPipGuard);window._zhPipGuard=null;}"
-            + "if(window._zhMO){window._zhMO.disconnect();window._zhMO=null;}"
-            + "try{if(window._zhOrig){HTMLMediaElement.prototype.pause=window._zhOrig;window._zhOrig=null;}}catch(e){}"
-            + "try{var m=document.getElementById('movie_player');if(m&&m._zhYtP){m._zhYtP=false;"
-            + "['pauseVideo','stopVideo'].forEach(function(fn){if(m['_O_'+fn])m[fn]=m['_O_'+fn];});}}catch(e){}"
+            + "  try {"
+            + "    window._zhPipBlock = false;"
+            + "    if (window._zhOrigPause) {"
+            + "      HTMLMediaElement.prototype.pause = window._zhOrigPause;"
+            + "      window._zhOrigPause = null;"
+            + "    }"
+            + "    if (window._zhMO) { try { window._zhMO.disconnect(); } catch(e) {} window._zhMO = null; }"
+            + "    if (window._zhPipObs2) { try { window._zhPipObs2.disconnect(); } catch(e) {} window._zhPipObs2 = null; }"
+            + "    var m = document.getElementById('movie_player');"
+            + "    if (m && m._zhYtP) {"
+            + "      m._zhYtP = false;"
+            + "      ['pauseVideo','stopVideo'].forEach(function(fn){ if (m['_O_'+fn]) m[fn] = m['_O_'+fn]; });"
+            + "    }"
+            + "    document.querySelectorAll('video').forEach(function(v){ v._zhPipListener = false; });"
+            + "  } catch(e) {}"
             + "})();";
 
     public void resumeMediaForPip() {
@@ -517,75 +477,54 @@ public class BrowserActivity extends AppCompatActivity {
             web.evaluateJavascript(RESUME_VIDEO_JS, null);
             if (isInPictureInPictureMode()) {
                 web.evaluateJavascript(PIP_BLOCK_PAUSE_JS, null);
+                if (customView == null) web.evaluateJavascript(PIP_FILL_JS, null);
             }
         }
     }
 
-    /** Get the playing video's screen rect and enter PiP — like Brave:
-     *  Android's compositor grabs that surface directly, no DOM changes needed. */
     public boolean enterPipMode() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return false;
-        if (customView != null) {
-            // YouTube / any site in its own fullscreen (onShowCustomView): the customView IS the video surface.
-            // Android grabs it directly — perfect quality, no DOM work needed.
-            return enterPipDirect(customView);
-        }
-        // Not in site fullscreen: ask JS for the playing video's bounding rect in screen coordinates.
-        // We launch PiP immediately with a 16:9 guess, then update with the real rect once JS replies.
-        enterPipDirect(null);       // start PiP now so the transition is instant
-        if (web != null) {
-            web.evaluateJavascript(
-                "(function(){try{"
-                + "var vs=[].slice.call(document.querySelectorAll('video'));"
-                + "var v=vs.filter(function(x){return !x.paused&&x.readyState>=2;})[0]"
-                + "||vs.sort(function(a,b){return b.clientWidth*b.clientHeight-a.clientWidth*a.clientHeight;})[0];"
-                + "if(!v)return null;"
-                + "var r=v.getBoundingClientRect();"
-                + "return JSON.stringify({l:Math.round(r.left),t:Math.round(r.top),r:Math.round(r.right),b:Math.round(r.bottom)});"
-                + "}catch(e){return null;}})()",
-                val -> {
-                    if (val == null || val.equals("null")) return;
-                    try {
-                        // strip surrounding JS quotes if any
-                        String j = val.startsWith("\"") ? val.substring(1, val.length()-1) : val;
-                        org.json.JSONObject o = new org.json.JSONObject(j);
-                        int[] loc = new int[2]; webBox.getLocationOnScreen(loc);
-                        float density = getResources().getDisplayMetrics().density;
-                        // JS gives CSS px; multiply by density for screen px, then add WebView's screen position
-                        Rect vr = new Rect(
-                            loc[0] + Math.round(o.getInt("l") * density),
-                            loc[1] + Math.round(o.getInt("t") * density),
-                            loc[0] + Math.round(o.getInt("r") * density),
-                            loc[1] + Math.round(o.getInt("b") * density));
-                        if (vr.width() > 0 && vr.height() > 0 && isInPictureInPictureMode()) {
-                            float ar = (float)vr.width()/vr.height();
-                            ar = Math.max(0.42f, Math.min(2.38f, ar));
-                            PictureInPictureParams.Builder b2 = new PictureInPictureParams.Builder()
-                                .setAspectRatio(new Rational(Math.round(ar * 1000), 1000))
-                                .setSourceRectHint(vr);
-                            setPictureInPictureParams(b2.build());
-                        }
-                    } catch (Exception ignored) {}
-                });
-        }
-        return true;
-    }
-
-    private boolean enterPipDirect(View target) {
         try {
+            // Install pause-guard BEFORE the activity is paused (Brave-style: keep engine alive)
+            pipActive = true;
+            if (web != null) {
+                try { web.onResume(); } catch (Exception ignored) {}
+                web.evaluateJavascript(PIP_BLOCK_PAUSE_JS, null);
+                if (customView == null) web.evaluateJavascript(PIP_FILL_JS, null);
+                web.evaluateJavascript(RESUME_VIDEO_JS, null);
+            }
+
             PictureInPictureParams.Builder b = new PictureInPictureParams.Builder();
-            if (target != null && target.getWidth() > 0 && target.getHeight() > 0) {
-                float r = (float) target.getWidth() / target.getHeight();
-                r = Math.max(0.42f, Math.min(2.38f, r));
-                b.setAspectRatio(new Rational(Math.round(r * 1000), 1000));
+            View target = (customView != null && customView.getWidth() > 0) ? customView : null;
+            int w = target != null ? target.getWidth() : 0;
+            int h = target != null ? target.getHeight() : 0;
+            if (w > 0 && h > 0) {
+                float r = (float) w / (float) h;
+                // Ratio must be within Android's strict bounds [1:2.39, 2.39:1]
+                if (r >= 0.42f && r <= 2.38f) {
+                    b.setAspectRatio(new Rational(Math.round(r * 1000), 1000));
+                } else {
+                    b.setAspectRatio(new Rational(16, 9));
+                }
                 Rect rect = new Rect();
                 target.getGlobalVisibleRect(rect);
                 b.setSourceRectHint(rect);
             } else {
                 b.setAspectRatio(new Rational(16, 9));
             }
-            return enterPictureInPictureMode(b.build());
+            if (Build.VERSION.SDK_INT >= 31) {
+                try { b.setSeamlessResizeEnabled(true); } catch (Throwable ignored) {}
+            }
+            boolean ok = enterPictureInPictureMode(b.build());
+            if (!ok) {
+                pipActive = false;
+            } else if (web != null) {
+                // Activity will onPause immediately — keep the WebView running
+                try { web.onResume(); } catch (Exception ignored) {}
+            }
+            return ok;
         } catch (Exception e) {
+            pipActive = false;
             return false;
         }
     }
@@ -606,7 +545,7 @@ public class BrowserActivity extends AppCompatActivity {
     }
 
     private void handlePipChange(boolean inPip) {
-        main.removeCallbacks(pipKeepAlive);
+        pipActive = inPip;
         if (inPip) {
             if (topBar != null) topBar.setVisibility(View.GONE);
             if (bottomBar != null) bottomBar.setVisibility(View.GONE);
@@ -623,18 +562,19 @@ public class BrowserActivity extends AppCompatActivity {
             if (fitBtn != null) fitBtn.setVisibility(View.GONE);
             hideSuggest();
 
-            // Block YouTube's pause + force play a few times, then soft keep-alive
+            // Install pause-blocker + event recovery; a few delayed resumes only (no interval loop)
             if (web != null) {
-                inPipSession = true;
                 web.evaluateJavascript(PIP_BLOCK_PAUSE_JS, null);
+                if (customView == null) web.evaluateJavascript(PIP_FILL_JS, null);
             }
             resumeMediaForPip();
-            main.postDelayed(this::resumeMediaForPip, 400);
-            main.postDelayed(pipKeepAlive, 3000);
+            main.postDelayed(this::resumeMediaForPip, 500);
+            main.postDelayed(this::resumeMediaForPip, 1500);
+            main.postDelayed(this::resumeMediaForPip, 3000);
         } else {
             if (web != null) {
-                inPipSession = false;
                 web.evaluateJavascript(PIP_UNBLOCK_PAUSE_JS, null);
+                web.evaluateJavascript(PIP_UNFILL_JS, null);
             }
             if (topBar != null) topBar.setVisibility(View.VISIBLE);
             if (bottomBar != null) bottomBar.setVisibility(View.VISIBLE);
@@ -702,9 +642,6 @@ public class BrowserActivity extends AppCompatActivity {
         else if (title != null) title = title.replaceAll("\\s*-\\s*YouTube$", "");
         pageMedia = has;
         pageVideo = playing && video;
-        if (pipBarBtn != null) {
-            pipBarBtn.setVisibility(!tv && playing && video && !audioMode() ? View.VISIBLE : View.GONE);
-        }
         if (listenBack && playing) {                     // from Music: playing → back to where you were
             listenBack = false;
             UiKit.makeToast(this, "🎧 " + T.t("Playing in the background — use the notification to pause"), Toast.LENGTH_LONG).show();
@@ -898,6 +835,8 @@ public class BrowserActivity extends AppCompatActivity {
 
     private void showLockUi() {
         lockLayer = new FrameLayout(this);
+        lockLayer.setClickable(false);
+        lockLayer.setFocusable(false);
         lockLayer.setOnTouchListener((v, e) -> {
             if (!locked) return false;
             if (e.getAction() == android.view.MotionEvent.ACTION_DOWN) flashLock();
@@ -907,6 +846,7 @@ public class BrowserActivity extends AppCompatActivity {
         lockBtn = UiKit.darkButton(this, "lock", 48, false, v -> {
             locked = !locked;
             lockLayer.setClickable(locked);
+            lockLayer.setFocusable(locked);
             UiKit.setIcon(this, lockBtn, "lock", 22, locked ? 0xFFEAB308 : android.graphics.Color.WHITE);
             UiKit.makeToast(this, T.t(locked ? "Screen locked — tap the lock to unlock" : "Unlocked"), Toast.LENGTH_SHORT).show();
             flashLock();
@@ -937,14 +877,11 @@ public class BrowserActivity extends AppCompatActivity {
         eqLp.setMargins(Ui.dp(this, 8), 0, 0, 0);
         if (Store.getBool("b_eq", true)) actions.addView(eq, eqLp);
 
-        // Zoom button: reset-to-100% if zoomed; shows a pinch hint if at 100%
-        final ImageView fit = UiKit.darkButton(this, "zoom-in", 48, false, v -> {
-            if (!locked) {
-                if (userZoom > 1.01f) resetBrowserZoom();
-                else UiKit.makeToast(BrowserActivity.this, T.t("Pinch to zoom"), Toast.LENGTH_SHORT).show();
-            }
+        // Video fit button: cycles Fit → Fill → Crop → Zoom (same 4 modes as the native player)
+        final ImageView fit = UiKit.darkButton(this, "maximize-2", 48, false, v -> {
+            if (!locked) cycleVideoFit();
         });
-        fit.setContentDescription(T.t("Pinch to zoom"));
+        fit.setContentDescription(T.t("Video fit"));
         fit.setTag("fs_fit");
         LinearLayout.LayoutParams fitLp = new LinearLayout.LayoutParams(Ui.dp(this, 48), Ui.dp(this, 48));
         fitLp.setMargins(Ui.dp(this, 8), 0, 0, 0);
@@ -1189,7 +1126,6 @@ public class BrowserActivity extends AppCompatActivity {
 
             @Override
             public void onPageFinished(WebView v, String url) {
-                if (url != null && url.contains("youtube.com")) v.evaluateJavascript(YT_FULLSCREEN_FIX_JS, null);
                 if (audioMode() && url != null && !url.contains("tamilcastplay.local")) v.evaluateJavascript(AUDIO_JS, null);
                 if (cssDark() && url != null && !url.contains("tamilcastplay.local")) v.evaluateJavascript(DARK_JS, null);
                 if (url != null && url.startsWith("http") && !Store.getBool("b_private", false)) BrowserData.visit(v.getTitle(), url);
@@ -1325,9 +1261,17 @@ public class BrowserActivity extends AppCompatActivity {
             public void onShowCustomView(View view, CustomViewCallback cb) {
                 customView = view;
                 customCb = cb;
-                root.addView(view, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+                ZoomLayout zoom = new ZoomLayout(BrowserActivity.this);
+                zoom.addView(view, new FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+                zoom.setFitMode(videoFitMode);
+                customZoomHost = zoom;
+                root.addView(zoom, new FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
                 showLockUi();
                 if (eqFab != null) eqFab.setVisibility(View.GONE);
+                // re-apply safe CSS fit without breaking YouTube
+                if (web != null) web.evaluateJavascript(FIT_JS[videoFitMode], null);
             }
 
             @Override
@@ -1598,7 +1542,7 @@ public class BrowserActivity extends AppCompatActivity {
     private static final int SHIELD_ORANGE = 0xFFFB542B;
     private static final int VPN_GREEN = 0xFF10B981;
 
-    private ImageView siteIcon, reloadBtn, shieldIcon, vpnIcon, videosIcon, pipBarBtn;
+    private ImageView siteIcon, reloadBtn, shieldIcon, vpnIcon, videosIcon;
     private TextView shieldBadge, videosBadge, findCount;
     private volatile boolean pageLoading;
     private final java.util.Map<WebView, String> hosts = java.util.Collections.synchronizedMap(new java.util.WeakHashMap<WebView, String>());
@@ -2949,18 +2893,38 @@ public class BrowserActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         updateVpnBar();
-        resumeMediaForPip();
+        if (web != null) {
+            try { web.onResume(); } catch (Exception ignored) {}
+        }
+        if (pipActive || (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInPictureInPictureMode())) {
+            resumeMediaForPip();
+        }
     }
 
     @Override
     protected void onPause() {
+        // Do NOT suspend the WebView while entering or staying in PiP.
+        // Race: isInPictureInPictureMode() is often still false here right after enterPictureInPictureMode().
+        // Brave / Chrome keep the renderer running; we do the same via pipActive.
+        boolean inPip = pipActive
+                || (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInPictureInPictureMode());
         super.onPause();
         saveTabs();
+        if (inPip && web != null) {
+            try { web.onResume(); } catch (Exception ignored) {}
+            web.evaluateJavascript(PIP_BLOCK_PAUSE_JS, null);
+            web.evaluateJavascript(RESUME_VIDEO_JS, null);
+        }
+    }
 
-        // Prevent web engine from suspending while in PiP
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInPictureInPictureMode()) {
+    @Override
+    protected void onStop() {
+        super.onStop();
+        // In PiP the activity is stopped but the small window stays visible — keep media alive
+        if (pipActive || (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInPictureInPictureMode())) {
             if (web != null) {
-                web.onResume();
+                try { web.onResume(); } catch (Exception ignored) {}
+                web.evaluateJavascript(RESUME_VIDEO_JS, null);
             }
         }
     }
@@ -2968,7 +2932,12 @@ public class BrowserActivity extends AppCompatActivity {
     private void hideCustom() {
         if (customView != null) {
             removeLockUi();
-            root.removeView(customView);
+            if (customZoomHost != null) {
+                root.removeView(customZoomHost);
+                customZoomHost = null;
+            } else {
+                root.removeView(customView);
+            }
             customView = null;
             if (customCb != null) customCb.onCustomViewHidden();
         }
@@ -3132,6 +3101,131 @@ public class BrowserActivity extends AppCompatActivity {
             arrow.close();
             c.drawPath(arrow, fill);
             c.drawPath(arrow, edge);
+        }
+    }
+
+    /**
+     * Pinch-to-zoom + pan + fit modes for fullscreen video (YouTube custom view).
+     * Fit modes applied on the Android view (reliable) in addition to safe CSS.
+     * Double-tap: 1x <-> 2x. Pinch: 1x – 4x.
+     */
+    static final class ZoomLayout extends FrameLayout {
+        private float scale = 1f;
+        private float tx, ty;
+        private float fitScale = 1f; // extra scale from fit mode (cover / zoom)
+        private final ScaleGestureDetector detector;
+        private long lastTap;
+        private float lastTapX, lastTapY;
+
+        ZoomLayout(android.content.Context c) {
+            super(c);
+            setClickable(true);
+            detector = new ScaleGestureDetector(c, new ScaleGestureDetector.SimpleOnScaleGestureListener() {
+                @Override public boolean onScaleBegin(ScaleGestureDetector d) { return true; }
+
+                @Override
+                public boolean onScale(ScaleGestureDetector d) {
+                    float factor = d.getScaleFactor();
+                    float base = scale * fitScale;
+                    float newBase = Math.max(1f, Math.min(4f, base * factor));
+                    float newScale = newBase / Math.max(0.01f, fitScale);
+                    float focusX = d.getFocusX();
+                    float focusY = d.getFocusY();
+                    tx = focusX - (focusX - tx) * (newScale / scale);
+                    ty = focusY - (focusY - ty) * (newScale / scale);
+                    scale = newScale;
+                    apply();
+                    return true;
+                }
+            });
+        }
+
+        /** 0 Fit, 1 Fill (stretch via X/Y), 2 Crop ~1.15, 3 Zoom 1.2 */
+        void setFitMode(int mode) {
+            switch (mode) {
+                case 1: // fill/stretch — approximate with uniform 1x; CSS handles stretch
+                    fitScale = 1f;
+                    break;
+                case 2: // crop/cover
+                    fitScale = 1.15f;
+                    break;
+                case 3: // zoom 1.2
+                    fitScale = 1.2f;
+                    break;
+                default: // fit/contain
+                    fitScale = 1f;
+                    break;
+            }
+            // reset pan when changing fit so video stays centered
+            if (mode == 0) { scale = 1f; tx = ty = 0f; }
+            apply();
+        }
+
+        private void apply() {
+            float total = scale * fitScale;
+            float maxX = getWidth() * (total - 1f) / 2f + getWidth() * 0.2f;
+            float maxY = getHeight() * (total - 1f) / 2f + getHeight() * 0.2f;
+            if (maxX < 0) maxX = 0;
+            if (maxY < 0) maxY = 0;
+            tx = Math.max(-maxX, Math.min(maxX, tx));
+            ty = Math.max(-maxY, Math.min(maxY, ty));
+            for (int i = 0; i < getChildCount(); i++) {
+                View child = getChildAt(i);
+                child.setPivotX(getWidth() / 2f);
+                child.setPivotY(getHeight() / 2f);
+                if (/* fill mode stretch */ fitScale == 1f && scale == 1f && false) {
+                    // reserved
+                }
+                child.setScaleX(total);
+                child.setScaleY(total);
+                child.setTranslationX(tx);
+                child.setTranslationY(ty);
+            }
+        }
+
+        private void resetZoom() {
+            scale = 1f;
+            tx = ty = 0f;
+            apply();
+        }
+
+        @Override
+        public boolean onInterceptTouchEvent(MotionEvent e) {
+            detector.onTouchEvent(e);
+            return detector.isInProgress() || (scale * fitScale > 1.05f && e.getPointerCount() > 1);
+        }
+
+        @Override
+        public boolean onTouchEvent(MotionEvent e) {
+            detector.onTouchEvent(e);
+            int action = e.getActionMasked();
+            if (action == MotionEvent.ACTION_DOWN) {
+                long now = SystemClock.elapsedRealtime();
+                if (now - lastTap < 300
+                        && Math.abs(e.getX() - lastTapX) < 40
+                        && Math.abs(e.getY() - lastTapY) < 40) {
+                    if (scale > 1.05f) resetZoom();
+                    else {
+                        scale = 2f;
+                        apply();
+                    }
+                    lastTap = 0;
+                    return true;
+                }
+                lastTap = now;
+                lastTapX = e.getX();
+                lastTapY = e.getY();
+            }
+            if (scale * fitScale > 1.05f && e.getPointerCount() == 1) {
+                if (action == MotionEvent.ACTION_MOVE && e.getHistorySize() > 0) {
+                    tx += e.getX() - e.getHistoricalX(0);
+                    ty += e.getY() - e.getHistoricalY(0);
+                    apply();
+                }
+                return true;
+            }
+            if (!detector.isInProgress() && scale * fitScale <= 1.05f) return false;
+            return true;
         }
     }
 }
