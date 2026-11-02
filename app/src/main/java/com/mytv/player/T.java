@@ -35,6 +35,26 @@ public final class T {
     }
 
     static {
+        TA.put("Search in new tab", "புதிய தாவலில் தேடு");
+        HI.put("Search in new tab", "नए टैब में खोजें");
+        TA.put("Send to Seedr", "Seedr-க்கு அனுப்பு");
+        HI.put("Send to Seedr", "Seedr को भेजें");
+        TA.put("Send to Seedr (stream/download in the cloud)", "Seedr-ல் ஸ்ட்ரீம்/பதிவிறக்கம் செய்");
+        HI.put("Send to Seedr (stream/download in the cloud)", "Seedr में स्ट्रीम/डाउनलोड करें");
+        TA.put("Torrent link", "டோரண்ட் இணைப்பு");
+        HI.put("Torrent link", "टोरेंट लिंक");
+        TA.put("Play / open here", "இங்கே இயக்கு / திற");
+        HI.put("Play / open here", "यहाँ चलाएँ / खोलें");
+        TA.put("Sent to Seedr", "Seedr-க்கு அனுப்பப்பட்டது");
+        HI.put("Sent to Seedr", "Seedr को भेजा गया");
+        TA.put("Opening Seedr…", "Seedr-ஐ திறக்கிறது…");
+        HI.put("Opening Seedr…", "Seedr खुल रहा है…");
+        TA.put("Pinch to zoom", "கிள்ளி பெரிதாக்கு");
+        HI.put("Pinch to zoom", "पिंच करके ज़ूम करें");
+        TA.put("Reset zoom", "ஜூம் மீட்டமை");
+        HI.put("Reset zoom", "ज़ूम रीसेट करें");
+        TA.put("Zoom reset", "ஜூம் மீட்டமைக்கப்பட்டது");
+        HI.put("Zoom reset", "ज़ूम रीसेट हुआ");
         TA.put("Video fit", "வீடியோ பொருத்தம்");
         HI.put("Video fit", "वीडियो फ़िट");
         TA.put("Fit", "பொருத்து");

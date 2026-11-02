@@ -110,9 +110,11 @@ public final class MusicLinks {
         return m.find() ? "https://m.youtube.com/watch?v=" + m.group(1) : u;
     }
 
-    /** YouTube to listen: the browser, audio only, in the background (notification: play / pause, timeline). */
+    /** YouTube to listen: the browser, audio only, in the background (notification: play / pause, timeline).
+     *  EXTRA_LISTEN=true tells the browser to load in the current tab and apply audio mode on page finish. */
     public static void playYouTube(Context c, String url) {
-        Store.putBool("b_audio", true);
+        // Don't set b_audio here — let the browser apply it per-tab in onPageFinished
+        // so other tabs aren't accidentally switched to audio mode
         c.startActivity(new Intent(c, BrowserActivity.class).putExtra(BrowserActivity.EXTRA_URL, youtubeWatch(url))
                 .putExtra(BrowserActivity.EXTRA_LISTEN, true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
     }

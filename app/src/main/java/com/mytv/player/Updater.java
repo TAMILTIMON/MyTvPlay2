@@ -283,8 +283,14 @@ public final class Updater {
             Intent i = new Intent(Intent.ACTION_VIEW).setDataAndType(u, "application/vnd.android.package-archive")
                     .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
             a.startActivity(i);
+            // schedule deletion: the system installer runs in a separate process; delete after a short delay
+            // (the FileProvider URI keeps the file readable until the installer is done)
+            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                try { f.delete(); } catch (Exception ignored) {}
+            }, 60_000);   // 60 s: enough for the installer to read the file
         } catch (Exception e) {
             UiKit.makeToast(a, "Install failed: " + e.getMessage(), android.widget.Toast.LENGTH_LONG).show();
+            try { f.delete(); } catch (Exception ignored) {}  // failed: clean up immediately
         }
     }
 }
