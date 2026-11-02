@@ -1009,7 +1009,7 @@ public class PlayerActivity extends AppCompatActivity {
             if (Family.minutesLeft() == 0 && !timesUpShown) {
                 timesUpShown = true;
                 mp.pause();
-                new UiDialog(this).setTitle(" + T.t("Time's up for today"))
+                new UiDialog(this).setTitle(T.t("Time's up for today"))
                         .setMessage(T.t("The daily screen time for this profile is used up."))
                         .setCancelable(false)
                         .setPositiveButton("🔒 " + T.t("Parents: +30 min"), (d, w) -> Family.askPin(this, "", () -> {
@@ -1274,9 +1274,9 @@ public class PlayerActivity extends AppCompatActivity {
         final JSONArray a = Store.bookmarks(it.u);
         String[] n = new String[a.length()];
         for (int i = 0; i < n.length; i++) n[i] = "⏱ " + Net.fmtTime(a.optJSONObject(i).optLong("t"));
-        new UiDialog(this).setTitle(" + T.t("Bookmarks")).setItems(n, (d, w) -> {
+        new UiDialog(this).setTitle(T.t("Bookmarks")).setItems(n, (d, w) -> {
             final long t = a.optJSONObject(w).optLong("t");
-            new UiDialog(this).setTitle(" + Net.fmtTime(t))
+            new UiDialog(this).setTitle(Net.fmtTime(t))
                     .setItems(new String[]{"▶ " + T.t("Jump here"), "🗑 " + T.t("Delete")}, (d2, w2) -> {
                         if (w2 == 0) seekTo(t);
                         else Store.delBookmark(it.u, w);
@@ -1976,7 +1976,7 @@ public class PlayerActivity extends AppCompatActivity {
             }
         }
         final int f = file;
-        new UiDialog(this).setTitle(" + T.t("Keep this movie on the TV?"))
+        new UiDialog(this).setTitle(T.t("Keep this movie on the TV?"))
                 .setMessage(it.t + "\n\n" + T.t("Keep = watch again later without internet (in the “Downloads” playlist). Delete = free the space."))
                 .setPositiveButton(T.t("Keep"), (d, w) -> {
                     TorrentEngine.get(this).keep(th, f, it.t, it.u);
@@ -2641,31 +2641,31 @@ public class PlayerActivity extends AppCompatActivity {
             int rot = Store.getInt("rotate", 1);
             labels.add("🔄  " + T.t("Rotation: ") + T.t(rot == 0 ? "Auto" : rot == 2 ? "Portrait" : "Landscape"));
             acts.add(new Runnable() { public void run() { command("rotate", "", ""); } });
-            labels.add("" + T.t("Lock screen"));
+            labels.add(T.t("Lock screen"));
             acts.add(new Runnable() { public void run() { command("lock", "1", ""); } });
         }
-        labels.add("" + T.t("Bookmark this scene"));
+        labels.add(T.t("Bookmark this scene"));
         acts.add(new Runnable() { public void run() { addBookmark(); } });
         if (current() != null && Store.bookmarks(current().u).length() > 0) {
-            labels.add("" + T.t("Bookmarks") + " · " + Store.bookmarks(current().u).length());
+            labels.add(T.t("Bookmarks") + " · " + Store.bookmarks(current().u).length());
             acts.add(new Runnable() { public void run() { menuBookmarks(); } });
         }
-        labels.add("" + T.t("Screenshot"));
+        labels.add(T.t("Screenshot"));
         acts.add(new Runnable() { public void run() { screenshot(); } });
-        labels.add("" + T.t("Audio only (picture off)") + ": " + T.t(audioOnly ? "On" : "Off"));
+        labels.add(T.t("Audio only (picture off)") + ": " + T.t(audioOnly ? "On" : "Off"));
         acts.add(new Runnable() { public void run() { command("audioonly", audioOnly ? "0" : "1", ""); } });
-        labels.add("" + T.t("Clear dialogue (quiet voices, loud music)") + ": " + dialogName(dialogLevel()));
+        labels.add(T.t("Clear dialogue (quiet voices, loud music)") + ": " + dialogName(dialogLevel()));
         acts.add(new Runnable() { public void run() {
             String[] n = {dialogName(0), dialogName(1), dialogName(2), dialogName(3)};
             choose(T.t("Clear dialogue (quiet voices, loud music)"), n, dialogLevel(), new IntCb() {
                 public void on(int i) { command("dialog", String.valueOf(i), ""); }
             });
         } });
-        labels.add("" + T.t("Volume levelling") + ": " + T.t(Store.getBool("level", false) ? "On" : "Off"));
+        labels.add(T.t("Volume levelling") + ": " + T.t(Store.getBool("level", false) ? "On" : "Off"));
         acts.add(new Runnable() { public void run() { command("level", Store.getBool("level", false) ? "0" : "1", ""); } });
-        labels.add("" + T.t("Auto frame-rate (smooth 24p)") + ": " + T.t(Store.getBool("afr", false) ? "On" : "Off"));
+        labels.add(T.t("Auto frame-rate (smooth 24p)") + ": " + T.t(Store.getBool("afr", false) ? "On" : "Off"));
         acts.add(new Runnable() { public void run() { command("afr", Store.getBool("afr", false) ? "0" : "1", ""); } });
-        labels.add("" + T.t("Brightness: ") + Store.getInt("bright", 100) + "%");
+        labels.add(T.t("Brightness: ") + Store.getInt("bright", 100) + "%");
         acts.add(new Runnable() { public void run() {
             stepper(T.t("Brightness: "), Store.getInt("bright", 100), 5, 10, 150, 100, new Fmt() {
                 public String f(float v) { return Math.round(v) + "%"; }
@@ -2674,7 +2674,7 @@ public class PlayerActivity extends AppCompatActivity {
             });
         } });
         int qn = Store.getInt("quality", 0);
-        labels.add("" + T.t("Streaming quality: ") + (qn == 0 ? T.t("Best") : qn + "p"));
+        labels.add(T.t("Streaming quality: ") + (qn == 0 ? T.t("Best") : qn + "p"));
         acts.add(new Runnable() { public void run() {
             final int[] qs = {0, 1080, 720, 480, 360};
             String[] names = {T.t("Best"), "1080p", "720p", "480p", "360p (" + T.t("saves most data") + ")"};
@@ -2682,7 +2682,7 @@ public class PlayerActivity extends AppCompatActivity {
             for (int i = 0; i < qs.length; i++) if (qs[i] == Store.getInt("quality", 0)) sel = i;
             choose(T.t("Streaming quality: "), names, sel, new IntCb() { public void on(int i) { command("quality", String.valueOf(qs[i]), ""); } });
         } });
-        labels.add("" + T.t("Go to Home"));
+        labels.add(T.t("Go to Home"));
         acts.add(new Runnable() { public void run() { Ui.goHome(PlayerActivity.this, true); } });
         labels.add(T.t("Phone remote: http://") + Net.ip() + ":" + RemoteService.PORT);
         acts.add(new Runnable() { public void run() { osd("Open http://" + Net.ip() + ":" + RemoteService.PORT + " on your phone"); } });
@@ -3083,7 +3083,7 @@ public class PlayerActivity extends AppCompatActivity {
                 keys.add(e.getKey());
                 names.add("📂 " + e.getKey() + "  ·  " + e.getValue());
             }
-            new UiDialog(this).setTitle(" + T.t("Categories"))
+            new UiDialog(this).setTitle(T.t("Categories"))
                     .setItems(names.toArray(new String[0]), (d, w) -> {
                         chFilter = keys.get(w);
                         rebuild[0].run();
