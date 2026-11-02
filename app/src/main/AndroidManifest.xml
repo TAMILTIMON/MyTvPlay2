@@ -72,7 +72,7 @@
         </intent>
         <package android:name="com.google.android.youtube.tv" />
         <package android:name="com.google.android.youtube" />
-        <package android:name="com.android.tv settings" />
+        <package android:name="com.android.tv.settings" />
         <package android:name="com.android.settings" />
     </queries>
 
