@@ -397,7 +397,7 @@ public class PlayerActivity extends AppCompatActivity {
         for (String[] m : CTL_ICON) if (m[0].equals(label)) ic = m[1];
         ImageView b = UiKit.darkButton(this, ic, Math.round(size), primary, l);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(size), dp(size));
-        lp.setMargins(dp(7), 0, dp(7), 0);
+        lp.setMargins(dp(3), 0, dp(3), 0);
         row.addView(b, lp);
         return b;
     }
@@ -425,46 +425,47 @@ public class PlayerActivity extends AppCompatActivity {
         root.addView(touch, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
 
-        loadingView = text(20, Color.WHITE);
+        loadingView = text(14, Color.WHITE);
         loadingView.setGravity(Gravity.CENTER);
-        loadingView.setPadding(dp(28), dp(16), dp(28), dp(16));
+        loadingView.setPadding(dp(22), dp(12), dp(22), dp(12));
         GradientDrawable lbg = new GradientDrawable();
-        lbg.setColor(0xB30E0A1C);
-        lbg.setStroke(dp(1), 0x40A78BFA);
-        lbg.setCornerRadius(dp(18));
+        lbg.setColor(0xE612121A);
+        lbg.setStroke(dp(1), 0x28FFFFFF);
+        lbg.setCornerRadius(dp(100));
         loadingView.setBackground(lbg);
         loadingView.setVisibility(View.GONE);
         root.addView(loadingView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER));
 
-        // ---- top bar: title + info + ⚙ in the corner
+        // ---- top bar (modern glass fade)
         topBar = new LinearLayout(this);
         topBar.setGravity(Gravity.CENTER_VERTICAL);
-        topBar.setPadding(dp(36), dp(22), dp(28), dp(36));
+        topBar.setPadding(dp(18), dp(12), dp(10), dp(32));
         topBar.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{0xCC000000, 0x00000000}));
+                new int[]{0xF2000000, 0x99000000, 0x00000000}));
         LinearLayout tcol = new LinearLayout(this);
         tcol.setOrientation(LinearLayout.VERTICAL);
-        titleView = text(22, Color.WHITE);
+        tcol.setPadding(dp(6), 0, dp(10), 0);
+        titleView = text(16, Color.WHITE);
         titleView.setTypeface(Typeface.DEFAULT_BOLD);
         titleView.setSingleLine(true);
         titleView.setEllipsize(android.text.TextUtils.TruncateAt.END);
         tcol.addView(titleView);
-        infoView = text(14, 0xFFC9C2E0);
-        infoView.setPadding(0, dp(4), 0, 0);
+        infoView = text(12, 0x99FFFFFF);
+        infoView.setPadding(0, dp(2), 0, 0);
         tcol.addView(infoView);
         topBar.addView(tcol, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
         if (!Ui.isTv(this)) {
-            ctl(topBar, "🔄", 52, false, v -> command("rotate", "", ""));
-            ctl(topBar, "🔒", 52, false, v -> command("lock", "1", ""));
-            ctl(topBar, "📡", 52, false, v -> playOnTv());   // continue this video on the TV
+            ctl(topBar, "🔄", 42, false, v -> command("rotate", "", ""));
+            ctl(topBar, "🔒", 42, false, v -> command("lock", "1", ""));
+            ctl(topBar, "📡", 42, false, v -> playOnTv());
         }
-        ctl(topBar, "⌂", 52, false, new View.OnClickListener() {
+        ctl(topBar, "⌂", 42, false, new View.OnClickListener() {
             public void onClick(View v) {
                 Ui.goHome(PlayerActivity.this, true);
             }
         });
-        gearBtn = ctl(topBar, "⚙", 52, false, new View.OnClickListener() {
+        gearBtn = ctl(topBar, "⚙", 42, false, new View.OnClickListener() {
             public void onClick(View v) {
                 showMenu();
             }
@@ -472,72 +473,78 @@ public class PlayerActivity extends AppCompatActivity {
         root.addView(topBar, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP));
 
-        osdView = text(19, Color.WHITE);
-        osdView.setPadding(dp(20), dp(10), dp(20), dp(10));
-        GradientDrawable obg = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
-                new int[]{0xE6000000 | (Ui.ACCENT & 0xFFFFFF), 0xE6000000 | (Ui.ACCENT2 & 0xFFFFFF)});
-        obg.setCornerRadius(dp(22));
+        // OSD pill
+        osdView = text(14, Color.WHITE);
+        osdView.setPadding(dp(16), dp(9), dp(16), dp(9));
+        GradientDrawable obg = new GradientDrawable();
+        obg.setColor(0xE612121A);
+        obg.setStroke(dp(1), 0x28FFFFFF);
+        obg.setCornerRadius(dp(100));
         osdView.setBackground(obg);
         osdView.setVisibility(View.GONE);
         FrameLayout.LayoutParams olp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP | Gravity.CENTER_HORIZONTAL);
-        olp.setMargins(dp(32), dp(96), dp(32), 0);
+        olp.setMargins(dp(24), dp(80), dp(24), 0);
         root.addView(osdView, olp);
 
-        unlockBtn = UiKit.darkButton(this, "lock", 64, true, null);
+        unlockBtn = UiKit.darkButton(this, "lock", 56, true, null);
         unlockBtn.setOnClickListener(v -> command("lock", "0", ""));
         unlockBtn.setVisibility(View.GONE);
-        FrameLayout.LayoutParams ulp = new FrameLayout.LayoutParams(dp(64), dp(64), Gravity.START | Gravity.CENTER_VERTICAL);
-        ulp.setMargins(dp(28), 0, 0, 0);
+        FrameLayout.LayoutParams ulp = new FrameLayout.LayoutParams(dp(56), dp(56), Gravity.TOP | Gravity.END);
+        ulp.setMargins(0, dp(20), dp(20), 0);
         root.addView(unlockBtn, ulp);
 
         chip = Ui.button(this, "⏩", true);
-        chip.setTextSize(16);
+        chip.setTextSize(14);
         chip.setVisibility(View.GONE);
         chip.setOnClickListener(v -> chipAction());
         FrameLayout.LayoutParams clp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
-                dp(50), Gravity.BOTTOM | Gravity.END);
-        clp.setMargins(0, 0, dp(48), dp(140));
+                ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.END);
+        clp.setMargins(0, 0, dp(20), dp(120));
         root.addView(chip, clp);
 
-        // ---- bottom glass panel
+        // ---- bottom control bar (sleek floating glass)
         panel = new LinearLayout(this);
         panel.setOrientation(LinearLayout.VERTICAL);
-        panel.setPadding(dp(28), dp(18), dp(28), dp(16));
+        panel.setPadding(dp(16), dp(14), dp(16), dp(14));
         GradientDrawable pbg = new GradientDrawable();
-        pbg.setColor(0xCC000000 | (Palette.mix(Ui.BAR, 0xFF000000, Palette.lum(Ui.BAR) > 0.5f ? 0.85f : 0.3f) & 0xFFFFFF));
-        pbg.setStroke(dp(1), 0x33FFFFFF);
-        pbg.setCornerRadius(dp(26));
+        pbg.setColor(0xE6101018);
+        pbg.setStroke(dp(1), 0x22FFFFFF);
+        pbg.setCornerRadius(dp(22));
         panel.setBackground(pbg);
+        panel.setElevation(dp(8));
 
+        // Time row: current ····· remaining
         LinearLayout trow = new LinearLayout(this);
         trow.setGravity(Gravity.CENTER_VERTICAL);
-        timeView = text(15, Color.WHITE);
+        timeView = text(12, 0xE6FFFFFF);
+        timeView.setTypeface(Typeface.MONOSPACE);
         trow.addView(timeView, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
-        TextView hint = text(12, 0xFF9C94B8);
-        hint.setText(UiKit.noEmoji(Ui.isTv(this) ? T.t("◀ ▶ seek · ▼ buttons · ⚙ settings")
-                : T.t("Left: brightness · Right: volume · Swipe sideways: seek · Double-tap: ±10 s")));
-        trow.addView(hint);
+        if (Ui.isTv(this)) {
+            TextView hint = text(11, 0x66FFFFFF);
+            hint.setText(UiKit.noEmoji(T.t("◀ ▶ seek · ▼ buttons · ⚙ settings")));
+            trow.addView(hint);
+        }
         panel.addView(trow);
 
-        // timeline you can drag (touch) or move with ◀ ▶ (TV remote: press ▲ from the buttons to reach it)
+        // Slim modern timeline
         timeline = new SeekBar(this);
         timeline.setMax(1000);
         timeline.setProgressDrawable(progressDrawable());
         GradientDrawable thumb = new GradientDrawable();
         thumb.setShape(GradientDrawable.OVAL);
         thumb.setColor(Color.WHITE);
-        thumb.setStroke(dp(3), Ui.ACCENT);
-        thumb.setSize(dp(20), dp(20));
+        thumb.setStroke(dp(2), Ui.ACCENT);
+        thumb.setSize(dp(16), dp(16));
         timeline.setThumb(thumb);
         timeline.setSplitTrack(false);
-        timeline.setPadding(dp(12), dp(8), dp(12), dp(8));
+        timeline.setPadding(dp(8), dp(4), dp(8), dp(4));
         timeline.setFocusable(true);
         GradientDrawable tlFocus = new GradientDrawable();
-        tlFocus.setCornerRadius(dp(14));
+        tlFocus.setCornerRadius(dp(12));
         tlFocus.setStroke(dp(2), 0x00000000);
         timeline.setOnFocusChangeListener((v, f) -> {
-            tlFocus.setStroke(dp(2), f ? Ui.ACCENT2 : 0x00000000);
+            tlFocus.setStroke(dp(2), f ? Ui.ACCENT : 0x00000000);
             v.setBackground(tlFocus);
         });
         timeline.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
@@ -546,23 +553,17 @@ public class PlayerActivity extends AppCompatActivity {
                 long len = mp.getLength();
                 if (len <= 0) return;
                 long target = len * v / 1000;
-                timeView.setText(UiKit.noEmoji("⏩ " + Net.fmtTime(target) + " / " + Net.fmtTime(len)));
-                showPreview(target);
+                timeView.setText(UiKit.noEmoji(Net.fmtTime(target) + " / " + Net.fmtTime(len)));
                 timelineMoved = System.currentTimeMillis();
-                handler.removeCallbacks(hideOverlay);
-                handler.postDelayed(hideOverlay, 6000);
-                if (!timelineDragging) {
-                    // remote ◀ ▶ on the bar: seek after a short pause
-                    handler.removeCallbacks(timelineSeek);
-                    handler.postDelayed(timelineSeek, 650);
-                }
+                seekTarget = target;
+                seekAt = System.currentTimeMillis();
+                handler.removeCallbacks(timelineSeek);
+                handler.postDelayed(timelineSeek, 280);
             }
-
             public void onStartTrackingTouch(SeekBar sb) {
                 timelineDragging = true;
                 handler.removeCallbacks(hideOverlay);
             }
-
             public void onStopTrackingTouch(SeekBar sb) {
                 timelineDragging = false;
                 timelineSeek.run();
@@ -570,39 +571,43 @@ public class PlayerActivity extends AppCompatActivity {
             }
         });
         progress = timeline;
-        LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(36));
-        plp.setMargins(-dp(12), dp(4), -dp(12), dp(6));
+        LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(28));
+        plp.setMargins(0, dp(2), 0, dp(8));
         panel.addView(timeline, plp);
 
+        // Transport + tools (two visual groups)
         LinearLayout btns = new LinearLayout(this);
-        btns.setGravity(Gravity.CENTER);
-        ctl(btns, "⏮", 46, false, v -> { prev(); showOverlay(); });
-        ctl(btns, "↺", 46, false, v -> seekBy(-10000));
-        playBtn = ctl(btns, "⏯", 62, true, v -> togglePause());
-        ctl(btns, "↻", 46, false, v -> seekBy(10000));
-        ctl(btns, "⏭", 46, false, v -> { next(); showOverlay(); });
+        btns.setGravity(Gravity.CENTER_VERTICAL);
+        btns.setPadding(dp(4), 0, dp(4), 0);
+        ctl(btns, "⏮", 40, false, v -> { prev(); showOverlay(); });
+        ctl(btns, "↺", 40, false, v -> seekBy(-10000));
+        playBtn = ctl(btns, "⏯", 56, true, v -> togglePause());
+        ctl(btns, "↻", 40, false, v -> seekBy(10000));
+        ctl(btns, "⏭", 40, false, v -> { next(); showOverlay(); });
         View gap = new View(this);
-        btns.addView(gap, new LinearLayout.LayoutParams(dp(18), 1));
-        ctl(btns, "📺", 46, false, v -> menuQueue());
-        ctl(btns, "🔊", 46, false, v -> menuAudio());
-        ctl(btns, "💬", 46, false, v -> menuSubs());
-        ctl(btns, "⛶", 46, false, v -> menuFit());
-        ctl(btns, "🎚", 46, false, v -> menuEq());
-        repeatBtn = ctl(btns, "🔁", 46, false, v -> command("repeat", "", ""));
-        shuffleBtn = ctl(btns, "🔀", 46, false, v -> command("shuffle", "", ""));
-        ctl(btns, "☰", 46, false, v -> showMenu());
+        btns.addView(gap, new LinearLayout.LayoutParams(dp(12), 1));
+        ctl(btns, "📺", 40, false, v -> menuQueue());
+        ctl(btns, "🔊", 40, false, v -> menuAudio());
+        ctl(btns, "💬", 40, false, v -> menuSubs());
+        ctl(btns, "⛶", 40, false, v -> menuFit());
+        ctl(btns, "🎚", 40, false, v -> menuEq());
+        repeatBtn = ctl(btns, "🔁", 40, false, v -> command("repeat", "", ""));
+        shuffleBtn = ctl(btns, "🔀", 40, false, v -> command("shuffle", "", ""));
+        ctl(btns, "☰", 40, false, v -> showMenu());
         updateModeButtons();
         android.widget.HorizontalScrollView hs = new android.widget.HorizontalScrollView(this);
         hs.setHorizontalScrollBarEnabled(false);
+        hs.setOverScrollMode(View.OVER_SCROLL_NEVER);
         hs.addView(btns);
-        panel.addView(hs, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT));
-        ((LinearLayout.LayoutParams) hs.getLayoutParams()).gravity = Gravity.CENTER_HORIZONTAL;
+        LinearLayout.LayoutParams hslp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT);
+        hs.setLayoutParams(hslp);
+        panel.addView(hs);
 
         FrameLayout.LayoutParams panelLp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM);
-        int side = Ui.isTv(this) ? dp(48) : dp(10);
-        panelLp.setMargins(side, 0, side, dp(Ui.isTv(this) ? 28 : 12));
+        int side = Ui.isTv(this) ? dp(40) : dp(12);
+        panelLp.setMargins(side, 0, side, dp(Ui.isTv(this) ? 24 : 16));
         root.addView(panel, panelLp);
         setContentView(root);
         root.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
@@ -615,17 +620,20 @@ public class PlayerActivity extends AppCompatActivity {
 
     private android.graphics.drawable.Drawable progressDrawable() {
         GradientDrawable bg = new GradientDrawable();
-        bg.setColor(0x33FFFFFF);
-        bg.setCornerRadius(dp(3));
+        bg.setColor(0x40FFFFFF);
+        bg.setCornerRadius(dp(100));
         GradientDrawable fg = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
-                new int[]{Ui.ACCENT, Ui.ACCENT2});
-        fg.setCornerRadius(dp(3));
+                new int[]{Ui.ACCENT, Ui.ACCENT2, Ui.ACCENT3});
+        fg.setCornerRadius(dp(100));
         android.graphics.drawable.ClipDrawable clip = new android.graphics.drawable.ClipDrawable(fg,
                 Gravity.START, android.graphics.drawable.ClipDrawable.HORIZONTAL);
         android.graphics.drawable.LayerDrawable ld = new android.graphics.drawable.LayerDrawable(
                 new android.graphics.drawable.Drawable[]{bg, clip});
         ld.setId(0, android.R.id.background);
         ld.setId(1, android.R.id.progress);
+        // Inset so the track looks like a slim modern bar
+        ld.setLayerInset(0, 0, dp(6), 0, dp(6));
+        ld.setLayerInset(1, 0, dp(6), 0, dp(6));
         return ld;
     }
 
@@ -851,13 +859,14 @@ public class PlayerActivity extends AppCompatActivity {
     private void updateOverlay() {
         if (mp == null) return;
         long t = mp.getTime(), len = mp.getLength();
-        timeView.setText(len > 0 ? Net.fmtTime(t) + " / " + Net.fmtTime(len) + (mp.isPlaying() ? "" : T.t("   ❚❚ Paused"))
-                : (mp.isPlaying() ? T.t("● Live  ") + Net.fmtTime(t) : T.t("❚❚ Paused")));
+        timeView.setText(len > 0
+                ? Net.fmtTime(t) + "  ·  " + Net.fmtTime(len) + (mp.isPlaying() ? "" : "  ·  " + T.t("Paused"))
+                : (mp.isPlaying() ? T.t("Live") + "  ·  " + Net.fmtTime(t) : T.t("Paused")));
         if (!timelineDragging && System.currentTimeMillis() - timelineMoved > 1500) {
             progress.setProgress(len > 0 ? (int) (1000 * Math.max(0, t) / len) : 0);
             if (len > 0) timeline.setKeyProgressIncrement(Math.max(1, (int) (10000L * 1000 / len))); // ◀ ▶ = 10 s
         }
-        UiKit.setIcon(this, playBtn, mp.isPlaying() ? "pause" : "play", 28, Color.WHITE);
+        UiKit.setIcon(this, playBtn, mp.isPlaying() ? "pause" : "play", 24, Color.WHITE);
         StringBuilder sb = new StringBuilder();
         if (queue.size() > 1) sb.append(index + 1).append('/').append(queue.size()).append("   ");
         if (trackCacheAge++ % 4 == 0) {
@@ -1000,7 +1009,7 @@ public class PlayerActivity extends AppCompatActivity {
             if (Family.minutesLeft() == 0 && !timesUpShown) {
                 timesUpShown = true;
                 mp.pause();
-                new UiDialog(this).setTitle("⏰ " + T.t("Time's up for today"))
+                new UiDialog(this).setTitle(" + T.t("Time's up for today"))
                         .setMessage(T.t("The daily screen time for this profile is used up."))
                         .setCancelable(false)
                         .setPositiveButton("🔒 " + T.t("Parents: +30 min"), (d, w) -> Family.askPin(this, "", () -> {
@@ -1265,9 +1274,9 @@ public class PlayerActivity extends AppCompatActivity {
         final JSONArray a = Store.bookmarks(it.u);
         String[] n = new String[a.length()];
         for (int i = 0; i < n.length; i++) n[i] = "⏱ " + Net.fmtTime(a.optJSONObject(i).optLong("t"));
-        new UiDialog(this).setTitle("🔖 " + T.t("Bookmarks")).setItems(n, (d, w) -> {
+        new UiDialog(this).setTitle(" + T.t("Bookmarks")).setItems(n, (d, w) -> {
             final long t = a.optJSONObject(w).optLong("t");
-            new UiDialog(this).setTitle("⏱ " + Net.fmtTime(t))
+            new UiDialog(this).setTitle(" + Net.fmtTime(t))
                     .setItems(new String[]{"▶ " + T.t("Jump here"), "🗑 " + T.t("Delete")}, (d2, w2) -> {
                         if (w2 == 0) seekTo(t);
                         else Store.delBookmark(it.u, w);
@@ -1967,7 +1976,7 @@ public class PlayerActivity extends AppCompatActivity {
             }
         }
         final int f = file;
-        new UiDialog(this).setTitle("💾  " + T.t("Keep this movie on the TV?"))
+        new UiDialog(this).setTitle(" + T.t("Keep this movie on the TV?"))
                 .setMessage(it.t + "\n\n" + T.t("Keep = watch again later without internet (in the “Downloads” playlist). Delete = free the space."))
                 .setPositiveButton(T.t("Keep"), (d, w) -> {
                     TorrentEngine.get(this).keep(th, f, it.t, it.u);
@@ -2632,31 +2641,31 @@ public class PlayerActivity extends AppCompatActivity {
             int rot = Store.getInt("rotate", 1);
             labels.add("🔄  " + T.t("Rotation: ") + T.t(rot == 0 ? "Auto" : rot == 2 ? "Portrait" : "Landscape"));
             acts.add(new Runnable() { public void run() { command("rotate", "", ""); } });
-            labels.add("🔒  " + T.t("Lock screen"));
+            labels.add("" + T.t("Lock screen"));
             acts.add(new Runnable() { public void run() { command("lock", "1", ""); } });
         }
-        labels.add("🔖  " + T.t("Bookmark this scene"));
+        labels.add("" + T.t("Bookmark this scene"));
         acts.add(new Runnable() { public void run() { addBookmark(); } });
         if (current() != null && Store.bookmarks(current().u).length() > 0) {
-            labels.add("🔖  " + T.t("Bookmarks") + " · " + Store.bookmarks(current().u).length());
+            labels.add("" + T.t("Bookmarks") + " · " + Store.bookmarks(current().u).length());
             acts.add(new Runnable() { public void run() { menuBookmarks(); } });
         }
-        labels.add("📸  " + T.t("Screenshot"));
+        labels.add("" + T.t("Screenshot"));
         acts.add(new Runnable() { public void run() { screenshot(); } });
-        labels.add("🎵  " + T.t("Audio only (picture off)") + ": " + T.t(audioOnly ? "On" : "Off"));
+        labels.add("" + T.t("Audio only (picture off)") + ": " + T.t(audioOnly ? "On" : "Off"));
         acts.add(new Runnable() { public void run() { command("audioonly", audioOnly ? "0" : "1", ""); } });
-        labels.add("🗣  " + T.t("Clear dialogue (quiet voices, loud music)") + ": " + dialogName(dialogLevel()));
+        labels.add("" + T.t("Clear dialogue (quiet voices, loud music)") + ": " + dialogName(dialogLevel()));
         acts.add(new Runnable() { public void run() {
             String[] n = {dialogName(0), dialogName(1), dialogName(2), dialogName(3)};
             choose(T.t("Clear dialogue (quiet voices, loud music)"), n, dialogLevel(), new IntCb() {
                 public void on(int i) { command("dialog", String.valueOf(i), ""); }
             });
         } });
-        labels.add("📊  " + T.t("Volume levelling") + ": " + T.t(Store.getBool("level", false) ? "On" : "Off"));
+        labels.add("" + T.t("Volume levelling") + ": " + T.t(Store.getBool("level", false) ? "On" : "Off"));
         acts.add(new Runnable() { public void run() { command("level", Store.getBool("level", false) ? "0" : "1", ""); } });
-        labels.add("🎞  " + T.t("Auto frame-rate (smooth 24p)") + ": " + T.t(Store.getBool("afr", false) ? "On" : "Off"));
+        labels.add("" + T.t("Auto frame-rate (smooth 24p)") + ": " + T.t(Store.getBool("afr", false) ? "On" : "Off"));
         acts.add(new Runnable() { public void run() { command("afr", Store.getBool("afr", false) ? "0" : "1", ""); } });
-        labels.add("☀  " + T.t("Brightness: ") + Store.getInt("bright", 100) + "%");
+        labels.add("" + T.t("Brightness: ") + Store.getInt("bright", 100) + "%");
         acts.add(new Runnable() { public void run() {
             stepper(T.t("Brightness: "), Store.getInt("bright", 100), 5, 10, 150, 100, new Fmt() {
                 public String f(float v) { return Math.round(v) + "%"; }
@@ -2665,7 +2674,7 @@ public class PlayerActivity extends AppCompatActivity {
             });
         } });
         int qn = Store.getInt("quality", 0);
-        labels.add("📶  " + T.t("Streaming quality: ") + (qn == 0 ? T.t("Best") : qn + "p"));
+        labels.add("" + T.t("Streaming quality: ") + (qn == 0 ? T.t("Best") : qn + "p"));
         acts.add(new Runnable() { public void run() {
             final int[] qs = {0, 1080, 720, 480, 360};
             String[] names = {T.t("Best"), "1080p", "720p", "480p", "360p (" + T.t("saves most data") + ")"};
@@ -2673,7 +2682,7 @@ public class PlayerActivity extends AppCompatActivity {
             for (int i = 0; i < qs.length; i++) if (qs[i] == Store.getInt("quality", 0)) sel = i;
             choose(T.t("Streaming quality: "), names, sel, new IntCb() { public void on(int i) { command("quality", String.valueOf(qs[i]), ""); } });
         } });
-        labels.add("🏠  " + T.t("Go to Home"));
+        labels.add("" + T.t("Go to Home"));
         acts.add(new Runnable() { public void run() { Ui.goHome(PlayerActivity.this, true); } });
         labels.add(T.t("Phone remote: http://") + Net.ip() + ":" + RemoteService.PORT);
         acts.add(new Runnable() { public void run() { osd("Open http://" + Net.ip() + ":" + RemoteService.PORT + " on your phone"); } });
@@ -3074,7 +3083,7 @@ public class PlayerActivity extends AppCompatActivity {
                 keys.add(e.getKey());
                 names.add("📂 " + e.getKey() + "  ·  " + e.getValue());
             }
-            new UiDialog(this).setTitle("📂 " + T.t("Categories"))
+            new UiDialog(this).setTitle(" + T.t("Categories"))
                     .setItems(names.toArray(new String[0]), (d, w) -> {
                         chFilter = keys.get(w);
                         rebuild[0].run();
