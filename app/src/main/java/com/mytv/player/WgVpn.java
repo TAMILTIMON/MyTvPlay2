@@ -38,7 +38,7 @@ public final class WgVpn {
     private static final Tunnel TUNNEL = new Tunnel() {
         @Override
         public String getName() {
-            return "zhplay";
+            return "ZH VPN";
         }
 
         @Override
