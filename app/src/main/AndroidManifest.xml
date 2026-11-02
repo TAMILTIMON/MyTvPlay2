@@ -227,25 +227,11 @@
         <activity
             android:name=".BrowserActivity"
             android:configChanges="orientation|screenSize|smallestScreenSize|keyboardHidden|keyboard|navigation|screenLayout|uiMode"
-            android:exported="true"
+            android:exported="false"
             android:label="ZH Browser"
             android:launchMode="singleTask"
             android:taskAffinity="com.tamil.castplay.browser"
-            android:windowSoftInputMode="adjustResize">
-            <!-- Text selection "Web search" and system search -->
-            <intent-filter>
-                <action android:name="android.intent.action.WEB_SEARCH" />
-                <category android:name="android.intent.category.DEFAULT" />
-            </intent-filter>
-            <!-- Open http(s) links in ZH Browser -->
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="http" />
-                <data android:scheme="https" />
-            </intent-filter>
-        </activity>
+            android:windowSoftInputMode="adjustResize" />
 
         <activity
             android:name=".ConnectActivity"
