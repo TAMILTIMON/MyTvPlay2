@@ -271,16 +271,26 @@ public class BrowserActivity extends AppCompatActivity {
     private static final String START_LOGO = "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";
 
     /** In PiP: the playing video fills the small window (YouTube's player is otherwise a strip in the page). */
-    static final String PIP_FILL_JS = "(function(){try{var vs=[].slice.call(document.querySelectorAll('video'));"
-            + "var v=vs.filter(function(x){return !x.paused;})[0]||vs.sort(function(a,b){return b.clientWidth*b.clientHeight-a.clientWidth*a.clientHeight;})[0];"
-            + "if(!v)return;v.setAttribute('data-zhpip','1');"
+    static final String PIP_FILL_JS = "(function(){try{"
+            + "var vs=[].slice.call(document.querySelectorAll('video'));"
+            + "var v=vs.filter(function(x){return !x.paused && x.readyState>=2;})[0]"
+            + "||vs.filter(function(x){return x.readyState>=2;}).sort(function(a,b){return b.clientWidth*b.clientHeight-a.clientWidth*a.clientHeight;})[0]"
+            + "||vs.sort(function(a,b){return b.clientWidth*b.clientHeight-a.clientWidth*a.clientHeight;})[0];"
+            + "if(!v){var mp=document.getElementById('movie_player');if(mp)v=mp.querySelector('video');}"
+            + "if(!v)return;"
+            + "v.setAttribute('data-zhpip','1');"
             + "for(var p=v.parentElement;p&&p!==document.body;p=p.parentElement){p.setAttribute('data-zhpipp','1');}"
             + "var s=document.getElementById('zh-pip')||document.createElement('style');s.id='zh-pip';"
-            + "s.textContent='html,body{overflow:hidden!important}[data-zhpipp]{transform:none!important;contain:none!important;"
-            + "filter:none!important;will-change:auto!important}video[data-zhpip]{position:fixed!important;left:0!important;top:0!important;"
-            + "width:100vw!important;height:100vh!important;max-width:none!important;max-height:none!important;z-index:2147483647!important;"
-            + "object-fit:contain!important;background:#000!important;margin:0!important}';"
-            + "(document.head||document.documentElement).appendChild(s);window.scrollTo(0,0);if(v.paused)v.play();}catch(e){}})();";
+            + "s.textContent='html,body{overflow:hidden!important;background:#000!important}"
+            + "[data-zhpipp]{transform:none!important;contain:none!important;filter:none!important;will-change:auto!important;opacity:1!important;visibility:visible!important}"
+            + "video[data-zhpip]{position:fixed!important;left:0!important;top:0!important;right:0!important;bottom:0!important;"
+            + "width:100vw!important;height:100vh!important;max-width:none!important;max-height:none!important;"
+            + "z-index:2147483647!important;object-fit:contain!important;background:#000!important;margin:0!important;"
+            + "opacity:1!important;visibility:visible!important;display:block!important}';"
+            + "(document.head||document.documentElement).appendChild(s);"
+            + "window.scrollTo(0,0);"
+            + "try{v.muted=false;if(v.paused)v.play().catch(function(){});}catch(e){}"
+            + "}catch(e){}})();";
     static final String PIP_UNFILL_JS = "(function(){var s=document.getElementById('zh-pip');if(s)s.remove();"
             + "[].slice.call(document.querySelectorAll('[data-zhpip],[data-zhpipp]')).forEach(function(e){"
             + "e.removeAttribute('data-zhpip');e.removeAttribute('data-zhpipp');});})();";
@@ -291,27 +301,50 @@ public class BrowserActivity extends AppCompatActivity {
     }
 
     private volatile boolean pageVideo;          // a video (not a song / audio mode) is playing
+    private final Runnable pipKeepAlive = new Runnable() {
+        @Override public void run() {
+            if (!isInPictureInPictureMode()) return;
+            resumeMediaForPip();
+            main.postDelayed(this, 1200);
+        }
+    };
 
     private static final String RESUME_VIDEO_JS =
             "(function() {"
             + "  try {"
-            + "    Object.defineProperty(document, 'hidden', { value: false, writable: true, configurable: true });"
-            + "    Object.defineProperty(document, 'visibilityState', { value: 'visible', writable: true, configurable: true });"
+            + "    Object.defineProperty(document, 'hidden', { get: function(){ return false; }, configurable: true });"
+            + "    Object.defineProperty(document, 'visibilityState', { get: function(){ return 'visible'; }, configurable: true });"
             + "    document.dispatchEvent(new Event('visibilitychange'));"
+            + "    try { window.dispatchEvent(new Event('focus')); } catch(e) {}"
             + "  } catch (e) {}"
             + "  try {"
             + "    var mp = document.getElementById('movie_player');"
-            + "    if (mp && mp.playVideo) { mp.playVideo(); }"
+            + "    if (mp) {"
+            + "      if (typeof mp.playVideo === 'function') mp.playVideo();"
+            + "      if (typeof mp.play === 'function') mp.play();"
+            + "      if (typeof mp.unMute === 'function') mp.unMute();"
+            + "      try { mp.setAttribute('data-zhplaying','1'); } catch(e) {}"
+            + "    }"
             + "  } catch (e) {}"
             + "  document.querySelectorAll('video').forEach(function(v) {"
-            + "    if (v.paused) { v.play().catch(function() {}); }"
+            + "    try {"
+            + "      v.muted = false;"
+            + "      if (v.paused || v.ended) {"
+            + "        var p = v.play();"
+            + "        if (p && typeof p.catch === 'function') p.catch(function(){});"
+            + "      }"
+            + "    } catch (e) {}"
             + "  });"
             + "})();";
 
     public void resumeMediaForPip() {
         if (web != null) {
-            web.onResume();
+            try { web.onResume(); } catch (Exception ignored) {}
             web.evaluateJavascript(RESUME_VIDEO_JS, null);
+            // Re-apply fill CSS if we are in PiP and not using system fullscreen customView
+            if (isInPictureInPictureMode() && customView == null) {
+                web.evaluateJavascript(PIP_FILL_JS, null);
+            }
         }
     }
 
@@ -359,6 +392,7 @@ public class BrowserActivity extends AppCompatActivity {
     }
 
     private void handlePipChange(boolean inPip) {
+        main.removeCallbacks(pipKeepAlive);
         if (inPip) {
             if (topBar != null) topBar.setVisibility(View.GONE);
             if (bottomBar != null) bottomBar.setVisibility(View.GONE);
@@ -378,6 +412,8 @@ public class BrowserActivity extends AppCompatActivity {
             main.postDelayed(this::resumeMediaForPip, 300);
             main.postDelayed(this::resumeMediaForPip, 800);
             main.postDelayed(this::resumeMediaForPip, 1500);
+            // Keep forcing play while YouTube tries to pause us in PiP
+            main.postDelayed(pipKeepAlive, 1200);
         } else {
             if (web != null) web.evaluateJavascript(PIP_UNFILL_JS, null);              // the page as it was
             if (topBar != null) topBar.setVisibility(View.VISIBLE);
