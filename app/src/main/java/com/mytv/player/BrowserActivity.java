@@ -301,14 +301,16 @@ public class BrowserActivity extends AppCompatActivity {
     }
 
     private volatile boolean pageVideo;          // a video (not a song / audio mode) is playing
+    /** Soft keep-alive: only re-triggers play if the video is actually paused (avoids play/pause fight). */
     private final Runnable pipKeepAlive = new Runnable() {
         @Override public void run() {
             if (!isInPictureInPictureMode()) return;
             resumeMediaForPip();
-            main.postDelayed(this, 1200);
+            main.postDelayed(this, 2500);
         }
     };
 
+    /** Spoof visibility + force play only when paused. */
     private static final String RESUME_VIDEO_JS =
             "(function() {"
             + "  try {"
@@ -323,7 +325,6 @@ public class BrowserActivity extends AppCompatActivity {
             + "      if (typeof mp.playVideo === 'function') mp.playVideo();"
             + "      if (typeof mp.play === 'function') mp.play();"
             + "      if (typeof mp.unMute === 'function') mp.unMute();"
-            + "      try { mp.setAttribute('data-zhplaying','1'); } catch(e) {}"
             + "    }"
             + "  } catch (e) {}"
             + "  document.querySelectorAll('video').forEach(function(v) {"
@@ -337,13 +338,57 @@ public class BrowserActivity extends AppCompatActivity {
             + "  });"
             + "})();";
 
+    /** While in PiP, block YouTube's automatic pause() so it cannot stop the video. */
+    private static final String PIP_BLOCK_PAUSE_JS =
+            "(function(){"
+            + "  if (window._zhPipBlock) return;"
+            + "  window._zhPipBlock = true;"
+            + "  try {"
+            + "    if (!window._zhOrigPause) window._zhOrigPause = HTMLMediaElement.prototype.pause;"
+            + "    HTMLMediaElement.prototype.pause = function() {"
+            + "      // Ignore pause while we are in forced PiP play mode"
+            + "    };"
+            + "  } catch(e) {}"
+            + "  try {"
+            + "    var mp = document.getElementById('movie_player');"
+            + "    if (mp && !mp._zhPausedPatched) {"
+            + "      mp._zhPausedPatched = true;"
+            + "      if (typeof mp.pauseVideo === 'function') {"
+            + "        mp._zhOrigPauseVideo = mp.pauseVideo;"
+            + "        mp.pauseVideo = function() {};"
+            + "      }"
+            + "    }"
+            + "  } catch(e) {}"
+            + "  // Re-apply visibility spoof"
+            + "  try {"
+            + "    Object.defineProperty(document, 'hidden', { get: function(){ return false; }, configurable: true });"
+            + "    Object.defineProperty(document, 'visibilityState', { get: function(){ return 'visible'; }, configurable: true });"
+            + "  } catch(e) {}"
+            + "})();";
+
+    private static final String PIP_UNBLOCK_PAUSE_JS =
+            "(function(){"
+            + "  try {"
+            + "    if (window._zhOrigPause) {"
+            + "      HTMLMediaElement.prototype.pause = window._zhOrigPause;"
+            + "      window._zhOrigPause = null;"
+            + "    }"
+            + "    window._zhPipBlock = false;"
+            + "    var mp = document.getElementById('movie_player');"
+            + "    if (mp && mp._zhOrigPauseVideo) {"
+            + "      mp.pauseVideo = mp._zhOrigPauseVideo;"
+            + "      mp._zhPausedPatched = false;"
+            + "    }"
+            + "  } catch(e) {}"
+            + "})();";
+
     public void resumeMediaForPip() {
         if (web != null) {
             try { web.onResume(); } catch (Exception ignored) {}
             web.evaluateJavascript(RESUME_VIDEO_JS, null);
-            // Re-apply fill CSS if we are in PiP and not using system fullscreen customView
-            if (isInPictureInPictureMode() && customView == null) {
-                web.evaluateJavascript(PIP_FILL_JS, null);
+            if (isInPictureInPictureMode()) {
+                web.evaluateJavascript(PIP_BLOCK_PAUSE_JS, null);
+                if (customView == null) web.evaluateJavascript(PIP_FILL_JS, null);
             }
         }
     }
@@ -407,15 +452,21 @@ public class BrowserActivity extends AppCompatActivity {
             if (pipBtn != null) pipBtn.setVisibility(View.GONE);
             hideSuggest();
 
+            // Block YouTube's pause + force play a few times, then soft keep-alive
+            if (web != null) {
+                web.evaluateJavascript(PIP_BLOCK_PAUSE_JS, null);
+                if (customView == null) web.evaluateJavascript(PIP_FILL_JS, null);
+            }
             resumeMediaForPip();
-            if (customView == null && web != null) web.evaluateJavascript(PIP_FILL_JS, null);
-            main.postDelayed(this::resumeMediaForPip, 300);
-            main.postDelayed(this::resumeMediaForPip, 800);
-            main.postDelayed(this::resumeMediaForPip, 1500);
-            // Keep forcing play while YouTube tries to pause us in PiP
-            main.postDelayed(pipKeepAlive, 1200);
+            main.postDelayed(this::resumeMediaForPip, 400);
+            main.postDelayed(this::resumeMediaForPip, 1000);
+            main.postDelayed(this::resumeMediaForPip, 2000);
+            main.postDelayed(pipKeepAlive, 3000);
         } else {
-            if (web != null) web.evaluateJavascript(PIP_UNFILL_JS, null);              // the page as it was
+            if (web != null) {
+                web.evaluateJavascript(PIP_UNBLOCK_PAUSE_JS, null);
+                web.evaluateJavascript(PIP_UNFILL_JS, null);
+            }
             if (topBar != null) topBar.setVisibility(View.VISIBLE);
             if (bottomBar != null) bottomBar.setVisibility(View.VISIBLE);
             if (eqFab != null) eqFab.setVisibility(pageMedia && Store.getBool("b_eq", true) && customView == null ? View.VISIBLE : View.GONE);
