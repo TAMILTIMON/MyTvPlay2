@@ -57,6 +57,9 @@ import java.util.Map;
  */
 public class BrowserActivity extends AppCompatActivity {
     public static final String EXTRA_URL = "url";
+    /** Opened from Music to LISTEN: audio only; the browser steps back once the sound starts. */
+    public static final String EXTRA_LISTEN = "listen";
+    private boolean listenBack;
 
     private WebView web;
     private EditText bar;
@@ -242,6 +245,7 @@ public class BrowserActivity extends AppCompatActivity {
         configure(web);
 
         String start = getIntent().getStringExtra(EXTRA_URL);
+        listenBack = getIntent().getBooleanExtra(EXTRA_LISTEN, false);
         if (start != null && !start.isEmpty()) go(start);
         else if ((Store.getBool("b_restore", true) || Store.getBool("b_restore_once", false)) && !BrowserData.savedTabs().isEmpty()) {
             Store.putBool("b_restore_once", false);
@@ -263,6 +267,28 @@ public class BrowserActivity extends AppCompatActivity {
 
     // ---------------------------------------------------------------- Picture-in-Picture (PiP)
     // Script overrides the Page Visibility API and intercepts programmatic pause attempts
+    /** In PiP: the playing video fills the small window (YouTube's player is otherwise a strip in the page). */
+    static final String PIP_FILL_JS = "(function(){try{var vs=[].slice.call(document.querySelectorAll('video'));"
+            + "var v=vs.filter(function(x){return !x.paused;})[0]||vs.sort(function(a,b){return b.clientWidth*b.clientHeight-a.clientWidth*a.clientHeight;})[0];"
+            + "if(!v)return;v.setAttribute('data-zhpip','1');"
+            + "for(var p=v.parentElement;p&&p!==document.body;p=p.parentElement){p.setAttribute('data-zhpipp','1');}"
+            + "var s=document.getElementById('zh-pip')||document.createElement('style');s.id='zh-pip';"
+            + "s.textContent='html,body{overflow:hidden!important}[data-zhpipp]{transform:none!important;contain:none!important;"
+            + "filter:none!important;will-change:auto!important}video[data-zhpip]{position:fixed!important;left:0!important;top:0!important;"
+            + "width:100vw!important;height:100vh!important;max-width:none!important;max-height:none!important;z-index:2147483647!important;"
+            + "object-fit:contain!important;background:#000!important;margin:0!important}';"
+            + "(document.head||document.documentElement).appendChild(s);window.scrollTo(0,0);if(v.paused)v.play();}catch(e){}})();";
+    static final String PIP_UNFILL_JS = "(function(){var s=document.getElementById('zh-pip');if(s)s.remove();"
+            + "[].slice.call(document.querySelectorAll('[data-zhpip],[data-zhpipp]')).forEach(function(e){"
+            + "e.removeAttribute('data-zhpip');e.removeAttribute('data-zhpipp');});})();";
+
+    /** Automatic PiP (Home while a video plays): on / off in the menu. */
+    static boolean pipAuto() {
+        return Store.getBool("b_pip", true);
+    }
+
+    private volatile boolean pageVideo;          // a video (not a song / audio mode) is playing
+
     private static final String RESUME_VIDEO_JS =
             "(function() {"
             + "  try {"
@@ -290,7 +316,8 @@ public class BrowserActivity extends AppCompatActivity {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return false;
         try {
             PictureInPictureParams.Builder b = new PictureInPictureParams.Builder();
-            View target = (customView != null && customView.getWidth() > 0) ? customView : webBox;
+            if (customView == null && web != null) web.evaluateJavascript(PIP_FILL_JS, null);   // the video fills the window
+            View target = (customView != null && customView.getWidth() > 0) ? customView : null;   // normal page: a 16:9 window
             int w = target != null ? target.getWidth() : 0;
             int h = target != null ? target.getHeight() : 0;
             if (w > 0 && h > 0) {
@@ -316,7 +343,8 @@ public class BrowserActivity extends AppCompatActivity {
     @Override
     protected void onUserLeaveHint() {
         super.onUserLeaveHint();
-        if ((pagePlaying || customView != null) && !tv) {
+        // only for a playing VIDEO (songs / audio mode keep playing quietly in the background), and only if switched on
+        if (!tv && pipAuto() && !audioMode() && (customView != null || (pagePlaying && pageVideo))) {
             enterPipMode();
         }
     }
@@ -343,10 +371,12 @@ public class BrowserActivity extends AppCompatActivity {
             hideSuggest();
 
             resumeMediaForPip();
+            if (customView == null && web != null) web.evaluateJavascript(PIP_FILL_JS, null);
             main.postDelayed(this::resumeMediaForPip, 300);
             main.postDelayed(this::resumeMediaForPip, 800);
             main.postDelayed(this::resumeMediaForPip, 1500);
         } else {
+            if (web != null) web.evaluateJavascript(PIP_UNFILL_JS, null);              // the page as it was
             if (topBar != null) topBar.setVisibility(View.VISIBLE);
             if (bottomBar != null) bottomBar.setVisibility(View.VISIBLE);
             if (eqFab != null) eqFab.setVisibility(pageMedia && Store.getBool("b_eq", true) && customView == null ? View.VISIBLE : View.GONE);
@@ -406,9 +436,16 @@ public class BrowserActivity extends AppCompatActivity {
     }
 
     private void mediaState(boolean playing, String title, boolean video, boolean has, long pos, long dur) {
+        updateVideos();
         if (!pageSong.isEmpty()) title = pageSong;
         else if (title != null) title = title.replaceAll("\\s*-\\s*YouTube$", "");
         pageMedia = has;
+        pageVideo = playing && video;
+        if (listenBack && playing) {                     // from Music: playing → back to where you were
+            listenBack = false;
+            UiKit.makeToast(this, "🎧 " + T.t("Playing in the background — use the notification to pause"), Toast.LENGTH_LONG).show();
+            main.postDelayed(() -> moveTaskToBack(true), 1200);
+        }
         pagePlaying = playing;
         if (eqFab != null) eqFab.setVisibility(has && Store.getBool("b_eq", true) && customView == null ? View.VISIBLE : View.GONE);
         if (lockBtn != null) lockBtn.setVisibility(customView != null ? View.VISIBLE : View.GONE);
@@ -843,8 +880,7 @@ public class BrowserActivity extends AppCompatActivity {
         s.setSupportMultipleWindows(true);
         s.setJavaScriptCanOpenWindowsAutomatically(true);
         s.setDomStorageEnabled(true);
-        // Do not require user tap to resume or play videos (crucial for PiP playback)
-        s.setMediaPlaybackRequiresUserGesture(false);
+        // autoplay is decided per site (Site settings → Autoplay sound) at every page load — see applySite()
         s.setLoadWithOverviewMode(true);
         s.setUseWideViewPort(true);
         s.setSupportZoom(true);
@@ -1581,10 +1617,12 @@ public class BrowserActivity extends AppCompatActivity {
         boolean bm = cur != null && BrowserData.isBookmarked(cur);
         Object[][] sections = {
                 {"§", T.t("Listening & Viewing")},
-                {23, T.t("Picture in Picture"), T.t("Floating video window"), -1, false},
+                {23, T.t("Picture in Picture"), T.t("Floating video window — open now"), -1, false},
+                {-4, T.t("Automatic Picture in Picture"), T.t(pipAuto() ? "On — Home while a video plays" : "Off"), pipAuto() ? 1 : 0, false},
                 {-2, T.t("Audio only"), T.t(audioMode() ? "On — video hidden, sound playing" : "Off"), audioMode() ? 1 : 0, false},
                 {-3, T.t("Sleep timer"), sleepLabel(), -1, false},
                 {"§", T.t("This page")},
+                {-5, T.t("Add to Music"), T.t("Music → Links (YouTube plays as audio)"), -1, false},
                 {19, T.t("Reload"), null, -1, false},
                 {12, T.t("Find in page"), null, -1, false},
                 {16, T.t("Videos on page"), found.isEmpty() ? null : found.size() + " " + T.t("found"), -1, false},
@@ -1615,6 +1653,30 @@ public class BrowserActivity extends AppCompatActivity {
             }
             int i = (Integer) sct[0];
             if (i == 23 && tv) continue;
+            if (i == -5) {                                              // add this page to Music → Links
+                list.addView(UiRows.row(this, "list-music", (String) sct[1], (String) sct[2], -1, false, v -> {
+                    d.dismiss();
+                    String u = web.getUrl();
+                    if (u == null || u.contains("tamilcastplay.local")) return;
+                    if (!MusicLinks.isYouTube(u) && !pageMedia) {
+                        UiKit.makeToast(this, T.t("Open a song / video page first (or long-press a media link)"), Toast.LENGTH_LONG).show();
+                        return;
+                    }
+                    String t = !pageSong.isEmpty() ? pageSong : web.getTitle();
+                    UiKit.makeToast(this, MusicLinks.add(t, MusicLinks.isYouTube(u) ? u : (found.isEmpty() ? u : found.keySet().iterator().next()), "")
+                            ? "✓ " + T.t("Added to Music → Links") : T.t("Already in Links"), Toast.LENGTH_SHORT).show();
+                }));
+                continue;
+            }
+            if (i == -4) {                                              // automatic PiP on / off
+                list.addView(UiRows.row(this, "maximize", (String) sct[1], (String) sct[2], (Integer) sct[3], false, v -> {
+                    d.dismiss();
+                    Store.putBool("b_pip", !pipAuto());
+                    UiKit.makeToast(this, T.t("Automatic Picture in Picture") + ": " + T.t(pipAuto() ? "On" : "Off"), Toast.LENGTH_SHORT).show();
+                    main.postDelayed(this::menu, 120);
+                }));
+                continue;
+            }
             if (i == -2) {
                 list.addView(UiRows.row(this, "headphones", (String) sct[1], (String) sct[2], (Integer) sct[3], false, v -> {
                     d.dismiss();
@@ -1984,6 +2046,12 @@ public class BrowserActivity extends AppCompatActivity {
     private void updateVideos() {
         if (videosBadge == null) return;
         int count = found.size();
+        String pu = web == null ? null : web.getUrl();
+        if (pu != null && MusicLinks.isYouTube(pu)) {             // a YouTube video page: the video itself is offered
+            videosBadge.setText("YT");
+            videosBadge.setVisibility(View.VISIBLE);
+            return;
+        }
         if (count > 0) {
             videosBadge.setText(count > 99 ? "99+" : String.valueOf(count));
             videosBadge.setVisibility(View.VISIBLE);
@@ -1993,6 +2061,11 @@ public class BrowserActivity extends AppCompatActivity {
     }
 
     private void showVideos() {
+        String pageUrl = web == null ? null : web.getUrl();
+        if (pageUrl != null && MusicLinks.isYouTube(pageUrl)) {
+            youtubeActions(pageUrl);                  // YouTube streams through hidden blob: links — offer the video itself
+            return;
+        }
         if (found.isEmpty()) {
             UiKit.makeToast(this, T.t("No videos found on this page yet. Start the video on the page first."), Toast.LENGTH_LONG).show();
             return;
@@ -2002,6 +2075,49 @@ public class BrowserActivity extends AppCompatActivity {
         for (int i = 0; i < names.length; i++) names[i] = found.get(us.get(i));
         new UiDialog(this).setTitle(T.t("Videos on this page"))
                 .setItems(names, (d, w) -> offer(us.get(w), found.get(us.get(us.indexOf(names[w])) != null ? us.get(w) : us.get(0)))).show();
+    }
+
+    /** A YouTube video: listen, add to Music, play on the TV, picture-in-picture. */
+    private void youtubeActions(final String url) {
+        final String title = pageSong.isEmpty() ? (web.getTitle() == null ? "YouTube" : web.getTitle().replaceAll("\\s*-\\s*YouTube$", "")) : pageSong;
+        final List<String> labels = new ArrayList<>();
+        final List<Runnable> acts = new ArrayList<>();
+        labels.add("🎵  " + T.t("Listen (audio only, in the background)"));
+        acts.add(() -> {
+            if (!audioMode()) setAudioMode(true);
+            UiKit.makeToast(this, "🎧 " + T.t("Audio only — press Home: it keeps playing, pause from the notification"), Toast.LENGTH_LONG).show();
+        });
+        labels.add("＋  " + T.t("Add to Music (Links)"));
+        acts.add(() -> UiKit.makeToast(this, MusicLinks.add(title, url, "") ? "✓ " + T.t("Added to Music → Links") : T.t("Already in Links"),
+                Toast.LENGTH_SHORT).show());
+        final String tvIp = Store.getStr("last_tv", "");
+        if (!tv && !tvIp.isEmpty()) {
+            labels.add("📺  " + T.t("Play on TV (YouTube app)"));
+            acts.add(() -> new Thread(() -> {
+                String m;
+                try {
+                    HashMap<String, String> p = new HashMap<>();
+                    p.put("q", url);
+                    p.put("where", "ytplay");
+                    m = TvClient.post(tvIp, "/search", p).optString("msg", T.t("Sent"));
+                } catch (Exception e) {
+                    m = T.t("Cannot reach the TV");
+                }
+                final String m2 = m;
+                main.post(() -> UiKit.makeToast(this, m2, Toast.LENGTH_LONG).show());
+            }).start());
+        }
+        labels.add("⧉  " + T.t("Picture in Picture"));
+        acts.add(() -> {
+            if (!enterPipMode()) UiKit.makeToast(this, T.t("Start the video first"), Toast.LENGTH_SHORT).show();
+        });
+        labels.add("ℹ  " + T.t("Why no download?"));
+        acts.add(() -> new UiDialog(this).setTitle(T.t("Why no download?"))
+                .setMessage(T.t("YouTube protects its videos (encrypted, changing stream addresses) and its terms don't allow downloading. "
+                        + "Use Listen or Add to Music to hear it any time, or YouTube Premium for offline. Videos from other sites can be "
+                        + "downloaded (long-press a video link → Download) and turned into songs with Features → Video → Audio."))
+                .setPositiveButton(T.t("OK"), null).show());
+        new UiDialog(this).setTitle(title).setItems(labels.toArray(new String[0]), (d, w) -> acts.get(w).run()).show();
     }
 
     private String withHeaders(String u) {
@@ -2078,6 +2194,11 @@ public class BrowserActivity extends AppCompatActivity {
             labels.add("⬇ " + T.t(tv ? "Download to this TV" : "Download to this phone"));
             acts.add(() -> BrowserDownloads.start(this, url, dl != null ? dl[0] : web.getSettings().getUserAgentString(),
                     dl != null ? dl[1] : null, dl != null ? dl[2] : null, web.getUrl()));
+        }
+        if (!Formats.isTorrent(url) && url.startsWith("http")) {
+            labels.add("🎵 " + T.t("Add to Music (Links)"));
+            acts.add(() -> UiKit.makeToast(this, MusicLinks.add(t, url, "") ? "✓ " + T.t("Added to Music → Links") : T.t("Already in Links"),
+                    Toast.LENGTH_SHORT).show());
         }
         labels.add(T.t("Open link here"));
         acts.add(() -> web.loadUrl(url));
@@ -2291,6 +2412,8 @@ public class BrowserActivity extends AppCompatActivity {
         super.onNewIntent(intent);
         setIntent(intent);
         String u = intent.getStringExtra(EXTRA_URL);
+        listenBack = intent.getBooleanExtra(EXTRA_LISTEN, false);
+        if (listenBack) setAudioMode(true);
         if (u != null && !u.isEmpty()) newTab(u);
     }
 

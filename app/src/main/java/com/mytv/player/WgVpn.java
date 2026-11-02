@@ -24,7 +24,9 @@ import java.lang.ref.WeakReference;
 import java.util.Locale;
 
 /**
- * Built-in WireGuard VPN with atomic zero-leak profile rotation and customizable timers.
+ * Built-in WireGuard VPN: imported profiles, scope (whole phone / only ZH Play), optional automatic rotation
+ * through the profiles. A profile switch reconnects the tunnel (a moment without VPN) — Android's
+ * "Always-on VPN + Block connections without VPN" setting is what prevents traffic outside the VPN.
  */
 public final class WgVpn {
     private WgVpn() {
@@ -187,12 +189,13 @@ public final class WgVpn {
         return Store.getBool("wg_rotate_enabled", false);
     }
 
+    /** At least 1 minute: every switch reconnects (videos, downloads and casting pause for a moment). */
     public static int getRotateIntervalSeconds() {
-        return Math.max(10, Store.getInt("wg_rotate_interval_sec", 60));
+        return Math.max(60, Store.getInt("wg_rotate_interval_sec", 300));
     }
 
     public static void setRotateIntervalSeconds(int sec) {
-        Store.putInt("wg_rotate_interval_sec", Math.max(10, sec));
+        Store.putInt("wg_rotate_interval_sec", Math.max(60, sec));
     }
 
     private static final Runnable rotateTask = new Runnable() {
@@ -224,39 +227,48 @@ public final class WgVpn {
         fire();
     }
 
-    /**
-     * Seamless zero-leak rotation:
-     * Advances to the next profile and updates backend state in-place.
-     * The VPN tunnel interface is NEVER set to DOWN, eliminating unprotected packet leaks.
-     */
+    /** The next profile in the list (automatic rotation). */
     public static synchronized void rotateNext(final Context c) {
-        org.json.JSONArray all = profiles();
-        int total = all.length();
+        int total = profiles().length();
         if (total <= 1) return;
+        switchTo(c, (active() + 1) % total, false);
+    }
 
-        int current = active();
-        int nextIndex = (current + 1) % total;
-        Store.putInt("wg_active", nextIndex);
-
+    /**
+     * Connects to profile `index`. If it fails, the following profiles are tried — each at most once — and then it
+     * stops with a message (before, a failing set of profiles retried endlessly). quiet = rotation (no pop-up).
+     */
+    public static void switchTo(final Context c, final int index, final boolean announce) {
+        final int total = profiles().length();
+        if (total == 0) return;
         new Thread(() -> {
-            try {
-                String rawConf = getProfileConfig(nextIndex);
-                if (rawConf.isEmpty()) return;
-
-                InputStream in = new ByteArrayInputStream(withScope(c, rawConf).getBytes("UTF-8"));
-                Config cfg = Config.parse(in);
-
-                // Atomic update without closing the tun interface
-                state = backend(c).setState(TUNNEL, Tunnel.State.UP, cfg);
-
-                new Handler(Looper.getMainLooper()).post(() -> {
-                    UiKit.makeToast(c, "🔄 " + T.t("Rotated to") + ": " + activeName() + " (" + server() + ")", Toast.LENGTH_SHORT).show();
-                    fire();
-                });
-            } catch (Throwable e) {
-                // If the selected server profile fails to parse, step to the next one
-                new Handler(Looper.getMainLooper()).post(() -> rotateNext(c));
+            String err = null;
+            for (int tried = 0; tried < total; tried++) {
+                int k = (index + tried) % total;
+                try {
+                    String rawConf = getProfileConfig(k);
+                    if (rawConf.isEmpty()) continue;
+                    Config cfg = Config.parse(new ByteArrayInputStream(withScope(c, rawConf).getBytes("UTF-8")));
+                    state = backend(c).setState(TUNNEL, Tunnel.State.UP, cfg);
+                    Store.putInt("wg_active", k);
+                    final boolean other = k != index;
+                    new Handler(Looper.getMainLooper()).post(() -> {
+                        if (announce || other)
+                            UiKit.makeToast(c, "🔐 " + activeName() + " · " + server()
+                                    + (other ? " (" + T.t("the chosen profile didn't connect") + ")" : ""), Toast.LENGTH_SHORT).show();
+                        fire();
+                    });
+                    return;
+                } catch (Throwable e) {
+                    err = e.getMessage();
+                }
             }
+            final String why = err;
+            new Handler(Looper.getMainLooper()).post(() -> {
+                stopRotation();
+                UiKit.makeToast(c, T.t("No VPN profile connected — rotation stopped") + (why == null ? "" : ": " + why), Toast.LENGTH_LONG).show();
+                fire();
+            });
         }).start();
     }
 
@@ -446,10 +458,7 @@ public final class WgVpn {
                     new UiDialog(a).setTitle(T.t("Profile")).setSingleChoiceItems(names, active(), (d2, k) -> {
                         Store.putInt("wg_active", k);
                         d2.dismiss();
-                        if (on()) {
-                            // Seamless in-place switch
-                            rotateNext(a);
-                        }
+                        if (on()) switchTo(a, k, true);      // exactly the profile you picked
                         panel(a);
                     }).show();
                     break;
@@ -501,7 +510,9 @@ public final class WgVpn {
                                     + "2. Go to account.protonvpn.com → Downloads → WireGuard configuration.\n"
                                     + "3. Create and download multiple .conf files from various locations.\n"
                                     + "4. Use 'Import profile files' to bulk load 8-10 profiles at once.\n"
-                                    + "5. Turn on Auto-rotate IP to continuously change your public IP address."))
+                                    + "5. Turn on Auto-rotate IP to change your public IP every few minutes.\n\n"
+                                    + "Each switch reconnects (a moment without VPN; videos and downloads pause briefly). To block all "
+                                    + "traffic outside the VPN, turn on Android Settings → VPN → ZH Play → Always-on + Block connections without VPN."))
                             .setPositiveButton(T.t("Open Proton VPN"), (d2, w2) -> {
                                 try {
                                     a.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("https://account.protonvpn.com/downloads")));
@@ -516,7 +527,6 @@ public final class WgVpn {
     // ------------------------------------------------------------------ Timing & Interval Selector
     private static void chooseIntervalDialog(final Activity a) {
         final String[] options = {
-                "30 " + T.t("seconds"),
                 "1 " + T.t("minute"),
                 "5 " + T.t("minutes"),
                 "10 " + T.t("minutes"),
@@ -524,7 +534,7 @@ public final class WgVpn {
                 "1 " + T.t("hour"),
                 T.t("Custom (seconds, minutes, or hours)…")
         };
-        final int[] seconds = {30, 60, 300, 600, 1800, 3600};
+        final int[] seconds = {60, 300, 600, 1800, 3600};
 
         new UiDialog(a).setTitle(T.t("Rotation timing")).setItems(options, (d, which) -> {
             if (which < seconds.length) {
@@ -560,7 +570,7 @@ public final class WgVpn {
                     if (!str.isEmpty()) {
                         try {
                             int val = Integer.parseInt(str);
-                            int totalSec = Math.max(10, val * multipliers[selectedUnit[0]]);
+                            int totalSec = Math.max(60, val * multipliers[selectedUnit[0]]);     // at least 1 minute
                             setRotateIntervalSeconds(totalSec);
                             if (isRotating()) startRotation(a);
                             UiKit.makeToast(a, T.t("Rotation interval set to: ") + formatInterval(totalSec), Toast.LENGTH_SHORT).show();

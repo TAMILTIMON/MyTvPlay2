@@ -178,8 +178,8 @@ public class PhoneLibraryActivity extends AppCompatActivity {
     // music: Songs · Albums · Artists · Genres · Folders · Playlists
     private int tab = 0;
     private String groupKey, plName;
-    private static final String[] TABS = {"Songs", "Albums", "Artists", "Genres", "Folders", "Playlists"};
-    private static final String[] TAB_ICON = {"list-music", "library", "users", "audio-lines", "folder", "list-video"};
+    private static final String[] TABS = {"Songs", "Albums", "Artists", "Genres", "Folders", "Playlists", "Links"};
+    private static final String[] TAB_ICON = {"list-music", "library", "users", "audio-lines", "folder", "list-video", "link"};
     private LinearLayout crumb;
 
     private void buildTabs() {
@@ -308,7 +308,13 @@ public class PhoneLibraryActivity extends AppCompatActivity {
     private void applyMusic() {
         shown.clear();
         String hint;
-        if (tab == 5) {
+        if (tab == 6) {                                         // Links: streams, .m3u playlists, YouTube to listen
+            PhoneMedia.M add = PhoneMedia.group("+link", "＋ " + T.t("Add link / M3U"), new ArrayList<PhoneMedia.M>());
+            add.sub = T.t("song or radio address, .m3u playlist, YouTube");
+            shown.add(add);
+            for (PhoneMedia.M m : MusicLinks.list()) if (match(m)) shown.add(m);
+            hint = T.t("YouTube plays as audio in the background · hold a link for more");
+        } else if (tab == 5) {
             if (plName == null) {
                 List<String> names = new ArrayList<>();
                 names.add(MusicLib.FAV);
@@ -592,6 +598,7 @@ public class PhoneLibraryActivity extends AppCompatActivity {
         v.setOnClickListener(x -> open(p));
         v.setOnLongClickListener(x -> {
             if (!audio) details(m, p);
+            else if (tab == 6 && m.groupKey == null) linkMenu(m);
             else if (m.groupKey != null) groupMenu(m);
             else {
                 int inPl = plName == null ? -1 : MusicLib.songs(plName).indexOf(m.uri.toString());
@@ -647,6 +654,48 @@ public class PhoneLibraryActivity extends AppCompatActivity {
     }
 
     // ------------------------------------------------------------------ details sheet
+    /** Hold a link: play on TV · rename · remove. */
+    private void linkMenu(final PhoneMedia.M m) {
+        final String u = m.uri.toString();
+        new UiDialog(this).setTitle(m.title).setItems(new String[]{"📺  " + T.t("Play on TV"), "✏  " + T.t("Rename"), "🗑  " + T.t("Remove")}, (d, w) -> {
+            if (w == 0) {
+                List<Store.Item> one = new ArrayList<>();
+                one.add(new Store.Item(m.title, u, ""));
+                String ip = Store.getStr("last_tv", "");
+                if (ip.isEmpty()) {
+                    UiKit.makeToast(this, T.t("Connect to a TV first"), android.widget.Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                new Thread(() -> {
+                    try {
+                        java.util.HashMap<String, String> p = new java.util.HashMap<>();
+                        p.put("url", u);
+                        p.put("title", m.title);
+                        TvClient.post(ip, "/play", p);
+                    } catch (Exception ignored) {
+                    }
+                }).start();
+                UiKit.makeToast(this, T.t("Sent to the TV"), android.widget.Toast.LENGTH_SHORT).show();
+            } else if (w == 1) {
+                final android.widget.EditText e = new android.widget.EditText(this);
+                e.setText(m.title);
+                new UiDialog(this).setTitle(T.t("Rename")).setView(e).setPositiveButton(T.t("Save"), (d2, w2) -> {
+                    MusicLinks.rename(u, e.getText().toString().trim());
+                    apply();
+                }).setNegativeButton(T.t("Cancel"), null).show();
+            } else {
+                MusicLinks.remove(u);
+                apply();
+            }
+        }).show();
+    }
+
+    @Override
+    protected void onActivityResult(int req, int res, android.content.Intent data) {
+        super.onActivityResult(req, res, data);
+        MusicLinks.onResult(this, req, res, data, this::apply);
+    }
+
     private void details(final PhoneMedia.M m, final int p) {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
@@ -693,6 +742,27 @@ public class PhoneLibraryActivity extends AppCompatActivity {
     // ------------------------------------------------------------------ actions
     private void open(int pos) {
         PhoneMedia.M g = shown.get(pos);
+        if (audio && "+link".equals(g.groupKey)) {
+            MusicLinks.addDialog(this, this::apply);
+            return;
+        }
+        if (audio && tab == 6) {
+            if (MusicLinks.isYouTube(g.uri.toString())) {                // YouTube → the browser, audio only, background
+                MusicLinks.playYouTube(this, g.uri.toString());
+                return;
+            }
+            List<PhoneMedia.M> songs = new ArrayList<>();                 // the other links play here, one after another
+            int start = 0;
+            for (int i = 0; i < shown.size(); i++) {
+                PhoneMedia.M m = shown.get(i);
+                if (m.groupKey != null || MusicLinks.isYouTube(m.uri.toString())) continue;
+                if (i == pos) start = songs.size();
+                songs.add(m);
+            }
+            MusicService.play(this, songs, start);
+            startActivity(new android.content.Intent(this, MusicActivity.class));
+            return;
+        }
         if (audio && g.groupKey != null) {
             if ("+new".equals(g.groupKey)) {
                 MusicDialogs.newPlaylist(this, n -> {

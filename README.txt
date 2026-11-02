@@ -1,3 +1,23 @@
+ZH PLAY 5.7 — new logo, Music links & YouTube listening, PiP fixed, VPN fixes
+==========================================================================
+(built on your Gemini changes: picture-in-picture, VPN button, IP rotation — kept)
+* New logo and TV banner (தீ · ZH PLAY · more than remote): app icons, adaptive icon (fits every
+  launcher shape), in-app logo, TV banner, the Linux app.
+* Music → Links (new tab): add a song / radio address, an .m3u / .m3u8 playlist (from a link or a file)
+  or a YouTube video. Links play in the music player; YouTube plays as AUDIO in the background
+  (the browser in audio-only mode steps back by itself; the notification has play / pause + timeline).
+  Hold a link: Play on TV · Rename · Remove. Browser: menu → "Add to Music", or long-press a media link.
+* Music player: 🌙 sleep timer button on the player screen (it was hidden in the ⋮ menu).
+* Browser, YouTube: the Videos button shows "YT" on video pages and offers Listen (audio only), Add to Music,
+  Play on TV (exactly that video in the YouTube app), Picture in Picture. (No YouTube download: protected
+  streams, against YouTube's terms — other sites' videos can be downloaded and converted as before.)
+* Picture in Picture: works for YouTube (the video fills the window, 16:9; the page comes back afterwards);
+  automatic PiP only for VIDEOS (not songs / audio mode) and can be switched off (menu → Automatic PiP).
+* VPN: choosing a profile connects exactly that one; rotation tries each profile once and stops with a
+  message instead of retrying forever; at least 1 minute between switches; no pop-up at every switch; the
+  help explains that each switch reconnects briefly (use Android's Always-on + Block connections for none).
+* Autoplay follows Site settings again (a global line overrode it).
+
 ZH PLAY 5.6 — browser music in the notification like a music player
 ==================================================================
 * YouTube (or any page) playing in the ZH Play browser now shows a full media notification:
