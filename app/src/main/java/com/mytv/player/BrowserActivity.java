@@ -2111,8 +2111,8 @@ public class BrowserActivity extends AppCompatActivity {
                 }
             });
         }
-        // Seedr: works for magnets / .torrent (and any link Seedr can fetch)
-        if (Formats.isTorrent(url) || (url != null && url.startsWith("http"))) {
+        // Seedr: only for magnets / .torrent (same places "Send to TV" appears)
+        if (Formats.isTorrent(url)) {
             labels.add("☁ " + T.t("Send to Seedr"));
             acts.add(() -> sendToSeedr(url));
         }
