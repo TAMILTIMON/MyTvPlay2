@@ -313,6 +313,11 @@ public class BrowserActivity extends AppCompatActivity {
                 }
         });
         webBox.setOnTouchListener((v2, ev) -> {
+            if (ev.getActionMasked() == android.view.MotionEvent.ACTION_DOWN) {
+                // store coordinates so the long-press handler can ask JS what's under the finger
+                web.evaluateJavascript("window._zhLpX=" + (int)ev.getX()
+                        + ";window._zhLpY=" + (int)ev.getY() + ";", null);
+            }
             if (ev.getPointerCount() >= 2) {
                 pinchZ.onTouchEvent(ev);
                 return true;                    // consume two-finger events, leave single-finger to WebView
@@ -1051,6 +1056,11 @@ public class BrowserActivity extends AppCompatActivity {
             @Override
             public void onPageFinished(WebView v, String url) {
                 
+                if (pendingSeedrMagnet != null && url != null && url.contains("seedr.cc")) {
+                    final String mag = pendingSeedrMagnet;
+                    pendingSeedrMagnet = null;
+                    main.postDelayed(() -> injectMagnetToSeedr(mag), 2000);  // wait for Seedr's React app to mount
+                }
                 if (audioMode() && url != null && !url.contains("tamilcastplay.local")) {
                     v.evaluateJavascript(AUDIO_JS, null);
                     // from Music Links: audio mode applied → step back automatically
@@ -1283,18 +1293,28 @@ public class BrowserActivity extends AppCompatActivity {
             WebView.HitTestResult h = web.getHitTestResult();
             String u = h.getExtra();
             int t = h.getType();
-            if (u != null && (t == WebView.HitTestResult.SRC_ANCHOR_TYPE || t == WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE)) {
+            // WebView sometimes returns UNKNOWN_TYPE for magnet: links (non-http scheme)
+            // Ask JS for the link under the finger as a fallback
+            if (u == null || t == WebView.HitTestResult.UNKNOWN_TYPE) {
+                // synchronous JS can't be used from long-click; use a stored value instead
+                web.evaluateJavascript(
+                    "(function(){var el=document.elementFromPoint(window._zhLpX||0,window._zhLpY||0);"
+                    + "for(var e=el;e;e=e.parentElement){if(e.tagName==='A'&&e.href){return e.href;}}"
+                    + "return null;})()",
+                    val -> {
+                        if (val != null && !val.equals("null")) {
+                            String link = val.startsWith("\"") ? val.substring(1,val.length()-1) : val;
+                            if (link.startsWith("magnet:") || Formats.isTorrent(link)) {
+                                main.post(() -> showMagnetMenu(link));
+                            }
+                        }
+                    });
+            }
+            if (u != null && (t == WebView.HitTestResult.SRC_ANCHOR_TYPE
+                    || t == WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE
+                    || (t == WebView.HitTestResult.UNKNOWN_TYPE && u.startsWith("magnet:")))) {
                 if (u.startsWith("magnet:") || Formats.isTorrent(u)) {
-                    new UiDialog(BrowserActivity.this).setTitle("🧲 " + T.t("Torrent link"))
-                        .setItems(new String[]{
-                            "☁  " + T.t("Send to Seedr"),
-                            "▶  " + T.t("Play / open here"),
-                            "📋  " + T.t("Copy link")
-                        }, (d2, w) -> {
-                            if (w == 0) sendToSeedr(u);
-                            else if (w == 1) { pendingDl = null; offer(u, null); }
-                            else copy(u);
-                        }).show();
+                    showMagnetMenu(u);
                     return true;
                 }
                 pendingDl = null;
@@ -2146,6 +2166,21 @@ public class BrowserActivity extends AppCompatActivity {
         return b;
     }
 
+    private void showMagnetMenu(final String u) {
+        new UiDialog(this).setTitle("🧲 " + T.t("Torrent link"))
+            .setItems(new String[]{
+                "☁  " + T.t("Send to Seedr"),
+                "▶  " + T.t("Play / open here"),
+                "📋  " + T.t("Copy link")
+            }, (d2, w) -> {
+                if (w == 0) sendToSeedr(u);
+                else if (w == 1) { pendingDl = null; offer(u, null); }
+                else copy(u);
+            }).show();
+    }
+
+    private String pendingSeedrMagnet;
+
     /** Open seedr.cc in an existing tab (reuse it if already open), paste the magnet, and submit. */
     private void sendToSeedr(final String magnet) {
         final String seedrUrl = "https://www.seedr.cc/";
@@ -2166,15 +2201,13 @@ public class BrowserActivity extends AppCompatActivity {
         UiKit.makeToast(this, "☁ " + T.t("Opening Seedr…"), Toast.LENGTH_SHORT).show();
     }
 
-    private String pendingSeedrMagnet;
-
     private void injectMagnetToSeedr(String magnet) {
         if (web == null) return;
         // seedr.cc input field: #magnet_url or .new-torrent-url, then the submit button
         String js = "(function(){"
                 + "var m=" + "\""+magnet.replace("\\","\\\\").replace("\"","\\\"")+"\"" + ";"
                 + "var inp=document.querySelector('#magnet_url,input[placeholder*=magnet],input[placeholder*=torrent],.new-torrent-url input');"
-                + "if(inp){inp.value=m;inp.dispatchEvent(new Event('input',{bubbles:true}));inp.dispatchEvent(new Event('change',{bubbles:true});}"
+                + "if(inp){inp.value=m;inp.dispatchEvent(new Event('input',{bubbles:true}));inp.dispatchEvent(new Event('change',{bubbles:true}));}" 
                 + "var btn=document.querySelector('[data-action=add-torrent],button[type=submit],.add-torrent-btn,.seedr-add-btn');"
                 + "if(btn)setTimeout(function(){btn.click();},300);"
                 + "})();";
@@ -2321,7 +2354,9 @@ public class BrowserActivity extends AppCompatActivity {
         return u + "|Referer=" + Uri.encode(page == null ? "" : page) + "&User-Agent=" + Uri.encode(ua);
     }
 
-    private void offer(final String url, String title) {
+    private void offer(final String rawUrl, String title) {
+        // boost magnet: add top public trackers so the engine finds peers faster
+        final String url = rawUrl.startsWith("magnet:") ? TorrentEngine.boostMagnet(rawUrl) : rawUrl;
         final String t = title != null ? title : (web.getTitle() != null && !Formats.isTorrent(url) ? web.getTitle() : Formats.titleFromUrl(url));
         final List<String> labels = new ArrayList<>();
         final List<Runnable> acts = new ArrayList<>();

@@ -305,6 +305,42 @@ public final class TorrentEngine {
     /** "magnet:…#zhfile=2" = only file 2 of that torrent (in playlists, "send to TV", …). */
     public static final String FILE_MARK = "#zhfile=";
 
+    // ---- top public trackers: UDP + HTTP, refreshed from ngosang/trackerslist ----
+    // More trackers = more peers found = faster download start. These are stable, high-uptime trackers.
+    private static final String[] BOOST_TRACKERS = {
+        "udp://open.tracker.cl:1337/announce",
+        "udp://tracker.opentrackr.org:1337/announce",
+        "udp://tracker.openbittorrent.com:6969/announce",
+        "udp://tracker.torrent.eu.org:451/announce",
+        "udp://open.stealth.si:80/announce",
+        "udp://explodie.org:6969/announce",
+        "udp://tracker.empire-js.us:1337/announce",
+        "udp://movies.zsw.ca:6969/announce",
+        "udp://tracker.birkenwald.de:6969/announce",
+        "https://tracker.gbitt.info:443/announce",
+        "https://tracker.tamersunion.org:443/announce",
+        "https://opentracker.i2p.rocks:443/announce",
+        "udp://tracker.dler.org:6969/announce",
+        "udp://bt.ktrackers.com:6666/announce"
+    };
+
+    /**
+     * Appends the top public trackers to a magnet link (no duplicates).
+     * Call this before handing the magnet to the player — the engine will announce to all of them
+     * at start, finding more peers much faster than with just the embedded trackers.
+     */
+    public static String boostMagnet(String magnet) {
+        if (magnet == null || !magnet.startsWith("magnet:")) return magnet;
+        StringBuilder sb = new StringBuilder(magnet);
+        for (String tr : BOOST_TRACKERS) {
+            String enc = android.net.Uri.encode(tr);
+            if (!magnet.contains(enc) && !magnet.contains(tr)) {
+                sb.append("&tr=").append(enc);
+            }
+        }
+        return sb.toString();
+    }
+
     public static String base(String uri) {
         if (uri == null) return "";
         int k = uri.indexOf(FILE_MARK);

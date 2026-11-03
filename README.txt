@@ -1,3 +1,14 @@
+ZH PLAY 5.9.3 — Seedr magnet menu always shows; 14 extra trackers for faster torrents
+=====================================================================================
+* Long-press on a magnet link always shows the "Send to Seedr / Play / Copy" menu.
+  Before, WebView returned UNKNOWN_TYPE for magnet: links (non-http scheme) on many torrent sites
+  so the menu never appeared. Now a JS fallback reads the link from the tapped element.
+* Send to Seedr now actually injects the magnet: waits 2 s for Seedr's React app to mount
+  before running the injection (before, the injection ran before the page was ready).
+* 14 extra public trackers (UDP + HTTPS) are added to every magnet link before playing —
+  the engine announces to all of them at start and finds far more peers than with just the
+  embedded ones. This is the main way to speed up torrents on a phone.
+
 ZH PLAY 5.8 — Music Links: YouTube audio-only from browser now works
 =====================================================================
 * Fixed: tapping a YouTube link in Music → Links (or "Add to Music" from the browser) didn't
