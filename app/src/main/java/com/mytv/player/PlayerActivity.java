@@ -507,13 +507,14 @@ public class PlayerActivity extends AppCompatActivity {
         // ---- Netflix / YouTube style bottom overlay: no visible box, just gradients ----
         panel = new LinearLayout(this);
         panel.setOrientation(LinearLayout.VERTICAL);
-        panel.setPadding(dp(20), dp(0), dp(20), dp(12));
+        panel.setPadding(0, 0, 0, dp(12));
         panel.setBackground(new GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP,
                 new int[]{0xF2000000, 0xCC000000, 0x00000000}));
 
         // timeline row: [elapsed] ———●——————— [remaining]
         LinearLayout trow = new LinearLayout(this);
         trow.setGravity(Gravity.CENTER_VERTICAL);
+        trow.setPadding(dp(16), 0, dp(16), 0);
         timeView = text(13, 0xFFFFFFFF);
         timeView.setTypeface(Typeface.MONOSPACE);
         trow.addView(timeView);                          // left: elapsed
@@ -525,7 +526,10 @@ public class PlayerActivity extends AppCompatActivity {
         timeline.setSplitTrack(false);
         timeline.setPadding(0, 0, 0, 0);
         timeline.setFocusable(true);
-        timeline.setOnFocusChangeListener((v, f) -> timeline.setThumb(thumbDrawable(f)));
+        timeline.setOnFocusChangeListener((v, f) -> {
+            timeline.setThumb(thumbDrawable(f));
+            timeline.setProgressTintList(f ? android.content.res.ColorStateList.valueOf(Ui.ACCENT2) : null);
+        });
         timeline.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             public void onProgressChanged(SeekBar sb, int v, boolean user) {
                 if (!user || mp == null) return;
@@ -561,15 +565,17 @@ public class PlayerActivity extends AppCompatActivity {
             }
         });
         progress = timeline;
-        LinearLayout.LayoutParams tlp2 = new LinearLayout.LayoutParams(0, dp(40), 1);
-        tlp2.setMargins(dp(10), 0, dp(10), 0);
+        // 48dp tall for easy finger/remote use; the bar itself is 2dp hairline via the insets
+        timeline.setMinimumHeight(dp(2));
+        LinearLayout.LayoutParams tlp2 = new LinearLayout.LayoutParams(0, dp(48), 1);
+        tlp2.setMargins(0, -dp(4), 0, -dp(4));   // negative margin so time text centres nicely
         trow.addView(timeline, tlp2);
         TextView remView = text(13, 0xFFFFFFFF);
         remView.setTypeface(Typeface.MONOSPACE);
         remView.setTag("rem");
         trow.addView(remView);
         LinearLayout.LayoutParams trowLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        trowLp.setMargins(0, dp(8), 0, dp(4));
+        trowLp.setMargins(0, dp(4), 0, dp(0));
         panel.addView(trow, trowLp);
 
         // Primary: ⏮  ↺10  ▶  ↻10  ⏭   (centred, large)
@@ -582,6 +588,7 @@ public class PlayerActivity extends AppCompatActivity {
         ctl(btns, "⏭", 48, false, v -> { next(); showOverlay(); });
         LinearLayout.LayoutParams bmlp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         bmlp.gravity = Gravity.CENTER_HORIZONTAL;
+        bmlp.setMargins(dp(16), dp(2), dp(16), 0);
         panel.addView(btns, bmlp);
 
         // Secondary: Queue · Audio · Subs · Fit · EQ · Repeat · Shuffle · Menu  (small, scrollable)
@@ -601,7 +608,7 @@ public class PlayerActivity extends AppCompatActivity {
         hs.setOverScrollMode(View.OVER_SCROLL_NEVER);
         hs.addView(sec);
         LinearLayout.LayoutParams hslp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        hslp.setMargins(0, dp(2), 0, 0);
+        hslp.setMargins(dp(12), dp(2), dp(12), 0);
         panel.addView(hs, hslp);
 
         FrameLayout.LayoutParams panelLp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
@@ -616,25 +623,31 @@ public class PlayerActivity extends AppCompatActivity {
         });
     }
 
-    /** Thumb: small white circle; grows + glows when dragging. */
+    /** Thumb: invisible at rest (just the bar shows); small dot on focus; big glowing on drag. */
     private android.graphics.drawable.Drawable thumbDrawable(boolean big) {
-        int sz = big ? dp(22) : dp(14);
-        GradientDrawable d = new GradientDrawable();
-        d.setShape(GradientDrawable.OVAL);
-        d.setColor(Color.WHITE);
-        if (big) d.setStroke(dp(3), Ui.ACCENT);
-        d.setSize(sz, sz);
-        if (big) {
-            GradientDrawable glow = new GradientDrawable();
-            glow.setShape(GradientDrawable.OVAL);
-            glow.setColor(0x40FFFFFF);
-            glow.setSize(dp(36), dp(36));
-            android.graphics.drawable.LayerDrawable ld = new android.graphics.drawable.LayerDrawable(new android.graphics.drawable.Drawable[]{glow, d});
-            int off = dp(7);
-            ld.setLayerInset(1, off, off, off, off);
-            return ld;
+        if (!big) {
+            // at rest: transparent (YouTube style — no dot until you touch)
+            GradientDrawable d = new GradientDrawable();
+            d.setShape(GradientDrawable.OVAL);
+            d.setColor(0x00000000);   // fully transparent
+            d.setSize(dp(2), dp(2));
+            return d;
         }
-        return d;
+        // dragging: solid white dot with accent ring + outer glow
+        GradientDrawable dot = new GradientDrawable();
+        dot.setShape(GradientDrawable.OVAL);
+        dot.setColor(Color.WHITE);
+        dot.setStroke(dp(2), Ui.ACCENT);
+        dot.setSize(dp(18), dp(18));
+        GradientDrawable glow = new GradientDrawable();
+        glow.setShape(GradientDrawable.OVAL);
+        glow.setColor(0x33FFFFFF);
+        glow.setSize(dp(32), dp(32));
+        android.graphics.drawable.LayerDrawable ld = new android.graphics.drawable.LayerDrawable(
+                new android.graphics.drawable.Drawable[]{glow, dot});
+        int off = dp(7);
+        ld.setLayerInset(1, off, off, off, off);
+        return ld;
     }
 
     /** Icon button with a tiny sub-label (used for ↺10 / ↻10). */
@@ -666,6 +679,10 @@ public class PlayerActivity extends AppCompatActivity {
                 new android.graphics.drawable.Drawable[]{bg, clip});
         ld.setId(0, android.R.id.background);
         ld.setId(1, android.R.id.progress);
+        // tall inset so the drawable clips to a 2 dp hairline inside the full-height touch area
+        int v2 = dp(19);   // (40dp touch height - 2dp bar) / 2 = 19dp top+bottom inset
+        ld.setLayerInset(0, 0, v2, 0, v2);
+        ld.setLayerInset(1, 0, v2, 0, v2);
         return ld;
     }
 
