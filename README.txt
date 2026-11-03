@@ -1,3 +1,17 @@
+ZH PLAY 6.0 — Full Seedr integration: files, transfers, search, delete, rename, stream
+======================================================================================
+* Complete Seedr file manager (same layout as the Seedr app):
+  - Files tab: browse folders, tap to stream/play, ⋮ menu for rename/delete
+  - Transfers tab: live progress bar, speed, seeds/peers, delete active downloads
+  - Search tab: search across your whole account
+  - Header: username + storage quota bar
+* Token setup: tries PAT directly as OAuth token first (many PATs work this way),
+  then falls back to OAuth exchange. Shows clear error if scope is wrong.
+* Magnet → Seedr: tap any magnet link in the browser → "Send to Seedr ✓" →
+  API call with real error reporting + fallback to browser injection on failure
+* Accessible from: Phone home board · Features screen · Browser menu · Magnet long-press
+* Fixed: files not showing (list_contents field names corrected), token refresh auto-retry
+
 ZH PLAY 5.9.7 — Seedr API: correct base URL from official docs
 =============================================================
 * Base URL fixed: https://www.seedr.cc/api/v0.1/p (from the official Seedr API docs)

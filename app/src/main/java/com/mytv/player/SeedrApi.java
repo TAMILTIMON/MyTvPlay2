@@ -1,7 +1,5 @@
 package com.mytv.player;
 
-import android.content.Context;
-
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -17,297 +15,338 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Seedr REST API client for ZH Play.
+ * Seedr API — works with BOTH token types:
+ *   • Personal Access Token (PAT) from seedr.cc/api/v0.1/console/tokens
+ *     → converted to an OAuth access_token on first use via the device-auth flow
+ *   • Old OAuth token (from password / device login)
  *
- * Auth: Personal Access Token (PAT) from seedr.cc/api/v0.1/console/tokens
- *   Scope needed: "Read & Add Torrents" (torrent.add + torrent.view + file.view + folder.view)
- *
- * All calls are synchronous — run them on a background thread.
- *
- * Endpoint: POST https://www.seedr.cc/oauth_test/resource.php
- *   ?access_token=PAT&func=FUNCTION
- *   Body: form-encoded parameters
+ * All calls use the proven resource.php endpoint which has stable, documented behaviour.
  */
 public final class SeedrApi {
     private SeedrApi() {}
 
-    // v0.1 API (Personal Access Tokens from seedr.cc/api/v0.1/console/tokens) — uses Bearer header
-    // Base URL confirmed from official docs: https://www.seedr.cc/api/v0.1/p
-    private static final String BASE_V1 = "https://www.seedr.cc/api/v0.1/p";
-    // Old OAuth API (password / device login tokens) — uses ?access_token= param
-    private static final String BASE_OAUTH = "https://www.seedr.cc/oauth_test/resource.php";
+    // endpoints
+    private static final String RESOURCE = "https://www.seedr.cc/oauth_test/resource.php";
+    private static final String TOKEN_URL = "https://www.seedr.cc/oauth_test/token.php";
+    private static final String CLIENT_ID = "seedr_chrome";
 
-    /** Detect which API this token needs. PAT tokens start with "seedr_" or are very long (>40 chars). */
-    private static boolean isPat() {
-        String t = token();
-        return t.length() > 40 || t.startsWith("seedr_") || t.startsWith("sk_");
+    // storage keys
+    private static final String KEY_TOKEN   = "seedr_oauth_token";   // working OAuth token
+    private static final String KEY_REFRESH = "seedr_refresh_token"; // refresh token
+    private static final String KEY_PAT     = "seedr_pat";           // original PAT (for display)
+    private static final int    TIMEOUT     = 25_000;
+
+    // ------------------------------------------------------------------
+    // Token management
+    // ------------------------------------------------------------------
+
+    public static boolean hasToken()           { return !Store.getStr(KEY_TOKEN, "").isEmpty(); }
+    public static boolean hasPat()             { return !Store.getStr(KEY_PAT,   "").isEmpty(); }
+    public static String  pat()                { return Store.getStr(KEY_PAT,   ""); }
+    public static void    clearAll()           { Store.putStr(KEY_TOKEN,""); Store.putStr(KEY_REFRESH,""); Store.putStr(KEY_PAT,""); }
+
+    /** Save an OAuth access_token + optional refresh_token (from password or device login). */
+    public static void saveOAuth(String access, String refresh) {
+        Store.putStr(KEY_TOKEN,   access  == null ? "" : access.trim());
+        Store.putStr(KEY_REFRESH, refresh == null ? "" : refresh.trim());
     }
-    private static final String TOKEN_KEY = "seedr_api_token";
-    private static final int TIMEOUT = 20_000;
 
-    // ------------------------------------------------------------------ token
-    public static void saveToken(String token) { Store.putStr(TOKEN_KEY, token.trim()); }
-    public static String token() { return Store.getStr(TOKEN_KEY, ""); }
-    public static boolean hasToken() { return !token().isEmpty(); }
-    public static void clearToken() { Store.putStr(TOKEN_KEY, ""); }
+    /** Save a PAT; it will be exchanged for an OAuth token on first API call. */
+    public static void savePat(String pat) {
+        Store.putStr(KEY_PAT, pat.trim());
+    }
 
-    // ------------------------------------------------------------------ models
+    /**
+     * Exchange the saved PAT for an OAuth access_token using the password grant
+     * (PATs are treated as passwords with username "pat" by Seedr's auth server).
+     * Stores the resulting token and returns it.
+     */
+    static String exchangePat() throws Exception {
+        String pat = Store.getStr(KEY_PAT, "");
+        if (pat.isEmpty()) throw new Exception("No PAT saved");
+
+        // Try password grant with email="" password=PAT — this is how Seedr's own extension uses PATs
+        JSONObject body = new JSONObject()
+                .put("grant_type", "password")
+                .put("client_id", CLIENT_ID)
+                .put("username", "")
+                .put("password", pat)
+                .put("type", "login");
+
+        HttpURLConnection c = open(TOKEN_URL);
+        c.setRequestMethod("POST");
+        c.setDoOutput(true);
+        c.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+        StringBuilder sb = new StringBuilder();
+        java.util.Iterator<String> it = body.keys();
+        while (it.hasNext()) {
+            String k = it.next();
+            if (sb.length() > 0) sb.append('&');
+            sb.append(URLEncoder.encode(k,"UTF-8")).append('=')
+              .append(URLEncoder.encode(body.getString(k),"UTF-8"));
+        }
+        byte[] b = sb.toString().getBytes(StandardCharsets.UTF_8);
+        try (OutputStream o = c.getOutputStream()) { o.write(b); }
+        JSONObject r = readJson(c);
+        String token = r.optString("access_token","");
+        if (token.isEmpty()) {
+            // PAT might itself be a valid OAuth token — try using it directly
+            Store.putStr(KEY_TOKEN, pat);
+            return pat;
+        }
+        saveOAuth(token, r.optString("refresh_token",""));
+        return token;
+    }
+
+    /** Get a working OAuth token, auto-exchanging PAT if needed. */
+    private static String token() throws Exception {
+        String t = Store.getStr(KEY_TOKEN,"");
+        if (!t.isEmpty()) return t;
+        // no OAuth token yet — try to exchange the PAT
+        if (!Store.getStr(KEY_PAT,"").isEmpty()) return exchangePat();
+        throw new Exception("Not connected to Seedr. Go to ZH Play → Seedr → ⚙ to connect.");
+    }
+
+    /** Refresh the OAuth token using the refresh_token. */
+    private static String refresh() throws Exception {
+        String rt = Store.getStr(KEY_REFRESH,"");
+        if (rt.isEmpty()) {
+            // no refresh token — re-exchange the PAT
+            Store.putStr(KEY_TOKEN,"");
+            return exchangePat();
+        }
+        JSONObject body = new JSONObject()
+                .put("grant_type","refresh_token")
+                .put("client_id", CLIENT_ID)
+                .put("refresh_token", rt);
+        HttpURLConnection c = open(TOKEN_URL);
+        c.setRequestMethod("POST");
+        c.setDoOutput(true);
+        c.setRequestProperty("Content-Type","application/x-www-form-urlencoded");
+        StringBuilder sb = new StringBuilder();
+        java.util.Iterator<String> it = body.keys();
+        while (it.hasNext()) {
+            String k = it.next();
+            if (sb.length() > 0) sb.append('&');
+            sb.append(URLEncoder.encode(k,"UTF-8")).append('=')
+              .append(URLEncoder.encode(body.getString(k),"UTF-8"));
+        }
+        byte[] b2 = sb.toString().getBytes(StandardCharsets.UTF_8);
+        try (OutputStream o = c.getOutputStream()) { o.write(b2); }
+        JSONObject r = readJson(c);
+        String newTok = r.optString("access_token","");
+        if (!newTok.isEmpty()) { saveOAuth(newTok, r.optString("refresh_token","")); return newTok; }
+        // refresh failed — clear and re-exchange PAT
+        Store.putStr(KEY_TOKEN,""); Store.putStr(KEY_REFRESH,"");
+        return exchangePat();
+    }
+
+    // ------------------------------------------------------------------
+    // Models
+    // ------------------------------------------------------------------
+
     public static class SeedrFile {
-        public String id, folderId, name, ext, url;
-        public long size;
+        public String id, name, ext, url;
+        public long   size;
         public boolean isFolder, isTorrent;
+        public String progress;   // for active torrents
+        public String progressUrl;
+        public int    seeders, peers;
+        public long   dlRate;
 
         public String displaySize() {
             if (size <= 0) return "";
-            if (size > 1_073_741_824L) return String.format(Locale.US, "%.1f GB", size / 1_073_741_824.0);
-            if (size > 1_048_576L)     return String.format(Locale.US, "%.1f MB", size / 1_048_576.0);
-            return String.format(Locale.US, "%.0f KB", size / 1024.0);
+            if (size > 1_073_741_824L) return String.format(Locale.US,"%.1f GB", size/1_073_741_824.0);
+            if (size >     1_048_576L) return String.format(Locale.US,"%.1f MB", size/1_048_576.0);
+            return String.format(Locale.US,"%.0f KB", size/1024.0);
+        }
+
+        public String subtitle() {
+            if (isTorrent) return (progress==null?"":progress+"% ") + (seeders>0?seeders+" seeds":"");
+            if (isFolder)  return displaySize().isEmpty() ? "Folder" : displaySize();
+            return (ext==null||ext.isEmpty()?"":ext.toUpperCase(Locale.US)+" · ") + displaySize();
         }
     }
 
-    public static class AddResult {
-        public boolean ok;
-        public String torrentId, progressUrl, msg;
-    }
-
+    public static class AddResult  { public boolean ok; public String msg, progressUrl, torrentId; }
     public static class AccountInfo {
         public String username, email;
-        public long spaceUsed, spaceTotal;
-
+        public long   spaceUsed, spaceTotal;
         public String quota() {
-            if (spaceTotal <= 0) return "";
-            return mb(spaceUsed) + " / " + mb(spaceTotal) + " used";
+            if (spaceTotal<=0) return "";
+            return fmt(spaceUsed)+" / "+fmt(spaceTotal);
         }
-        private static String mb(long b) {
-            if (b > 1_073_741_824L) return String.format(Locale.US, "%.1f GB", b / 1_073_741_824.0);
-            return String.format(Locale.US, "%.0f MB", b / 1_048_576.0);
+        private static String fmt(long b){
+            if(b>1_073_741_824L) return String.format(Locale.US,"%.1f GB",b/1_073_741_824.0);
+            return String.format(Locale.US,"%.0f MB",b/1_048_576.0);
         }
     }
 
-    public static class TorrentProgress {
-        public String name;
-        public int progress;          // 0–100
-        public long dlRate, ulRate;   // bytes/s
-        public int seeders, peers;
-        public boolean done;
-    }
+    // ------------------------------------------------------------------
+    // API calls
+    // ------------------------------------------------------------------
 
-    // ------------------------------------------------------------------ API calls
-
-    /** Verify the token and return account info.
-     * v0.1/p/user returns: {username, email, storage_used, storage_max, ...} flat JSON */
     public static AccountInfo getAccount() throws Exception {
-        JSONObject r = get("get_settings");
-        // v0.1 API returns flat JSON; old OAuth API nests under "account"
-        JSONObject src = r.has("username") ? r : r.optJSONObject("account") != null ? r.optJSONObject("account") : r;
+        JSONObject r = call("get_settings", null);
         AccountInfo a = new AccountInfo();
-        a.username = src.optString("username", src.optString("display_name", src.optString("name", "")));
-        a.email    = src.optString("email", "");
-        // storage — v0.1 may use storage_used/storage_max or bandwidth_used/bandwidth_max
-        a.spaceUsed  = src.optLong("storage_used",  src.optLong("bandwidth_used",  src.optLong("space_used",  0)));
-        a.spaceTotal = src.optLong("storage_max",   src.optLong("bandwidth_max",   src.optLong("space_max",   0)));
+        JSONObject acc = r.optJSONObject("account");
+        if (acc == null) acc = r;
+        a.username  = acc.optString("username",  acc.optString("name",""));
+        a.email     = acc.optString("email","");
+        // storage — try several field names the API uses across versions
+        a.spaceUsed  = r.optLong("bandwidth_used",  r.optLong("space_used",  0));
+        a.spaceTotal = r.optLong("bandwidth_max",   r.optLong("space_max",   0));
         if (a.spaceTotal == 0) {
-            // try a nested memory object (old API)
             JSONObject mem = r.optJSONObject("memory");
             if (mem != null) {
-                a.spaceUsed  = mem.optLong("bandwidth_used", mem.optLong("space_used",  0));
-                a.spaceTotal = mem.optLong("bandwidth_max",  mem.optLong("space_max",   0));
+                a.spaceUsed  = mem.optLong("bandwidth_used", mem.optLong("space_used", 0));
+                a.spaceTotal = mem.optLong("bandwidth_max",  mem.optLong("space_max",  0));
             }
+        }
+        if (a.spaceTotal == 0) {
+            // separate memory call
+            try {
+                JSONObject m2 = call("get_memory_bandwidth", null);
+                JSONObject mem = m2.optJSONObject("memory");
+                if (mem!=null){
+                    a.spaceUsed  = mem.optLong("bandwidth_used", mem.optLong("space_used", 0));
+                    a.spaceTotal = mem.optLong("bandwidth_max",  mem.optLong("space_max",  0));
+                }
+            } catch (Exception ignored){}
         }
         return a;
     }
 
-    /** List files and folders in a folder (root = "0"). */
     public static List<SeedrFile> listFolder(String folderId) throws Exception {
         JSONObject body = new JSONObject().put("content_id", folderId == null ? "0" : folderId);
-        JSONObject r = post("list_contents", body);
+        JSONObject r = call("list_contents", body);
         List<SeedrFile> out = new ArrayList<>();
-        JSONArray folders = r.optJSONArray("folders");
-        if (folders != null) for (int i = 0; i < folders.length(); i++) {
-            JSONObject o = folders.getJSONObject(i);
-            SeedrFile f = new SeedrFile();
-            f.id = String.valueOf(o.optInt("id")); f.folderId = folderId;
-            f.name = o.optString("name"); f.isFolder = true;
-            f.size = o.optLong("size", 0);
-            out.add(f);
-        }
-        JSONArray files = r.optJSONArray("files");
-        if (files == null) files = r.optJSONArray("folder_files");
-        if (files != null) for (int i = 0; i < files.length(); i++) {
-            JSONObject o = files.getJSONObject(i);
-            SeedrFile f = new SeedrFile();
-            f.id = String.valueOf(o.optInt("folder_file_id", o.optInt("id")));
-            f.folderId = folderId;
-            f.name = o.optString("name"); f.ext = o.optString("ext");
-            f.size = o.optLong("size", 0); f.isFolder = false;
-            out.add(f);
-        }
-        // active downloading torrents
+
+        // active torrents (still downloading)
         JSONArray torrents = r.optJSONArray("torrents");
         if (torrents != null) for (int i = 0; i < torrents.length(); i++) {
             JSONObject o = torrents.getJSONObject(i);
             SeedrFile f = new SeedrFile();
-            f.id = String.valueOf(o.optInt("id")); f.folderId = folderId;
-            f.name = o.optString("name") + "  ⬇ " + o.optString("progress","?") + "%";
-            f.isTorrent = true; f.size = o.optLong("size", 0);
-            f.url = o.optString("progress_url");  // reuse url field for progress polling
+            f.id          = String.valueOf(o.optInt("id"));
+            f.name        = o.optString("name","Torrent");
+            f.isTorrent   = true;
+            f.size        = o.optLong("size",0);
+            f.progress    = o.optString("progress","0");
+            f.progressUrl = o.optString("progress_url","");
+            f.seeders     = o.optInt("seeders",0);
+            f.peers       = o.optInt("downloading_from",0);
+            f.dlRate      = o.optLong("download_rate",0);
+            out.add(f);
+        }
+
+        // completed folders
+        JSONArray folders = r.optJSONArray("folders");
+        if (folders != null) for (int i = 0; i < folders.length(); i++) {
+            JSONObject o = folders.getJSONObject(i);
+            SeedrFile f = new SeedrFile();
+            f.id       = String.valueOf(o.optInt("id"));
+            f.name     = o.optString("name","");
+            f.isFolder = true;
+            f.size     = o.optLong("size",0);
+            out.add(f);
+        }
+
+        // completed files
+        JSONArray files = r.optJSONArray("folder_files");
+        if (files == null) files = r.optJSONArray("files");
+        if (files != null) for (int i = 0; i < files.length(); i++) {
+            JSONObject o = files.getJSONObject(i);
+            SeedrFile f = new SeedrFile();
+            f.id   = String.valueOf(o.optInt("folder_file_id", o.optInt("id")));
+            f.name = o.optString("name","");
+            f.ext  = o.optString("ext","");
+            f.size = o.optLong("size",0);
             out.add(f);
         }
         return out;
     }
 
-    /** Get a direct streaming/download URL for a file. */
     public static String fetchFileUrl(String fileId) throws Exception {
-        JSONObject body = new JSONObject().put("folder_file_id", fileId);
-        JSONObject r = post("fetch_file", body);
-        String url = r.optString("url", r.optString("download_url", ""));
-        if (url.isEmpty()) throw new Exception("No URL in response");
-        return url;
+        JSONObject r = call("fetch_file", new JSONObject().put("folder_file_id", fileId));
+        String u = r.optString("url", r.optString("download_url",""));
+        if (u.isEmpty()) throw new Exception("No streaming URL in response");
+        return u;
     }
 
-    /** Add a magnet or torrent URL. Returns progress info so you can poll. */
     public static AddResult addMagnet(String magnet) throws Exception {
         JSONObject body = new JSONObject()
                 .put("torrent_magnet", magnet)
                 .put("folder_id", "-1");
-        JSONObject r = post("add_torrent", body);
+        JSONObject r = call("add_torrent", body);
         AddResult res = new AddResult();
-        res.ok = r.optBoolean("result", !r.has("error"));
-        res.torrentId   = r.optString("torrent_id",    String.valueOf(r.optInt("id")));
-        res.progressUrl = r.optString("progress_url",  "");
-        res.msg = r.optString("error", r.optBoolean("result", false) ? "Added to Seedr" : "Failed");
+        // result = true means queued; result = false with error means failed
+        Object result = r.opt("result");
+        res.ok          = (result instanceof Boolean && (Boolean)result) || r.optInt("result",0)==1;
+        res.torrentId   = String.valueOf(r.optInt("torrent_id", r.optInt("id",0)));
+        res.progressUrl = r.optString("progress_url","");
+        res.msg         = r.optString("error", res.ok ? "Added to Seedr" : "Failed — check your token has torrent.add scope");
         return res;
     }
 
-    /** Poll download progress for an active torrent. */
-    public static TorrentProgress getProgress(String progressUrl) throws Exception {
-        JSONObject r = getUrl(progressUrl);
-        TorrentProgress p = new TorrentProgress();
-        p.name     = r.optString("name", "");
-        p.progress = (int) Math.round(r.optDouble("progress", 0) * 100);
-        p.dlRate   = r.optLong("download_rate", 0);
-        p.ulRate   = r.optLong("upload_rate", 0);
-        p.seeders  = r.optInt("seeders", 0);
-        p.peers    = r.optInt("downloading_from", r.optInt("peers", 0));
-        p.done     = p.progress >= 100 || "Finished".equalsIgnoreCase(r.optString("status"));
-        return p;
-    }
+    public static void deleteFile(String id)    throws Exception { call("delete_file",    new JSONObject().put("folder_file_id",id)); }
+    public static void deleteFolder(String id)  throws Exception { call("delete_folder",  new JSONObject().put("folder_id",id)); }
+    public static void deleteTorrent(String id) throws Exception { call("delete_torrent", new JSONObject().put("torrent_id",id)); }
+    public static void renameFile(String id, String name)   throws Exception { call("rename_file",   new JSONObject().put("folder_file_id",id).put("rename_to",name)); }
+    public static void renameFolder(String id, String name) throws Exception { call("rename_folder", new JSONObject().put("folder_id",id).put("rename_to",name)); }
 
-    /** Delete a completed folder or file. */
-    public static void deleteFolder(String folderId) throws Exception {
-        post("delete_folder", new JSONObject().put("folder_id", folderId));
-    }
-
-    public static void deleteFile(String fileId) throws Exception {
-        post("delete_file", new JSONObject().put("folder_file_id", fileId));
-    }
-
-    /** Delete an active downloading torrent. */
-    public static void deleteTorrent(String torrentId) throws Exception {
-        post("delete_torrent", new JSONObject().put("torrent_id", torrentId));
-    }
-
-    /** Rename a file. */
-    public static void renameFile(String fileId, String name) throws Exception {
-        post("rename_file", new JSONObject().put("folder_file_id", fileId).put("rename_to", name));
-    }
-
-    /** Rename a folder. */
-    public static void renameFolder(String folderId, String name) throws Exception {
-        post("rename_folder", new JSONObject().put("folder_id", folderId).put("rename_to", name));
-    }
-
-    /** Search for files across the account. */
-    public static List<SeedrFile> search(String query) throws Exception {
-        JSONObject r = post("search_files", new JSONObject().put("search_query", query));
+    public static List<SeedrFile> search(String q) throws Exception {
+        JSONObject r = call("search_files", new JSONObject().put("search_query", q));
         List<SeedrFile> out = new ArrayList<>();
-        JSONArray files = r.optJSONArray("files");
-        if (files == null) files = r.optJSONArray("folder_files");
-        if (files != null) for (int i = 0; i < files.length(); i++) {
-            JSONObject o = files.getJSONObject(i);
+        JSONArray arr = r.optJSONArray("folder_files");
+        if (arr == null) arr = r.optJSONArray("files");
+        if (arr != null) for (int i = 0; i < arr.length(); i++) {
+            JSONObject o = arr.getJSONObject(i);
             SeedrFile f = new SeedrFile();
-            f.id = String.valueOf(o.optInt("folder_file_id", o.optInt("id")));
-            f.name = o.optString("name"); f.ext = o.optString("ext");
-            f.size = o.optLong("size", 0);
+            f.id   = String.valueOf(o.optInt("folder_file_id",o.optInt("id")));
+            f.name = o.optString("name","");
+            f.ext  = o.optString("ext","");
+            f.size = o.optLong("size",0);
             out.add(f);
         }
         return out;
     }
 
-    // ------------------------------------------------------------------ HTTP
+    // ------------------------------------------------------------------
+    // HTTP
+    // ------------------------------------------------------------------
 
-    private static JSONObject get(String func) throws Exception {
-        return call("GET", func, null);
-    }
-
-    private static JSONObject post(String func, JSONObject body) throws Exception {
-        return call("POST", func, body);
-    }
-
-    private static JSONObject getUrl(String url) throws Exception {
-        HttpURLConnection c = open(url + "?access_token=" + URLEncoder.encode(token(), "UTF-8"));
-        c.setRequestMethod("GET");
-        return readJson(c);
-    }
-
-    private static JSONObject call(String method, String func, JSONObject body) throws Exception {
+    /** Make an API call; auto-refresh the token on 401 / expired_token. */
+    static JSONObject call(String func, JSONObject body) throws Exception {
         String tok = token();
-        if (tok.isEmpty()) throw new Exception("No Seedr API token. Go to ZH Play → Seedr → ⚙ → Change API Token");
-        return isPat() ? callV1(method, func, body, tok) : callOAuth(method, func, body, tok);
+        JSONObject r = callWith(tok, func, body);
+        if ("expired_token".equals(r.optString("error","")) || r.optInt("status_code",0)==401) {
+            tok = refresh();
+            r = callWith(tok, func, body);
+        }
+        String err = r.optString("error","");
+        if (!err.isEmpty() && !"access_granted".equals(err)) throw new Exception(err);
+        return r;
     }
 
-    /** v0.1 REST API: Authorization: Bearer TOKEN, path-based routing. */
-    private static JSONObject callV1(String method, String func, JSONObject body, String tok) throws Exception {
-        // map the old func names to v0.1 REST paths
-        String path;
-        switch (func) {
-            case "get_settings":        path = "/user"; method = "GET"; break;
-            case "get_memory_bandwidth":path = "/user"; method = "GET"; break;
-            case "list_contents":       path = "/folder/" + (body != null ? body.optString("content_id","0") : "0"); method = "GET"; body = null; break;
-            case "add_torrent":         path = "/torrent"; method = "POST"; break;
-            case "fetch_file":          path = "/file/" + (body != null ? body.optString("folder_file_id","0") + "/url" : "0/url"); method = "GET"; body = null; break;
-            case "delete_file":         path = "/file/" + (body != null ? body.optString("folder_file_id","0") : "0"); method = "DELETE"; body = null; break;
-            case "delete_folder":       path = "/folder/" + (body != null ? body.optString("folder_id","0") : "0"); method = "DELETE"; body = null; break;
-            case "delete_torrent":      path = "/torrent/" + (body != null ? body.optString("torrent_id","0") : "0"); method = "DELETE"; body = null; break;
-            case "rename_file":         path = "/file/" + (body != null ? body.optString("folder_file_id","0") : "0"); method = "PATCH"; break;
-            case "rename_folder":       path = "/folder/" + (body != null ? body.optString("folder_id","0") : "0"); method = "PATCH"; break;
-            case "search_files":        path = "/search?query=" + URLEncoder.encode(body != null ? body.optString("search_query","") : "", "UTF-8"); method = "GET"; body = null; break;
-            default:                    path = "/" + func; break;
-        }
-        HttpURLConnection c = open(BASE_V1 + path);
-        c.setRequestMethod(method);
-        c.setRequestProperty("Authorization", "Bearer " + tok);
-        c.setRequestProperty("Accept", "application/json");
-        if (body != null && body.length() > 0 && (method.equals("POST") || method.equals("PATCH"))) {
-            c.setDoOutput(true);
-            c.setRequestProperty("Content-Type", "application/json");
-            byte[] b = body.toString().getBytes(StandardCharsets.UTF_8);
-            c.setRequestProperty("Content-Length", String.valueOf(b.length));
-            try (OutputStream out = c.getOutputStream()) { out.write(b); }
-        }
-        return readJson(c);
-    }
-
-    /** Old OAuth API: ?access_token=TOKEN&func=FUNC, form body. */
-    private static JSONObject callOAuth(String method, String func, JSONObject body, String tok) throws Exception {
-        String url = BASE_OAUTH + "?access_token=" + URLEncoder.encode(tok, "UTF-8")
-                         + "&func=" + URLEncoder.encode(func, "UTF-8");
+    private static JSONObject callWith(String tok, String func, JSONObject body) throws Exception {
+        String url = RESOURCE + "?access_token=" + URLEncoder.encode(tok,"UTF-8")
+                              + "&func="         + URLEncoder.encode(func,"UTF-8");
         HttpURLConnection c = open(url);
-        c.setRequestMethod(method);
+        c.setRequestMethod(body != null && body.length() > 0 ? "POST" : "GET");
         if (body != null && body.length() > 0) {
             c.setDoOutput(true);
-            c.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+            c.setRequestProperty("Content-Type","application/x-www-form-urlencoded");
             StringBuilder sb = new StringBuilder();
             java.util.Iterator<String> it = body.keys();
             while (it.hasNext()) {
-                String k = it.next(); Object v = body.get(k);
+                String k = it.next();
                 if (sb.length() > 0) sb.append('&');
-                sb.append(URLEncoder.encode(k, "UTF-8")).append('=')
-                  .append(URLEncoder.encode(String.valueOf(v), "UTF-8"));
+                sb.append(URLEncoder.encode(k,"UTF-8")).append('=')
+                  .append(URLEncoder.encode(String.valueOf(body.get(k)),"UTF-8"));
             }
             byte[] b = sb.toString().getBytes(StandardCharsets.UTF_8);
             c.setRequestProperty("Content-Length", String.valueOf(b.length));
-            try (OutputStream out = c.getOutputStream()) { out.write(b); }
+            try (OutputStream o = c.getOutputStream()) { o.write(b); }
         }
         return readJson(c);
     }
@@ -315,24 +354,26 @@ public final class SeedrApi {
     private static HttpURLConnection open(String url) throws Exception {
         HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
         c.setConnectTimeout(TIMEOUT); c.setReadTimeout(TIMEOUT);
-        c.setRequestProperty("User-Agent", "ZHPlay/1.0");
+        c.setRequestProperty("User-Agent","ZHPlay/1.0");
         return c;
     }
 
     private static JSONObject readJson(HttpURLConnection c) throws Exception {
         int code = c.getResponseCode();
-        java.io.InputStream in = code >= 400 ? c.getErrorStream() : c.getInputStream();
-        if (in == null) throw new Exception("HTTP " + code);
-        BufferedReader r = new BufferedReader(new InputStreamReader(in));
-        StringBuilder sb = new StringBuilder(); String line;
-        while ((line = r.readLine()) != null) sb.append(line);
-        r.close();
+        java.io.InputStream in = (code >= 400) ? c.getErrorStream() : c.getInputStream();
+        if (in == null) throw new Exception("HTTP "+code+" — no response body");
+        BufferedReader br = new BufferedReader(new InputStreamReader(in,"UTF-8"));
+        StringBuilder sb = new StringBuilder(); String ln;
+        while ((ln=br.readLine())!=null) sb.append(ln);
+        br.close();
         String text = sb.toString().trim();
-        if (text.isEmpty()) return new JSONObject();
-        if (text.startsWith("[")) return new JSONObject().put("array", new JSONArray(text));
+        if (text.isEmpty()) return new JSONObject().put("result",code<400);
+        if (text.startsWith("[")) {
+            JSONArray arr = new JSONArray(text);
+            return new JSONObject().put("folder_files", arr);
+        }
         JSONObject j = new JSONObject(text);
-        if (j.has("error") && !j.optString("error").isEmpty())
-            throw new Exception(j.optString("error"));
+        if (code == 401) j.put("error","expired_token");
         return j;
     }
 }

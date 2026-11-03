@@ -1296,19 +1296,24 @@ public class BrowserActivity extends AppCompatActivity {
             // WebView sometimes returns UNKNOWN_TYPE for magnet: links (non-http scheme)
             // Ask JS for the link under the finger as a fallback
             if (u == null || t == WebView.HitTestResult.UNKNOWN_TYPE) {
-                // synchronous JS can't be used from long-click; use a stored value instead
+                // JS fallback: ask what's under the finger (magnet: links often return UNKNOWN_TYPE)
                 web.evaluateJavascript(
                     "(function(){var el=document.elementFromPoint(window._zhLpX||0,window._zhLpY||0);"
-                    + "for(var e=el;e;e=e.parentElement){if(e.tagName==='A'&&e.href){return e.href;}}"
+                    + "for(var e=el;e;e=e.parentElement){"
+                    + "  if(e.tagName==='A'&&e.href&&(e.href.startsWith('magnet:')||e.href.indexOf('.torrent')>0))"
+                    + "    return e.href;"
+                    + "}"
                     + "return null;})()",
                     val -> {
                         if (val != null && !val.equals("null")) {
-                            String link = val.startsWith("\"") ? val.substring(1,val.length()-1) : val;
+                            String link = val.startsWith("\"") ? val.substring(1, val.length()-1) : val;
                             if (link.startsWith("magnet:") || Formats.isTorrent(link)) {
                                 main.post(() -> showMagnetMenu(link));
                             }
                         }
                     });
+                // consume the event so WebView's default long-press menu doesn't also appear
+                if (u == null) return true;
             }
             if (u != null && (t == WebView.HitTestResult.SRC_ANCHOR_TYPE
                     || t == WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE
@@ -2175,32 +2180,44 @@ public class BrowserActivity extends AppCompatActivity {
     }
 
     private void showMagnetMenu(final String u) {
-        String seedrLabel = SeedrApi.hasToken()
-                ? "☁  " + T.t("Send to Seedr") + "  ✓"    // ✓ = API token connected
-                : "☁  " + T.t("Send to Seedr (browser)");
+        boolean connected = SeedrApi.hasToken() || SeedrApi.hasPat();
+        String seedrLabel = connected
+                ? "☁  " + T.t("Send to Seedr") + "  ✓"
+                : "☁  " + T.t("Send to Seedr");
         new UiDialog(this).setTitle("🧲 " + T.t("Torrent link"))
             .setItems(new String[]{
                 seedrLabel,
                 "▶  " + T.t("Play / open here"),
                 "📋  " + T.t("Copy link"),
-                "📂  " + T.t("Open Seedr manager")
+                "📂  " + T.t("Open Seedr")
             }, (d2, w) -> {
                 if (w == 0) {
-                    if (SeedrApi.hasToken()) {
-                        // API path: instant, no browser tab needed
-                        SeedrActivity s = null;
+                    if (connected) {
+                        // Use API — open Seedr manager and send there
+                        Toast.makeText(this, "☁ " + T.t("Sending to Seedr…"), Toast.LENGTH_SHORT).show();
                         new Thread(() -> {
                             try {
                                 SeedrApi.AddResult res = SeedrApi.addMagnet(u);
-                                main.post(() -> Toast.makeText(this, res.ok
-                                        ? "☁ " + T.t("Sending to Seedr via API…")
-                                        : "⚠ " + res.msg, Toast.LENGTH_LONG).show());
+                                main.post(() -> {
+                                    if (res.ok) {
+                                        Toast.makeText(this, "☁ " + T.t("Added! Check Seedr → Transfers"), Toast.LENGTH_LONG).show();
+                                    } else {
+                                        Toast.makeText(this, "⚠ " + res.msg, Toast.LENGTH_LONG).show();
+                                        // fallback: open browser Seedr tab
+                                        sendToSeedr(u);
+                                    }
+                                });
                             } catch (Exception e) {
-                                main.post(() -> Toast.makeText(this, "⚠ " + e.getMessage(), Toast.LENGTH_LONG).show());
+                                main.post(() -> {
+                                    Toast.makeText(this, "⚠ API: " + e.getMessage() + " — trying browser…", Toast.LENGTH_LONG).show();
+                                    sendToSeedr(u);
+                                });
                             }
                         }).start();
-                        Toast.makeText(this, "☁ " + T.t("Sending to Seedr via API…"), Toast.LENGTH_SHORT).show();
-                    } else sendToSeedr(u);                  // fallback: browser injection
+                    } else {
+                        // not connected: open Seedr setup
+                        SeedrActivity.open(this);
+                    }
                 } else if (w == 1) { pendingDl = null; offer(u, null); }
                 else if (w == 2) copy(u);
                 else SeedrActivity.open(this);
@@ -2263,7 +2280,12 @@ public class BrowserActivity extends AppCompatActivity {
             return true;
         }
         String l = u.toLowerCase(Locale.US);
-        if (l.startsWith("magnet:") || Formats.isTorrent(u) || isPlayable(u, null)) {
+        if (l.startsWith("magnet:") || Formats.isTorrent(u)) {
+            // tap on magnet/torrent → show the full menu including Seedr
+            showMagnetMenu(u);
+            return true;
+        }
+        if (isPlayable(u, null)) {
             offer(u, null);
             return true;
         }
