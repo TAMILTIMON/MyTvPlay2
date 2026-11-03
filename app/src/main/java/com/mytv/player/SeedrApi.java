@@ -31,7 +31,17 @@ import java.util.Locale;
 public final class SeedrApi {
     private SeedrApi() {}
 
-    private static final String BASE = "https://www.seedr.cc/oauth_test/resource.php";
+    // v0.1 API (Personal Access Tokens from seedr.cc/api/v0.1/console/tokens) — uses Bearer header
+    // Base URL confirmed from official docs: https://www.seedr.cc/api/v0.1/p
+    private static final String BASE_V1 = "https://www.seedr.cc/api/v0.1/p";
+    // Old OAuth API (password / device login tokens) — uses ?access_token= param
+    private static final String BASE_OAUTH = "https://www.seedr.cc/oauth_test/resource.php";
+
+    /** Detect which API this token needs. PAT tokens start with "seedr_" or are very long (>40 chars). */
+    private static boolean isPat() {
+        String t = token();
+        return t.length() > 40 || t.startsWith("seedr_") || t.startsWith("sk_");
+    }
     private static final String TOKEN_KEY = "seedr_api_token";
     private static final int TIMEOUT = 20_000;
 
@@ -84,19 +94,25 @@ public final class SeedrApi {
 
     // ------------------------------------------------------------------ API calls
 
-    /** Verify the token and return account info. */
+    /** Verify the token and return account info.
+     * v0.1/p/user returns: {username, email, storage_used, storage_max, ...} flat JSON */
     public static AccountInfo getAccount() throws Exception {
         JSONObject r = get("get_settings");
-        JSONObject acc = r.optJSONObject("account");
-        if (acc == null) acc = r;
+        // v0.1 API returns flat JSON; old OAuth API nests under "account"
+        JSONObject src = r.has("username") ? r : r.optJSONObject("account") != null ? r.optJSONObject("account") : r;
         AccountInfo a = new AccountInfo();
-        a.username = acc.optString("username", acc.optString("display_name", ""));
-        a.email    = acc.optString("email", "");
-        JSONObject mem = r.optJSONObject("memory");
-        if (mem == null) { JSONObject mb2 = get("get_memory_bandwidth"); mem = mb2.optJSONObject("memory"); }
-        if (mem != null) {
-            a.spaceUsed  = mem.optLong("bandwidth_used", mem.optLong("space_used", 0));
-            a.spaceTotal = mem.optLong("bandwidth_max", mem.optLong("space_max", 0));
+        a.username = src.optString("username", src.optString("display_name", src.optString("name", "")));
+        a.email    = src.optString("email", "");
+        // storage — v0.1 may use storage_used/storage_max or bandwidth_used/bandwidth_max
+        a.spaceUsed  = src.optLong("storage_used",  src.optLong("bandwidth_used",  src.optLong("space_used",  0)));
+        a.spaceTotal = src.optLong("storage_max",   src.optLong("bandwidth_max",   src.optLong("space_max",   0)));
+        if (a.spaceTotal == 0) {
+            // try a nested memory object (old API)
+            JSONObject mem = r.optJSONObject("memory");
+            if (mem != null) {
+                a.spaceUsed  = mem.optLong("bandwidth_used", mem.optLong("space_used",  0));
+                a.spaceTotal = mem.optLong("bandwidth_max",  mem.optLong("space_max",   0));
+            }
         }
         return a;
     }
@@ -236,8 +252,45 @@ public final class SeedrApi {
 
     private static JSONObject call(String method, String func, JSONObject body) throws Exception {
         String tok = token();
-        if (tok.isEmpty()) throw new Exception("No Seedr API token saved — go to ZH Play → Browser → Seedr");
-        String url = BASE + "?access_token=" + URLEncoder.encode(tok, "UTF-8")
+        if (tok.isEmpty()) throw new Exception("No Seedr API token. Go to ZH Play → Seedr → ⚙ → Change API Token");
+        return isPat() ? callV1(method, func, body, tok) : callOAuth(method, func, body, tok);
+    }
+
+    /** v0.1 REST API: Authorization: Bearer TOKEN, path-based routing. */
+    private static JSONObject callV1(String method, String func, JSONObject body, String tok) throws Exception {
+        // map the old func names to v0.1 REST paths
+        String path;
+        switch (func) {
+            case "get_settings":        path = "/user"; method = "GET"; break;
+            case "get_memory_bandwidth":path = "/user"; method = "GET"; break;
+            case "list_contents":       path = "/folder/" + (body != null ? body.optString("content_id","0") : "0"); method = "GET"; body = null; break;
+            case "add_torrent":         path = "/torrent"; method = "POST"; break;
+            case "fetch_file":          path = "/file/" + (body != null ? body.optString("folder_file_id","0") + "/url" : "0/url"); method = "GET"; body = null; break;
+            case "delete_file":         path = "/file/" + (body != null ? body.optString("folder_file_id","0") : "0"); method = "DELETE"; body = null; break;
+            case "delete_folder":       path = "/folder/" + (body != null ? body.optString("folder_id","0") : "0"); method = "DELETE"; body = null; break;
+            case "delete_torrent":      path = "/torrent/" + (body != null ? body.optString("torrent_id","0") : "0"); method = "DELETE"; body = null; break;
+            case "rename_file":         path = "/file/" + (body != null ? body.optString("folder_file_id","0") : "0"); method = "PATCH"; break;
+            case "rename_folder":       path = "/folder/" + (body != null ? body.optString("folder_id","0") : "0"); method = "PATCH"; break;
+            case "search_files":        path = "/search?query=" + URLEncoder.encode(body != null ? body.optString("search_query","") : "", "UTF-8"); method = "GET"; body = null; break;
+            default:                    path = "/" + func; break;
+        }
+        HttpURLConnection c = open(BASE_V1 + path);
+        c.setRequestMethod(method);
+        c.setRequestProperty("Authorization", "Bearer " + tok);
+        c.setRequestProperty("Accept", "application/json");
+        if (body != null && body.length() > 0 && (method.equals("POST") || method.equals("PATCH"))) {
+            c.setDoOutput(true);
+            c.setRequestProperty("Content-Type", "application/json");
+            byte[] b = body.toString().getBytes(StandardCharsets.UTF_8);
+            c.setRequestProperty("Content-Length", String.valueOf(b.length));
+            try (OutputStream out = c.getOutputStream()) { out.write(b); }
+        }
+        return readJson(c);
+    }
+
+    /** Old OAuth API: ?access_token=TOKEN&func=FUNC, form body. */
+    private static JSONObject callOAuth(String method, String func, JSONObject body, String tok) throws Exception {
+        String url = BASE_OAUTH + "?access_token=" + URLEncoder.encode(tok, "UTF-8")
                          + "&func=" + URLEncoder.encode(func, "UTF-8");
         HttpURLConnection c = open(url);
         c.setRequestMethod(method);

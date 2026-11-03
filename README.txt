@@ -1,3 +1,10 @@
+ZH PLAY 5.9.7 — Seedr API: correct base URL from official docs
+=============================================================
+* Base URL fixed: https://www.seedr.cc/api/v0.1/p (from the official Seedr API docs)
+  Previously using /api/v0.1/ without the /p — caused "access denied".
+* User endpoint: /p/user (not /account).
+* Both PAT and OAuth tokens supported automatically.
+
 ZH PLAY 5.9.5 — Seedr API integration: cloud torrent manager inside ZH Play
 ==========================================================================
 * Full Seedr file manager: browse your Seedr cloud, add magnets via API,
