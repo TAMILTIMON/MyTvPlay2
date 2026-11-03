@@ -680,7 +680,7 @@ public class PlayerActivity extends AppCompatActivity {
         ld.setId(0, android.R.id.background);
         ld.setId(1, android.R.id.progress);
         // tall inset so the drawable clips to a 2 dp hairline inside the full-height touch area
-        int v2 = dp(19);   // (40dp touch height - 2dp bar) / 2 = 19dp top+bottom inset
+        int v2 = dp(14);   // (40dp touch height - 2dp bar) / 2 = 19dp top+bottom inset
         ld.setLayerInset(0, 0, v2, 0, v2);
         ld.setLayerInset(1, 0, v2, 0, v2);
         return ld;
