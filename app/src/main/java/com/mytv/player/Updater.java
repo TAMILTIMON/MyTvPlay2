@@ -113,7 +113,7 @@ public final class Updater {
                 final int mine = installed(a);
                 // builds before this numbering have a lower Android version code: Android refuses them
                 if (Store.getInt("upd_fixed_from", 0) == 0 && mine > 0) Store.putInt("upd_fixed_from", mine);
-                final int from = Store.getInt("upd_fixed_from", mine);
+                final int from = Math.max(1, Store.getInt("upd_fixed_from", Math.max(1, mine)));   // adb build (mine=0): allow any
                 a.runOnUiThread(() -> {
                     if (all.isEmpty()) {
                         UiKit.makeToast(a, T.t("No versions found"), android.widget.Toast.LENGTH_LONG).show();
@@ -122,7 +122,7 @@ public final class Updater {
                     String[] rows = new String[all.size()];
                     for (int k = 0; k < rows.length; k++) {
                         Info i = all.get(k);
-                        rows[k] = (i.code == mine ? "✅  " : i.code > mine ? "⬆  " : i.code < from ? "🚫  " : "↩  ") + i.name + ": " + i.date
+                        rows[k] = (i.code == mine ? "✅  " : i.code > mine ? "⬆  " : mine == 0 ? "↩  " : i.code < from ? "🚫  " : "↩  ") + i.name + ": " + i.date
                                 + (i.code == mine ? " · " + T.t("installed") : i.code > mine ? " · " + T.t("newer")
                                 : i.code < from ? " · " + T.t("too old to go back to") : "");
                     }
