@@ -253,7 +253,16 @@ public class SeedrActivity extends Activity {
             addNavRow("← " + (folderStack.size() > 2 ? folderStack.get(folderStack.size()-2)[1] : "My Files"),
                     () -> { folderStack.pop(); String[] p = folderStack.pop(); loadFolder(p[0], p[1]); });
         }
-        if (files.isEmpty()) { addEmptyLabel("This folder is empty.\nTap ＋ to add a magnet."); return; }
+        if (files.isEmpty()) {
+            // show raw API response so we can see what field names Seedr actually uses
+            String raw = SeedrApi.lastRaw;
+            String preview = raw.length()>0 ? raw.substring(0,Math.min(400,raw.length())) : "no response";
+            addEmptyLabel("This folder is empty.
+
+API response keys:
+" + preview);
+            return;
+        }
         for (SeedrApi.SeedrFile f : files) {
             if (f.isTorrent) addTransferRow(f);
             else addFileRow(f);
@@ -588,56 +597,154 @@ public class SeedrActivity extends Activity {
     // ================================================================== SETUP / SETTINGS
 
     private void showSetup() {
-        LinearLayout box=new LinearLayout(this); box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(20),dp(4),dp(20),0);
-        TextView msg=tv(13,0xCCFFFFFF,false);
-        msg.setText(
-            "1. Go to seedr.cc/api/v0.1/console/tokens\n"+
-            "2. Create token → choose \"Read & Add Torrents\"\n"+
-            "3. Paste it below\n\n"+
-            "Or use the 6-Hour Token from the Documentation page."
-        );
-        msg.setPadding(0,0,0,dp(12));
-        box.addView(msg);
-        EditText et=new EditText(this);
-        et.setHint(T.t("Paste your Seedr token here"));
-        et.setSingleLine(true);
-        if(SeedrApi.hasToken()) et.setText(SeedrApi.pat());
-        box.addView(et);
-        new UiDialog(this).setTitle("☁  "+T.t("Connect to Seedr")).setView(box)
-                .setPositiveButton(T.t("Connect"),(d,w)->{
-                    String tok=et.getText().toString().trim();
-                    if(tok.isEmpty())return;
+        new UiDialog(this).setTitle("☁  Seedr")
+                .setMessage("Connect your Seedr account to ZH Play.
+
+Choose a login method:")
+                .setPositiveButton("📱 Sign in with code", (d,w) -> startDeviceLogin())
+                .setNeutralButton("✉ Email & Password",   (d,w) -> showEmailLogin())
+                .setNegativeButton("Cancel", null).show();
+    }
+
+    // ---- Device Flow ----
+    private void startDeviceLogin() {
+        showLoading(true);
+        new Thread(() -> {
+            try {
+                SeedrApi.DeviceCode dc = SeedrApi.startDeviceFlow();
+                main.post(() -> { showLoading(false); showDeviceCodeDialog(dc); });
+            } catch (Exception e) {
+                main.post(() -> { showLoading(false); showError(e.getMessage()); showEmailLogin(); });
+            }
+        }).start();
+    }
+
+    private void showDeviceCodeDialog(SeedrApi.DeviceCode dc) {
+        LinearLayout box = new LinearLayout(this); box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(20), dp(8), dp(20), dp(8));
+
+        TextView step = tv(13, 0xCCFFFFFF, false);
+        step.setText("1. Open on any browser:
+   " + dc.verifyUrl + "
+
+2. Enter this code:");
+        box.addView(step);
+
+        TextView code = tv(36, Ui.ACCENT, true);
+        code.setText(dc.userCode);
+        code.setGravity(android.view.Gravity.CENTER);
+        code.setLetterSpacing(0.15f);
+        LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        clp.setMargins(0, dp(12), 0, dp(12));
+        box.addView(code, clp);
+
+        TextView step2 = tv(13, 0xCCFFFFFF, false);
+        step2.setText("3. ZH Play will connect automatically after you approve.");
+        box.addView(step2);
+
+        android.widget.Button copyBtn = new android.widget.Button(this);
+        copyBtn.setText("📋 Copy URL to clipboard");
+        copyBtn.setOnClickListener(v -> {
+            android.content.ClipboardManager cm =
+                    (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+            if (cm != null)
+                cm.setPrimaryClip(android.content.ClipData.newPlainText("seedr", dc.verifyUrl));
+            Toast.makeText(this, "Copied!", Toast.LENGTH_SHORT).show();
+        });
+        LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        blp.setMargins(0, dp(10), 0, 0);
+        box.addView(copyBtn, blp);
+
+        android.app.AlertDialog[] dlg = {null};
+        dlg[0] = new UiDialog(this).setTitle("☁  Sign in to Seedr").setView(box)
+                .setNegativeButton("Cancel", (d, w) -> {}).build();
+        dlg[0].show();
+
+        // poll in background every `interval` seconds
+        final boolean[] done = {false};
+        Runnable[] poll = {null};
+        poll[0] = new Runnable() {
+            public void run() {
+                if (done[0] || dlg[0] == null || !dlg[0].isShowing()) return;
+                new Thread(() -> {
+                    try {
+                        if (SeedrApi.pollDeviceFlow(dc.deviceCode)) {
+                            done[0] = true;
+                            SeedrApi.AccountInfo acc = SeedrApi.getAccount();
+                            main.post(() -> {
+                                if (dlg[0] != null) dlg[0].dismiss();
+                                onConnected(acc);
+                            });
+                        } else {
+                            main.postDelayed(poll[0], Math.max(5000, dc.interval * 1000L));
+                        }
+                    } catch (Exception ignored) {
+                        main.postDelayed(poll[0], 8000);
+                    }
+                }).start();
+            }
+        };
+        main.postDelayed(poll[0], Math.max(5000, dc.interval * 1000L));
+    }
+
+    // ---- Email + Password ----
+    private void showEmailLogin() {
+        LinearLayout box = new LinearLayout(this); box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(20), dp(8), dp(20), 0);
+
+        EditText email = new EditText(this);
+        email.setHint("Seedr email");
+        email.setInputType(android.text.InputType.TYPE_CLASS_TEXT |
+                android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
+        email.setSingleLine(true);
+        if (!SeedrApi.email().isEmpty()) email.setText(SeedrApi.email());
+        box.addView(email);
+
+        LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        plp.setMargins(0, dp(10), 0, 0);
+        EditText pwd = new EditText(this);
+        pwd.setHint("Password");
+        pwd.setInputType(android.text.InputType.TYPE_CLASS_TEXT |
+                android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        pwd.setSingleLine(true);
+        box.addView(pwd, plp);
+
+        new UiDialog(this).setTitle("☁  Seedr Login").setView(box)
+                .setPositiveButton("Sign in", (d, w) -> {
+                    String em = email.getText().toString().trim();
+                    String pw = pwd.getText().toString();
+                    if (em.isEmpty() || pw.isEmpty()) {
+                        Toast.makeText(this, "Enter email and password", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
                     showLoading(true);
-                    new Thread(()->{
+                    new Thread(() -> {
                         try {
-                            SeedrApi.AccountInfo acc=SeedrApi.connect(tok);
-                            main.post(()->{
-                                showLoading(false);
-                                Toast.makeText(this,"✅ "+T.t("Connected as")+" "+acc.username,Toast.LENGTH_LONG).show();
-                                usernameView.setText(acc.username+"  ·  "+acc.email);
-                                if(acc.spaceTotal>0){
-                                    quotaLabel.setText("Storage: "+acc.quota());
-                                    quotaBar.setProgress((int)(1000L*acc.spaceUsed/acc.spaceTotal));
-                                }
-                                folderStack.clear(); currentTab=0; refreshTab();
-                            });
-                        } catch(Exception e){
-                            main.post(()->{
-                                showLoading(false);
-                                showError(e.getMessage());
-                            });
+                            SeedrApi.AccountInfo acc = SeedrApi.login(em, pw);
+                            main.post(() -> { showLoading(false); onConnected(acc); });
+                        } catch (Exception e) {
+                            main.post(() -> { showLoading(false); showError("Login failed: " + e.getMessage()); });
                         }
                     }).start();
                 })
-                .setNeutralButton(T.t("Open Seedr console"),(d,w)->
-                    startActivity(new Intent(this,BrowserActivity.class)
-                        .putExtra(BrowserActivity.EXTRA_URL,"https://www.seedr.cc/api/v0.1/console/tokens")))
-                .setNegativeButton(T.t("Cancel"),null).show();
+                .setNegativeButton("Cancel", null).show();
+    }
+
+    private void onConnected(SeedrApi.AccountInfo acc) {
+        Toast.makeText(this, "✅ Connected as " + acc.username, Toast.LENGTH_LONG).show();
+        usernameView.setText(acc.username + (acc.email.isEmpty() ? "" : "  ·  " + acc.email));
+        if (acc.spaceTotal > 0) {
+            quotaLabel.setText("Storage: " + acc.quota());
+            quotaBar.setProgress((int) (1000L * acc.spaceUsed / acc.spaceTotal));
+        }
+        folderStack.clear(); currentTab = 0; refreshTab();
     }
 
     private void showSettings() {
-        new UiDialog(this).setTitle("Seedr  ·  "+(SeedrApi.pat().length()>12?SeedrApi.pat().substring(0,12)+"…":SeedrApi.pat()))
+        new UiDialog(this).setTitle("Seedr  ·  "+(SeedrApi.email().length()>12?SeedrApi.email().substring(0,12)+"…":SeedrApi.email()))
                 .setItems(new String[]{
                         "🔄  "+T.t("Refresh"),
                         "🔑  "+T.t("Change token"),
