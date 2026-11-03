@@ -608,16 +608,14 @@ public class SeedrActivity extends Activity {
                 .setPositiveButton(T.t("Connect"),(d,w)->{
                     String tok=et.getText().toString().trim();
                     if(tok.isEmpty())return;
-                    SeedrApi.clearAll();
-                    SeedrApi.savePat(tok);
                     showLoading(true);
                     new Thread(()->{
                         try {
-                            SeedrApi.AccountInfo acc=SeedrApi.getAccount();
+                            SeedrApi.AccountInfo acc=SeedrApi.connect(tok);
                             main.post(()->{
                                 showLoading(false);
                                 Toast.makeText(this,"✅ "+T.t("Connected as")+" "+acc.username,Toast.LENGTH_LONG).show();
-                                usernameView.setText(acc.username);
+                                usernameView.setText(acc.username+"  ·  "+acc.email);
                                 if(acc.spaceTotal>0){
                                     quotaLabel.setText("Storage: "+acc.quota());
                                     quotaBar.setProgress((int)(1000L*acc.spaceUsed/acc.spaceTotal));
@@ -628,7 +626,6 @@ public class SeedrActivity extends Activity {
                             main.post(()->{
                                 showLoading(false);
                                 showError(e.getMessage());
-                                SeedrApi.clearAll();
                             });
                         }
                     }).start();
@@ -640,7 +637,7 @@ public class SeedrActivity extends Activity {
     }
 
     private void showSettings() {
-        new UiDialog(this).setTitle("Seedr  ·  "+SeedrApi.pat().substring(0,Math.min(12,SeedrApi.pat().length()))+"…")
+        new UiDialog(this).setTitle("Seedr  ·  "+(SeedrApi.pat().length()>12?SeedrApi.pat().substring(0,12)+"…":SeedrApi.pat()))
                 .setItems(new String[]{
                         "🔄  "+T.t("Refresh"),
                         "🔑  "+T.t("Change token"),
