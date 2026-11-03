@@ -1,5 +1,6 @@
 package com.mytv.player;
 
+import androidx.appcompat.app.AlertDialog;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
@@ -649,9 +650,9 @@ public class SeedrActivity extends Activity {
         blp.setMargins(0, dp(10), 0, 0);
         box.addView(copyBtn, blp);
 
-        android.app.AlertDialog[] dlg = {null};
-        dlg[0] = new UiDialog(this).setTitle("☁  Sign in to Seedr").setView(box)
-                .setNegativeButton("Cancel", (d, w) -> {}).build();
+        AlertDialog[] dlg = {null};
+        dlg[0] = (AlertDialog) new UiDialog(this).setTitle("☁  Sign in to Seedr").setView(box)
+                .setNegativeButton("Cancel", (d, w) -> {}).create();
         dlg[0].show();
 
         // poll in background every `interval` seconds
