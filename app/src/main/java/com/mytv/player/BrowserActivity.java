@@ -1803,6 +1803,7 @@ public class BrowserActivity extends AppCompatActivity {
                 {-3, T.t("Sleep timer"), sleepLabel(), -1, false},
                 {"§", T.t("This page")},
                 {-5, T.t("Add to Music"), T.t("Music → Links (YouTube plays as audio)"), -1, false},
+                {-6, T.t("Open Seedr"), T.t("Cloud torrent manager"), -1, false},
                 {19, T.t("Reload"), null, -1, false},
                 {12, T.t("Find in page"), null, -1, false},
                 {16, T.t("Videos on page"), found.isEmpty() ? null : found.size() + " " + T.t("found"), -1, false},
@@ -1833,6 +1834,13 @@ public class BrowserActivity extends AppCompatActivity {
             }
             int i = (Integer) sct[0];
             if (i == 23 && tv) continue;
+            if (i == -6) {                                              // open Seedr manager
+                list.addView(UiRows.row(this, "cloud", (String) sct[1], (String) sct[2], -1, false, v -> {
+                    d.dismiss();
+                    SeedrActivity.open(this);
+                }));
+                continue;
+            }
             if (i == -5) {                                              // add this page to Music → Links
                 list.addView(UiRows.row(this, "list-music", (String) sct[1], (String) sct[2], -1, false, v -> {
                     d.dismiss();
@@ -2167,15 +2175,35 @@ public class BrowserActivity extends AppCompatActivity {
     }
 
     private void showMagnetMenu(final String u) {
+        String seedrLabel = SeedrApi.hasToken()
+                ? "☁  " + T.t("Send to Seedr") + "  ✓"    // ✓ = API token connected
+                : "☁  " + T.t("Send to Seedr (browser)");
         new UiDialog(this).setTitle("🧲 " + T.t("Torrent link"))
             .setItems(new String[]{
-                "☁  " + T.t("Send to Seedr"),
+                seedrLabel,
                 "▶  " + T.t("Play / open here"),
-                "📋  " + T.t("Copy link")
+                "📋  " + T.t("Copy link"),
+                "📂  " + T.t("Open Seedr manager")
             }, (d2, w) -> {
-                if (w == 0) sendToSeedr(u);
-                else if (w == 1) { pendingDl = null; offer(u, null); }
-                else copy(u);
+                if (w == 0) {
+                    if (SeedrApi.hasToken()) {
+                        // API path: instant, no browser tab needed
+                        SeedrActivity s = null;
+                        new Thread(() -> {
+                            try {
+                                SeedrApi.AddResult res = SeedrApi.addMagnet(u);
+                                main.post(() -> Toast.makeText(this, res.ok
+                                        ? "☁ " + T.t("Sending to Seedr via API…")
+                                        : "⚠ " + res.msg, Toast.LENGTH_LONG).show());
+                            } catch (Exception e) {
+                                main.post(() -> Toast.makeText(this, "⚠ " + e.getMessage(), Toast.LENGTH_LONG).show());
+                            }
+                        }).start();
+                        Toast.makeText(this, "☁ " + T.t("Sending to Seedr via API…"), Toast.LENGTH_SHORT).show();
+                    } else sendToSeedr(u);                  // fallback: browser injection
+                } else if (w == 1) { pendingDl = null; offer(u, null); }
+                else if (w == 2) copy(u);
+                else SeedrActivity.open(this);
             }).show();
     }
 
@@ -2356,7 +2384,7 @@ public class BrowserActivity extends AppCompatActivity {
 
     private void offer(final String rawUrl, String title) {
         // boost magnet: add top public trackers so the engine finds peers faster
-        final String url = rawUrl.startsWith("magnet:") ? TorrentEngine.boostMagnet(rawUrl) : rawUrl;
+        final String url = rawUrl.startsWith("magnet:") ? TorrentEngine.boostMagnet(this, rawUrl) : rawUrl;
         final String t = title != null ? title : (web.getTitle() != null && !Formats.isTorrent(url) ? web.getTitle() : Formats.titleFromUrl(url));
         final List<String> labels = new ArrayList<>();
         final List<Runnable> acts = new ArrayList<>();

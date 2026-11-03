@@ -1,3 +1,25 @@
+ZH PLAY 5.9.5 — Seedr API integration: cloud torrent manager inside ZH Play
+==========================================================================
+* Full Seedr file manager: browse your Seedr cloud, add magnets via API,
+  stream/play files directly, live download progress, delete/rename.
+* One-time setup: paste your Personal Access Token from
+  seedr.cc/api/v0.1/console/tokens (choose "Read & Add Torrents" scope).
+* Access via: Features → Seedr, or browser menu → Open Seedr, or
+  long-press a magnet → Send to Seedr (✓ = API connected, instant add).
+* Old browser-injection method kept as fallback when no token is saved.
+
+ZH PLAY 5.9.4 — Trackers: auto-update from live community lists + latency ranking
+==================================================================================
+* TrackerList: fetches 3 community-maintained tracker sources in parallel on first run
+  and every 24 hours in the background (ngosang/trackerslist best_ip + best, XIU2 best).
+* Each tracker is probed with a real UDP/TCP ping (1.5 s timeout): only reachable trackers
+  are used. They are ranked fastest-first and the top 50 are saved.
+* Every magnet link now gets the full ranked list appended before playing — up to 50
+  fresh high-uptime trackers vs the old hardcoded 14.
+* If the network is offline, the last good ranked list is used; if there is no cached list
+  yet, the hardcoded fallback is used — torrents always have trackers.
+* Tracker list warms up at app start so it is ready before you click any magnet.
+
 ZH PLAY 5.9.3 — Seedr magnet menu always shows; 14 extra trackers for faster torrents
 =====================================================================================
 * Long-press on a magnet link always shows the "Send to Seedr / Play / Copy" menu.

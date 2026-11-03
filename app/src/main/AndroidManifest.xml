@@ -130,6 +130,12 @@
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden" />
 
         <activity
+            android:name=".SeedrActivity"
+            android:exported="false"
+            android:label="Seedr"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
             android:name=".LiveConsentActivity"
             android:exported="false"
             android:excludeFromRecents="true"

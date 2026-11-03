@@ -325,18 +325,20 @@ public final class TorrentEngine {
     };
 
     /**
-     * Appends the top public trackers to a magnet link (no duplicates).
-     * Call this before handing the magnet to the player — the engine will announce to all of them
-     * at start, finding more peers much faster than with just the embedded trackers.
+     * Appends the current best-ranked public trackers (auto-updated daily) to a magnet link.
+     * Delegates to TrackerList which fetches, probes and ranks trackers automatically.
      */
+    public static String boostMagnet(android.content.Context ctx, String magnet) {
+        return TrackerList.boostMagnet(ctx, magnet);
+    }
+
+    /** Convenience overload — context-free version uses the hardcoded fallback list only. */
     public static String boostMagnet(String magnet) {
         if (magnet == null || !magnet.startsWith("magnet:")) return magnet;
         StringBuilder sb = new StringBuilder(magnet);
         for (String tr : BOOST_TRACKERS) {
             String enc = android.net.Uri.encode(tr);
-            if (!magnet.contains(enc) && !magnet.contains(tr)) {
-                sb.append("&tr=").append(enc);
-            }
+            if (!magnet.contains(enc) && !magnet.contains(tr)) sb.append("&tr=").append(enc);
         }
         return sb.toString();
     }
