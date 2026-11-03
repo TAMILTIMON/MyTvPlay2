@@ -35,6 +35,26 @@ public final class T {
     }
 
     static {
+        TA.put("Pair with code","குறியீட்டால் இணை");
+        HI.put("Pair with code","कोड से जोड़ें");
+        TA.put("enter the 6-digit code from your TV","TV-இல் உள்ள 6-இலக்க குறியீட்டை உள்ளிடு");
+        HI.put("enter the 6-digit code from your TV","TV का 6-अंकीय कोड दर्ज करें");
+        TA.put("Enter code from TV","TV-இலிருந்து குறியீட்டை உள்ளிடு");
+        HI.put("Enter code from TV","TV से कोड दर्ज करें");
+        TA.put("Looking for TV…","TV-ஐ தேடுகிறது…");
+        HI.put("Looking for TV…","TV खोज रहा है…");
+        TA.put("Enter the 6-character code shown on your TV","உங்கள் TV-இல் காட்டப்படும் 6-எழுத்து குறியீட்டை உள்ளிடு");
+        HI.put("Enter the 6-character code shown on your TV","अपने TV पर दिखाए गए 6-अक्षर कोड दर्ज करें");
+        TA.put("Enter IP instead","IP-ஐ பதிலாக உள்ளிடு");
+        HI.put("Enter IP instead","बजाय IP दर्ज करें");
+        TA.put("No TV found with code","குறியீட்டுடன் TV கிடைக்கவில்லை");
+        HI.put("No TV found with code","कोड के साथ TV नहीं मिला");
+        TA.put("Make sure both devices are on the same Wi-Fi","இரண்டு சாதனங்களும் ஒரே Wi-Fi-ல் இருப்பதை உறுதிசெய்");
+        HI.put("Make sure both devices are on the same Wi-Fi","सुनिश्चित करें दोनों डिवाइस एक ही Wi-Fi पर हैं");
+        TA.put("Pair code","இணை குறியீடு");
+        HI.put("Pair code","जोड़ी कोड");
+        TA.put(" min"," நி");
+        HI.put(" min"," मि");
         TA.put("Search in new tab", "புதிய தாவலில் தேடு");
         HI.put("Search in new tab", "नए टैब में खोजें");
         TA.put("Send to Seedr", "Seedr-க்கு அனுப்பு");

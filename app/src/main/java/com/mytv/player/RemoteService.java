@@ -40,6 +40,7 @@ public class RemoteService extends Service {
             server.start(NanoHTTPD.SOCKET_READ_TIMEOUT, false);
             running = true;
             error = null;
+            PairCode.generate();   // fresh pairing code on service start
             Discovery.register(this);
             if (Ui.isTv(this) || !Store.getStr("dl_list", "[]").equals("[]")) TorrentDownloads.resumeAll(this);
             if (Ui.isTv(this)) FastKeys.ensure(this);   // fast keys ready before the first press

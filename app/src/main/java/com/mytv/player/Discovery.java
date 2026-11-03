@@ -24,13 +24,15 @@ public final class Discovery {
     public static final String TYPE = "_mytvplayer._tcp.";
 
     public static final class Device {
-        public final String name, ip;
+        public final String name, ip, pairCode;
         public final boolean tv;
 
         Device(String name, String ip, boolean tv) {
-            this.name = name;
-            this.ip = ip;
-            this.tv = tv;
+            this(name, ip, tv, "");
+        }
+        Device(String name, String ip, boolean tv, String pairCode) {
+            this.name = name; this.ip = ip; this.tv = tv;
+            this.pairCode = pairCode == null ? "" : pairCode;
         }
     }
 
@@ -64,6 +66,7 @@ public final class Discovery {
             info.setServiceName(deviceName(c));
             info.setServiceType(TYPE);
             info.setPort(RemoteService.PORT);
+            PairCode.setAttributes(info);   // embed pairing code in TXT record
             reg = new NsdManager.RegistrationListener() {
                 public void onRegistrationFailed(NsdServiceInfo s, int e) { }
                 public void onUnregistrationFailed(NsdServiceInfo s, int e) { }
@@ -100,7 +103,8 @@ public final class Discovery {
             }
             JSONObject o = new JSONObject(sb.toString());
             if (!"mytvplayer".equals(o.optString("app"))) return null;
-            return new Device(o.optString("name", ip), ip, o.optBoolean("tv", true));
+            return new Device(o.optString("name", ip), ip, o.optBoolean("tv", true),
+                    o.optString("code",""));   // pairing code from TV
         } catch (Exception e) {
             return null;
         } finally {
@@ -163,7 +167,16 @@ public final class Discovery {
                             if (s2.getHost() == null) return;
                             String ip = s2.getHost().getHostAddress();
                             if (ip == null || ip.equals(me) || ip.contains(":")) return;
-                            l.onFound(new Device(s2.getServiceName(), ip, true));
+                            // extract pairing code from NSD TXT record (Android 5+)
+                            String code = "";
+                            try {
+                                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+                                    java.util.Map<String,byte[]> attrs = s2.getAttributes();
+                                    if (attrs != null && attrs.containsKey("code"))
+                                        code = new String(attrs.get("code"), "UTF-8");
+                                }
+                            } catch (Exception ignored) {}
+                            l.onFound(new Device(s2.getServiceName(), ip, true, code));
                         }
                     });
                 } catch (Throwable ignored) {

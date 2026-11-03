@@ -506,7 +506,9 @@ public class MainActivity extends AppCompatActivity {
         if (Pair.enabled()) sb.append("🔐  PIN ").append(Pair.pin()).append("   ·   ");
         if (RemoteService.error != null) sb.append(RemoteService.error);
         else sb.append("📱  Control from your phone: install this same app on the phone (it finds this TV by itself), "
-                + "or open  http://").append(Net.ip()).append(":").append(RemoteService.PORT).append("  in a browser.");
+                + "Pair code: ").append(PairCode.formatted(PairCode.get()))
+                   .append("   (").append(PairCode.minutesLeft()).append(" min)")
+                   .append("   |   http://").append(Net.ip()).append(":").append(RemoteService.PORT);
 
         info.setText(UiKit.noEmoji(sb.toString()));
     }

@@ -115,10 +115,10 @@ public class ConnectActivity extends AppCompatActivity {
             }
         });
         root.addView(rescan, full());
-        Button manual = Ui.button(this, T.t("⌨  Enter TV address"), false);
+        Button manual = Ui.button(this, T.t("⌨  Pair with code"), false);
         manual.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                manual();
+                enterPairCode();
             }
         });
         root.addView(manual, full());
@@ -280,6 +280,75 @@ public class ConnectActivity extends AppCompatActivity {
     protected void onActivityResult(int req, int res, Intent data) {
         super.onActivityResult(req, res, data);
         WgVpn.onResult(this, req, res, data);
+    }
+
+    private void enterPairCode() {
+        final android.widget.EditText e = new android.widget.EditText(this);
+        e.setHint("ZH7-K2M");
+        e.setInputType(android.text.InputType.TYPE_CLASS_TEXT |
+                android.text.InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS |
+                android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        e.setTextSize(28);
+        e.setGravity(android.view.Gravity.CENTER);
+        e.setLetterSpacing(0.15f);
+        new UiDialog(this).setTitle("📺  " + T.t("Enter code from TV")).setView(e)
+                .setPositiveButton(T.t("Connect"), (d, w) -> {
+                    String code = e.getText().toString().trim()
+                            .replaceAll("[^A-Za-z0-9]","").toUpperCase(java.util.Locale.US);
+                    if (code.length() < 6) {
+                        UiKit.makeToast(this, T.t("Enter the 6-character code shown on your TV"), Toast.LENGTH_LONG).show();
+                        return;
+                    }
+                    UiKit.makeToast(this, T.t("Looking for TV…"), Toast.LENGTH_SHORT).show();
+                    final String finalCode = code;
+                    new Thread(() -> resolveCode(finalCode)).start();
+                })
+                .setNeutralButton(T.t("Enter IP instead"), (d, w) -> manual())
+                .setNegativeButton(T.t("Cancel"), null).show();
+    }
+
+    private void resolveCode(String code) {
+        // Phase 1: check already-discovered devices in memory
+        synchronized (found) {
+            for (Discovery.Device dev : found.values()) {
+                if (code.equalsIgnoreCase(dev.pairCode)) {
+                    main.post(() -> open(dev.ip, dev.name));
+                    return;
+                }
+            }
+        }
+        // Phase 2: full IP scan — ping every host and check its pairing code
+        String me = Net.ip();
+        int dot = me.lastIndexOf('.');
+        if (dot < 0) { main.post(() -> codeNotFound(code)); return; }
+        final String prefix = me.substring(0, dot + 1);
+        java.util.concurrent.ExecutorService ex =
+                java.util.concurrent.Executors.newFixedThreadPool(32);
+        final java.util.concurrent.atomic.AtomicBoolean ok =
+                new java.util.concurrent.atomic.AtomicBoolean(false);
+        for (int i = 1; i < 255; i++) {
+            final String ip = prefix + i;
+            if (ip.equals(me)) continue;
+            ex.execute(() -> {
+                if (ok.get()) return;
+                Discovery.Device dev = Discovery.ping(ip, 700);
+                if (dev != null && code.equalsIgnoreCase(dev.pairCode)
+                        && ok.compareAndSet(false, true)) {
+                    main.post(() -> open(dev.ip, dev.name));
+                }
+            });
+        }
+        ex.shutdown();
+        try { ex.awaitTermination(12, java.util.concurrent.TimeUnit.SECONDS); }
+        catch (InterruptedException ignored) {}
+        if (!ok.get()) main.post(() -> codeNotFound(code));
+    }
+
+    private void codeNotFound(String code) {
+        UiKit.makeToast(this,
+                T.t("No TV found with code") + " " + code + "\n" +
+                T.t("Make sure both devices are on the same Wi-Fi"),
+                Toast.LENGTH_LONG).show();
     }
 
     private void manual() {

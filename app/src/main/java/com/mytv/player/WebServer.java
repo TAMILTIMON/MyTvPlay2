@@ -364,7 +364,9 @@ public class WebServer extends NanoHTTPD {
 
                 case "/ping":
                     return json(new JSONObject().put("app", "mytvplayer").put("name", Discovery.deviceName(ctx))
-                            .put("tv", Ui.isTv(ctx)).put("ip", Net.ip()).put("share", Store.getBool("share_fs", false)).toString());
+                            .put("tv", Ui.isTv(ctx)).put("ip", Net.ip())
+                            .put("code", PairCode.get())  // pairing code — IP stays hidden from UI
+                            .put("share", Store.getBool("share_fs", false)).toString());
 
                 case "/livescreen": {
                     // the phone watches this TV live: it waits at its address + port with a one-time key

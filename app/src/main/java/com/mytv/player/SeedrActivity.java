@@ -257,10 +257,7 @@ public class SeedrActivity extends Activity {
             // show raw API response so we can see what field names Seedr actually uses
             String raw = SeedrApi.lastRaw;
             String preview = raw.length()>0 ? raw.substring(0,Math.min(400,raw.length())) : "no response";
-            addEmptyLabel("This folder is empty.
-
-API response keys:
-" + preview);
+            addEmptyLabel("This folder is empty.\n\nAPI response keys:\n" + preview);
             return;
         }
         for (SeedrApi.SeedrFile f : files) {
@@ -598,9 +595,7 @@ API response keys:
 
     private void showSetup() {
         new UiDialog(this).setTitle("☁  Seedr")
-                .setMessage("Connect your Seedr account to ZH Play.
-
-Choose a login method:")
+                .setMessage("Connect your Seedr account to ZH Play.\n\nChoose a login method:")
                 .setPositiveButton("📱 Sign in with code", (d,w) -> startDeviceLogin())
                 .setNeutralButton("✉ Email & Password",   (d,w) -> showEmailLogin())
                 .setNegativeButton("Cancel", null).show();
@@ -624,10 +619,7 @@ Choose a login method:")
         box.setPadding(dp(20), dp(8), dp(20), dp(8));
 
         TextView step = tv(13, 0xCCFFFFFF, false);
-        step.setText("1. Open on any browser:
-   " + dc.verifyUrl + "
-
-2. Enter this code:");
+        step.setText("1. Open on any browser:\n   " + dc.verifyUrl + "\n\n2. Enter this code:");
         box.addView(step);
 
         TextView code = tv(36, Ui.ACCENT, true);
