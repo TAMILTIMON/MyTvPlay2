@@ -62,7 +62,7 @@ public class SeedrActivity extends Activity {
         super.onCreate(b);
         getWindow().setStatusBarColor(0xFF0C1120);
         buildUi();
-        if (!SeedrApi.hasToken() && !SeedrApi.hasPat()) showSetup();
+        if (!SeedrApi.hasToken()) showSetup();
         else loadAccount();
     }
 
@@ -602,20 +602,17 @@ public class SeedrActivity extends Activity {
         EditText et=new EditText(this);
         et.setHint(T.t("Paste your Seedr token here"));
         et.setSingleLine(true);
-        if(SeedrApi.hasPat()) et.setText(SeedrApi.pat());
+        if(SeedrApi.hasToken()) et.setText(SeedrApi.pat());
         box.addView(et);
         new UiDialog(this).setTitle("☁  "+T.t("Connect to Seedr")).setView(box)
                 .setPositiveButton(T.t("Connect"),(d,w)->{
                     String tok=et.getText().toString().trim();
                     if(tok.isEmpty())return;
-                    // save as PAT; the API layer will exchange it for OAuth
                     SeedrApi.clearAll();
                     SeedrApi.savePat(tok);
                     showLoading(true);
                     new Thread(()->{
                         try {
-                            // first: try using PAT directly as access_token (some Seedr tokens work this way)
-                            SeedrApi.saveOAuth(tok,"");
                             SeedrApi.AccountInfo acc=SeedrApi.getAccount();
                             main.post(()->{
                                 showLoading(false);
@@ -628,25 +625,11 @@ public class SeedrActivity extends Activity {
                                 folderStack.clear(); currentTab=0; refreshTab();
                             });
                         } catch(Exception e){
-                            // try exchange via OAuth
-                            try {
+                            main.post(()->{
+                                showLoading(false);
+                                showError(e.getMessage());
                                 SeedrApi.clearAll();
-                                SeedrApi.savePat(tok);
-                                String oauth=SeedrApi.exchangePat();
-                                SeedrApi.AccountInfo acc2=SeedrApi.getAccount();
-                                main.post(()->{
-                                    showLoading(false);
-                                    Toast.makeText(this,"✅ "+T.t("Connected as")+" "+acc2.username,Toast.LENGTH_LONG).show();
-                                    usernameView.setText(acc2.username);
-                                    folderStack.clear(); currentTab=0; refreshTab();
-                                });
-                            } catch(Exception e2){
-                                main.post(()->{
-                                    showLoading(false);
-                                    showError(T.t("Token rejected")+": "+e2.getMessage()+"\n\nTry the 6-Hour Token from the Docs page.");
-                                    SeedrApi.clearAll();
-                                });
-                            }
+                            });
                         }
                     }).start();
                 })

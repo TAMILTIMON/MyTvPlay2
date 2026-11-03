@@ -2180,7 +2180,7 @@ public class BrowserActivity extends AppCompatActivity {
     }
 
     private void showMagnetMenu(final String u) {
-        boolean connected = SeedrApi.hasToken() || SeedrApi.hasPat();
+        boolean connected = SeedrApi.hasToken();
         String seedrLabel = connected
                 ? "☁  " + T.t("Send to Seedr") + "  ✓"
                 : "☁  " + T.t("Send to Seedr");
