@@ -565,8 +565,8 @@ public class PlayerActivity extends AppCompatActivity {
             }
         });
         progress = timeline;
-        // 48dp tall for easy finger/remote use; the bar itself is 2dp hairline via the insets
-        timeline.setMinimumHeight(dp(2));
+        // 48dp touch target; visible ~5–6 dp track (not a hairline)
+        timeline.setMinimumHeight(dp(48));
         LinearLayout.LayoutParams tlp2 = new LinearLayout.LayoutParams(0, dp(48), 1);
         tlp2.setMargins(0, -dp(4), 0, -dp(4));   // negative margin so time text centres nicely
         trow.addView(timeline, tlp2);
@@ -623,14 +623,15 @@ public class PlayerActivity extends AppCompatActivity {
         });
     }
 
-    /** Thumb: invisible at rest (just the bar shows); small dot on focus; big glowing on drag. */
+    /** Thumb: small visible accent dot at rest; larger glowing dot when focused/dragging. */
     private android.graphics.drawable.Drawable thumbDrawable(boolean big) {
         if (!big) {
-            // at rest: transparent (YouTube style — no dot until you touch)
+            // at rest: small solid accent dot so the timeline is always easy to see
             GradientDrawable d = new GradientDrawable();
             d.setShape(GradientDrawable.OVAL);
-            d.setColor(0x00000000);   // fully transparent
-            d.setSize(dp(2), dp(2));
+            d.setColor(Ui.ACCENT);
+            d.setStroke(dp(1), Color.WHITE);
+            d.setSize(dp(14), dp(14));
             return d;
         }
         // dragging: solid white dot with accent ring + outer glow
@@ -638,11 +639,11 @@ public class PlayerActivity extends AppCompatActivity {
         dot.setShape(GradientDrawable.OVAL);
         dot.setColor(Color.WHITE);
         dot.setStroke(dp(2), Ui.ACCENT);
-        dot.setSize(dp(18), dp(18));
+        dot.setSize(dp(20), dp(20));
         GradientDrawable glow = new GradientDrawable();
         glow.setShape(GradientDrawable.OVAL);
-        glow.setColor(0x33FFFFFF);
-        glow.setSize(dp(32), dp(32));
+        glow.setColor(0x44FFFFFF);
+        glow.setSize(dp(34), dp(34));
         android.graphics.drawable.LayerDrawable ld = new android.graphics.drawable.LayerDrawable(
                 new android.graphics.drawable.Drawable[]{glow, dot});
         int off = dp(7);
@@ -668,19 +669,19 @@ public class PlayerActivity extends AppCompatActivity {
 
     private android.graphics.drawable.Drawable progressDrawable() {
         GradientDrawable bg = new GradientDrawable();
-        bg.setColor(0x33FFFFFF);
-        bg.setCornerRadius(dp(3));
+        bg.setColor(0x55FFFFFF);          // a bit stronger so the track is visible on dark video
+        bg.setCornerRadius(dp(4));
         GradientDrawable fg = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
                 new int[]{Ui.ACCENT, Ui.ACCENT2});
-        fg.setCornerRadius(dp(3));
+        fg.setCornerRadius(dp(4));
         android.graphics.drawable.ClipDrawable clip = new android.graphics.drawable.ClipDrawable(fg,
                 Gravity.START, android.graphics.drawable.ClipDrawable.HORIZONTAL);
         android.graphics.drawable.LayerDrawable ld = new android.graphics.drawable.LayerDrawable(
                 new android.graphics.drawable.Drawable[]{bg, clip});
         ld.setId(0, android.R.id.background);
         ld.setId(1, android.R.id.progress);
-        // tall inset so the drawable clips to a 2 dp hairline inside the full-height touch area
-        int v2 = dp(14);   // (40dp touch height - 2dp bar) / 2 = 19dp top+bottom inset
+        // ~6 dp visible track inside the 48 dp touch area
+        int v2 = dp(21);   // (48 - 6) / 2 ≈ 21
         ld.setLayerInset(0, 0, v2, 0, v2);
         ld.setLayerInset(1, 0, v2, 0, v2);
         return ld;
