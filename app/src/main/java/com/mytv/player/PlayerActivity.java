@@ -681,7 +681,7 @@ public class PlayerActivity extends AppCompatActivity {
         ld.setId(0, android.R.id.background);
         ld.setId(1, android.R.id.progress);
         // ~6 dp visible track inside the 48 dp touch area
-        int v2 = dp(12);   // (48 - 6) / 2 ≈ 21
+        int v2 = dp(21);   // (48 - 6) / 2 ≈ 21
         ld.setLayerInset(0, 0, v2, 0, v2);
         ld.setLayerInset(1, 0, v2, 0, v2);
         return ld;

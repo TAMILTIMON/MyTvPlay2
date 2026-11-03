@@ -53,17 +53,31 @@ import java.util.concurrent.Executors;
 /**
  * Phone: presenter for PDF slides — or a whiteboard (no PDF) — on the TV / PC / a TV group.
  * Pinch to zoom (sharp on the big screen), two-finger pan, double-tap; tools: Laser · Pen · Highlighter · Eraser ·
- * Shapes (line, arrow, rectangle, circle, triangle) · Ruler (cm + angle) · Text (math symbols, formulas) · Spotlight · Move;
- * colours, sizes, undo / redo, clear page; each page keeps its own drawing; whiteboard papers and pages.
+ * Shapes (line, arrow, rectangle, circle, triangle) · Geometry (Ruler cm+angle · Protractor · Compass) ·
+ * Text (math symbols, formulas) · Spotlight · Move; colours, sizes, undo / redo, clear page;
+ * each page keeps its own drawing; whiteboard papers and pages.
  */
 public class PresentActivity extends AppCompatActivity {
     public static final String EXTRA_IP = "ip", EXTRA_BOARD = "board";
-    private static final int LASER = 0, PEN = 1, HL = 2, ERASE = 3, SHAPE = 4, RULER = 5, TEXT = 6, SPOT = 7, MOVE = 8;
+    private static final int LASER = 0, PEN = 1, HL = 2, ERASE = 3, SHAPE = 4, RULER = 5, TEXT = 6, SPOT = 7, MOVE = 8,
+            PROTRACTOR = 9, COMPASS = 10;
     private static final String[][] TOOLS = {{"🔴", "Laser"}, {"✏", "Pen"}, {"🖍", "Highlighter"}, {"🧽", "Eraser"}, {"⬜", "Shapes"},
-            {"📏", "Ruler"}, {"T", "Text"}, {"🔦", "Spotlight"}, {"✋", "Move"}};
+            {"📏", "Ruler"}, {"T", "Text"}, {"🔦", "Spotlight"}, {"✋", "Move"},
+            {"📐", "Protractor"}, {"⭕", "Compass"}};
     private static final int[] COLORS = {0xFFEF4444, 0xFFFACC15, 0xFF22C55E, 0xFF3B82F6, 0xFFFFFFFF, 0xFF111827};
-    private static final String[] SHAPES = {"line", "arrow", "rect", "oval", "tri"};
-    private static final String[] SHAPE_NAMES = {"Line", "Arrow", "Rectangle", "Circle", "Triangle"};
+    // Outline + filled variants (EZWrite-style) and extra polygons
+    private static final String[] SHAPES = {
+            "line", "arrow",
+            "rect", "rect_f", "oval", "oval_f", "tri", "tri_f",
+            "diamond", "diamond_f", "star", "star_f", "pent", "pent_f", "hex", "hex_f"
+    };
+    private static final String[] SHAPE_NAMES = {
+            "Line", "Arrow",
+            "Rectangle", "Rectangle (filled)", "Circle", "Circle (filled)", "Triangle", "Triangle (filled)",
+            "Diamond", "Diamond (filled)", "Star", "Star (filled)", "Pentagon", "Pentagon (filled)", "Hexagon", "Hexagon (filled)"
+    };
+    private static final String[] GEO_NAMES = {"Ruler (cm + angle)", "Protractor (degrees)", "Compass (circle)"};
+    private static final int[] GEO_TOOLS = {RULER, PROTRACTOR, COMPASS};
     private static final String[] SYMBOLS = {"²", "³", "√", "π", "θ", "α", "β", "γ", "Δ", "Σ", "∫", "∞", "±", "×", "÷", "≠", "≈", "≤", "≥",
             "°", "½", "→", "⇒", "∠", "⊥", "∥", "µ", "Ω", "λ"};
     private static final String[] FORMULAS = {"a² + b² = c²", "x = (−b ± √(b² − 4ac)) / 2a", "(a + b)² = a² + 2ab + b²",
@@ -400,8 +414,9 @@ public class PresentActivity extends AppCompatActivity {
     }
 
     // ---- the circle menu
+    // Ring slot 5 is "Geometry" (opens Ruler / Protractor / Compass picker) — not a direct tool index
     private static final String[][] RING = {{"🔴", "Laser"}, {"✏", "Pen"}, {"🖍", "Highlighter"}, {"🧽", "Eraser"}, {"⬜", "Shapes"},
-            {"📏", "Ruler"}, {"T", "Text"}, {"🔦", "Spotlight"}, {"✋", "Move"}, {"↶", "Undo"}, {"↷", "Redo"}, {"🧹", "Clear"}};
+            {"📐", "Geometry"}, {"T", "Text"}, {"🔦", "Spotlight"}, {"✋", "Move"}, {"↶", "Undo"}, {"↷", "Redo"}, {"🧹", "Clear"}};
 
     private void toggleRadial() {
         if (radial != null) {
@@ -428,24 +443,32 @@ public class PresentActivity extends AppCompatActivity {
         for (int i = 0; i < RING.length; i++) {
             final int k = i;
             double ang = -Math.PI / 2 + 2 * Math.PI * i / RING.length;
-            boolean isTool = i < TOOLS.length;
+            boolean isTool = i <= MOVE;   // ring slots 0–8 are tool slots (5 = Geometry)
+            boolean selected = isTool && (tool == i
+                    || (i == RULER && (tool == RULER || tool == PROTRACTOR || tool == COMPASS)));
             TextView b = Ui.text(this, i == TEXT ? 20 : 19, Color.WHITE, true);
             b.setText(RING[i][0]);
             b.setGravity(Gravity.CENTER);
             b.setContentDescription(T.t(RING[i][1]));
-            b.setBackground(Ui.card(this, isTool && tool == i ? 0xFF0E7490 : 0xF226262E, isTool && tool == i ? 0xFF22D3EE : 0x55FFFFFF, (int) (item / 2)));
+            b.setBackground(Ui.card(this, selected ? 0xFF0E7490 : 0xF226262E, selected ? 0xFF22D3EE : 0x55FFFFFF, (int) (item / 2)));
             b.setElevation(dp(8));
             b.setOnClickListener(v -> {
-                if (k < TOOLS.length) {
+                // First 9 ring slots map to tools 0–8, except 4=Shapes picker and 5=Geometry picker
+                if (k <= MOVE) {
                     if (k == SHAPE) {
                         toggleRadial();
                         pickShape();
                         return;
                     }
+                    if (k == RULER) {   // ring label is "Geometry"
+                        toggleRadial();
+                        pickGeometry();
+                        return;
+                    }
                     setTool(k);
                     toggleRadial();
-                } else if (k == TOOLS.length) undo();
-                else if (k == TOOLS.length + 1) redo();
+                } else if (k == MOVE + 1) undo();
+                else if (k == MOVE + 2) redo();
                 else clearPage();
             });
             place(b, cx + (float) (R1 * Math.cos(ang)), cy + (float) (R1 * Math.sin(ang)), item);
@@ -545,11 +568,17 @@ public class PresentActivity extends AppCompatActivity {
         }).show();
     }
 
+    /** EZWrite-style geometry tools: Ruler · Protractor · Compass. */
+    private void pickGeometry() {
+        new UiDialog(this).setTitle(T.t("Geometry")).setItems(tr(GEO_NAMES), (d, w) -> setTool(GEO_TOOLS[w])).show();
+    }
+
     /** The round button shows the tool, in the pen colour. */
     private void paintOpts() {
         if (fab == null) return;
-        fab.setText(TOOLS[tool][0]);
-        boolean ink = tool == PEN || tool == HL || tool == SHAPE || tool == RULER || tool == TEXT;
+        fab.setText(TOOLS[Math.min(tool, TOOLS.length - 1)][0]);
+        boolean ink = tool == PEN || tool == HL || tool == SHAPE || tool == RULER
+                || tool == PROTRACTOR || tool == COMPASS || tool == TEXT;
         fab.setBackground(Ui.card(this, 0xF226262E, ink ? color : 0xFF22D3EE, dp(29)));
         if (paperBtn != null) paperBtn.setText("📄 " + T.t("Paper") + ": "
                 + T.t(InkDraw.PAPER_NAMES[Math.max(0, java.util.Arrays.asList(InkDraw.PAPERS).indexOf(paper))]));
@@ -944,7 +973,9 @@ public class PresentActivity extends AppCompatActivity {
             case PEN:
             case HL: stroke(a, f); break;
             case SHAPE:
-            case RULER: shape(a, f); break;
+            case RULER:
+            case PROTRACTOR:
+            case COMPASS: shape(a, f); break;
             case ERASE: erase(f); break;
             case TEXT:
                 if (a == MotionEvent.ACTION_DOWN) {
@@ -1061,7 +1092,11 @@ public class PresentActivity extends AppCompatActivity {
     private void shape(int a, float[] f) {
         try {
             if (a == MotionEvent.ACTION_DOWN) {
-                drawing = newEl(tool == RULER ? "ruler" : shape);
+                String t = tool == RULER ? "ruler"
+                        : tool == PROTRACTOR ? "protractor"
+                        : tool == COMPASS ? "compass"
+                        : shape;
+                drawing = newEl(t);
                 drawing.put("p", new JSONArray().put(r4(f[0])).put(r4(f[1])).put(r4(f[0])).put(r4(f[1])));
                 pageInk(page).put(drawing.getString("id"), drawing);
             } else if (drawing != null) {
