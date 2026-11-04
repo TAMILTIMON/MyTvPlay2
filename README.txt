@@ -1,3 +1,14 @@
+ZH PLAY 6.9 — Send to Seedr adds directly (no website)
+=====================================================
+* Seedr moved adding to its REST API: POST https://www.seedr.cc/rest/torrent/magnet
+  (field "magnet", Bearer sign-in token). The old oauth_test add_torrent now answers 404 for
+  every link — that was the error all along. Confirmed by a current open-source Seedr client.
+* ZH Play now adds there with the sign-in it already has: one tap on a magnet → added.
+  No folder_id for the top folder (the REST route 404s on the old "-1").
+* Not signed in? The Seedr screen opens, you sign in once, and the link is added right after.
+* The seedr.cc website route stays only as a last resort if the REST call itself fails.
+* Request verified on a local test server: path, Bearer header, form body, magnet intact.
+
 ZH PLAY 6.8.1 — seedr.cc add: confirms or explains every time
 =============================================================
 * The seedr.cc add script now watches the site's own network calls and only says "Added" when

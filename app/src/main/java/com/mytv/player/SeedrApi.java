@@ -13,6 +13,7 @@ import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -46,6 +47,8 @@ public final class SeedrApi {
     }
 
     private static final String RESOURCE = "https://www.seedr.cc/oauth_test/resource.php";
+    /** Seedr's REST API: adding torrents moved here (the legacy add_torrent now answers 404). */
+    private static final String REST = "https://www.seedr.cc/rest";
     private static final String TOKEN_URL = "https://www.seedr.cc/oauth_test/token.php";
     private static final String DEVICE_CODE_URL = "https://www.seedr.cc/api/device/code";
     private static final String DEVICE_AUTH_URL = "https://www.seedr.cc/api/device/authorize";
@@ -300,26 +303,35 @@ public final class SeedrApi {
 
     // ------------------------------------------------------------------ adding
 
-    /** Add a magnet link, or an http(s) link to a .torrent file (downloaded here and uploaded). */
+    /**
+     * Add a magnet link or an http(s) .torrent link — the same call Seedr's own browser extension uses:
+     * POST https://www.seedr.cc/rest/torrent/magnet, "magnet=<link>", Bearer sign-in token.
+     * (Seedr retired the old resource.php add_torrent: it answers 404 for every link.)
+     * No folder_id for the top folder — the REST route 404s on the old "-1".
+     */
     public static AddResult addMagnet(String link) throws Exception {
         link = link.trim();
-        if (link.startsWith("http") && !link.startsWith("magnet:")) {
-            Map<String, String> f = new LinkedHashMap<>();
-            f.put("folder_id", "-1");
-            return addResult(api("POST", "add_torrent", f, download(link)));
-        }
-        // Seedr's API can refuse magnets its website accepts — e.g. hybrid v1+v2 links with a second
-        // "xt=urn:btmh:" hash, or very long tracker lists. The v1 info-hash alone names the same
-        // torrent, so if the full link is refused, try simpler forms of the same link.
         AddResult last = null;
-        for (String m : magnetVariants(link)) {
+        List<String> tries = link.startsWith("magnet:") ? magnetVariants(link) : Collections.singletonList(link);
+        for (String m : tries) {
             Map<String, String> f = new LinkedHashMap<>();
-            f.put("torrent_magnet", m);
-            f.put("folder_id", "-1");
-            last = addResult(api("POST", "add_torrent", f, null));
+            f.put("magnet", m);
+            last = addResult(rest("/torrent/magnet", f));
             if (last.ok || !last.retry) return last;
         }
         return last;
+    }
+
+    /** A Bearer-token POST to Seedr's REST API; renews the sign-in once if it expired. */
+    private static JSONObject rest(String path, Map<String, String> form) throws Exception {
+        String tok = Store.getStr(K_ACCESS, "");
+        if (tok.isEmpty()) throw new Exception(T.t("Not signed in to Seedr"));
+        JSONObject r = request("POST", REST + path, null, form, null, tok);
+        if (r.optInt("status_code", 0) == 401 || "expired_token".equals(r.optString("error", ""))) {
+            if (!renew()) throw new Exception(T.t("Seedr sign-in expired — sign in again in Seedr ⚙"));
+            r = request("POST", REST + path, null, form, null, Store.getStr(K_ACCESS, ""));
+        }
+        return r;
     }
 
     /** The link as given, then without the v2 hash, then hash + name (+ a few trackers), then the bare hash. */
@@ -364,7 +376,12 @@ public final class SeedrApi {
     private static AddResult addResult(JSONObject r) {
         AddResult a = new AddResult();
         Object res = r.opt("result");
-        a.ok = Boolean.TRUE.equals(res) || "true".equals(String.valueOf(res));
+        Object suc = r.opt("success");
+        boolean httpOk = r.optInt("status_code", 200) < 400;
+        a.ok = httpOk && r.optString("error", "").isEmpty()
+                && (Boolean.TRUE.equals(res) || "true".equals(String.valueOf(res))
+                || Boolean.TRUE.equals(suc) || "true".equals(String.valueOf(suc)) || "1".equals(String.valueOf(suc))
+                || r.optLong("user_torrent_id", 0) > 0);
         a.title = r.optString("title", "");
         if (a.ok) {
             a.msg = "☁ " + T.t("Added to Seedr") + (a.title.isEmpty() ? "" : ": " + a.title);
@@ -520,6 +537,11 @@ public final class SeedrApi {
 
     private static JSONObject request(String method, String url, Map<String, String> query, Map<String, String> form,
                                       byte[] torrentFile) throws Exception {
+        return request(method, url, query, form, torrentFile, null);
+    }
+
+    private static JSONObject request(String method, String url, Map<String, String> query, Map<String, String> form,
+                                      byte[] torrentFile, String bearer) throws Exception {
         StringBuilder u = new StringBuilder(url);
         if (query != null && !query.isEmpty()) u.append(url.contains("?") ? '&' : '?').append(encode(query));
         HttpURLConnection c = (HttpURLConnection) new URL(u.toString()).openConnection();
@@ -528,6 +550,7 @@ public final class SeedrApi {
         c.setRequestMethod(method);
         c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android) ZHPlay");
         c.setRequestProperty("Accept", "application/json");
+        if (bearer != null) c.setRequestProperty("Authorization", "Bearer " + bearer);
         if ("POST".equals(method)) {
             c.setDoOutput(true);
             byte[] body;

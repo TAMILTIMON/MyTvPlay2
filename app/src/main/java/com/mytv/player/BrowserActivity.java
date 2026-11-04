@@ -2203,8 +2203,8 @@ public class BrowserActivity extends AppCompatActivity {
                 "📂  " + T.t("Open Seedr")
             }, (d2, w) -> {
                 if (w == 0) {
-                    if (!signedIn) {                 // add on seedr.cc (website login), no app sign-in needed
-                        sendToSeedr(u);
+                    if (!signedIn) {                 // sign in once in the Seedr screen; the link is added right after
+                        SeedrActivity.open(this, u);
                         return;
                     }
                     UiKit.makeToast(this, "☁ " + T.t("Sending to Seedr…"), Toast.LENGTH_SHORT).show();
