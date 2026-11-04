@@ -2266,51 +2266,131 @@ public class BrowserActivity extends AppCompatActivity {
         UiKit.makeToast(this, "☁ " + T.t("Adding on seedr.cc…"), Toast.LENGTH_SHORT).show();
     }
 
-    /** seedr.cc's add box script: fills "Paste link URL Here" and presses its + button (React-safe). */
+    /**
+     * seedr.cc add script: fills the site's "Paste link URL Here" box and presses its add control
+     * (falls back to Enter / form submit / nearby buttons), while watching the site's own network
+     * calls to confirm it really sent its add request (POST …/task) and what seedr.cc answered.
+     * Result in window.__zhR = {state: working|sent|nothing|noinput, input, tries[], task{url,status,resp}}.
+     * Source + tests: tested against mock pages (icon +, Enter-only, form-only, no reaction, signed out).
+     */
     private static final String SEEDR_ADD_JS =
-            "(function(m){var tries=0;window.__zhSeedr='working';"
-            + "function setVal(i,v){var d=Object.getOwnPropertyDescriptor(Object.getPrototypeOf(i),'value');"
-            + "if(d&&d.set)d.set.call(i,v);else i.value=v;"
-            + "i.dispatchEvent(new Event('input',{bubbles:true}));i.dispatchEvent(new Event('change',{bubbles:true}));}"
-            + "function find(){var c=document.querySelectorAll('input,textarea');for(var k=0;k<c.length;k++){var e=c[k];"
-            + "if(e.type==='hidden'||e.type==='checkbox'||e.offsetParent===null)continue;"
-            + "var h=((e.placeholder||'')+' '+(e.name||'')+' '+(e.id||'')+' '+(e.getAttribute('aria-label')||'')).toLowerCase();"
-            + "if(/search|mail|pass|user/.test(h))continue;"
-            + "if(/magnet|torrent|paste|link|url/.test(h))return e;}return null;}"
-            + "function label(b){var cn=b.className;cn=(cn&&cn.baseVal!==undefined)?cn.baseVal:(cn||'');"
-            + "return ((b.textContent||'').trim()+' '+(b.getAttribute('title')||'')+' '+(b.getAttribute('aria-label')||'')+' '+cn).toLowerCase().trim();}"
-            + "function addButton(i){var p=i.parentElement;for(var lv=0;lv<4&&p;lv++,p=p.parentElement){"
-            + "var bs=p.querySelectorAll('button,a,[role=button],i,span,svg,div');for(var j=0;j<bs.length;j++){var b=bs[j];"
-            + "if(b===i||b.contains(i))continue;var t=label(b);if(t.length>40||/folder|clear|close|search|upload/.test(t))continue;"
-            + "if(/^\\+$|\\badd\\b|plus|submit/.test(t))return (b.closest&&b.closest('button,a,[role=button]'))||b;}}return null;}"
-            + "function go(){var i=find();if(!i){if(++tries<40)return setTimeout(go,500);window.__zhSeedr='noinput';return;}"
-            + "i.focus();setVal(i,m);setTimeout(function(){var b=addButton(i);"
-            + "if(b){b.click();window.__zhSeedr='clicked';}"
-            + "else{['keydown','keypress','keyup'].forEach(function(t){i.dispatchEvent(new KeyboardEvent(t,{key:'Enter',code:'Enter',keyCode:13,which:13,bubbles:true}));});"
-            + "window.__zhSeedr='entered';}},500);}"
-            + "go();})";
+            "(function (m) { var R = window.__zhR = { state: 'working', input: '', tries: [], task: null, page: location.hr"
+            + "ef }; function fdStr(f) { var a = []; try { f.forEach(function (v, k) { a.push(k + '=' + String(v).slice(0, 80"
+            + ")); }); } catch (e) {} return a.join('&'); } function bodyStr(b) { if (b == null) return ''; if (typeof b === "
+            + "'string') return b.slice(0, 300); if (typeof FormData !== 'undefined' && b instanceof FormData) return fdStr(b"
+            + ").slice(0, 300); if (typeof URLSearchParams !== 'undefined' && b instanceof URLSearchParams) return b.toString"
+            + "().slice(0, 300); return '[' + typeof b + ']'; } var WATCH = /\\/task|torrent|magnet/i; if (!window.__zhHooked)"
+            + " { window.__zhHooked = 1; var oOpen = XMLHttpRequest.prototype.open, oSend = XMLHttpRequest.prototype.send; XM"
+            + "LHttpRequest.prototype.open = function (meth, url) { this.__zu = String(url); this.__zm = meth; return oOpen.a"
+            + "pply(this, arguments); }; XMLHttpRequest.prototype.send = function (b) { var x = this; if (WATCH.test(x.__zu |"
+            + "| '') && x.__zm && String(x.__zm).toUpperCase() !== 'GET') { var rec = { url: x.__zu, method: x.__zm, body: bo"
+            + "dyStr(b) }; window.__zhR.task = rec; window.__zhR.state = 'sent'; x.addEventListener('loadend', function () { "
+            + "rec.status = x.status; rec.resp = String(x.responseText || '').slice(0, 300); }); } return oSend.apply(this, a"
+            + "rguments); }; if (window.fetch) { var oFetch = window.fetch; window.fetch = function (u, o) { var url = typeof"
+            + " u === 'string' ? u : (u && u.url) || ''; var meth = (o && o.method) || (u && u.method) || 'GET'; var p = oFet"
+            + "ch.apply(this, arguments); if (WATCH.test(url) && String(meth).toUpperCase() !== 'GET') { var rec = { url: url"
+            + ", method: meth, body: bodyStr(o && o.body) }; window.__zhR.task = rec; window.__zhR.state = 'sent'; p.then(fun"
+            + "ction (r) { rec.status = r.status; return r.clone().text().then(function (t) { rec.resp = t.slice(0, 300); });"
+            + " }) .catch(function (e) { rec.status = 'ERR ' + e; }); } return p; }; } } function setVal(i, v) { var d = Obje"
+            + "ct.getOwnPropertyDescriptor(Object.getPrototypeOf(i), 'value'); if (d && d.set) d.set.call(i, v); else i.value"
+            + " = v; i.dispatchEvent(new Event('input', { bubbles: true })); i.dispatchEvent(new Event('change', { bubbles: t"
+            + "rue })); i.dispatchEvent(new KeyboardEvent('keyup', { key: 'v', bubbles: true })); } function visible(e) { ret"
+            + "urn e.offsetParent !== null || e.getClientRects().length > 0; } function find() { var c = document.querySelect"
+            + "orAll('input,textarea'); for (var k = 0; k < c.length; k++) { var e = c[k]; if (e.type === 'hidden' || e.type "
+            + "=== 'checkbox' || e.type === 'radio' || !visible(e)) continue; var h = ((e.placeholder || '') + ' ' + (e.name "
+            + "|| '') + ' ' + (e.id || '') + ' ' + (e.getAttribute('aria-label') || '')).toLowerCase(); if (/search|mail|pass"
+            + "|user|name/.test(h) && !/link|url|magnet|torrent/.test(h)) continue; if (/magnet|torrent|paste|link|url/.test("
+            + "h)) return e; } return null; } function label(b) { var cn = b.className; cn = (cn && cn.baseVal !== undefined)"
+            + " ? cn.baseVal : (cn || ''); return ((b.textContent || '').trim() + ' ' + (b.getAttribute('title') || '') + ' '"
+            + " + (b.getAttribute('aria-label') || '') + ' ' + cn).toLowerCase().trim(); } function describe(e) { if (!e) ret"
+            + "urn 'none'; var cn = e.className; cn = (cn && cn.baseVal !== undefined) ? cn.baseVal : (cn || ''); return '<' "
+            + "+ e.tagName.toLowerCase() + (e.id ? '#' + e.id : '') + (cn ? '.' + String(cn).trim().split(/\\s+/).join('.') : "
+            + "'') + '> \"' + (e.textContent || e.placeholder || '').trim().slice(0, 20) + '\"'; } function candidates(i) { var"
+            + " plus = [], other = [], seen = []; var p = i.parentElement; for (var lv = 0; lv < 4 && p; lv++, p = p.parentEl"
+            + "ement) { var bs = p.querySelectorAll('button,a,[role=button],i,span,svg,div,label,input[type=submit],input[typ"
+            + "e=button]'); for (var j = 0; j < bs.length; j++) { var b = bs[j]; if (b === i || b.contains(i)) continue; var "
+            + "t = label(b); if (t.length > 40 || /folder|clear|close|search|upload|delete|remove|logout|menu/.test(t)) conti"
+            + "nue; var target = (b.closest && b.closest('button,a,[role=button]')) || b; if (seen.indexOf(target) >= 0) cont"
+            + "inue; seen.push(target); if (/^\\+$|\\badd\\b|plus|submit|\\u271a|\\u2795/.test(t)) plus.push(target); else if (/^("
+            + "button|a)$/i.test(target.tagName) || target.getAttribute('role') === 'button') other.push(target); } } return "
+            + "plus.concat(other.slice(0, 3)); } function press(el) { ['pointerdown', 'mousedown', 'pointerup', 'mouseup'].fo"
+            + "rEach(function (t) { try { el.dispatchEvent(new MouseEvent(t, { bubbles: true, cancelable: true, view: window "
+            + "})); } catch (e) {} }); el.click(); } function enter(i) { ['keydown', 'keypress', 'keyup'].forEach(function (t"
+            + ") { i.dispatchEvent(new KeyboardEvent(t, { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true,"
+            + " cancelable: true })); }); } var tries = 0; function go() { var i = find(); if (!i) { if (++tries < 40) return"
+            + " setTimeout(go, 500); R.state = 'noinput'; return; } R.input = describe(i); i.focus(); setVal(i, m); var steps"
+            + " = []; candidates(i).forEach(function (b) { steps.push({ name: 'click ' + describe(b), run: function () { pres"
+            + "s(b); } }); }); steps.splice(Math.min(1, steps.length), 0, { name: 'Enter key', run: function () { enter(i); }"
+            + " }); if (i.form) steps.push({ name: 'form submit', run: function () { i.form.requestSubmit ? i.form.requestSub"
+            + "mit() : i.form.submit(); } }); var k = 0; function next() { if (R.task) { R.state = 'sent'; return; } if (k >="
+            + " steps.length) { R.state = 'nothing'; return; } if (i.value !== m) setVal(i, m); R.tries.push(steps[k].name); "
+            + "try { steps[k].run(); } catch (e) { R.tries.push('error: ' + e); } k++; setTimeout(next, 2500); } setTimeout(n"
+            + "ext, 400); } go(); })";
 
     private void injectMagnetToSeedr(final String magnet) {
         final WebView w = web;
         if (w == null) return;
         w.evaluateJavascript(SEEDR_ADD_JS + "(" + org.json.JSONObject.quote(magnet) + ");", null);
-        // report what happened once the page had time to load its add box (polls up to 20 s)
-        final int[] checks = {0};
+        final long start = System.currentTimeMillis();
         main.postDelayed(new Runnable() {
             @Override
             public void run() {
-                w.evaluateJavascript("window.__zhSeedr||''", v -> {
-                    String st = v == null ? "" : v.replace("\"", "");
-                    if ("working".equals(st) && ++checks[0] < 12) {
-                        main.postDelayed(this, 2000);
-                    } else if ("clicked".equals(st) || "entered".equals(st)) {
-                        UiKit.makeToast(BrowserActivity.this, "☁ " + T.t("Added on seedr.cc — it appears in Seedr → Transfers"), Toast.LENGTH_LONG).show();
-                    } else if ("noinput".equals(st)) {
-                        UiKit.makeToast(BrowserActivity.this, T.t("Sign in to seedr.cc in this tab once, then send the link again (it is copied — you can also paste it in “Paste link URL”)"), Toast.LENGTH_LONG).show();
+                w.evaluateJavascript("JSON.stringify(window.__zhR||{})", v -> {
+                    org.json.JSONObject r;
+                    try {
+                        Object o = new org.json.JSONTokener(v == null ? "\"{}\"" : v).nextValue();
+                        r = new org.json.JSONObject(o instanceof String ? (String) o : "{}");
+                    } catch (Exception e) {
+                        r = new org.json.JSONObject();
+                    }
+                    String state = r.optString("state", "");
+                    org.json.JSONObject task = r.optJSONObject("task");
+                    boolean timeUp = System.currentTimeMillis() - start > 45_000;
+                    if (task != null && task.has("status")) {
+                        seedrReport(r, task);
+                    } else if (("working".equals(state) || "sent".equals(state) || state.isEmpty()) && !timeUp) {
+                        main.postDelayed(this, 2000);           // still trying, or waiting for seedr.cc's answer
+                    } else {
+                        seedrReport(r, task);
                     }
                 });
             }
-        }, 2500);
+        }, 2000);
+    }
+
+    /** Tell the user what seedr.cc really did with the link. */
+    private void seedrReport(org.json.JSONObject r, org.json.JSONObject task) {
+        String state = r.optString("state", "");
+        if (task != null && task.has("status")) {
+            int code = task.optInt("status", 0);
+            String resp = task.optString("resp", "");
+            boolean refused = resp.contains("\"result\":false") || resp.contains("\"error\"");
+            if (code >= 200 && code < 300 && !refused) {
+                UiKit.makeToast(this, "☁ " + T.t("Added to Seedr ✓ — it appears in Seedr → Transfers"), Toast.LENGTH_LONG).show();
+                return;
+            }
+            new UiDialog(this).setTitle("☁ seedr.cc")
+                    .setMessage(T.t("seedr.cc answered:") + " HTTP " + code + "\n\n" + resp
+                            + "\n\n" + T.t("(Free plan: one download at a time, and limited space.)"))
+                    .setPositiveButton(T.t("OK"), null).show();
+            return;
+        }
+        if ("noinput".equals(state)) {
+            new UiDialog(this).setTitle("☁ seedr.cc")
+                    .setMessage(T.t("Sign in to seedr.cc in this tab once (ZH Browser keeps you signed in), then send the link again. The link is copied — you can also paste it in “Paste link URL Here”."))
+                    .setPositiveButton(T.t("OK"), null).show();
+            return;
+        }
+        // the box was filled but seedr.cc never sent its add request: show exactly what was tried
+        org.json.JSONArray tries = r.optJSONArray("tries");
+        StringBuilder sb = new StringBuilder();
+        sb.append(T.t("seedr.cc did not react. The link is copied — tap + next to “Paste link URL Here” yourself.")).append("\n\n");
+        sb.append(T.t("Report (send a screenshot of this to fix it):")).append("\n");
+        sb.append("page: ").append(r.optString("page")).append("\n");
+        sb.append("box: ").append(r.optString("input", "?")).append("\n");
+        if (tries != null) for (int i = 0; i < tries.length(); i++) sb.append("• ").append(tries.optString(i)).append("\n");
+        new UiDialog(this).setTitle("☁ seedr.cc").setMessage(sb.toString())
+                .setPositiveButton(T.t("OK"), null).show();
     }
 
     private void go(String text) {

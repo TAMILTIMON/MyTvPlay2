@@ -1,3 +1,14 @@
+ZH PLAY 6.8.1 — seedr.cc add: confirms or explains every time
+=============================================================
+* The seedr.cc add script now watches the site's own network calls and only says "Added" when
+  seedr.cc really sent its add request (POST …/task) and answered OK.
+* If the + click doesn't trigger the site it tries, in order: + / add controls → Enter key →
+  form submit → nearby buttons, stopping as soon as the site sends its request.
+* If seedr.cc refuses (free plan: 1 download at a time / no space) its exact answer is shown.
+* If nothing triggers the site, a report shows the page, the box found and every step tried.
+* Tested on mock pages (icon +, Enter-only, form-only, no reaction, signed out); the script
+  embedded in the app is byte-identical to the tested one.
+
 ZH PLAY 6.8 — Send to Seedr adds through seedr.cc itself
 ========================================================
 * Found with DevTools: seedr.cc adds torrents with POST /api/v0.1/task (+ CSRF, website login).
