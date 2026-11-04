@@ -1,3 +1,10 @@
+ZH PLAY 6.7.1 — Seedr accepts hybrid (v1+v2) magnets
+====================================================
+* Magnets with two hashes (xt=urn:btih + xt=urn:btmh, BitTorrent v2 hybrids — common on 1TamilMV)
+  were refused by Seedr's app API (404) though seedr.cc accepts them. ZH Play now retries with
+  simpler forms of the same torrent: without the v2 hash → hash + name + 5 trackers → hash + name
+  → bare hash. Stops early on definite answers (queue full, no space, already added).
+
 ZH PLAY 6.7 — Browser tabs restored · Seedr rebuilt on Seedr's real protocol
 ============================================================================
 BROWSER

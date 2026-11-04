@@ -118,6 +118,7 @@ public final class SeedrApi {
 
     public static class AddResult {
         public boolean ok;
+        boolean retry;
         public String msg = "", title = "";
     }
 
@@ -300,18 +301,65 @@ public final class SeedrApi {
     /** Add a magnet link, or an http(s) link to a .torrent file (downloaded here and uploaded). */
     public static AddResult addMagnet(String link) throws Exception {
         link = link.trim();
-        JSONObject r;
         if (link.startsWith("http") && !link.startsWith("magnet:")) {
-            byte[] torrent = download(link);
             Map<String, String> f = new LinkedHashMap<>();
             f.put("folder_id", "-1");
-            r = api("POST", "add_torrent", f, torrent);
-        } else {
-            Map<String, String> f = new LinkedHashMap<>();
-            f.put("torrent_magnet", link);
-            f.put("folder_id", "-1");
-            r = api("POST", "add_torrent", f, null);
+            return addResult(api("POST", "add_torrent", f, download(link)));
         }
+        // Seedr's API can refuse magnets its website accepts — e.g. hybrid v1+v2 links with a second
+        // "xt=urn:btmh:" hash, or very long tracker lists. The v1 info-hash alone names the same
+        // torrent, so if the full link is refused, try simpler forms of the same link.
+        AddResult last = null;
+        for (String m : magnetVariants(link)) {
+            Map<String, String> f = new LinkedHashMap<>();
+            f.put("torrent_magnet", m);
+            f.put("folder_id", "-1");
+            last = addResult(api("POST", "add_torrent", f, null));
+            if (last.ok || !last.retry) return last;
+        }
+        return last;
+    }
+
+    /** The link as given, then without the v2 hash, then hash + name (+ a few trackers), then the bare hash. */
+    static List<String> magnetVariants(String magnet) {
+        List<String> out = new ArrayList<>();
+        out.add(magnet);
+        String q = magnet.indexOf('?') >= 0 ? magnet.substring(magnet.indexOf('?') + 1) : "";
+        String btih = null, dn = null;
+        List<String> keep = new ArrayList<>(), trackers = new ArrayList<>();
+        for (String part : q.split("&")) {
+            if (part.isEmpty()) continue;
+            String low = part.toLowerCase(Locale.US);
+            if (low.startsWith("xt=urn:btih:")) btih = part.substring(12);
+            else if (low.startsWith("xt=urn:btmh:")) continue;           // BitTorrent v2 hash
+            else if (low.startsWith("dn=")) dn = part.substring(3);
+            else if (low.startsWith("tr=")) trackers.add(part);
+            if (!low.startsWith("xt=urn:btmh:")) keep.add(part);
+        }
+        if (btih == null) return out;                                     // not a normal v1 magnet: send as is
+        String noV2 = "magnet:?" + TextUtils_join("&", keep);
+        if (!noV2.equals(magnet)) out.add(noV2);
+        StringBuilder small = new StringBuilder("magnet:?xt=urn:btih:").append(btih);
+        if (dn != null) small.append("&dn=").append(dn);
+        for (int i = 0; i < Math.min(5, trackers.size()); i++) small.append('&').append(trackers.get(i));
+        if (!out.contains(small.toString())) out.add(small.toString());
+        String bare = "magnet:?xt=urn:btih:" + btih + (dn != null ? "&dn=" + dn : "");
+        if (!out.contains(bare)) out.add(bare);
+        String hashOnly = "magnet:?xt=urn:btih:" + btih;
+        if (!out.contains(hashOnly)) out.add(hashOnly);
+        return out;
+    }
+
+    private static String TextUtils_join(String sep, List<String> parts) {
+        StringBuilder sb = new StringBuilder();
+        for (String p : parts) {
+            if (sb.length() > 0) sb.append(sep);
+            sb.append(p);
+        }
+        return sb.toString();
+    }
+
+    private static AddResult addResult(JSONObject r) {
         AddResult a = new AddResult();
         Object res = r.opt("result");
         a.ok = Boolean.TRUE.equals(res) || "true".equals(String.valueOf(res));
@@ -319,6 +367,10 @@ public final class SeedrApi {
         if (a.ok) {
             a.msg = "☁ " + T.t("Added to Seedr") + (a.title.isEmpty() ? "" : ": " + a.title);
         } else {
+            String why = (String.valueOf(res) + " " + r.optString("error", "")).toLowerCase(Locale.US);
+            // a definite answer about the account (queue full, no space, already there, signed out): don't retry
+            a.retry = !(why.contains("queue_full") || why.contains("not_enough_space") || why.contains("already")
+                    || why.contains("exists") || why.contains("access_denied") || r.optInt("status_code", 0) == 401);
             a.msg = explainAdd(r);
         }
         return a;
@@ -342,7 +394,7 @@ public final class SeedrApi {
         }
         if (s.contains("already") || s.contains("exists")) return T.t("This torrent is already in your Seedr.");
         if (status == 404) {
-            return T.t("Seedr refused the link (404). The magnet may be broken or not a real torrent link — open the page and copy the magnet again.");
+            return T.t("Seedr's app connection refused this link, even in simpler forms. Tap “Add on seedr.cc” to add it on the website instead.");
         }
         if (status == 401 || s.contains("access_denied")) return T.t("Seedr sign-in expired — sign in again in Seedr ⚙");
         return T.t("Seedr did not add it") + " — " + shortRaw();
