@@ -388,8 +388,39 @@ public class SeedrActivity extends Activity {
     // ================================================================== ACTIONS
 
     private void onFileTap(SeedrApi.SeedrFile f) {
-        if (f.isFolder) { loadFolder(f.id, f.name); return; }
-        // fetch streaming URL then offer play options
+        if (f.isFolder) {
+            // Check if folder name has a video extension — Seedr wraps single-file torrents as folders
+            String low = f.name.toLowerCase(Locale.US);
+            boolean looksLikeVideo = low.matches(".*\.(mkv|mp4|avi|mov|m4v|webm|ts|flv|m2ts)$");
+            if (looksLikeVideo) {
+                // Try to list files inside; if there is exactly one file, play it directly
+                showLoading(true);
+                new Thread(() -> {
+                    try {
+                        List<SeedrApi.SeedrFile> inside = SeedrApi.listFolder(f.id);
+                        // find the first playable file inside
+                        SeedrApi.SeedrFile playable = null;
+                        for (SeedrApi.SeedrFile fi : inside) {
+                            if (!fi.isFolder && !fi.isTorrent) { playable = fi; break; }
+                        }
+                        final SeedrApi.SeedrFile toPlay = playable;
+                        if (toPlay != null) {
+                            String url = SeedrApi.fetchFileUrl(toPlay.id);
+                            main.post(() -> { showLoading(false); offerPlay(url, toPlay.name.isEmpty() ? f.name : toPlay.name); });
+                        } else {
+                            // no file inside — browse the folder
+                            main.post(() -> { showLoading(false); loadFolder(f.id, f.name); });
+                        }
+                    } catch (Exception e) {
+                        main.post(() -> { showLoading(false); showError(e.getMessage()); });
+                    }
+                }).start();
+            } else {
+                loadFolder(f.id, f.name);
+            }
+            return;
+        }
+        // regular file — fetch URL
         showLoading(true);
         new Thread(() -> {
             try {
@@ -405,22 +436,51 @@ public class SeedrActivity extends Activity {
         String low = name.toLowerCase(Locale.US);
         boolean video = low.matches(".*\\.(mp4|mkv|avi|mov|m4v|webm|ts|flv|3gp|wmv|m2ts)$");
         boolean audio = low.matches(".*\\.(mp3|m4a|aac|flac|ogg|opus|wav)$");
-        new UiDialog(this).setTitle(name)
-                .setItems(new String[]{
-                        "▶  " + T.t(video||audio ? "Play / Stream" : "Open in Browser"),
-                        "📋  " + T.t("Copy streaming link")
-                }, (d,w) -> {
-                    if (w == 0) {
-                        if (video || audio) startActivity(new Intent(this, PlayerActivity.class)
-                                .putExtra("url",url).putExtra("title",name));
-                        else startActivity(new Intent(this, BrowserActivity.class)
-                                .putExtra(BrowserActivity.EXTRA_URL, url));
-                    } else {
-                        android.content.ClipboardManager cm = (android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
-                        if (cm!=null) cm.setPrimaryClip(android.content.ClipData.newPlainText("url",url));
-                        Toast.makeText(this,"📋 "+T.t("Copied"),Toast.LENGTH_SHORT).show();
+        boolean isMedia = video || audio;
+
+        java.util.List<String> items = new java.util.ArrayList<>();
+        items.add("📱  " + T.t("Play on this phone"));
+        if (isMedia) items.add("📺  " + T.t("Send to TV"));
+        items.add("🌐  " + T.t("Open in browser"));
+        items.add("📋  " + T.t("Copy link"));
+
+        new UiDialog(this).setTitle(name).setItems(items.toArray(new String[0]), (d,w) -> {
+            String ch = items.get(w);
+            if (ch.contains("Play on this phone")) {
+                if (isMedia) {
+                    startActivity(new Intent(this, PlayerActivity.class)
+                            .putExtra("url", url).putExtra("title", name));
+                } else {
+                    startActivity(new Intent(this, BrowserActivity.class)
+                            .putExtra(BrowserActivity.EXTRA_URL, url));
+                }
+            } else if (ch.contains("Send to TV")) {
+                String tv = Store.getStr("last_tv","");
+                if (tv.isEmpty()) {
+                    Toast.makeText(this, T.t("Connect to a TV first from the home screen"), Toast.LENGTH_LONG).show();
+                    return;
+                }
+                final String tvIp = tv;
+                new Thread(() -> {
+                    try {
+                        java.util.Map<String,String> params = new java.util.HashMap<>();
+                        params.put("url",   url);
+                        params.put("title", name);
+                        TvClient.post(tvIp, "/play", params);
+                        main.post(() -> Toast.makeText(SeedrActivity.this,"📺 "+T.t("Sent to TV"),Toast.LENGTH_SHORT).show());
+                    } catch (Exception e) {
+                        main.post(() -> showError(T.t("TV error")+": "+e.getMessage()));
                     }
-                }).show();
+                }).start();
+            } else if (ch.contains("Open in browser")) {
+                startActivity(new Intent(this, BrowserActivity.class)
+                        .putExtra(BrowserActivity.EXTRA_URL, url));
+            } else {
+                android.content.ClipboardManager cm=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
+                if(cm!=null) cm.setPrimaryClip(android.content.ClipData.newPlainText("url",url));
+                Toast.makeText(this,"📋 "+T.t("Copied"),Toast.LENGTH_SHORT).show();
+            }
+        }).show();
     }
 
     private void fileMenu(SeedrApi.SeedrFile f) {

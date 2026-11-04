@@ -199,15 +199,29 @@ public final class SeedrApi {
     public static AddResult addMagnet(String magnet) throws Exception {
         JSONObject r = call("add_torrent", new JSONObject()
                 .put("torrent_magnet", magnet)
-                .put("folder_id","-1"));
+                .put("folder_id", "-1"));
+        // log the full raw response so we can diagnose issues
+        android.util.Log.d("SeedrAPI", "add_torrent raw: " + r.toString());
         AddResult res = new AddResult();
         Object result = r.opt("result");
+        // Seedr returns result:true on success, result:false + error on failure
         res.ok = (result instanceof Boolean && (Boolean)result)
-              || r.optInt("result",0)==1;
-        res.torrentId   = r.optString("torrent_id","");
-        res.progressUrl = r.optString("progress_url","");
-        res.msg = res.ok ? "✓ Added to Seedr"
-                : r.optString("error","Failed — free accounts allow 1 active torrent");
+              || r.optInt("result", 0) == 1
+              || r.has("torrent_id");   // some responses have torrent_id without result:true
+        res.torrentId   = r.optString("torrent_id", "");
+        res.progressUrl = r.optString("progress_url", "");
+        if (res.ok) {
+            res.msg = "✓ Added to Seedr";
+        } else {
+            // show the EXACT error from Seedr, not a guessed message
+            String err = r.optString("error", "");
+            String fullRaw = r.toString();
+            if (err.isEmpty()) {
+                res.msg = "Seedr returned: " + fullRaw;
+            } else {
+                res.msg = "Seedr says: " + err + "\n\nFull response: " + fullRaw;
+            }
+        }
         return res;
     }
 
