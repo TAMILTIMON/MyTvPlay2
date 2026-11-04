@@ -391,7 +391,7 @@ public class SeedrActivity extends Activity {
         if (f.isFolder) {
             // Check if folder name has a video extension — Seedr wraps single-file torrents as folders
             String low = f.name.toLowerCase(Locale.US);
-            boolean looksLikeVideo = low.matches(".*\.(mkv|mp4|avi|mov|m4v|webm|ts|flv|m2ts)$");
+            boolean looksLikeVideo = low.matches(".*\\.(mkv|mp4|avi|mov|m4v|webm|ts|flv|m2ts)$");
             if (looksLikeVideo) {
                 // Try to list files inside; if there is exactly one file, play it directly
                 showLoading(true);
