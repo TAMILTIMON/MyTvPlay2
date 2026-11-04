@@ -55,7 +55,16 @@ public final class BoardLayout {
             l.size = Math.max(0, Math.min(3, o.optInt("size", 1)));
         } catch (Exception ignored) {
         }
-        for (String id : allIds) if (!l.order.contains(id)) l.order.add(id);   // tiles added in new versions
+        // tiles added in new versions: place each right after the tile it follows by default (e.g. SD Card & USB after Seedr)
+        String prev = null;
+        for (String id : allIds) {
+            if (!l.order.contains(id)) {
+                int at = prev == null ? -1 : l.order.indexOf(prev);
+                if (at >= 0) l.order.add(at + 1, id);
+                else l.order.add(id);
+            }
+            prev = id;
+        }
         return l;
     }
 

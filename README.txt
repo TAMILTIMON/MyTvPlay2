@@ -1,3 +1,20 @@
+ZH PLAY 7.0 — SD Card & USB file manager
+========================================
+* New "SD Card & USB" tile right after Seedr (phone board and TV Features; on a customised
+  board new tiles now land next to the tile they follow, not at the end).
+* Overview: phone storage, every SD card and USB drive (OTG / TV box) with free space bars;
+  drives appear / disappear live when plugged in or removed. Quick access: Downloads,
+  Movies, Music, Pictures, Camera, Documents.
+* Browse with breadcrumbs; list or grid; thumbnails for pictures, video frames, album art;
+  sort by name / date / size / type, ascending or descending; show hidden files; search.
+* Multi-select (long-press): copy, move (cut), paste on any drive, delete, share, rename,
+  properties (size counted in the background). Copy / move / delete run with a progress bar
+  and Cancel; a cancelled copy leaves no half file; name clashes become "name (1).ext".
+* Videos and songs play in ZH Play (the whole folder as a playlist); other files open with
+  the right app ("Open with…" to choose). TV remote: ☰ / menu key opens a file's options.
+* Asks for "All files access" with a clear card when it's missing.
+* Seedr code unchanged.
+
 ZH PLAY 6.9 — Send to Seedr adds directly (no website)
 =====================================================
 * Seedr moved adding to its REST API: POST https://www.seedr.cc/rest/torrent/magnet

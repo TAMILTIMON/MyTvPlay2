@@ -35,6 +35,7 @@ final class FeatureBoard {
         }));
         t.put("vpn", UiKit.tile(a, "lock", "VPN", T.t("WireGuard / Proton free"), 0xFF10B981, v -> WgVpn.panel(a)));
         t.put("seedr", UiKit.tile(a, "cloud-download", "Seedr", T.t("Cloud torrent manager"), 0xFF3B82F6, v -> SeedrActivity.open(a)));
+        t.put("storage", UiKit.tile(a, "sd-card", T.t("SD Card & USB"), T.t("files on SD card, USB, phone"), 0xFFF59E0B, v -> StorageActivity.open(a)));
         t.put("eq", UiKit.tile(a, "sliders-vertical", T.t("Equalizer"), T.t("for the music player"), 0xFF22D3EE,
                 v -> a.startActivity(new Intent(a, PowerEqActivity.class))));
         t.put("updates", UiKit.tile(a, "refresh-cw", T.t("Updates"), Updater.installedName(a), 0xFF8B5CF6, v -> Updater.menu(a)));

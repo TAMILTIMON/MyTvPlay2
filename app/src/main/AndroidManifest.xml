@@ -130,6 +130,12 @@
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden" />
 
         <activity
+            android:name=".StorageActivity"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden"
+            android:exported="false"
+            android:label="SD Card &amp; USB" />
+
+        <activity
             android:name=".SeedrActivity"
             android:exported="false"
             android:label="Seedr"

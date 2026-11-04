@@ -35,6 +35,32 @@ public final class T {
     }
 
     static {
+        TA.put("Open with…", "இதில் திற…");
+        HI.put("Open with…", "इसके साथ खोलें…");
+        TA.put("selected", "தேர்ந்தெடுக்கப்பட்டது");
+        HI.put("selected", "चुने गए");
+        TA.put("Properties", "விவரங்கள்");
+        HI.put("Properties", "गुण");
+        TA.put("New folder", "புதிய கோப்புறை");
+        HI.put("New folder", "नया फ़ोल्डर");
+        TA.put("Paste", "ஒட்டு");
+        HI.put("Paste", "पेस्ट करें");
+        TA.put("free of", "காலி /");
+        HI.put("free of", "खाली /");
+        TA.put("Quick access", "விரைவு அணுகல்");
+        HI.put("Quick access", "त्वरित पहुँच");
+        TA.put("Storage", "சேமிப்பு");
+        HI.put("Storage", "स्टोरेज");
+        TA.put("USB drive", "USB டிரைவ்");
+        HI.put("USB drive", "USB ड्राइव");
+        TA.put("SD card", "SD கார்டு");
+        HI.put("SD card", "SD कार्ड");
+        TA.put("Phone storage", "தொலைபேசி சேமிப்பு");
+        HI.put("Phone storage", "फ़ोन स्टोरेज");
+        TA.put("files on SD card, USB, phone", "SD கார்டு, USB, தொலைபேசி கோப்புகள்");
+        HI.put("files on SD card, USB, phone", "SD कार्ड, USB, फ़ोन की फ़ाइलें");
+        TA.put("SD Card & USB", "SD கார்டு & USB");
+        HI.put("SD Card & USB", "SD कार्ड और USB");
         TA.put("Files", "கோப்புகள்");
         HI.put("Files", "फ़ाइलें");
         TA.put("Transfers", "பரிமாற்றங்கள்");
