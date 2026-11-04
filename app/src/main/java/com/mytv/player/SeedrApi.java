@@ -118,6 +118,8 @@ public final class SeedrApi {
 
     public static class AddResult {
         public boolean ok;
+        /** Seedr's app API refused (404): add it on the seedr.cc website instead. */
+        public boolean website;
         boolean retry;
         public String msg = "", title = "";
     }
@@ -371,6 +373,7 @@ public final class SeedrApi {
             // a definite answer about the account (queue full, no space, already there, signed out): don't retry
             a.retry = !(why.contains("queue_full") || why.contains("not_enough_space") || why.contains("already")
                     || why.contains("exists") || why.contains("access_denied") || r.optInt("status_code", 0) == 401);
+            a.website = r.optInt("status_code", 0) == 404;
             a.msg = explainAdd(r);
         }
         return a;

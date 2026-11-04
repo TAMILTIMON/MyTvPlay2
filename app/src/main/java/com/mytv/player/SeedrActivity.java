@@ -104,6 +104,11 @@ public class SeedrActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        if (backFromWebsite && SeedrApi.hasToken()) {   // added on seedr.cc: show it in Transfers
+            backFromWebsite = false;
+            showTab(1);
+            refreshAccount();
+        }
         main.removeCallbacks(transferTick);
         if (tab == 1) main.postDelayed(transferTick, 5000);
     }
@@ -679,14 +684,25 @@ public class SeedrActivity extends Activity {
                     toast(res.msg);
                     refreshAccount();
                     showTab(1);
+                } else if (res.website) {      // Seedr's app API no longer adds: the website does it
+                    addOnWebsite(link);
                 } else {
                     new UiDialog(this).setTitle("☁ Seedr").setMessage(res.msg)
-                            .setPositiveButton(T.t("OK"), null).show();
+                            .setPositiveButton(T.t("Add on seedr.cc"), (d, w) -> addOnWebsite(link))
+                            .setNegativeButton(T.t("Close"), null).show();
                     reload();
                 }
             });
         }).start();
     }
+
+    /** Seedr's website always accepts links: ZH Browser opens seedr.cc and adds it there. */
+    private void addOnWebsite(String link) {
+        startActivity(new Intent(this, BrowserActivity.class).putExtra(BrowserActivity.EXTRA_SEEDR_ADD, link));
+        backFromWebsite = true;
+    }
+
+    private boolean backFromWebsite;
 
     // ================================================================== search
 

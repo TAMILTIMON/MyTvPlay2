@@ -1,3 +1,17 @@
+ZH PLAY 6.8 — Send to Seedr adds through seedr.cc itself
+========================================================
+* Found with DevTools: seedr.cc adds torrents with POST /api/v0.1/task (+ CSRF, website login).
+  Seedr's app APIs can no longer add: the old add_torrent answers 404 for every link, and the
+  token API (/api/v0.1/p/…) has no task or file routes (404 before auth).
+* So when the app API refuses, ZH Play adds on seedr.cc inside ZH Browser: it fills the site's
+  own "Paste link URL Here" box and presses its + button — the same request the site makes,
+  with your website login (sign in to seedr.cc once in ZH Browser). The link is also copied.
+* Works from: browser magnet tap → Send to Seedr, and the Seedr screen's ＋ (back in the
+  Seedr screen it jumps to Transfers). Not signed in to the app? The website route still works.
+* The old fallback never found the box (it looked for "magnet"/"torrent"; the box says
+  "Paste link URL Here"). Tested on mock pages: icon "+", text "+", late-loading page,
+  signed-out page; never touches search, Create Folder or clear.
+
 ZH PLAY 6.7.1 — Seedr accepts hybrid (v1+v2) magnets
 ====================================================
 * Magnets with two hashes (xt=urn:btih + xt=urn:btmh, BitTorrent v2 hybrids — common on 1TamilMV)

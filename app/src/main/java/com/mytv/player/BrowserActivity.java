@@ -59,6 +59,8 @@ public class BrowserActivity extends AppCompatActivity {
     public static final String EXTRA_URL = "url";
     /** Opened from Music to LISTEN: audio only; the browser steps back once the sound starts. */
     public static final String EXTRA_LISTEN = "listen";
+    /** A magnet / .torrent link to add on seedr.cc (used when Seedr's app API refuses to add). */
+    public static final String EXTRA_SEEDR_ADD = "seedr_add";
     // ---- Browser pinch-to-zoom (works on YouTube and every site) ----
     // WebView already has built-in pinch-zoom but it doesn't work in fullscreen mode (the system WebView
     // intercepts touch events for the address bar area). We attach a ScaleGestureDetector to webBox
@@ -350,6 +352,8 @@ public class BrowserActivity extends AppCompatActivity {
         } else {
             go(wanted);                          // first tab
         }
+        String seedrAdd = getIntent().getStringExtra(EXTRA_SEEDR_ADD);
+        if (seedrAdd != null) sendToSeedr(seedrAdd);
         if (tv) web.requestFocus();
         WgVpn.onChange = () -> main.post(this::updateVpnBar);
         updateVpnBar();
@@ -2199,26 +2203,31 @@ public class BrowserActivity extends AppCompatActivity {
                 "📂  " + T.t("Open Seedr")
             }, (d2, w) -> {
                 if (w == 0) {
-                    if (!signedIn) {                 // sign in first; the link is added right after
-                        SeedrActivity.open(this, u);
+                    if (!signedIn) {                 // add on seedr.cc (website login), no app sign-in needed
+                        sendToSeedr(u);
                         return;
                     }
                     UiKit.makeToast(this, "☁ " + T.t("Sending to Seedr…"), Toast.LENGTH_SHORT).show();
                     new Thread(() -> {
                         String msg;
-                        boolean ok = false;
+                        boolean ok = false, website = false;
                         try {
                             SeedrApi.AddResult res = SeedrApi.addMagnet(u);
                             ok = res.ok;
+                            website = res.website;
                             msg = res.msg;
                         } catch (Exception e) {
                             msg = e.getMessage();
                         }
-                        final boolean fOk = ok;
+                        final boolean fOk = ok, fWebsite = website;
                         final String fMsg = msg;
                         main.post(() -> {
                             if (fOk) {
                                 UiKit.makeToast(this, fMsg, Toast.LENGTH_LONG).show();
+                                return;
+                            }
+                            if (fWebsite) {          // Seedr's app API no longer adds: do it on seedr.cc
+                                sendToSeedr(u);
                                 return;
                             }
                             new UiDialog(this).setTitle("☁ Seedr").setMessage(fMsg)
@@ -2237,15 +2246,16 @@ public class BrowserActivity extends AppCompatActivity {
 
     /** Open seedr.cc in an existing tab (reuse it if already open), paste the magnet, and submit. */
     private void sendToSeedr(final String magnet) {
-        final String seedrUrl = "https://www.seedr.cc/";
+        final String seedrUrl = "https://www.seedr.cc/files";
         // look for an existing Seedr tab to reuse
         for (WebView tab : tabs) {
             String u = tab.getUrl();
             if (u != null && u.contains("seedr.cc")) {
                 // switch to that tab and inject the magnet into the Add Torrent box
                 switchTo(tab);
+                copy(magnet);
                 injectMagnetToSeedr(magnet);
-                UiKit.makeToast(this, "☁ " + T.t("Sent to Seedr"), Toast.LENGTH_SHORT).show();
+                UiKit.makeToast(this, "☁ " + T.t("Adding on seedr.cc…"), Toast.LENGTH_SHORT).show();
                 return;
             }
         }
@@ -2253,20 +2263,54 @@ public class BrowserActivity extends AppCompatActivity {
         newTab(seedrUrl);
         pendingSeedrMagnet = magnet;
         copy(magnet);
-        UiKit.makeToast(this, "☁ " + T.t("Link copied — if it isn't added by itself, tap Add on Seedr and paste"), Toast.LENGTH_LONG).show();
+        UiKit.makeToast(this, "☁ " + T.t("Adding on seedr.cc…"), Toast.LENGTH_SHORT).show();
     }
 
-    private void injectMagnetToSeedr(String magnet) {
-        if (web == null) return;
-        // seedr.cc input field: #magnet_url or .new-torrent-url, then the submit button
-        String js = "(function(){"
-                + "var m=" + "\""+magnet.replace("\\","\\\\").replace("\"","\\\"")+"\"" + ";"
-                + "var inp=document.querySelector('#magnet_url,input[placeholder*=magnet],input[placeholder*=torrent],.new-torrent-url input');"
-                + "if(inp){inp.value=m;inp.dispatchEvent(new Event('input',{bubbles:true}));inp.dispatchEvent(new Event('change',{bubbles:true}));}" 
-                + "var btn=document.querySelector('[data-action=add-torrent],button[type=submit],.add-torrent-btn,.seedr-add-btn');"
-                + "if(btn)setTimeout(function(){btn.click();},300);"
-                + "})();";
-        web.evaluateJavascript(js, null);
+    /** seedr.cc's add box script: fills "Paste link URL Here" and presses its + button (React-safe). */
+    private static final String SEEDR_ADD_JS =
+            "(function(m){var tries=0;window.__zhSeedr='working';"
+            + "function setVal(i,v){var d=Object.getOwnPropertyDescriptor(Object.getPrototypeOf(i),'value');"
+            + "if(d&&d.set)d.set.call(i,v);else i.value=v;"
+            + "i.dispatchEvent(new Event('input',{bubbles:true}));i.dispatchEvent(new Event('change',{bubbles:true}));}"
+            + "function find(){var c=document.querySelectorAll('input,textarea');for(var k=0;k<c.length;k++){var e=c[k];"
+            + "if(e.type==='hidden'||e.type==='checkbox'||e.offsetParent===null)continue;"
+            + "var h=((e.placeholder||'')+' '+(e.name||'')+' '+(e.id||'')+' '+(e.getAttribute('aria-label')||'')).toLowerCase();"
+            + "if(/search|mail|pass|user/.test(h))continue;"
+            + "if(/magnet|torrent|paste|link|url/.test(h))return e;}return null;}"
+            + "function label(b){var cn=b.className;cn=(cn&&cn.baseVal!==undefined)?cn.baseVal:(cn||'');"
+            + "return ((b.textContent||'').trim()+' '+(b.getAttribute('title')||'')+' '+(b.getAttribute('aria-label')||'')+' '+cn).toLowerCase().trim();}"
+            + "function addButton(i){var p=i.parentElement;for(var lv=0;lv<4&&p;lv++,p=p.parentElement){"
+            + "var bs=p.querySelectorAll('button,a,[role=button],i,span,svg,div');for(var j=0;j<bs.length;j++){var b=bs[j];"
+            + "if(b===i||b.contains(i))continue;var t=label(b);if(t.length>40||/folder|clear|close|search|upload/.test(t))continue;"
+            + "if(/^\\+$|\\badd\\b|plus|submit/.test(t))return (b.closest&&b.closest('button,a,[role=button]'))||b;}}return null;}"
+            + "function go(){var i=find();if(!i){if(++tries<40)return setTimeout(go,500);window.__zhSeedr='noinput';return;}"
+            + "i.focus();setVal(i,m);setTimeout(function(){var b=addButton(i);"
+            + "if(b){b.click();window.__zhSeedr='clicked';}"
+            + "else{['keydown','keypress','keyup'].forEach(function(t){i.dispatchEvent(new KeyboardEvent(t,{key:'Enter',code:'Enter',keyCode:13,which:13,bubbles:true}));});"
+            + "window.__zhSeedr='entered';}},500);}"
+            + "go();})";
+
+    private void injectMagnetToSeedr(final String magnet) {
+        final WebView w = web;
+        if (w == null) return;
+        w.evaluateJavascript(SEEDR_ADD_JS + "(" + org.json.JSONObject.quote(magnet) + ");", null);
+        // report what happened once the page had time to load its add box (polls up to 20 s)
+        final int[] checks = {0};
+        main.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                w.evaluateJavascript("window.__zhSeedr||''", v -> {
+                    String st = v == null ? "" : v.replace("\"", "");
+                    if ("working".equals(st) && ++checks[0] < 12) {
+                        main.postDelayed(this, 2000);
+                    } else if ("clicked".equals(st) || "entered".equals(st)) {
+                        UiKit.makeToast(BrowserActivity.this, "☁ " + T.t("Added on seedr.cc — it appears in Seedr → Transfers"), Toast.LENGTH_LONG).show();
+                    } else if ("noinput".equals(st)) {
+                        UiKit.makeToast(BrowserActivity.this, T.t("Sign in to seedr.cc in this tab once, then send the link again (it is copied — you can also paste it in “Paste link URL”)"), Toast.LENGTH_LONG).show();
+                    }
+                });
+            }
+        }, 2500);
     }
 
     private void go(String text) {
@@ -2726,6 +2770,11 @@ public class BrowserActivity extends AppCompatActivity {
     protected void onNewIntent(android.content.Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
+        String seedrAdd = intent.getStringExtra(EXTRA_SEEDR_ADD);
+        if (seedrAdd != null) {
+            sendToSeedr(seedrAdd);
+            return;
+        }
         String url = intentUrl(intent);
         if (url != null) newTab(url);            // the browser is already open: a new tab, the others stay
     }
