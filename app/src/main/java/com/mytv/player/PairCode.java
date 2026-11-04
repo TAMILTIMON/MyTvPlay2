@@ -17,7 +17,7 @@ import java.util.Locale;
  *   1. NSD: browse all _mytvplayer._tcp services → match TXT code field
  *   2. IP scan fallback: scan /24 subnet → /ping each → match code field
  *
- * Code is regenerated every 30 minutes or on TV app start.
+ * A new code is made each time the TV's remote service starts.
  * Format: 6 uppercase alphanumeric chars (A-Z 0-9), vowels removed to avoid
  * confusing words. Example: ZH7K2M
  */
@@ -25,31 +25,20 @@ public final class PairCode {
     private PairCode() {}
 
     private static final String KEY_CODE    = "pair_code";
-    private static final String KEY_EXPIRY  = "pair_code_exp";
-    private static final long   TTL_MS      = 30 * 60 * 1000L;  // 30 minutes
     private static final char[] CHARS       = "BCDFGHJKLMNPQRSTVWXYZ23456789".toCharArray();
 
-    /** Get the current pairing code for this TV — generates a new one if expired. */
+    /** This TV's pairing code. It stays the same while the TV app runs (so what the screen shows
+     *  always works) and a new one is made each time the remote service starts. */
     public static String get() {
-        long now = System.currentTimeMillis();
-        long exp = Store.getLong(KEY_EXPIRY, 0);
         String code = Store.getStr(KEY_CODE, "");
-        if (code.length() == 6 && now < exp) return code;
-        return generate();
+        return code.length() == 6 ? code : generate();
     }
 
-    /** Force-generate a new code (called on TV app start). */
+    /** A new code (called when the remote service starts). */
     public static String generate() {
         String code = randomCode();
         Store.putStr(KEY_CODE, code);
-        Store.putLong(KEY_EXPIRY, System.currentTimeMillis() + TTL_MS);
         return code;
-    }
-
-    /** Returns minutes until the code expires (for display countdown). */
-    public static int minutesLeft() {
-        long ms = Store.getLong(KEY_EXPIRY, 0) - System.currentTimeMillis();
-        return (int) Math.max(0, ms / 60_000);
     }
 
     private static String randomCode() {

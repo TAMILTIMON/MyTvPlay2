@@ -1,19 +1,21 @@
 package com.mytv.player;
 
-import androidx.appcompat.app.AlertDialog;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.InputType;
+import android.text.TextUtils;
 import android.view.Gravity;
+import android.view.KeyEvent;
 import android.view.View;
-import android.view.ViewGroup;
+import android.view.inputmethod.EditorInfo;
 import android.widget.EditText;
 import android.widget.FrameLayout;
-import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
@@ -21,857 +23,880 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
-import java.util.Stack;
 
 /**
- * Full Seedr file manager — same layout as the Seedr app:
- *  Header: username · quota bar
- *  Tabs: Files | Transfers | Search
- *  File list: icon · name · size/progress · ⋮ menu
- *  Actions: play, stream, delete, rename, add magnet
+ * Seedr inside ZH Play: your Seedr cloud with Files · Transfers · Search, storage bar,
+ * add magnet / .torrent links, play on the phone, send to the TV, download, rename, delete.
  */
 public class SeedrActivity extends Activity {
+    private static final String EXTRA_MAGNET = "magnet";
+    private static final int BG = 0xFF0B0F1A, PANEL = 0xFF121826, SUB = 0x99FFFFFF;
 
     private final Handler main = new Handler(Looper.getMainLooper());
-    private final Stack<String[]> folderStack = new Stack<>(); // {id, name}
+    private final ArrayList<String[]> path = new ArrayList<>();   // {folderId, name}; empty = top
+    private int tab = 0;                                          // 0 Files · 1 Transfers · 2 Search
+    private String pendingMagnet;                                 // added right after signing in
+    private String lastQuery = "";
+    private int loadSeq;                                          // drops answers from older loads
 
-    // views
-    private TextView titleView, usernameView, quotaLabel;
-    private ProgressBar quotaBar;
-    private LinearLayout fileList;
-    private ScrollView scroll;
-    private View tabFiles, tabTransfers, tabSearch;
-    private LinearLayout loadingOverlay;
-    private int currentTab = 0; // 0=Files 1=Transfers 2=Search
+    private TextView title, account;
+    private ProgressBar quota, busy;
+    private LinearLayout list;
+    private final TextView[] tabViews = new TextView[3];
 
-    // polling
-    private final List<Runnable> pollers = new ArrayList<>();
-
-    private int dp(float v) { return Math.round(v * getResources().getDisplayMetrics().density); }
-    private TextView tv(float sp, int color, boolean bold) {
-        TextView t = new TextView(this); t.setTextSize(sp); t.setTextColor(color);
-        if (bold) t.setTypeface(Typeface.DEFAULT_BOLD); return t;
-    }
-
+    /** Open the Seedr screen. */
     public static void open(Context c) {
-        c.startActivity(new Intent(c, SeedrActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        open(c, null);
     }
 
-    @Override protected void onCreate(android.os.Bundle b) {
-        super.onCreate(b);
-        getWindow().setStatusBarColor(0xFF0C1120);
-        buildUi();
-        if (!SeedrApi.hasToken()) showSetup();
-        else loadAccount();
+    /** Open the Seedr screen and add this magnet / .torrent link (after signing in if needed). */
+    public static void open(Context c, String magnet) {
+        Intent i = new Intent(c, SeedrActivity.class);
+        if (magnet != null) i.putExtra(EXTRA_MAGNET, magnet);
+        if (!(c instanceof Activity)) i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        c.startActivity(i);
     }
 
-    @Override protected void onDestroy() {
-        super.onDestroy();
-        for (Runnable r : pollers) main.removeCallbacks(r);
+    private int dp(float v) {
+        return Math.round(v * getResources().getDisplayMetrics().density);
     }
 
-    // ================================================================== UI BUILD
-
-    private void buildUi() {
-        FrameLayout root = new FrameLayout(this);
-        root.setBackgroundColor(0xFF0C1120);
-
-        // ---- header ----
-        LinearLayout header = new LinearLayout(this);
-        header.setOrientation(LinearLayout.VERTICAL);
-        header.setBackgroundColor(0xFF111827);
-        header.setPadding(dp(16), dp(36), dp(16), dp(12));
-
-        LinearLayout topRow = new LinearLayout(this);
-        topRow.setGravity(Gravity.CENTER_VERTICAL);
-
-        ImageView backBtn = UiKit.darkButton(this,"arrow-left",40,false,v->onBackPressed());
-        topRow.addView(backBtn, lp(dp(40),dp(40)));
-
-        LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT,1);
-        tlp.setMargins(dp(10),0,0,0);
-        LinearLayout titles = new LinearLayout(this); titles.setOrientation(LinearLayout.VERTICAL);
-        titleView    = tv(17, Color.WHITE, true);  titleView.setText("☁  Seedr");
-        usernameView = tv(12, 0x88FFFFFF, false);
-        titles.addView(titleView); titles.addView(usernameView);
-        topRow.addView(titles, tlp);
-
-        ImageView searchBtn = UiKit.darkButton(this,"search",40,false,v->{currentTab=2;refreshTab();});
-        ImageView addBtn    = UiKit.darkButton(this,"plus",  40,false,v->showAddMagnet());
-        ImageView settBtn   = UiKit.darkButton(this,"settings",40,false,v->showSettings());
-        topRow.addView(searchBtn, lp(dp(40),dp(40)));
-        topRow.addView(addBtn,    lp(dp(40),dp(40)));
-        topRow.addView(settBtn,   lp(dp(40),dp(40)));
-        header.addView(topRow);
-
-        // quota bar
-        LinearLayout qRow = new LinearLayout(this);
-        qRow.setOrientation(LinearLayout.VERTICAL);
-        qRow.setPadding(0,dp(10),0,0);
-        quotaLabel = tv(11, 0x88FFFFFF, false);
-        quotaBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
-        quotaBar.setMax(1000); quotaBar.setProgress(0);
-        LinearLayout.LayoutParams qlp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(4));
-        qlp.setMargins(0,dp(4),0,0);
-        qRow.addView(quotaLabel);
-        qRow.addView(quotaBar, qlp);
-        header.addView(qRow);
-
-        FrameLayout.LayoutParams hlp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP);
-        root.addView(header, hlp);
-
-        // ---- tabs ----
-        LinearLayout tabs = new LinearLayout(this);
-        tabs.setBackgroundColor(0xFF111827);
-
-        tabFiles      = makeTab("Files",     0);
-        tabTransfers  = makeTab("Transfers", 1);
-        tabSearch     = makeTab("Search",    2);
-        tabs.addView(tabFiles,     new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT,1));
-        tabs.addView(tabTransfers, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT,1));
-        tabs.addView(tabSearch,    new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT,1));
-
-        FrameLayout.LayoutParams tblp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(42));
-        tblp.topMargin = dp(116);
-        root.addView(tabs, tblp);
-
-        // ---- file list ----
-        scroll = new ScrollView(this);
-        scroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
-        fileList = new LinearLayout(this);
-        fileList.setOrientation(LinearLayout.VERTICAL);
-        fileList.setPadding(dp(12), dp(8), dp(12), dp(80));
-        scroll.addView(fileList);
-        FrameLayout.LayoutParams flp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
-        flp.topMargin = dp(158);
-        root.addView(scroll, flp);
-
-        // ---- loading overlay ----
-        loadingOverlay = new LinearLayout(this);
-        loadingOverlay.setGravity(Gravity.CENTER);
-        loadingOverlay.setBackgroundColor(0xAA0C1120);
-        loadingOverlay.setVisibility(View.GONE);
-        ProgressBar spinner = new ProgressBar(this);
-        loadingOverlay.addView(spinner);
-        root.addView(loadingOverlay, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-
-        setContentView(root);
-        updateTabHighlight();
-    }
-
-    private View makeTab(String label, int idx) {
-        TextView t = tv(13, 0xAAFFFFFF, false);
-        t.setText(label); t.setGravity(Gravity.CENTER);
-        t.setPadding(0, dp(10), 0, dp(10));
-        t.setOnClickListener(v -> { currentTab = idx; folderStack.clear(); refreshTab(); });
+    private TextView text(float sp, int color, boolean bold) {
+        TextView t = new TextView(this);
+        t.setTextSize(sp);
+        t.setTextColor(color);
+        if (bold) t.setTypeface(Typeface.DEFAULT_BOLD);
         return t;
     }
 
-    private void updateTabHighlight() {
-        View[] tabs = {tabFiles, tabTransfers, tabSearch};
-        for (int i = 0; i < tabs.length; i++) {
-            if (tabs[i] instanceof TextView) {
-                ((TextView) tabs[i]).setTextColor(i == currentTab ? Ui.ACCENT : 0xAAFFFFFF);
-                ((TextView) tabs[i]).setTypeface(i == currentTab ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
-            }
+    private void toast(String s) {
+        UiKit.makeToast(this, s, Toast.LENGTH_LONG).show();
+    }
+
+    // ================================================================== life cycle
+
+    @Override
+    protected void onCreate(Bundle b) {
+        super.onCreate(b);
+        getWindow().setStatusBarColor(PANEL);
+        getWindow().setNavigationBarColor(BG);
+        build();
+        pendingMagnet = getIntent().getStringExtra(EXTRA_MAGNET);
+        if (!SeedrApi.hasToken()) signIn();
+        else afterSignIn();
+    }
+
+    @Override
+    protected void onNewIntent(Intent i) {
+        super.onNewIntent(i);
+        String m = i.getStringExtra(EXTRA_MAGNET);
+        if (m == null) return;
+        if (SeedrApi.hasToken()) add(m);
+        else {
+            pendingMagnet = m;
+            signIn();
         }
     }
 
-    // ================================================================== DATA LOADING
-
-    private void loadAccount() {
-        new Thread(() -> {
-            try {
-                SeedrApi.AccountInfo acc = SeedrApi.getAccount();
-                main.post(() -> {
-                    usernameView.setText(acc.username + (acc.email.isEmpty() ? "" : "  ·  " + acc.email));
-                    quotaLabel.setText("Storage: " + acc.quota());
-                    if (acc.spaceTotal > 0)
-                        quotaBar.setProgress((int)(1000L * acc.spaceUsed / acc.spaceTotal));
-                    refreshTab();
-                });
-            } catch (Exception e) {
-                main.post(() -> { showError(e.getMessage()); showSetup(); });
-            }
-        }).start();
+    @Override
+    protected void onResume() {
+        super.onResume();
+        main.removeCallbacks(transferTick);
+        if (tab == 1) main.postDelayed(transferTick, 5000);
     }
 
-    private void refreshTab() {
-        updateTabHighlight();
-        if (currentTab == 0) loadFolder(folderStack.isEmpty() ? "0" : folderStack.peek()[0],
-                                        folderStack.isEmpty() ? "My Files" : folderStack.peek()[1]);
-        else if (currentTab == 1) loadTransfers();
-        else showSearchBar();
+    @Override
+    protected void onPause() {
+        super.onPause();
+        main.removeCallbacks(transferTick);
     }
 
-    private void loadFolder(String id, String name) {
-        if (folderStack.isEmpty() || !folderStack.peek()[0].equals(id))
-            folderStack.push(new String[]{id, name});
-        titleView.setText("☁  " + name);
-        showLoading(true);
-        new Thread(() -> {
-            try {
-                List<SeedrApi.SeedrFile> files = SeedrApi.listFolder(id);
-                main.post(() -> { showLoading(false); renderFiles(files, id); });
-            } catch (Exception e) {
-                main.post(() -> { showLoading(false); showError(e.getMessage()); });
-            }
-        }).start();
-    }
-
-    private void loadTransfers() {
-        titleView.setText("☁  Transfers");
-        showLoading(true);
-        new Thread(() -> {
-            try {
-                // list_contents on root returns active torrents too
-                List<SeedrApi.SeedrFile> all = SeedrApi.listFolder("0");
-                List<SeedrApi.SeedrFile> active = new ArrayList<>();
-                for (SeedrApi.SeedrFile f : all) if (f.isTorrent) active.add(f);
-                main.post(() -> {
-                    showLoading(false);
-                    fileList.removeAllViews();
-                    if (active.isEmpty()) {
-                        addEmptyLabel("No active transfers.\nTap ＋ to add a magnet link.");
-                    } else {
-                        for (SeedrApi.SeedrFile f : active) addTransferRow(f);
-                    }
-                });
-            } catch (Exception e) {
-                main.post(() -> { showLoading(false); showError(e.getMessage()); });
-            }
-        }).start();
-    }
-
-    // ================================================================== RENDER
-
-    private void renderFiles(List<SeedrApi.SeedrFile> files, String parentId) {
-        fileList.removeAllViews();
-        // breadcrumb back row
-        if (!folderStack.isEmpty() && folderStack.size() > 1) {
-            addNavRow("← " + (folderStack.size() > 2 ? folderStack.get(folderStack.size()-2)[1] : "My Files"),
-                    () -> { folderStack.pop(); String[] p = folderStack.pop(); loadFolder(p[0], p[1]); });
+    @Override
+    public void onBackPressed() {
+        if (tab == 0 && !path.isEmpty()) {
+            path.remove(path.size() - 1);
+            reload();
+        } else if (tab != 0) {
+            showTab(0);
+        } else {
+            super.onBackPressed();
         }
-        if (files.isEmpty()) {
-            // show raw API response so we can see what field names Seedr actually uses
-            String raw = SeedrApi.lastRaw;
-            String preview = raw.length()>0 ? raw.substring(0,Math.min(400,raw.length())) : "no response";
-            addEmptyLabel("This folder is empty.\n\nAPI response keys:\n" + preview);
+    }
+
+    // ================================================================== layout
+
+    private void build() {
+        FrameLayout frame = new FrameLayout(this);
+        frame.setBackgroundColor(BG);
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        frame.addView(root, new FrameLayout.LayoutParams(-1, -1));
+
+        // ---- header
+        LinearLayout head = new LinearLayout(this);
+        head.setOrientation(LinearLayout.VERTICAL);
+        head.setBackgroundColor(PANEL);
+        head.setPadding(dp(8), dp(10), dp(8), dp(10));
+        LinearLayout row = new LinearLayout(this);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.addView(UiKit.darkButton(this, "arrow-left", 42, false, v -> onBackPressed()), new LinearLayout.LayoutParams(dp(42), dp(42)));
+        LinearLayout names = new LinearLayout(this);
+        names.setOrientation(LinearLayout.VERTICAL);
+        names.setPadding(dp(10), 0, dp(6), 0);
+        title = text(18, Color.WHITE, true);
+        title.setSingleLine(true);
+        title.setEllipsize(TextUtils.TruncateAt.MIDDLE);
+        title.setText("Seedr");
+        account = text(12, SUB, false);
+        account.setSingleLine(true);
+        account.setEllipsize(TextUtils.TruncateAt.END);
+        names.addView(title);
+        names.addView(account);
+        row.addView(names, new LinearLayout.LayoutParams(0, -2, 1));
+        row.addView(UiKit.darkButton(this, "plus", 42, true, v -> askMagnet()), new LinearLayout.LayoutParams(dp(42), dp(42)));
+        View gap = new View(this);
+        row.addView(gap, new LinearLayout.LayoutParams(dp(6), 1));
+        row.addView(UiKit.darkButton(this, "settings", 42, false, v -> settings()), new LinearLayout.LayoutParams(dp(42), dp(42)));
+        head.addView(row);
+        quota = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        quota.setMax(1000);
+        LinearLayout.LayoutParams qlp = new LinearLayout.LayoutParams(-1, dp(4));
+        qlp.setMargins(dp(8), dp(10), dp(8), 0);
+        head.addView(quota, qlp);
+        root.addView(head);
+
+        // ---- tabs
+        LinearLayout tabs = new LinearLayout(this);
+        tabs.setBackgroundColor(PANEL);
+        String[] names3 = {T.t("Files"), T.t("Transfers"), T.t("Search")};
+        for (int i = 0; i < 3; i++) {
+            final int k = i;
+            TextView t = text(14, SUB, false);
+            t.setText(names3[i]);
+            t.setGravity(Gravity.CENTER);
+            t.setPadding(0, dp(12), 0, dp(12));
+            t.setFocusable(true);
+            t.setBackground(Ui.focusCard(this, 10));
+            t.setOnClickListener(v -> showTab(k));
+            tabViews[i] = t;
+            tabs.addView(t, new LinearLayout.LayoutParams(0, -2, 1));
+        }
+        root.addView(tabs);
+
+        // ---- list
+        ScrollView sv = new ScrollView(this);
+        sv.setFillViewport(true);
+        list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        list.setPadding(dp(12), dp(10), dp(12), dp(40));
+        sv.addView(list);
+        root.addView(sv, new LinearLayout.LayoutParams(-1, 0, 1));
+
+        busy = new ProgressBar(this);
+        busy.setVisibility(View.GONE);
+        frame.addView(busy, new FrameLayout.LayoutParams(dp(48), dp(48), Gravity.CENTER));
+        setContentView(frame);
+        markTabs();
+    }
+
+    private void markTabs() {
+        for (int i = 0; i < 3; i++) {
+            tabViews[i].setTextColor(i == tab ? Ui.ACCENT : SUB);
+            tabViews[i].setTypeface(i == tab ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
+        }
+    }
+
+    private void showTab(int k) {
+        tab = k;
+        markTabs();
+        main.removeCallbacks(transferTick);
+        reload();
+    }
+
+    private void loading(boolean on) {
+        busy.setVisibility(on ? View.VISIBLE : View.GONE);
+    }
+
+    private void message(String s) {
+        list.removeAllViews();
+        TextView t = text(15, SUB, false);
+        t.setText(s);
+        t.setGravity(Gravity.CENTER);
+        t.setPadding(dp(24), dp(48), dp(24), dp(24));
+        list.addView(t);
+    }
+
+    // ================================================================== loading
+
+    private void afterSignIn() {
+        refreshAccount();
+        showTab(tab);
+        if (pendingMagnet != null) {
+            String m = pendingMagnet;
+            pendingMagnet = null;
+            add(m);
+        }
+    }
+
+    private void refreshAccount() {
+        new Thread(() -> {
+            try {
+                SeedrApi.AccountInfo a = SeedrApi.getAccount();
+                main.post(() -> {
+                    String q = a.quota();
+                    account.setText((a.username.isEmpty() ? a.email : a.username)
+                            + (q.isEmpty() ? "" : "   ·   " + q) + (a.premium ? "   ·   ⭐" : ""));
+                    quota.setProgress(a.spaceTotal > 0 ? (int) (1000L * a.spaceUsed / a.spaceTotal) : 0);
+                });
+            } catch (Exception e) {
+                main.post(() -> account.setText("⚠ " + e.getMessage()));
+            }
+        }).start();
+    }
+
+    private void reload() {
+        if (!SeedrApi.hasToken()) {
+            message(T.t("Sign in to see your Seedr files."));
             return;
         }
-        for (SeedrApi.SeedrFile f : files) {
-            if (f.isTorrent) addTransferRow(f);
-            else addFileRow(f);
+        if (tab == 2) {
+            searchView();
+            return;
         }
+        final int seq = ++loadSeq;
+        final String id = tab == 0 && !path.isEmpty() ? path.get(path.size() - 1)[0] : "0";
+        title.setText(tab == 1 ? T.t("Transfers") : path.isEmpty() ? "Seedr" : path.get(path.size() - 1)[1]);
+        if (list.getChildCount() == 0 || tab == 0) loading(true);
+        new Thread(() -> {
+            try {
+                List<SeedrApi.SeedrFile> items = SeedrApi.listFolder(id);
+                main.post(() -> {
+                    if (seq != loadSeq) return;
+                    loading(false);
+                    render(items);
+                });
+            } catch (Exception e) {
+                main.post(() -> {
+                    if (seq != loadSeq) return;
+                    loading(false);
+                    message("⚠ " + e.getMessage());
+                });
+            }
+        }).start();
     }
 
-    private void addNavRow(String label, Runnable action) {
-        LinearLayout row = new LinearLayout(this);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(dp(14), dp(10), dp(14), dp(10));
-        row.setBackground(Ui.focusCard(this, 12));
-        TextView t = tv(13, Ui.ACCENT, false); t.setText(label);
-        row.addView(t);
-        row.setOnClickListener(v -> action.run());
-        LinearLayout.LayoutParams lp = row(4);
-        fileList.addView(row, lp);
+    private final Runnable transferTick = new Runnable() {
+        @Override
+        public void run() {
+            if (tab != 1 || isFinishing()) return;
+            reload();
+        }
+    };
+
+    private void render(List<SeedrApi.SeedrFile> items) {
+        list.removeAllViews();
+        if (tab == 1) {
+            List<SeedrApi.SeedrFile> t = new ArrayList<>();
+            for (SeedrApi.SeedrFile f : items) if (f.isTorrent) t.add(f);
+            if (t.isEmpty()) message(T.t("Nothing is downloading.\nTap ＋ to add a magnet link."));
+            else for (SeedrApi.SeedrFile f : t) list.addView(transferRow(f), rowLp());
+            main.removeCallbacks(transferTick);
+            main.postDelayed(transferTick, 5000);           // live progress while this tab is open
+            return;
+        }
+        if (!path.isEmpty()) list.addView(upRow(), rowLp());
+        if (items.isEmpty()) {
+            TextView t = text(15, SUB, false);
+            t.setText(path.isEmpty() ? T.t("Your Seedr is empty.\nTap ＋ to add a magnet link.") : T.t("This folder is empty."));
+            t.setGravity(Gravity.CENTER);
+            t.setPadding(dp(24), dp(40), dp(24), dp(24));
+            list.addView(t);
+            return;
+        }
+        for (SeedrApi.SeedrFile f : items) list.addView(f.isTorrent ? transferRow(f) : fileRow(f), rowLp());
     }
 
-    private void addFileRow(SeedrApi.SeedrFile f) {
-        LinearLayout row = new LinearLayout(this);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(dp(14), dp(12), dp(8), dp(12));
-        row.setBackground(Ui.focusCard(this, 12));
-
-        // icon
-        String icon = f.isFolder ? "folder" : iconFor(f.ext);
-        int iconColor = f.isFolder ? 0xFFFFAA00 : 0xFFCCCCCC;
-        ImageView ic = UiKit.icon(this, icon, 22, iconColor);
-        LinearLayout.LayoutParams ilp = lp(dp(36), dp(36));
-        ilp.setMargins(0,0,dp(12),0);
-        row.addView(ic, ilp);
-
-        // name + subtitle
-        LinearLayout col = new LinearLayout(this); col.setOrientation(LinearLayout.VERTICAL);
-        TextView name = tv(14, Color.WHITE, f.isFolder);
-        name.setText(f.name); name.setSingleLine(true);
-        name.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        col.addView(name);
-        String sub = f.subtitle();
-        if (!sub.isEmpty()) { TextView sv = tv(11, 0x88FFFFFF, false); sv.setText(sub); col.addView(sv); }
-        row.addView(col, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT,1));
-
-        // ⋮ menu button
-        ImageView more = UiKit.darkButton(this,"more-vertical",36,false,v->fileMenu(f));
-        row.addView(more, lp(dp(36),dp(36)));
-
-        row.setOnClickListener(v->onFileTap(f));
-        fileList.addView(row, row(4));
+    private LinearLayout.LayoutParams rowLp() {
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
+        lp.setMargins(0, dp(4), 0, dp(4));
+        return lp;
     }
 
-    private void addTransferRow(SeedrApi.SeedrFile f) {
-        LinearLayout row = new LinearLayout(this); row.setOrientation(LinearLayout.VERTICAL);
-        row.setPadding(dp(14), dp(12), dp(14), dp(12));
-        row.setBackground(Ui.card(this, 0xFF111827, Ui.ACCENT, 12));
+    private View upRow() {
+        LinearLayout r = baseRow();
+        r.addView(UiKit.icon(this, "arrow-left", 22, Ui.ACCENT), new LinearLayout.LayoutParams(dp(36), dp(36)));
+        TextView t = text(15, Ui.ACCENT, true);
+        t.setText(path.size() > 1 ? path.get(path.size() - 2)[1] : T.t("All files"));
+        t.setSingleLine(true);
+        t.setEllipsize(TextUtils.TruncateAt.END);
+        t.setPadding(dp(12), 0, 0, 0);
+        r.addView(t, new LinearLayout.LayoutParams(0, -2, 1));
+        r.setOnClickListener(v -> onBackPressed());
+        return r;
+    }
 
-        // name row
-        LinearLayout topRow = new LinearLayout(this); topRow.setGravity(Gravity.CENTER_VERTICAL);
-        ImageView ic = UiKit.icon(this,"download",18,Ui.ACCENT2);
-        LinearLayout.LayoutParams ilp = lp(dp(24),dp(24)); ilp.setMargins(0,0,dp(8),0);
-        topRow.addView(ic,ilp);
-        TextView name = tv(13, Color.WHITE, true);
-        name.setText(f.name); name.setSingleLine(true);
-        name.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        topRow.addView(name, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT,1));
-        ImageView del = UiKit.darkButton(this,"x",32,false,v->confirmDeleteTorrent(f));
-        topRow.addView(del, lp(dp(32),dp(32)));
-        row.addView(topRow);
+    private LinearLayout baseRow() {
+        LinearLayout r = new LinearLayout(this);
+        r.setGravity(Gravity.CENTER_VERTICAL);
+        r.setPadding(dp(14), dp(12), dp(6), dp(12));
+        r.setBackground(Ui.focusCard(this, 14));
+        r.setFocusable(true);
+        return r;
+    }
 
-        // progress bar
-        ProgressBar pb = new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);
+    private static String iconFor(SeedrApi.SeedrFile f) {
+        if (f.isFolder) return "folder";
+        if (f.playVideo || Formats.isVideo(f.name)) return "film";
+        if (f.playAudio || Formats.isAudio(f.name)) return "file-music";
+        String n = f.name.toLowerCase(java.util.Locale.US);
+        if (n.matches(".*\\.(jpg|jpeg|png|gif|webp|bmp)$")) return "image";
+        return "download";
+    }
+
+    private View fileRow(final SeedrApi.SeedrFile f) {
+        LinearLayout r = baseRow();
+        int tint = f.isFolder ? 0xFFF5B942 : f.playable() ? Ui.ACCENT : 0xFFB0B8C8;
+        r.addView(UiKit.icon(this, iconFor(f), 24, tint), new LinearLayout.LayoutParams(dp(36), dp(36)));
+        LinearLayout col = new LinearLayout(this);
+        col.setOrientation(LinearLayout.VERTICAL);
+        col.setPadding(dp(12), 0, dp(4), 0);
+        TextView n = text(15, Color.WHITE, f.isFolder);
+        n.setText(f.name);
+        n.setMaxLines(2);
+        n.setEllipsize(TextUtils.TruncateAt.END);
+        TextView s = text(12, SUB, false);
+        s.setText(f.subtitle());
+        col.addView(n);
+        col.addView(s);
+        r.addView(col, new LinearLayout.LayoutParams(0, -2, 1));
+        r.addView(UiKit.darkButton(this, "ellipsis-vertical", 38, false, v -> itemMenu(f)), new LinearLayout.LayoutParams(dp(38), dp(38)));
+        r.setOnClickListener(v -> openItem(f));
+        r.setOnLongClickListener(v -> {
+            itemMenu(f);
+            return true;
+        });
+        return r;
+    }
+
+    private View transferRow(final SeedrApi.SeedrFile f) {
+        LinearLayout r = new LinearLayout(this);
+        r.setOrientation(LinearLayout.VERTICAL);
+        r.setPadding(dp(14), dp(12), dp(8), dp(12));
+        r.setBackground(Ui.card(this, PANEL, Ui.ACCENT, dp(14)));
+        LinearLayout top = new LinearLayout(this);
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        top.addView(UiKit.icon(this, "cloud-download", 22, Ui.ACCENT), new LinearLayout.LayoutParams(dp(30), dp(30)));
+        TextView n = text(14, Color.WHITE, true);
+        n.setText(f.name);
+        n.setMaxLines(2);
+        n.setEllipsize(TextUtils.TruncateAt.END);
+        n.setPadding(dp(10), 0, dp(4), 0);
+        top.addView(n, new LinearLayout.LayoutParams(0, -2, 1));
+        top.addView(UiKit.darkButton(this, "x", 36, false, v -> confirmDelete(f)), new LinearLayout.LayoutParams(dp(36), dp(36)));
+        r.addView(top);
+        ProgressBar pb = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         pb.setMax(100);
-        try { pb.setProgress(Integer.parseInt(f.progress==null?"0":f.progress.replace("%","").trim())); }
-        catch(Exception ignored){}
-        LinearLayout.LayoutParams pblp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(6));
-        pblp.setMargins(0,dp(6),0,dp(4));
-        row.addView(pb, pblp);
-
-        // stats
-        TextView stats = tv(11, 0x88FFFFFF, false);
-        stats.setText(buildStats(f));
-        row.addView(stats);
-
-        fileList.addView(row, row(6));
-
-        // live poll
-        if (!f.progressUrl.isEmpty()) {
-            Runnable[] poll = {null};
-            poll[0] = new Runnable() { public void run() {
-                new Thread(() -> {
-                    try {
-                        SeedrApi.SeedrFile updated = pollProgress(f.progressUrl);
-                        main.post(() -> {
-                            try { pb.setProgress(Integer.parseInt(updated.progress==null?"0":updated.progress.replace("%","").trim())); }
-                            catch(Exception ignored){}
-                            stats.setText(buildStats(updated));
-                            name.setText(updated.name.isEmpty() ? f.name : updated.name);
-                            if (!"100".equals(updated.progress)) main.postDelayed(poll[0],4000);
-                            else { stats.setText("✅ Complete — go to Files tab"); loadAccount(); }
-                        });
-                    } catch(Exception ignored){}
-                }).start();
-            }};
-            pollers.add(poll[0]);
-            main.postDelayed(poll[0], 4000);
+        try {
+            pb.setProgress(Integer.parseInt(f.progress));
+        } catch (Exception ignored) {
         }
+        LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(-1, dp(6));
+        plp.setMargins(0, dp(8), dp(6), dp(6));
+        r.addView(pb, plp);
+        TextView s = text(12, SUB, false);
+        s.setText(f.subtitle() + (f.size > 0 ? "   ·   " + f.displaySize() : ""));
+        r.addView(s);
+        return r;
     }
 
-    private String buildStats(SeedrApi.SeedrFile f) {
-        StringBuilder sb = new StringBuilder();
-        sb.append(f.progress==null?"0":f.progress).append("%");
-        if (f.dlRate > 0) sb.append("  ↓ ").append(fmtSpeed(f.dlRate));
-        if (f.seeders > 0) sb.append("  ").append(f.seeders).append(" seeds");
-        if (f.peers   > 0) sb.append("  ").append(f.peers).append(" peers");
-        if (f.size    > 0) sb.append("  ").append(f.displaySize());
-        return sb.toString();
-    }
+    // ================================================================== opening & playing
 
-    private void addEmptyLabel(String msg) {
-        TextView t = tv(14, 0x66FFFFFF, false);
-        t.setText(msg); t.setGravity(Gravity.CENTER);
-        t.setPadding(dp(32),dp(56),dp(32),dp(56));
-        fileList.addView(t);
-    }
-
-    // ================================================================== ACTIONS
-
-    private void onFileTap(SeedrApi.SeedrFile f) {
-        if (f.isFolder) {
-            // Check if folder name has a video extension — Seedr wraps single-file torrents as folders
-            String low = f.name.toLowerCase(Locale.US);
-            boolean looksLikeVideo = low.matches(".*\\.(mkv|mp4|avi|mov|m4v|webm|ts|flv|m2ts)$");
-            if (looksLikeVideo) {
-                // Try to list files inside; if there is exactly one file, play it directly
-                showLoading(true);
-                new Thread(() -> {
-                    try {
-                        List<SeedrApi.SeedrFile> inside = SeedrApi.listFolder(f.id);
-                        // find the first playable file inside
-                        SeedrApi.SeedrFile playable = null;
-                        for (SeedrApi.SeedrFile fi : inside) {
-                            if (!fi.isFolder && !fi.isTorrent) { playable = fi; break; }
-                        }
-                        final SeedrApi.SeedrFile toPlay = playable;
-                        if (toPlay != null) {
-                            String url = SeedrApi.fetchFileUrl(toPlay.id);
-                            main.post(() -> { showLoading(false); offerPlay(url, toPlay.name.isEmpty() ? f.name : toPlay.name); });
-                        } else {
-                            // no file inside — browse the folder
-                            main.post(() -> { showLoading(false); loadFolder(f.id, f.name); });
-                        }
-                    } catch (Exception e) {
-                        main.post(() -> { showLoading(false); showError(e.getMessage()); });
-                    }
-                }).start();
-            } else {
-                loadFolder(f.id, f.name);
-            }
+    private void openItem(final SeedrApi.SeedrFile f) {
+        if (f.isTorrent) {
+            showTab(1);
             return;
         }
-        // regular file — fetch URL
-        showLoading(true);
+        if (!f.isFolder) {
+            fileActions(f);
+            return;
+        }
+        // A finished torrent with one video inside is a folder in Seedr: go straight to the video.
+        loading(true);
         new Thread(() -> {
             try {
-                String url = SeedrApi.fetchFileUrl(f.id);
-                main.post(() -> { showLoading(false); offerPlay(url, f.name); });
+                List<SeedrApi.SeedrFile> inside = SeedrApi.listFolder(f.id);
+                SeedrApi.SeedrFile only = null;
+                int playable = 0, folders = 0;
+                for (SeedrApi.SeedrFile x : inside) {
+                    if (x.isFolder) folders++;
+                    if (x.playable()) {
+                        playable++;
+                        only = x;
+                    }
+                }
+                final SeedrApi.SeedrFile single = playable == 1 && folders == 0 ? only : null;
+                main.post(() -> {
+                    loading(false);
+                    if (single != null) {
+                        fileActions(single);
+                    } else {
+                        path.add(new String[]{f.id, f.name});
+                        title.setText(f.name);
+                        render(inside);
+                    }
+                });
             } catch (Exception e) {
-                main.post(() -> { showLoading(false); showError(e.getMessage()); });
+                main.post(() -> {
+                    loading(false);
+                    toast("⚠ " + e.getMessage());
+                });
             }
         }).start();
     }
 
-    private void offerPlay(String url, String name) {
-        String low = name.toLowerCase(Locale.US);
-        boolean video = low.matches(".*\\.(mp4|mkv|avi|mov|m4v|webm|ts|flv|3gp|wmv|m2ts)$");
-        boolean audio = low.matches(".*\\.(mp3|m4a|aac|flac|ogg|opus|wav)$");
-        boolean isMedia = video || audio;
-
-        java.util.List<String> items = new java.util.ArrayList<>();
-        items.add("📱  " + T.t("Play on this phone"));
-        if (isMedia) items.add("📺  " + T.t("Send to TV"));
-        items.add("🌐  " + T.t("Open in browser"));
-        items.add("📋  " + T.t("Copy link"));
-
-        new UiDialog(this).setTitle(name).setItems(items.toArray(new String[0]), (d,w) -> {
-            String ch = items.get(w);
-            if (ch.contains("Play on this phone")) {
-                if (isMedia) {
-                    startActivity(new Intent(this, PlayerActivity.class)
-                            .putExtra("url", url).putExtra("title", name));
-                } else {
-                    startActivity(new Intent(this, BrowserActivity.class)
-                            .putExtra(BrowserActivity.EXTRA_URL, url));
-                }
-            } else if (ch.contains("Send to TV")) {
-                String tv = Store.getStr("last_tv","");
-                if (tv.isEmpty()) {
-                    Toast.makeText(this, T.t("Connect to a TV first from the home screen"), Toast.LENGTH_LONG).show();
-                    return;
-                }
-                final String tvIp = tv;
-                new Thread(() -> {
-                    try {
-                        java.util.Map<String,String> params = new java.util.HashMap<>();
-                        params.put("url",   url);
-                        params.put("title", name);
-                        TvClient.post(tvIp, "/play", params);
-                        main.post(() -> Toast.makeText(SeedrActivity.this,"📺 "+T.t("Sent to TV"),Toast.LENGTH_SHORT).show());
-                    } catch (Exception e) {
-                        main.post(() -> showError(T.t("TV error")+": "+e.getMessage()));
-                    }
-                }).start();
-            } else if (ch.contains("Open in browser")) {
-                startActivity(new Intent(this, BrowserActivity.class)
-                        .putExtra(BrowserActivity.EXTRA_URL, url));
-            } else {
-                android.content.ClipboardManager cm=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
-                if(cm!=null) cm.setPrimaryClip(android.content.ClipData.newPlainText("url",url));
-                Toast.makeText(this,"📋 "+T.t("Copied"),Toast.LENGTH_SHORT).show();
-            }
+    /** What to do with a file: play here, send to the TV, download, copy the link. */
+    private void fileActions(final SeedrApi.SeedrFile f) {
+        final List<String> labels = new ArrayList<>();
+        final List<Integer> ids = new ArrayList<>();
+        if (f.playable()) {
+            labels.add("▶  " + T.t("Play on this phone"));
+            ids.add(0);
+            labels.add("📺  " + T.t("Play on the TV"));
+            ids.add(1);
+        }
+        labels.add("⬇  " + T.t("Download to this phone"));
+        ids.add(2);
+        labels.add("📋  " + T.t("Copy link"));
+        ids.add(3);
+        labels.add("✏  " + T.t("Rename"));
+        ids.add(4);
+        labels.add("🗑  " + T.t("Delete"));
+        ids.add(5);
+        new UiDialog(this).setTitle(f.name).setItems(labels.toArray(new String[0]), (d, w) -> {
+            final int act = ids.get(w);
+            if (act == 4) rename(f);
+            else if (act == 5) confirmDelete(f);
+            else withLink(f, url -> useLink(act, f.name, url));
         }).show();
     }
 
-    private void fileMenu(SeedrApi.SeedrFile f) {
-        List<String> items = new ArrayList<>();
-        if (!f.isFolder) items.add("▶  " + T.t("Play / Stream"));
-        items.add("✏  " + T.t("Rename"));
-        items.add("🗑  " + T.t("Delete"));
-        new UiDialog(this).setTitle(f.name).setItems(items.toArray(new String[0]),(d,w)->{
-            String ch = items.get(w);
-            if (ch.contains("Play")) onFileTap(f);
-            else if (ch.contains("Rename")) showRename(f);
+    private interface LinkUser {
+        void use(String url);
+    }
+
+    /** Seedr links are fetched fresh each time (they are signed and expire). */
+    private void withLink(final SeedrApi.SeedrFile f, final LinkUser then) {
+        loading(true);
+        new Thread(() -> {
+            try {
+                String url = SeedrApi.fetchFileUrl(f.id);
+                main.post(() -> {
+                    loading(false);
+                    then.use(url);
+                });
+            } catch (Exception e) {
+                main.post(() -> {
+                    loading(false);
+                    toast("⚠ " + e.getMessage());
+                });
+            }
+        }).start();
+    }
+
+    private void useLink(int act, String name, String url) {
+        if (act == 0) {
+            Store.Item it = new Store.Item(name, url, "");
+            Store.addRecent(it);
+            Remote.play(this, Collections.singletonList(it), 0);   // the same path every other screen uses
+        } else if (act == 1) {
+            sendToTv(name, url);
+        } else if (act == 2) {
+            download(name, url);
+        } else {
+            android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+            if (cm != null) cm.setPrimaryClip(android.content.ClipData.newPlainText(name, url));
+            toast("📋 " + T.t("Link copied"));
+        }
+    }
+
+    private void sendToTv(final String name, final String url) {
+        final String ip = Store.getStr("last_tv", "");
+        if (ip.isEmpty()) {
+            toast(T.t("Connect to your TV first (ZH Play home → pick the TV)"));
+            return;
+        }
+        toast("📺 " + T.t("Sending to the TV…"));
+        new Thread(() -> {
+            String msg;
+            try {
+                HashMap<String, String> p = new HashMap<>();
+                p.put("url", url);
+                p.put("title", name);
+                org.json.JSONObject r = TvClient.post(ip, "/play", p);
+                msg = r.optString("msg", r.optBoolean("ok", true) ? T.t("Playing on the TV") : T.t("The TV could not play it"));
+            } catch (TvClient.AuthNeeded e) {
+                msg = T.t("Open the remote and enter the TV PIN first");
+            } catch (Exception e) {
+                msg = T.t("Cannot reach the TV — same Wi-Fi?");
+            }
+            final String m = msg;
+            main.post(() -> toast(m));
+        }).start();
+    }
+
+    private void download(String name, String url) {
+        try {
+            android.app.DownloadManager dm = (android.app.DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+            android.app.DownloadManager.Request r = new android.app.DownloadManager.Request(android.net.Uri.parse(url));
+            r.setTitle(name);
+            r.setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+            r.setDestinationInExternalPublicDir(android.os.Environment.DIRECTORY_DOWNLOADS, name.replaceAll("[\\\\/:*?\"<>|]", "_"));
+            dm.enqueue(r);
+            toast("⬇ " + T.t("Downloading to Downloads — see the notification"));
+        } catch (Exception e) {
+            toast("⚠ " + e.getMessage());
+        }
+    }
+
+    // ================================================================== manage
+
+    private void itemMenu(final SeedrApi.SeedrFile f) {
+        if (f.isTorrent) {
+            confirmDelete(f);
+            return;
+        }
+        if (!f.isFolder) {
+            fileActions(f);
+            return;
+        }
+        new UiDialog(this).setTitle(f.name).setItems(new String[]{
+                "📂  " + T.t("Open"), "✏  " + T.t("Rename"), "🗑  " + T.t("Delete")}, (d, w) -> {
+            if (w == 0) openItem(f);
+            else if (w == 1) rename(f);
             else confirmDelete(f);
         }).show();
     }
 
-    private void showRename(SeedrApi.SeedrFile f) {
-        EditText et = new EditText(this); et.setText(f.name); et.setSingleLine(true);
-        LinearLayout box = new LinearLayout(this); box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(20),dp(4),dp(20),0); box.addView(et);
-        new UiDialog(this).setTitle(T.t("Rename")).setView(box)
-                .setPositiveButton(T.t("Save"),(d,w)->{
-                    String nm = et.getText().toString().trim(); if(nm.isEmpty())return;
-                    new Thread(()->{
-                        try {
-                            if(f.isFolder) SeedrApi.renameFolder(f.id,nm);
-                            else SeedrApi.renameFile(f.id,nm);
-                            main.post(()->loadFolder(folderStack.peek()[0],folderStack.peek()[1]));
-                        } catch(Exception e){ main.post(()->showError(e.getMessage())); }
-                    }).start();
-                }).setNegativeButton(T.t("Cancel"),null).show();
-    }
-
-    private void confirmDelete(SeedrApi.SeedrFile f) {
-        new UiDialog(this).setTitle(T.t("Delete")+": "+f.name)
-                .setMessage(T.t("This cannot be undone."))
-                .setPositiveButton(T.t("Delete"),(d,w)->new Thread(()->{
-                    try {
-                        if(f.isFolder) SeedrApi.deleteFolder(f.id);
-                        else SeedrApi.deleteFile(f.id);
-                        main.post(()->{
-                            Toast.makeText(this,"🗑 "+T.t("Deleted"),Toast.LENGTH_SHORT).show();
-                            loadFolder(folderStack.peek()[0],folderStack.peek()[1]);
-                        });
-                    } catch(Exception e){ main.post(()->showError(e.getMessage())); }
-                }).start())
-                .setNegativeButton(T.t("Cancel"),null).show();
-    }
-
-    private void confirmDeleteTorrent(SeedrApi.SeedrFile f) {
-        new UiDialog(this).setTitle(T.t("Stop & delete")+"?").setMessage(f.name)
-                .setPositiveButton(T.t("Delete"),(d,w)->new Thread(()->{
-                    try {
-                        SeedrApi.deleteTorrent(f.id);
-                        main.post(()->{
-                            Toast.makeText(this,"🗑 "+T.t("Deleted"),Toast.LENGTH_SHORT).show();
-                            loadTransfers();
-                        });
-                    } catch(Exception e){ main.post(()->showError(e.getMessage())); }
-                }).start())
-                .setNegativeButton(T.t("Cancel"),null).show();
-    }
-
-    // ================================================================== ADD MAGNET
-
-    public void showAddMagnet() {
-        LinearLayout box = new LinearLayout(this); box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(20),dp(4),dp(20),0);
-        EditText et = new EditText(this);
-        et.setHint(T.t("Paste magnet link or torrent URL"));
-        et.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_VARIATION_URI);
-        // auto-paste magnet from clipboard
-        try {
-            android.content.ClipboardManager cm=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
-            if(cm!=null&&cm.hasPrimaryClip()){
-                CharSequence clip=cm.getPrimaryClip().getItemAt(0).getText();
-                if(clip!=null&&clip.toString().startsWith("magnet:")) et.setText(clip.toString().trim());
-            }
-        } catch(Exception ignored){}
-        box.addView(et);
-        new UiDialog(this).setTitle("☁  "+T.t("Add to Seedr")).setView(box)
-                .setPositiveButton(T.t("Add"),(d,w)->{
-                    String link=et.getText().toString().trim();
-                    if(!link.isEmpty()) sendToSeedrApi(link);
+    private void rename(final SeedrApi.SeedrFile f) {
+        final EditText e = new EditText(this);
+        e.setSingleLine(true);
+        e.setText(f.name);
+        e.setSelectAllOnFocus(true);
+        new UiDialog(this).setTitle(T.t("Rename")).setView(pad(e))
+                .setPositiveButton(T.t("Save"), (d, w) -> {
+                    final String nn = e.getText().toString().trim();
+                    if (nn.isEmpty() || nn.equals(f.name)) return;
+                    background(() -> {
+                        if (f.isFolder) SeedrApi.renameFolder(f.id, nn);
+                        else SeedrApi.renameFile(f.id, nn);
+                    }, "✏ " + T.t("Renamed"));
                 })
-                .setNegativeButton(T.t("Cancel"),null).show();
+                .setNegativeButton(T.t("Cancel"), null).show();
     }
 
-    public void sendToSeedrApi(final String magnet) {
-        showLoading(true);
-        new Thread(()->{
-            try {
-                SeedrApi.AddResult res = SeedrApi.addMagnet(magnet);
-                main.post(()->{
-                    showLoading(false);
-                    if (res.ok) {
-                        Toast.makeText(this,"☁ "+T.t("Added to Seedr — downloading in the cloud"),Toast.LENGTH_LONG).show();
-                        currentTab = 1; refreshTab();   // switch to Transfers
-                    } else {
-                        showError(res.msg);
-                    }
-                });
-            } catch(Exception e){
-                main.post(()->{ showLoading(false); showError(e.getMessage()); });
-            }
-        }).start();
+    private void confirmDelete(final SeedrApi.SeedrFile f) {
+        new UiDialog(this).setTitle("🗑  " + T.t("Delete") + "?")
+                .setMessage(f.name + "\n\n" + (f.isTorrent ? T.t("This stops the download.") : T.t("This frees its space in Seedr.")))
+                .setPositiveButton(T.t("Delete"), (d, w) -> background(() -> {
+                    if (f.isTorrent) SeedrApi.deleteTorrent(f.id);
+                    else if (f.isFolder) SeedrApi.deleteFolder(f.id);
+                    else SeedrApi.deleteFile(f.id);
+                }, "🗑 " + T.t("Deleted")))
+                .setNegativeButton(T.t("Cancel"), null).show();
     }
 
-    // ================================================================== SEARCH
-
-    private void showSearchBar() {
-        titleView.setText("☁  Search");
-        fileList.removeAllViews();
-        LinearLayout box = new LinearLayout(this); box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(0,dp(8),0,0);
-        EditText et = new EditText(this); et.setHint(T.t("Search your Seedr files…")); et.setSingleLine(true);
-        et.setTextColor(Color.WHITE); et.setHintTextColor(0x66FFFFFF);
-        et.setBackgroundColor(0xFF1A2035);
-        et.setPadding(dp(14),dp(12),dp(14),dp(12));
-        box.addView(et);
-        LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);
-        blp.setMargins(0,0,0,dp(8));
-        fileList.addView(box,blp);
-        et.setOnEditorActionListener((v,id,ev)->{
-            String q=et.getText().toString().trim();
-            if(!q.isEmpty()){
-                showLoading(true);
-                new Thread(()->{
-                    try {
-                        List<SeedrApi.SeedrFile> r=SeedrApi.search(q);
-                        main.post(()->{
-                            showLoading(false);
-                            // remove everything below the search bar
-                            while(fileList.getChildCount()>1) fileList.removeViewAt(1);
-                            if(r.isEmpty()) {
-                                TextView empty=tv(14,0x66FFFFFF,false);
-                                empty.setText(T.t("No results for")+" \""+q+"\"");
-                                empty.setPadding(0,dp(24),0,0);
-                                fileList.addView(empty);
-                            } else {
-                                for(SeedrApi.SeedrFile f:r) {
-                                    View row=buildSearchRow(f);
-                                    fileList.addView(row,row(4));
-                                }
-                            }
-                        });
-                    } catch(Exception e){ main.post(()->{showLoading(false);showError(e.getMessage());}); }
-                }).start();
-            }
-            return false;
-        });
+    private interface Job {
+        void run() throws Exception;
     }
 
-    private View buildSearchRow(SeedrApi.SeedrFile f) {
-        LinearLayout row=new LinearLayout(this);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(dp(14),dp(12),dp(8),dp(12));
-        row.setBackground(Ui.focusCard(this,12));
-        ImageView ic=UiKit.icon(this,iconFor(f.ext),20,0xFFCCCCCC);
-        LinearLayout.LayoutParams ilp=lp(dp(32),dp(32)); ilp.setMargins(0,0,dp(10),0);
-        row.addView(ic,ilp);
-        LinearLayout col=new LinearLayout(this); col.setOrientation(LinearLayout.VERTICAL);
-        TextView name=tv(13,Color.WHITE,false);
-        name.setText(f.name); name.setSingleLine(true);
-        name.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        col.addView(name);
-        TextView sub=tv(11,0x88FFFFFF,false); sub.setText(f.displaySize()); col.addView(sub);
-        row.addView(col,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));
-        row.setOnClickListener(v->onFileTap(f));
-        return row;
-    }
-
-    // ================================================================== SETUP / SETTINGS
-
-    private void showSetup() {
-        new UiDialog(this).setTitle("☁  Seedr")
-                .setMessage("Connect your Seedr account to ZH Play.\n\nChoose a login method:")
-                .setPositiveButton("📱 Sign in with code", (d,w) -> startDeviceLogin())
-                .setNeutralButton("✉ Email & Password",   (d,w) -> showEmailLogin())
-                .setNegativeButton("Cancel", null).show();
-    }
-
-    // ---- Device Flow ----
-    private void startDeviceLogin() {
-        showLoading(true);
+    private void background(final Job job, final String done) {
+        loading(true);
         new Thread(() -> {
+            String msg = done;
             try {
-                SeedrApi.DeviceCode dc = SeedrApi.startDeviceFlow();
-                main.post(() -> { showLoading(false); showDeviceCodeDialog(dc); });
+                job.run();
             } catch (Exception e) {
-                main.post(() -> { showLoading(false); showError(e.getMessage()); showEmailLogin(); });
+                msg = "⚠ " + e.getMessage();
             }
+            final String m = msg;
+            main.post(() -> {
+                loading(false);
+                toast(m);
+                refreshAccount();
+                reload();
+            });
         }).start();
     }
 
-    private void showDeviceCodeDialog(SeedrApi.DeviceCode dc) {
-        LinearLayout box = new LinearLayout(this); box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(20), dp(8), dp(20), dp(8));
+    // ================================================================== adding
 
-        TextView step = tv(13, 0xCCFFFFFF, false);
-        step.setText("1. Open on any browser:\n   " + dc.verifyUrl + "\n\n2. Enter this code:");
-        box.addView(step);
-
-        TextView code = tv(36, Ui.ACCENT, true);
-        code.setText(dc.userCode);
-        code.setGravity(android.view.Gravity.CENTER);
-        code.setLetterSpacing(0.15f);
-        LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        clp.setMargins(0, dp(12), 0, dp(12));
-        box.addView(code, clp);
-
-        TextView step2 = tv(13, 0xCCFFFFFF, false);
-        step2.setText("3. ZH Play will connect automatically after you approve.");
-        box.addView(step2);
-
-        android.widget.Button copyBtn = new android.widget.Button(this);
-        copyBtn.setText("📋 Copy URL to clipboard");
-        copyBtn.setOnClickListener(v -> {
-            android.content.ClipboardManager cm =
-                    (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-            if (cm != null)
-                cm.setPrimaryClip(android.content.ClipData.newPlainText("seedr", dc.verifyUrl));
-            Toast.makeText(this, "Copied!", Toast.LENGTH_SHORT).show();
-        });
-        LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        blp.setMargins(0, dp(10), 0, 0);
-        box.addView(copyBtn, blp);
-
-        AlertDialog[] dlg = {null};
-        dlg[0] = (AlertDialog) new UiDialog(this).setTitle("☁  Sign in to Seedr").setView(box)
-                .setNegativeButton("Cancel", (d, w) -> {}).create();
-        dlg[0].show();
-
-        // poll in background every `interval` seconds
-        final boolean[] done = {false};
-        Runnable[] poll = {null};
-        poll[0] = new Runnable() {
-            public void run() {
-                if (done[0] || dlg[0] == null || !dlg[0].isShowing()) return;
-                new Thread(() -> {
-                    try {
-                        if (SeedrApi.pollDeviceFlow(dc.deviceCode)) {
-                            done[0] = true;
-                            SeedrApi.AccountInfo acc = SeedrApi.getAccount();
-                            main.post(() -> {
-                                if (dlg[0] != null) dlg[0].dismiss();
-                                onConnected(acc);
-                            });
-                        } else {
-                            main.postDelayed(poll[0], Math.max(5000, dc.interval * 1000L));
-                        }
-                    } catch (Exception ignored) {
-                        main.postDelayed(poll[0], 8000);
-                    }
-                }).start();
-            }
-        };
-        main.postDelayed(poll[0], Math.max(5000, dc.interval * 1000L));
-    }
-
-    // ---- Email + Password ----
-    private void showEmailLogin() {
-        LinearLayout box = new LinearLayout(this); box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(20), dp(8), dp(20), 0);
-
-        EditText email = new EditText(this);
-        email.setHint("Seedr email");
-        email.setInputType(android.text.InputType.TYPE_CLASS_TEXT |
-                android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
-        email.setSingleLine(true);
-        if (!SeedrApi.email().isEmpty()) email.setText(SeedrApi.email());
-        box.addView(email);
-
-        LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        plp.setMargins(0, dp(10), 0, 0);
-        EditText pwd = new EditText(this);
-        pwd.setHint("Password");
-        pwd.setInputType(android.text.InputType.TYPE_CLASS_TEXT |
-                android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        pwd.setSingleLine(true);
-        box.addView(pwd, plp);
-
-        new UiDialog(this).setTitle("☁  Seedr Login").setView(box)
-                .setPositiveButton("Sign in", (d, w) -> {
-                    String em = email.getText().toString().trim();
-                    String pw = pwd.getText().toString();
-                    if (em.isEmpty() || pw.isEmpty()) {
-                        Toast.makeText(this, "Enter email and password", Toast.LENGTH_SHORT).show();
-                        return;
-                    }
-                    showLoading(true);
-                    new Thread(() -> {
-                        try {
-                            SeedrApi.AccountInfo acc = SeedrApi.login(em, pw);
-                            main.post(() -> { showLoading(false); onConnected(acc); });
-                        } catch (Exception e) {
-                            main.post(() -> { showLoading(false); showError("Login failed: " + e.getMessage()); });
-                        }
-                    }).start();
-                })
-                .setNegativeButton("Cancel", null).show();
-    }
-
-    private void onConnected(SeedrApi.AccountInfo acc) {
-        Toast.makeText(this, "✅ Connected as " + acc.username, Toast.LENGTH_LONG).show();
-        usernameView.setText(acc.username + (acc.email.isEmpty() ? "" : "  ·  " + acc.email));
-        if (acc.spaceTotal > 0) {
-            quotaLabel.setText("Storage: " + acc.quota());
-            quotaBar.setProgress((int) (1000L * acc.spaceUsed / acc.spaceTotal));
+    private void askMagnet() {
+        if (!SeedrApi.hasToken()) {
+            signIn();
+            return;
         }
-        folderStack.clear(); currentTab = 0; refreshTab();
-    }
-
-    private void showSettings() {
-        new UiDialog(this).setTitle("Seedr  ·  "+(SeedrApi.email().length()>12?SeedrApi.email().substring(0,12)+"…":SeedrApi.email()))
-                .setItems(new String[]{
-                        "🔄  "+T.t("Refresh"),
-                        "🔑  "+T.t("Change token"),
-                        "🚪  "+T.t("Sign out")
-                },(d,w)->{
-                    if(w==0) loadAccount();
-                    else if(w==1) showSetup();
-                    else { SeedrApi.clearAll(); finish(); }
-                }).show();
-    }
-
-    // ================================================================== PROGRESS POLL
-
-    private SeedrApi.SeedrFile pollProgress(String url) {
-        SeedrApi.SeedrFile f = new SeedrApi.SeedrFile();
+        final EditText e = new EditText(this);
+        e.setHint("magnet:?xt=…   /   https://…/file.torrent");
+        e.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
         try {
-            // progress_url is a direct JSON endpoint
-            java.net.HttpURLConnection c=(java.net.HttpURLConnection)new java.net.URL(url).openConnection();
-            c.setConnectTimeout(8000); c.setReadTimeout(8000);
-            java.io.BufferedReader br=new java.io.BufferedReader(new java.io.InputStreamReader(c.getInputStream()));
-            StringBuilder sb=new StringBuilder(); String ln;
-            while((ln=br.readLine())!=null) sb.append(ln);
-            br.close();
-            org.json.JSONObject r=new org.json.JSONObject(sb.toString());
-            f.name     = r.optString("name","");
-            f.progress = String.valueOf((int)(r.optDouble("progress",0)*100));
-            f.dlRate   = r.optLong("download_rate",0);
-            f.seeders  = r.optInt("seeders",0);
-            f.peers    = r.optInt("downloading_from",0);
-            f.size     = r.optLong("size",0);
-        } catch(Exception ignored){}
+            android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+            if (cm != null && cm.hasPrimaryClip() && cm.getPrimaryClip().getItemCount() > 0) {
+                CharSequence c = cm.getPrimaryClip().getItemAt(0).getText();
+                if (c != null && (c.toString().trim().startsWith("magnet:") || Formats.isTorrent(c.toString().trim())))
+                    e.setText(c.toString().trim());
+            }
+        } catch (Exception ignored) {
+        }
+        new UiDialog(this).setTitle("☁  " + T.t("Add to Seedr")).setView(pad(e))
+                .setPositiveButton(T.t("Add"), (d, w) -> {
+                    String m = e.getText().toString().trim();
+                    if (!m.isEmpty()) add(m);
+                })
+                .setNegativeButton(T.t("Cancel"), null).show();
+    }
+
+    private void add(final String link) {
+        if (!link.startsWith("magnet:") && !link.startsWith("http")) {
+            toast(T.t("Paste a magnet link or a link to a .torrent file"));
+            return;
+        }
+        loading(true);
+        new Thread(() -> {
+            SeedrApi.AddResult r;
+            try {
+                r = SeedrApi.addMagnet(link);
+            } catch (Exception e) {
+                r = new SeedrApi.AddResult();
+                r.msg = "⚠ " + e.getMessage();
+            }
+            final SeedrApi.AddResult res = r;
+            main.post(() -> {
+                loading(false);
+                if (res.ok) {
+                    toast(res.msg);
+                    refreshAccount();
+                    showTab(1);
+                } else {
+                    new UiDialog(this).setTitle("☁ Seedr").setMessage(res.msg)
+                            .setPositiveButton(T.t("OK"), null).show();
+                    reload();
+                }
+            });
+        }).start();
+    }
+
+    // ================================================================== search
+
+    private void searchView() {
+        title.setText(T.t("Search"));
+        list.removeAllViews();
+        final EditText q = new EditText(this);
+        q.setSingleLine(true);
+        q.setHint(T.t("Search your Seedr files…"));
+        q.setText(lastQuery);
+        q.setTextColor(Color.WHITE);
+        q.setHintTextColor(SUB);
+        q.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
+        q.setBackground(Ui.card(this, PANEL, 0x33FFFFFF, dp(12)));
+        q.setPadding(dp(14), dp(12), dp(14), dp(12));
+        list.addView(q, rowLp());
+        final LinearLayout results = new LinearLayout(this);
+        results.setOrientation(LinearLayout.VERTICAL);
+        list.addView(results);
+        q.setOnEditorActionListener((v, id, ev) -> {
+            boolean go = id == EditorInfo.IME_ACTION_SEARCH
+                    || (ev != null && ev.getKeyCode() == KeyEvent.KEYCODE_ENTER && ev.getAction() == KeyEvent.ACTION_DOWN);
+            if (!go) return false;
+            final String s = q.getText().toString().trim();
+            if (s.isEmpty()) return true;
+            lastQuery = s;
+            loading(true);
+            new Thread(() -> {
+                try {
+                    List<SeedrApi.SeedrFile> found = SeedrApi.search(s);
+                    main.post(() -> {
+                        loading(false);
+                        results.removeAllViews();
+                        if (found.isEmpty()) {
+                            TextView t = text(14, SUB, false);
+                            t.setText(T.t("Nothing found for") + " “" + s + "”");
+                            t.setPadding(dp(8), dp(20), dp(8), 0);
+                            results.addView(t);
+                        }
+                        for (SeedrApi.SeedrFile f : found) results.addView(fileRow(f), rowLp());
+                    });
+                } catch (Exception e) {
+                    main.post(() -> {
+                        loading(false);
+                        toast("⚠ " + e.getMessage());
+                    });
+                }
+            }).start();
+            return true;
+        });
+        q.requestFocus();
+    }
+
+    // ================================================================== sign in
+
+    private View pad(View v) {
+        FrameLayout f = new FrameLayout(this);
+        f.setPadding(dp(20), dp(8), dp(20), 0);
+        f.addView(v);
         return f;
     }
 
-    // ================================================================== HELPERS
-
-    private void showLoading(boolean show) {
-        loadingOverlay.setVisibility(show ? View.VISIBLE : View.GONE);
+    private void signIn() {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(20), dp(6), dp(20), 0);
+        TextView info = text(13, SUB, false);
+        info.setText(T.t("Sign in with your Seedr account. ZH Play keeps you signed in."));
+        box.addView(info);
+        final EditText mail = new EditText(this);
+        mail.setHint(T.t("E-mail"));
+        mail.setSingleLine(true);
+        mail.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
+        mail.setText(SeedrApi.email());
+        box.addView(mail);
+        final EditText pw = new EditText(this);
+        pw.setHint(T.t("Password"));
+        pw.setSingleLine(true);
+        pw.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        box.addView(pw);
+        new UiDialog(this).setTitle("☁  " + T.t("Sign in to Seedr")).setView(box)
+                .setPositiveButton(T.t("Sign in"), (d, w) -> {
+                    final String em = mail.getText().toString().trim(), p = pw.getText().toString();
+                    if (em.isEmpty() || p.isEmpty()) {
+                        toast(T.t("Enter your e-mail and password"));
+                        return;
+                    }
+                    loading(true);
+                    new Thread(() -> {
+                        try {
+                            SeedrApi.login(em, p);
+                            main.post(() -> {
+                                loading(false);
+                                toast("✅ " + T.t("Signed in to Seedr"));
+                                afterSignIn();
+                            });
+                        } catch (Exception e) {
+                            main.post(() -> {
+                                loading(false);
+                                toast("⚠ " + e.getMessage());
+                                message(T.t("Not signed in.") + "\n\n" + T.t("Tap ⚙ to sign in."));
+                            });
+                        }
+                    }).start();
+                })
+                .setNeutralButton(T.t("Sign in with a code"), (d, w) -> deviceSignIn())
+                .setNegativeButton(T.t("Cancel"), (d, w) -> {
+                    if (!SeedrApi.hasToken()) message(T.t("Not signed in.") + "\n\n" + T.t("Tap ⚙ to sign in."));
+                }).show();
     }
 
-    private void showError(String msg) {
-        Toast.makeText(this, "⚠ "+msg, Toast.LENGTH_LONG).show();
+    /** For when typing a password is awkward (TV): approve a short code on seedr.cc/devices. */
+    private void deviceSignIn() {
+        loading(true);
+        new Thread(() -> {
+            try {
+                final SeedrApi.DeviceCode dc = SeedrApi.startDeviceFlow();
+                main.post(() -> {
+                    loading(false);
+                    showDeviceCode(dc);
+                });
+            } catch (Exception e) {
+                main.post(() -> {
+                    loading(false);
+                    toast("⚠ " + e.getMessage());
+                });
+            }
+        }).start();
     }
 
-    private static String fmtSpeed(long bps){
-        if(bps>1_048_576) return String.format(Locale.US,"%.1f MB/s",bps/1_048_576.0);
-        if(bps>1024)      return String.format(Locale.US,"%.0f KB/s",bps/1024.0);
-        return bps+" B/s";
+    private void showDeviceCode(final SeedrApi.DeviceCode dc) {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(20), dp(6), dp(20), 0);
+        TextView a = text(14, SUB, false);
+        a.setText(T.t("On any phone or computer open") + "\n" + dc.verifyUrl + "\n" + T.t("and enter this code:"));
+        box.addView(a);
+        TextView code = text(34, Ui.ACCENT, true);
+        code.setText(dc.userCode);
+        code.setGravity(Gravity.CENTER);
+        code.setLetterSpacing(0.12f);
+        code.setPadding(0, dp(14), 0, dp(14));
+        code.setTextIsSelectable(true);
+        box.addView(code);
+        TextView b = text(13, SUB, false);
+        b.setText(T.t("Waiting for you to approve it…"));
+        box.addView(b);
+        final boolean[] done = {false};
+        final android.app.Dialog dlg = new UiDialog(this).setTitle("☁  " + T.t("Sign in with a code")).setView(box)
+                .setNegativeButton(T.t("Cancel"), (d, w) -> done[0] = true).show();
+        final long until = System.currentTimeMillis() + dc.expiresIn * 1000L;
+        final Runnable[] poll = new Runnable[1];
+        poll[0] = () -> {
+            if (done[0] || isFinishing()) return;
+            if (System.currentTimeMillis() > until) {
+                done[0] = true;
+                dlg.dismiss();
+                toast(T.t("The code expired — try again"));
+                return;
+            }
+            new Thread(() -> {
+                boolean ok = false;
+                try {
+                    ok = SeedrApi.pollDeviceFlow(dc.deviceCode);
+                } catch (Exception ignored) {
+                }
+                final boolean fOk = ok;
+                main.post(() -> {
+                    if (done[0]) return;
+                    if (fOk) {
+                        done[0] = true;
+                        dlg.dismiss();
+                        toast("✅ " + T.t("Signed in to Seedr"));
+                        afterSignIn();
+                    } else {
+                        main.postDelayed(poll[0], dc.interval * 1000L);
+                    }
+                });
+            }).start();
+        };
+        main.postDelayed(poll[0], dc.interval * 1000L);
     }
 
-    private static String iconFor(String ext){
-        if(ext==null) return "file";
-        switch(ext.toLowerCase(Locale.US)){
-            case "mp4": case "mkv": case "avi": case "mov": case "m4v":
-            case "webm": case "ts": case "flv": return "video";
-            case "mp3": case "m4a": case "aac": case "flac":
-            case "ogg": case "opus": case "wav": return "music";
-            case "pdf": return "file-text";
-            case "zip": case "rar": case "7z": return "archive";
-            case "jpg": case "jpeg": case "png": case "gif": case "webp": return "image";
-            default: return "file";
+    private void settings() {
+        final boolean in = SeedrApi.hasToken();
+        List<String> l = new ArrayList<>();
+        if (in) {
+            l.add("🔄  " + T.t("Refresh"));
+            l.add("🌐  " + T.t("Open seedr.cc"));
+            l.add("🚪  " + T.t("Sign out"));
+        } else {
+            l.add("🔑  " + T.t("Sign in"));
+            l.add("🌐  " + T.t("Open seedr.cc"));
         }
-    }
-
-    private LinearLayout.LayoutParams lp(int w,int h){return new LinearLayout.LayoutParams(w,h);}
-    private LinearLayout.LayoutParams row(int marginDp){
-        LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT);
-        p.setMargins(0,dp(marginDp/2),0,dp(marginDp/2)); return p;
-    }
-
-    @Override public void onBackPressed(){
-        if(currentTab!=0){ currentTab=0; folderStack.clear(); refreshTab(); return; }
-        if(folderStack.size()>1){ folderStack.pop(); String[]p=folderStack.pop(); loadFolder(p[0],p[1]); return; }
-        super.onBackPressed();
+        new UiDialog(this).setTitle("Seedr" + (SeedrApi.email().isEmpty() ? "" : " · " + SeedrApi.email()))
+                .setItems(l.toArray(new String[0]), (d, w) -> {
+                    if (w == 0 && !in) {
+                        signIn();
+                    } else if (w == 0) {
+                        refreshAccount();
+                        reload();
+                    } else if (w == 1) {
+                        startActivity(new Intent(this, BrowserActivity.class).putExtra(BrowserActivity.EXTRA_URL, "https://www.seedr.cc/files"));
+                    } else {
+                        SeedrApi.clearAll();
+                        path.clear();
+                        account.setText("");
+                        quota.setProgress(0);
+                        message(T.t("Signed out.") + "\n\n" + T.t("Tap ⚙ to sign in."));
+                    }
+                }).show();
     }
 }

@@ -337,7 +337,19 @@ public class BrowserActivity extends AppCompatActivity {
 
         configure(web);
 
-        handleOpenIntent(getIntent());
+        // Start-up: bring back the last tabs (or the home page), then open what was asked for.
+        boolean restoring = (Store.getBool("b_restore", true) || Store.getBool("b_restore_once", false))
+                && !BrowserData.savedTabs().isEmpty();
+        Store.putBool("b_restore_once", false);
+        if (restoring) restoreTabs();
+        String wanted = intentUrl(getIntent());
+        if (wanted == null) {
+            if (!restoring) home();
+        } else if (restoring) {
+            newTab(wanted);                      // keep the restored tabs, the new link opens beside them
+        } else {
+            go(wanted);                          // first tab
+        }
         if (tv) web.requestFocus();
         WgVpn.onChange = () -> main.post(this::updateVpnBar);
         updateVpnBar();
@@ -533,10 +545,14 @@ public class BrowserActivity extends AppCompatActivity {
 
     private void saveTabs() {
         List<String[]> l = new ArrayList<>();
+        boolean anyLoaded = false;
         for (WebView t : tabs) {
             String u = t.getUrl();
+            if (u != null) anyLoaded = true;
             if (u != null && u.startsWith("http")) l.add(new String[]{t.getTitle() == null ? "" : t.getTitle(), u});
         }
+        // Tabs that haven't loaded yet (start-up) must not wipe the last saved set.
+        if (!anyLoaded && !tabs.isEmpty()) return;
         if (Store.getBool("b_private", false)) l.clear();
         BrowserData.saveTabs(l, Math.max(0, tabs.indexOf(web)));
     }
@@ -1063,12 +1079,6 @@ public class BrowserActivity extends AppCompatActivity {
                 }
                 if (audioMode() && url != null && !url.contains("tamilcastplay.local")) {
                     v.evaluateJavascript(AUDIO_JS, null);
-                    // from Music Links: audio mode applied → step back automatically
-                    if (listenBack) {
-                        listenBack = false;
-                        UiKit.makeToast(BrowserActivity.this, "\uD83C\uDFA7 " + T.t("Playing in the background — use the notification to pause"), Toast.LENGTH_LONG).show();
-                        main.postDelayed(() -> moveTaskToBack(true), 1500);
-                    }
                 }
                 if (cssDark() && url != null && !url.contains("tamilcastplay.local")) v.evaluateJavascript(DARK_JS, null);
                 if (url != null && url.startsWith("http") && !Store.getBool("b_private", false)) BrowserData.visit(v.getTitle(), url);
@@ -1840,7 +1850,7 @@ public class BrowserActivity extends AppCompatActivity {
             int i = (Integer) sct[0];
             if (i == 23 && tv) continue;
             if (i == -6) {                                              // open Seedr manager
-                list.addView(UiRows.row(this, "cloud", (String) sct[1], (String) sct[2], -1, false, v -> {
+                list.addView(UiRows.row(this, "cloud-download", (String) sct[1], (String) sct[2], -1, false, v -> {
                     d.dismiss();
                     SeedrActivity.open(this);
                 }));
@@ -2180,44 +2190,43 @@ public class BrowserActivity extends AppCompatActivity {
     }
 
     private void showMagnetMenu(final String u) {
-        boolean connected = SeedrApi.hasToken();
-        String seedrLabel = connected
-                ? "☁  " + T.t("Send to Seedr") + "  ✓"
-                : "☁  " + T.t("Send to Seedr");
+        final boolean signedIn = SeedrApi.hasToken();
         new UiDialog(this).setTitle("🧲 " + T.t("Torrent link"))
             .setItems(new String[]{
-                seedrLabel,
+                "☁  " + T.t("Send to Seedr") + (signedIn ? "  ✓" : ""),
                 "▶  " + T.t("Play / open here"),
                 "📋  " + T.t("Copy link"),
                 "📂  " + T.t("Open Seedr")
             }, (d2, w) -> {
                 if (w == 0) {
-                    if (connected) {
-                        // Use API — open Seedr manager and send there
-                        Toast.makeText(this, "☁ " + T.t("Sending to Seedr…"), Toast.LENGTH_SHORT).show();
-                        new Thread(() -> {
-                            try {
-                                SeedrApi.AddResult res = SeedrApi.addMagnet(u);
-                                main.post(() -> {
-                                    if (res.ok) {
-                                        Toast.makeText(this, "☁ " + T.t("Added! Check Seedr → Transfers"), Toast.LENGTH_LONG).show();
-                                    } else {
-                                        Toast.makeText(this, "⚠ " + res.msg, Toast.LENGTH_LONG).show();
-                                        // fallback: open browser Seedr tab
-                                        sendToSeedr(u);
-                                    }
-                                });
-                            } catch (Exception e) {
-                                main.post(() -> {
-                                    Toast.makeText(this, "⚠ API: " + e.getMessage() + " — trying browser…", Toast.LENGTH_LONG).show();
-                                    sendToSeedr(u);
-                                });
-                            }
-                        }).start();
-                    } else {
-                        // not connected: open Seedr setup
-                        SeedrActivity.open(this);
+                    if (!signedIn) {                 // sign in first; the link is added right after
+                        SeedrActivity.open(this, u);
+                        return;
                     }
+                    UiKit.makeToast(this, "☁ " + T.t("Sending to Seedr…"), Toast.LENGTH_SHORT).show();
+                    new Thread(() -> {
+                        String msg;
+                        boolean ok = false;
+                        try {
+                            SeedrApi.AddResult res = SeedrApi.addMagnet(u);
+                            ok = res.ok;
+                            msg = res.msg;
+                        } catch (Exception e) {
+                            msg = e.getMessage();
+                        }
+                        final boolean fOk = ok;
+                        final String fMsg = msg;
+                        main.post(() -> {
+                            if (fOk) {
+                                UiKit.makeToast(this, fMsg, Toast.LENGTH_LONG).show();
+                                return;
+                            }
+                            new UiDialog(this).setTitle("☁ Seedr").setMessage(fMsg)
+                                    .setPositiveButton(T.t("Open Seedr"), (x, y) -> SeedrActivity.open(this))
+                                    .setNeutralButton(T.t("Add on seedr.cc"), (x, y) -> sendToSeedr(u))
+                                    .setNegativeButton(T.t("Close"), null).show();
+                        });
+                    }).start();
                 } else if (w == 1) { pendingDl = null; offer(u, null); }
                 else if (w == 2) copy(u);
                 else SeedrActivity.open(this);
@@ -2243,7 +2252,8 @@ public class BrowserActivity extends AppCompatActivity {
         // no Seedr tab: open one and inject after it loads
         newTab(seedrUrl);
         pendingSeedrMagnet = magnet;
-        UiKit.makeToast(this, "☁ " + T.t("Opening Seedr…"), Toast.LENGTH_SHORT).show();
+        copy(magnet);
+        UiKit.makeToast(this, "☁ " + T.t("Link copied — if it isn't added by itself, tap Add on Seedr and paste"), Toast.LENGTH_LONG).show();
     }
 
     private void injectMagnetToSeedr(String magnet) {
@@ -2686,37 +2696,38 @@ public class BrowserActivity extends AppCompatActivity {
                 }).show();
     }
 
-    /** Handles VIEW, WEB_SEARCH, PROCESS_TEXT and EXTRA_URL intents from any caller. */
-    private void handleOpenIntent(android.content.Intent intent) {
-        if (intent == null) return;
-        // EXTRA_URL / EXTRA_LISTEN (internal: Music, other ZH Play screens)
-        String direct = intent.getStringExtra(EXTRA_URL);
+    /**
+     * The address an intent asks the browser to open, or null when it asks for nothing.
+     * Handles ZH Play's own EXTRA_URL / EXTRA_LISTEN (Music → Links), PROCESS_TEXT (text selected
+     * in another app), WEB_SEARCH (voice / system search) and VIEW (a link opened from another app).
+     */
+    private String intentUrl(android.content.Intent intent) {
+        if (intent == null) return null;
         listenBack = intent.getBooleanExtra(EXTRA_LISTEN, false);
         if (listenBack) setAudioMode(true);
-        if (direct != null && !direct.isEmpty()) { newTab(direct); return; }
-        // PROCESS_TEXT: selected text in another app → "Search in new tab" in ZH Browser
+        String direct = intent.getStringExtra(EXTRA_URL);
+        if (direct != null && !direct.trim().isEmpty()) return direct.trim();
         CharSequence proc = intent.getCharSequenceExtra(android.content.Intent.EXTRA_PROCESS_TEXT);
-        if (proc != null && proc.length() > 0) {
-            String q = proc.toString().trim();
-            if (!q.isEmpty()) newTab(BrowserLook.searchUrl() + android.net.Uri.encode(q));
-            return;
-        }
-        // WEB_SEARCH: from voice or system search
+        if (proc != null && proc.toString().trim().length() > 0)
+            return BrowserLook.searchUrl() + android.net.Uri.encode(proc.toString().trim());
         String query = intent.getStringExtra(android.app.SearchManager.QUERY);
         if (query == null) query = intent.getStringExtra("query");
-        if (query != null && !query.isEmpty()) { newTab(BrowserLook.searchUrl() + android.net.Uri.encode(query)); return; }
-        // ACTION_VIEW: another app opened a URL in ZH Browser
+        if (query != null && !query.trim().isEmpty())
+            return BrowserLook.searchUrl() + android.net.Uri.encode(query.trim());
         android.net.Uri data = intent.getData();
         if (data != null) {
             String url = data.toString();
-            if (url.startsWith("http") || url.startsWith("magnet:") || Formats.isTorrent(url)) newTab(url);
+            if (url.startsWith("http") || url.startsWith("magnet:") || Formats.isTorrent(url)) return url;
         }
+        return null;
     }
 
+    @Override
     protected void onNewIntent(android.content.Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
-        handleOpenIntent(intent);
+        String url = intentUrl(intent);
+        if (url != null) newTab(url);            // the browser is already open: a new tab, the others stay
     }
 
     private LinearLayout suggestBox;

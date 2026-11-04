@@ -1,3 +1,35 @@
+ZH PLAY 6.7 — Browser tabs restored · Seedr rebuilt on Seedr's real protocol
+============================================================================
+BROWSER
+* Fixed: after closing and reopening, all tabs were black and nothing was restored. The start-up
+  code that restores the last tabs (or loads the home page) had been deleted by the 5.8-era
+  "open links from other apps" change. Restored; a link opened from another app now opens as an
+  extra tab beside your restored tabs.
+* Tabs that haven't loaded yet can no longer overwrite (wipe) the saved tabs.
+* Music → Links (YouTube listen): steps back only once the audio really plays.
+* Magnet → Send to Seedr: shows Seedr's real reason if it fails; if you're not signed in, Seedr
+  opens and adds the link right after you sign in. No more surprise extra seedr.cc tabs.
+
+SEEDR (checked line by line against the reference client seedrcc 2.1.2)
+* Play on this phone works (it now opens the player the same way the rest of the app does).
+* Play on the TV with PIN / Wi-Fi error messages; Download to this phone (Downloads folder).
+* A finished single-video torrent opens straight to its video.
+* Username, e-mail and storage bar now show (they are under "account" in Seedr's reply).
+* Rename uses Seedr's "rename" function (the old names didn't exist).
+* "Sign in with a code" now really finishes (GET api/device/authorize, client seedr_xbmc).
+* Sign-in stays alive: token renewal uses oauth_test/token.php (was a wrong URL).
+* Adding explains Seedr's answer: queue full (free plan, put on wishlist), not enough space,
+  unreadable magnet, already added. .torrent http links are downloaded and uploaded properly.
+* Transfers tab refreshes every 5 s while open.
+
+PAIRING CODE
+* The TV home shows only the pair code (no IP). The code no longer changes silently after 30 min
+  while the screen still showed the old one; it now changes each time the TV app restarts.
+
+BUILD
+* Every file now compile-checked at Java 8 against Android 34 + the real library sources before
+  release (0 errors).
+
 ZH PLAY 6.0 — Full Seedr integration: files, transfers, search, delete, rename, stream
 ======================================================================================
 * Complete Seedr file manager (same layout as the Seedr app):

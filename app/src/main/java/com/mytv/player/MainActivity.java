@@ -505,11 +505,8 @@ public class MainActivity extends AppCompatActivity {
         StringBuilder sb = new StringBuilder();
         if (Pair.enabled()) sb.append("🔐  PIN ").append(Pair.pin()).append("   ·   ");
         if (RemoteService.error != null) sb.append(RemoteService.error);
-        else sb.append("📱  Control from your phone: install this same app on the phone (it finds this TV by itself), "
-                + "Pair code: ").append(PairCode.formatted(PairCode.get()))
-                   .append("   (").append(PairCode.minutesLeft()).append(" min)")
-                   .append("   |   http://").append(Net.ip()).append(":").append(RemoteService.PORT);
-
+        else sb.append("📱  ").append(T.t("On your phone: ZH Play → Pair with code")).append("   ")
+                .append(PairCode.formatted(PairCode.get()));
         info.setText(UiKit.noEmoji(sb.toString()));
     }
 

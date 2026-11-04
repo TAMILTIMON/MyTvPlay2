@@ -35,6 +35,14 @@ public final class T {
     }
 
     static {
+        TA.put("Files", "கோப்புகள்");
+        HI.put("Files", "फ़ाइलें");
+        TA.put("Transfers", "பரிமாற்றங்கள்");
+        HI.put("Transfers", "ट्रांसफ़र");
+        TA.put("Sign in to Seedr", "Seedr-ல் உள்நுழை");
+        HI.put("Sign in to Seedr", "Seedr में साइन इन करें");
+        TA.put("On your phone: ZH Play → Pair with code", "தொலைபேசியில்: ZH Play → குறியீட்டால் இணை");
+        HI.put("On your phone: ZH Play → Pair with code", "फ़ोन पर: ZH Play → कोड से जोड़ें");
         TA.put("Pair with code","குறியீட்டால் இணை");
         HI.put("Pair with code","कोड से जोड़ें");
         TA.put("enter the 6-digit code from your TV","TV-இல் உள்ள 6-இலக்க குறியீட்டை உள்ளிடு");
