@@ -55,6 +55,8 @@ import java.util.concurrent.Executors;
  */
 public class NativeRemoteActivity extends AppCompatActivity {
     public static final String EXTRA_IP = "ip", EXTRA_NAME = "name";
+    /** Opened from the home-screen widget's mic: start listening right away. */
+    public static final String EXTRA_VOICE = "voice";
     private static final int PICK_MEDIA = 21, PICK_TORRENT = 22, PICK_SUB = 23;
 
     private String ip, tvName;
@@ -649,6 +651,13 @@ public class NativeRemoteActivity extends AppCompatActivity {
         LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(dp(110), dp(36));
         tlp.setMargins(dp(6), 0, 0, 0);
         rh.addView(padT, tlp);
+        padN = btn("123", false, v -> {
+            numAuto = false;                         // chosen by hand: stays until changed by hand
+            setPadMode(2);
+        });
+        LinearLayout.LayoutParams nlp = new LinearLayout.LayoutParams(dp(60), dp(36));
+        nlp.setMargins(dp(6), 0, 0, 0);
+        rh.addView(padN, nlp);
         rc.addView(rh);
 
         LinearLayout body = new LinearLayout(this);
@@ -666,6 +675,8 @@ public class NativeRemoteActivity extends AppCompatActivity {
         touchView = new UiKit.TouchPad(this, this::key);
         padBox.addView(dpadView, new FrameLayout.LayoutParams(pw, pw, Gravity.CENTER));
         padBox.addView(touchView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, pw, Gravity.CENTER));
+        numView = buildNumPad(pw);
+        padBox.addView(numView, new FrameLayout.LayoutParams(pw, pw, Gravity.CENTER));
         LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(0, pw, 1);
         plp.setMargins(dp(10), 0, dp(10), 0);
         body.addView(padBox, plp);
@@ -677,6 +688,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
         body.addView(brSlider, new LinearLayout.LayoutParams(dp(54), dp(236)));
         rc.addView(body);
         setPadMode(Store.getInt("padmode", 0));
+        if (getIntent().getBooleanExtra(EXTRA_VOICE, false)) main.postDelayed(this::voice, 700);
 
         rc.addView(iconRow(new String[]{"arrow-left", "house", "layers", "menu", "power"},
                 new Runnable[]{() -> key("back"), () -> key("home"), () -> key("recents"), () -> cmd("menu", ""), this::powerMenu}, 50));
@@ -738,6 +750,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
         board.put("ai_assistant", UiKit.tile(this, "sparkles", T.t("AI assistant"), T.t("Tamil · English · Tanglish"), 0xFF8B5CF6, v -> openAi()));
         board.put("cast_screen", UiKit.tile(this, "monitor", T.t("Cast screen"), T.t("show this phone on the TV"), 0xFF0EA5E9, v -> castScreen()));
         board.put("vpn", UiKit.tile(this, "lock", "VPN", T.t("WireGuard / Proton free"), 0xFF10B981, v -> WgVpn.panel(this)));
+        board.put("seedr", UiKit.tile(this, "cloud-download", "Seedr", T.t("cloud torrents · play on TV"), 0xFF3B82F6, v -> SeedrActivity.open(this)));
         board.put("present", UiKit.tile(this, "presentation", T.t("Present"), T.t("PDF slides, clicker, laser"), 0xFF6366F1,
                             v -> startActivity(new Intent(this, PresentActivity.class).putExtra(PresentActivity.EXTRA_IP, ip))));
         board.put("dj_mixer", UiKit.tile(this, "disc-3", T.t("DJ mixer"), T.t("two decks, sync, EQ"), 0xFFF59E0B,
@@ -760,6 +773,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
         board.put("my_tv", UiKit.tile(this, "gauge", T.t("My TV"), T.t("storage, speed"), 0xFF06B6D4, v -> myTv()));
         board.put("share", tShare);
         board.put("power", UiKit.tile(this, "power", T.t("Power"), T.t("sleep, restart"), 0xFFEF4444, v -> powerMenu()));
+        board.put("exit_app", UiKit.tile(this, "power", T.t("Exit ZH Play"), T.t("close all, save battery"), 0xFF991B1B, v -> App.confirmExit(this)));
         board.put("colours", UiKit.tile(this, "palette", T.t("Colours"), T.t("theme & palette"), 0xFFD946EF, v -> Palette.show(this)));
         board.put("switch_tv", UiKit.tile(this, "tv", T.t("Switch TV"), tvName, 0xFF64748B, v -> {
                         startActivity(new Intent(this, ConnectActivity.class).putExtra("no_auto", true).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP));
@@ -802,6 +816,59 @@ public class NativeRemoteActivity extends AppCompatActivity {
             r.addView(b, lp);
         }
         return r;
+    }
+
+    private Button padN;
+    private View numView;
+    private boolean numAuto;                         // switched to 123 because the TV asked for a number
+    private int numPrev;
+
+    /** 1-9, ⌫ 0 OK — for PIN locks, channel numbers, number boxes on the TV. */
+    private View buildNumPad(int w) {
+        LinearLayout g = new LinearLayout(this);
+        g.setOrientation(LinearLayout.VERTICAL);
+        String[][] rows = {{"1", "2", "3"}, {"4", "5", "6"}, {"7", "8", "9"}, {"⌫", "0", "OK"}};
+        String[][] keysOf = {{"1", "2", "3"}, {"4", "5", "6"}, {"7", "8", "9"}, {"del", "0", "ok"}};
+        int gap = dp(5);
+        for (int r = 0; r < rows.length; r++) {
+            LinearLayout row = new LinearLayout(this);
+            for (int c = 0; c < 3; c++) {
+                final String k = keysOf[r][c];
+                TextView b = new TextView(this);
+                b.setText(rows[r][c]);
+                b.setGravity(Gravity.CENTER);
+                b.setTextSize(k.equals("ok") ? 17 : 24);
+                b.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+                boolean ok = k.equals("ok");
+                b.setTextColor(ok ? Color.WHITE : Ui.TEXT);
+                b.setBackground(ok ? Ui.gradient(this, 16) : Ui.focusCard(this, 16));
+                b.setFocusable(true);
+                b.setClickable(true);
+                b.setOnClickListener(v -> {
+                    v.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP);
+                    key(k);
+                });
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1);
+                lp.setMargins(gap, gap, gap, gap);
+                row.addView(b, lp);
+            }
+            g.addView(row, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
+        }
+        g.setVisibility(View.GONE);
+        return g;
+    }
+
+    /** The TV opened a number box (PIN / parental lock): show 123; back to the previous pad after. */
+    private void autoNumPad(boolean wantsNumber) {
+        int cur = Store.getInt("padmode", 0);
+        if (wantsNumber && cur != 2) {
+            numPrev = cur;
+            numAuto = true;
+            setPadMode(2);
+        } else if (!wantsNumber && numAuto) {
+            numAuto = false;
+            if (cur == 2) setPadMode(numPrev);
+        }
     }
 
     private View buildDpad(int w) {
@@ -890,6 +957,12 @@ public class NativeRemoteActivity extends AppCompatActivity {
                     updateVoiceBtn();
                     d.dismiss();
                 }).show();
+    }
+
+    @Override
+    protected void onNewIntent(Intent i) {
+        super.onNewIntent(i);
+        if (i.getBooleanExtra(EXTRA_VOICE, false)) main.postDelayed(this::voice, 300);
     }
 
     private void voice() {
@@ -1164,6 +1237,11 @@ public class NativeRemoteActivity extends AppCompatActivity {
         Store.putInt("padmode", m);
         dpadView.setVisibility(m == 0 ? View.VISIBLE : View.GONE);
         touchView.setVisibility(m == 1 ? View.VISIBLE : View.GONE);
+        if (numView != null) numView.setVisibility(m == 2 ? View.VISIBLE : View.GONE);
+        if (padN != null) {
+            padN.setBackground(m == 2 ? Ui.gradient(this, 18) : Ui.card(this, Ui.CARD, Ui.STROKE, 18));
+            padN.setTextColor(m == 2 ? Color.WHITE : Ui.TEXT);
+        }
         padD.setBackground(m == 0 ? Ui.gradient(this, 18) : Ui.card(this, Ui.CARD, Ui.STROKE, 18));
         padT.setBackground(m == 1 ? Ui.gradient(this, 18) : Ui.card(this, Ui.CARD, Ui.STROKE, 18));
         padD.setTextColor(m == 0 ? Color.WHITE : Ui.TEXT);
@@ -2402,6 +2480,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
         renderQueue();
         accessHint.setVisibility(S.optBoolean("access", true) ? View.GONE : View.VISIBLE);
         boolean kb = S.optBoolean("kbd");
+        autoNumPad(S.optBoolean("num"));
         if (kb && !kbdShown && System.currentTimeMillis() - kbdDismissed > 4000 && !sheetOpen) showKbd(true);
         else if (!kb && kbdShown && System.currentTimeMillis() - kbdTyped > 2500) showKbd(false);
         adbBtn.setVisibility(S.optBoolean("adb", true) ? View.GONE : View.VISIBLE);

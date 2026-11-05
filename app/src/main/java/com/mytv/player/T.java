@@ -35,6 +35,14 @@ public final class T {
     }
 
     static {
+        TA.put("cloud torrents · play on TV", "கிளவுட் டோரண்ட் · TV-யில் இயக்கு");
+        HI.put("cloud torrents · play on TV", "क्लाउड टोरेंट · TV पर चलाएँ");
+        TA.put("Exit", "வெளியேறு");
+        HI.put("Exit", "बाहर निकलें");
+        TA.put("close all, save battery", "அனைத்தையும் மூடு, பேட்டரி சேமி");
+        HI.put("close all, save battery", "सब बंद करें, बैटरी बचाएँ");
+        TA.put("Exit ZH Play", "ZH Play-ஐ மூடு");
+        HI.put("Exit ZH Play", "ZH Play बंद करें");
         TA.put("Open with…", "இதில் திற…");
         HI.put("Open with…", "इसके साथ खोलें…");
         TA.put("selected", "தேர்ந்தெடுக்கப்பட்டது");

@@ -36,13 +36,23 @@ public class TvAccess extends AccessibilityService {
 
     /** When focus lands on a text box in any app (e.g. a search field) → the phone opens its keyboard. */
     public static volatile long editFocusAt;
+    /** The focused text box takes numbers only (PIN / parental lock / channel number). */
+    public static volatile boolean editNumeric;
+
+    static boolean isNumberType(int t) {
+        int cls = t & android.text.InputType.TYPE_MASK_CLASS;
+        return cls == android.text.InputType.TYPE_CLASS_NUMBER || cls == android.text.InputType.TYPE_CLASS_PHONE;
+    }
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent e) {
         try {
             if (e.getEventType() == AccessibilityEvent.TYPE_VIEW_FOCUSED) {
                 AccessibilityNodeInfo n = e.getSource();
-                if (n != null && n.isEditable()) editFocusAt = System.currentTimeMillis();
+                if (n != null && n.isEditable()) {
+                    editFocusAt = System.currentTimeMillis();
+                    editNumeric = android.os.Build.VERSION.SDK_INT >= 19 && isNumberType(n.getInputType());
+                }
             }
         } catch (Throwable ignored) {
         }
@@ -127,6 +137,30 @@ public class TvAccess extends AccessibilityService {
             n = n.getParent();
         }
         return false;
+    }
+
+    /** Inserts text at the cursor of the focused text box in one step (instant, any length). */
+    public boolean insert(String text) {
+        try {
+            AccessibilityNodeInfo f = focused();
+            if (f == null || !f.isEditable()) return false;
+            CharSequence cur = f.getText();
+            boolean hint = android.os.Build.VERSION.SDK_INT >= 26 && f.isShowingHintText();
+            String base = cur == null || hint ? "" : cur.toString();
+            int s = f.getTextSelectionStart(), e = f.getTextSelectionEnd();
+            if (s < 0 || s > base.length()) s = base.length();
+            if (e < s || e > base.length()) e = s;
+            Bundle b = new Bundle();
+            b.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, base.substring(0, s) + text + base.substring(e));
+            if (!f.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, b)) return false;
+            Bundle sel = new Bundle();
+            sel.putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, s + text.length());
+            sel.putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, s + text.length());
+            f.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION, sel);
+            return true;
+        } catch (Throwable t) {
+            return false;
+        }
     }
 
     /** Puts text into the focused search / text box of any app. */

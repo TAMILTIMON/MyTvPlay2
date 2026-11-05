@@ -80,7 +80,9 @@ public final class Remote {
             case "back": return KeyEvent.KEYCODE_BACK;
             case "menu": return KeyEvent.KEYCODE_MENU;
             case "playpause": return KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE;
-            default: return -1;
+            default:
+                if (k.length() == 1 && k.charAt(0) >= '0' && k.charAt(0) <= '9') return KeyEvent.KEYCODE_0 + (k.charAt(0) - '0');
+                return -1;
         }
     }
 
@@ -156,7 +158,9 @@ public final class Remote {
             case "menu": return 82;
             case "del": return 67;
             case "enter": return 66;
-            default: return -1;
+            default:
+                if (k.length() == 1 && k.charAt(0) >= '0' && k.charAt(0) <= '9') return 7 + (k.charAt(0) - '0');   // KEYCODE_0..9
+                return -1;
         }
     }
 
@@ -165,6 +169,12 @@ public final class Remote {
     }
 
     public static String type(Context ctx, String text) {
+        // Instant first (a pasted magnet link appears at once, like Google's TV remote):
+        // ZH Play's own text box, then any app's text box through the accessibility service.
+        if (App.visible > 0 && insertOwn(text)) return null;
+        TvAccess fast = TvAccess.inst;
+        if (fast != null && fast.insert(text)) return null;
+        // ...otherwise key by key, as before
         if (App.visible > 0) {
             try {
                 new Instrumentation().sendStringSync(text);
@@ -176,6 +186,40 @@ public final class Remote {
         TvAccess acc = TvAccess.inst;
         if (acc == null) return needAccess();
         return acc.type(text) ? null : "Select a search / text box on the TV first";
+    }
+
+    /** Puts the text into the focused text box of the ZH Play screen in front, at the cursor. */
+    private static boolean insertOwn(final String text) {
+        final android.app.Activity a = App.top();
+        if (a == null) return false;
+        try {
+            Boolean ok = call(() -> {
+                android.view.View f = a.getCurrentFocus();
+                if (!(f instanceof android.widget.EditText)) return false;
+                android.widget.EditText e = (android.widget.EditText) f;
+                int s = Math.max(0, e.getSelectionStart()), en = Math.max(0, e.getSelectionEnd());
+                e.getText().replace(Math.min(s, en), Math.max(s, en), text);
+                return true;
+            });
+            return ok != null && ok;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /** Is a number box (PIN, channel number…) focused on a ZH Play screen? */
+    static boolean ownNumberFocus() {
+        final android.app.Activity a = App.top();
+        if (a == null || App.visible == 0) return false;
+        try {
+            Boolean ok = call(() -> {
+                android.view.View f = a.getCurrentFocus();
+                return f instanceof android.widget.EditText && TvAccess.isNumberType(((android.widget.EditText) f).getInputType());
+            });
+            return ok != null && ok;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     public static String pressKey(final int code) {

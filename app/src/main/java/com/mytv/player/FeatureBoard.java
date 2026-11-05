@@ -36,9 +36,20 @@ final class FeatureBoard {
         t.put("vpn", UiKit.tile(a, "lock", "VPN", T.t("WireGuard / Proton free"), 0xFF10B981, v -> WgVpn.panel(a)));
         t.put("seedr", UiKit.tile(a, "cloud-download", "Seedr", T.t("Cloud torrent manager"), 0xFF3B82F6, v -> SeedrActivity.open(a)));
         t.put("storage", UiKit.tile(a, "sd-card", T.t("SD Card & USB"), T.t("files on SD card, USB, phone"), 0xFFF59E0B, v -> StorageActivity.open(a)));
+        t.put("network", UiKit.tile(a, "network", T.t("Network folders"), T.t("PC / NAS, phones sharing videos"), 0xFF14B8A6,
+                v -> a.startActivity(new Intent(a, NetworkActivity.class))));
+        if (tv) {
+            t.put("local_files", UiKit.tile(a, "usb", T.t("Local files"), T.t("USB drive / TV storage"), 0xFF0EA5E9,
+                    v -> a.startActivity(new Intent(a, FileBrowserActivity.class))));
+            t.put("library", UiKit.tile(a, "library", T.t("Library"), T.t("posters, watched ✓, sort"), 0xFF8B5CF6,
+                    v -> a.startActivity(new Intent(a, LibraryActivity.class))));
+            t.put("my_tv", UiKit.tile(a, "gauge", T.t("My TV"), T.t("storage, memory, speed test"), 0xFF06B6D4,
+                    v -> a.startActivity(new Intent(a, TvInfoActivity.class))));
+        }
         t.put("eq", UiKit.tile(a, "sliders-vertical", T.t("Equalizer"), T.t("for the music player"), 0xFF22D3EE,
                 v -> a.startActivity(new Intent(a, PowerEqActivity.class))));
         t.put("updates", UiKit.tile(a, "refresh-cw", T.t("Updates"), Updater.installedName(a), 0xFF8B5CF6, v -> Updater.menu(a)));
         t.put("settings", UiKit.tile(a, "settings", T.t("Settings"), T.t("language, theme, …"), 0xFF64748B, v -> SettingsDialog.show(a)));
+        if (!tv) t.put("exit", UiKit.tile(a, "power", T.t("Exit ZH Play"), T.t("close all, save battery"), 0xFFEF4444, v -> App.confirmExit(a)));
     }
 }

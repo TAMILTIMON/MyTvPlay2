@@ -10,7 +10,8 @@ public class BootReceiver extends BroadcastReceiver {
     public void onReceive(Context context, Intent intent) {
         if (intent != null && Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) {
             Store.init(context);
-            if (Store.getBool("boot", Ui.isTv(context))) RemoteService.start(context);
+            if (Store.getBool("boot", Ui.isTv(context)) && (Ui.isTv(context) || !Store.getBool("exited", false)))
+                RemoteService.start(context);
         }
     }
 }

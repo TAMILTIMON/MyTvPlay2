@@ -960,6 +960,7 @@ public class WebServer extends NanoHTTPD {
         o.put("adb", AdbClient.enabled());
         o.put("scan", ChannelScanner.status());
         o.put("profile", Family.label());
+        o.put("num", BgState.num);                  // a number box (PIN…) is open → phone shows its number pad
         o.put("kbd", BgState.kbd);                  // TV keyboard open → phone shows live typing (checked in the background)
         boolean tvDark = !"light".equals(Store.getStr("theme", "dark"));
         int[] pc = Palette.resolve(tvDark);

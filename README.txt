@@ -1,3 +1,32 @@
+ZH PLAY 7.3 — Seedr in the remote · Exit (battery saver) · TV tiles back in reach
+=================================================================================
+* Phone remote board: new "Seedr" tile (cloud torrents; Play on the TV from there) and
+  "Exit ZH Play" tile.
+* EXIT ZH PLAY (phone home board and remote board): after asking, stops every ZH Play service
+  (music, browser audio, screen casting, remote service, VPN, torrent downloads), removes all
+  ZH Play notifications from the notification bar, closes every screen and ends the app. It
+  stays closed (no restart at boot or by widgets) until you open ZH Play again.
+* TV: Network folders (PC / NAS and phones sharing their videos), Local files (USB / TV
+  storage), Library and My TV are now also tiles on the TV's "✨ All features" board (they were
+  only rows in the TV's start list, which is unchanged). Network folders is on the phone board too.
+* Nothing removed.
+
+ZH PLAY 7.2 — Instant paste · 123 keypad · widget mic + app colours
+===================================================================
+* PASTE / TYPE ON THE TV IS INSTANT: text from the phone used to be typed on the TV one key press per
+  character (a 600-character magnet took a long time). Now it is put into the text box in one step:
+  ZH Play's own boxes directly at the cursor, other apps' boxes through the accessibility service
+  (inserted at the cursor). The old key-by-key methods remain as fallbacks.
+* 123 NUMBER PAD next to D-pad / Touchpad on the phone remote: 1-9, ⌫, 0, OK (PIN locks, channel
+  numbers). Digits 0-9 now work on the TV (ZH Play screens; other apps with the ADB full remote).
+  When the TV opens a number box (PIN / parental lock), the remote switches to 123 by itself and
+  goes back to the previous pad when it closes (choosing 123 by hand keeps it).
+* WIDGETS: 🎤 mic button on the remote widgets (medium / large / wide) and the player widget — opens
+  the remote already listening: type on the TV, search YouTube / the TV, play in ZH Play, ask the AI.
+* WIDGETS IN THE APP'S COLOURS: icons, title and mic follow the ZH Play theme and accent; from
+  Android 12 the panel, keys and OK button too. They repaint when the theme changes.
+* Nothing removed.
+
 ZH PLAY 7.1.1 — 1080p plays smoothly like VLC
 =============================================
 * Cause: brightness above 100% (phone remote slider / TV ☀ menu go up to 150%, and the setting is

@@ -10,6 +10,8 @@ public final class BgState {
     }
 
     public static volatile boolean kbd;
+    /** The open text box wants numbers (PIN lock…): the phone remote switches to its number pad. */
+    public static volatile boolean num;
     public static volatile JSONObject other;
     private static volatile long lastAsk;
     private static boolean running;
@@ -23,6 +25,8 @@ public final class BgState {
             while (System.currentTimeMillis() - lastAsk < 15000) {
                 try {
                     kbd = FastKeys.imeShown(c) || System.currentTimeMillis() - TvAccess.editFocusAt < 5000;
+                    num = (kbd && TvAccess.editNumeric && System.currentTimeMillis() - TvAccess.editFocusAt < 60000)
+                            || Remote.ownNumberFocus();
                     other = Remote.player == null ? SessionWatcher.info(c) : null;
                     Thread.sleep(700);
                 } catch (Throwable ignored) {

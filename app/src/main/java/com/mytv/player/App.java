@@ -26,6 +26,60 @@ public class App extends Application {
     /** Number of visible activities of this app (0 = app is in the background). */
     public static volatile int visible = 0;
 
+    /** The ZH Play screen in front (typing from the phone goes straight into its text box). */
+    public static volatile java.lang.ref.WeakReference<Activity> top;
+
+    /** "Exit ZH Play" (phone): asks first, then closes everything. */
+    public static void confirmExit(final Activity a) {
+        new UiDialog(a).setTitle("⏻  " + T.t("Exit ZH Play"))
+                .setMessage(T.t("Closes ZH Play completely to save battery: stops music, browser audio, screen casting, the VPN, torrent downloads and the background remote service, and clears all ZH Play notifications. Open the app again any time to start it."))
+                .setPositiveButton(T.t("Exit"), (d, w) -> exitAll(a))
+                .setNegativeButton(T.t("Cancel"), null).show();
+    }
+
+    /** Stops every service, removes every notification, closes every screen, ends the process. */
+    public static void exitAll(Activity a) {
+        final android.content.Context c = a.getApplicationContext();
+        Store.putBool("exited", true);
+        Class<?>[] services = {MusicService.class, BrowserPlayService.class, CastScreenService.class,
+                TvControlService.class, MediaWatch.class, RemoteService.class};
+        for (Class<?> s : services) {
+            try {
+                c.stopService(new android.content.Intent(c, s));
+            } catch (Throwable ignored) {
+            }
+        }
+        final android.app.NotificationManager nm = (android.app.NotificationManager) c.getSystemService(android.content.Context.NOTIFICATION_SERVICE);
+        try {
+            if (nm != null) nm.cancelAll();
+        } catch (Throwable ignored) {
+        }
+        try {
+            android.app.ActivityManager am = (android.app.ActivityManager) c.getSystemService(android.content.Context.ACTIVITY_SERVICE);
+            if (am != null && android.os.Build.VERSION.SDK_INT >= 21)
+                for (android.app.ActivityManager.AppTask t : am.getAppTasks()) t.finishAndRemoveTask();
+        } catch (Throwable ignored) {
+        }
+        try {
+            a.finishAffinity();
+        } catch (Throwable ignored) {
+        }
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+            try {
+                if (nm != null) nm.cancelAll();          // anything a stopping service posted on its way out
+            } catch (Throwable ignored) {
+            }
+            android.os.Process.killProcess(android.os.Process.myPid());
+            System.exit(0);
+        }, 500);
+    }
+
+    public static Activity top() {
+        java.lang.ref.WeakReference<Activity> r = top;
+        Activity a = r == null ? null : r.get();
+        return a == null || a.isFinishing() ? null : a;
+    }
+
     @Override
     public void onCreate() {
         super.onCreate();
@@ -45,13 +99,20 @@ public class App extends Application {
         });
         Net.cleanSubtitleCache(this);
         TorrentEngine.cleanupAsync(this);
-        RemoteService.start(this);
+        // after "Exit ZH Play" the phone stays fully closed until the user opens the app again
+        if (Ui.isTv(this) || !Store.getBool("exited", false)) RemoteService.start(this);
         seedIptv();
         registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {
-            public void onActivityStarted(Activity a) { visible++; }
+            public void onActivityStarted(Activity a) {
+                visible++;
+                if (Store.getBool("exited", false)) {          // opened again after Exit: back to normal
+                    Store.putBool("exited", false);
+                    RemoteService.start(a.getApplicationContext());
+                }
+            }
             public void onActivityStopped(Activity a) { visible = Math.max(0, visible - 1); }
             public void onActivityCreated(Activity a, Bundle b) { }
-            public void onActivityResumed(Activity a) { }
+            public void onActivityResumed(Activity a) { top = new java.lang.ref.WeakReference<>(a); }
             public void onActivityPaused(Activity a) { }
             public void onActivitySaveInstanceState(Activity a, Bundle b) { }
             public void onActivityDestroyed(Activity a) { }

@@ -44,6 +44,9 @@ public class TvWidget extends AppWidgetProvider {
             open.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             int f = PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0);
             v.setOnClickPendingIntent(R.id.w_title, PendingIntent.getActivity(c, 99, open, f));
+            v.setOnClickPendingIntent(R.id.w_voice, PendingIntent.getActivity(c, 98, PadWidget.voiceIntent(c), f));
+            PadWidget.theme(c, v, R.id.w_root, R.id.w_title, 0, R.id.w_voice,
+                    new int[]{R.id.w_rew, R.id.w_play, R.id.w_ff, R.id.w_vdown, R.id.w_mute, R.id.w_vup}, new int[0]);
             AppWidgetManager.getInstance(c).updateAppWidget(new ComponentName(c, TvWidget.class), v);
         } catch (Throwable ignored) {
         }

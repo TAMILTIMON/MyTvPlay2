@@ -86,6 +86,15 @@ public final class Ui {
         STROKE = darkBg ? 0x29FFFFFF : 0x1F2A1B5C;
         FIELD = darkBg ? 0x26000000 : 0x0D000000;
         dark = darkBg;
+        // the theme changed: repaint the home-screen widgets in the new colours (once per change)
+        int sig = ACCENT * 31 + BG * 17 + TEXT;
+        if (sig != Store.getInt("w_theme_sig", 0)) {
+            Store.putInt("w_theme_sig", sig);
+            try {
+                PadWidget.refreshAll(a);
+            } catch (Throwable ignored) {
+            }
+        }
     }
 
     public static boolean dark() {
