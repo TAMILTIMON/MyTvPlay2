@@ -1,3 +1,52 @@
+ZH PLAY 7.1.1 — 1080p plays smoothly like VLC
+=============================================
+* Cause: brightness above 100% (phone remote slider / TV ☀ menu go up to 150%, and the setting is
+  saved) switched EVERY video to software decoding (VLC's picture filter needs CPU frames) and
+  reloaded the video on each change. A TV box can decode 720p on the CPU but not 1080p / HEVC.
+  VLC always decodes on the video chip — hence "VLC plays any clarity".
+* Now the boost is done on the graphics chip: while brightness is above 100% the video draws into
+  a TextureView with a colour matrix; at 100% or less it uses the normal SurfaceView (like VLC).
+  Hardware decoding is never switched off by brightness, and changing it no longer reloads.
+* Added VLC for Android's default --avcodec-skiploopfilter=1, so videos that do need software
+  decoding (e.g. a codec the TV chip lacks) keep up like in VLC.
+* If ⚙ Decoder is set to Software, the player says so once (that setting makes 1080p stutter).
+
+ZH PLAY 7.1 — VLC-style streaming: resume anywhere, jump anywhere, save data
+=============================================================================
+RESUME
+* Positions are remembered by what the video is, not the exact link. Seedr / download links
+  carry tokens that change every time (…/Movie.mkv?st=…&e=…), so before, every new link
+  started at 0:00. Now: same file name → same position (or the link minus token/expiry parts).
+  Old saved positions still work. "Continue watching" keeps one entry per movie.
+
+TORRENT / MAGNET STREAMING — "Save data" (on by default)
+* Before: streaming a magnet downloaded the WHOLE movie in order, in the background. Jumping to
+  1:00:00 had to compete with that download, and it used data for parts never watched.
+* Now (like VLC): only ~32 MB ahead of where you're watching is downloaded (plus the file's first
+  and last pieces, which players read first). Jumping releases the old spot at once, so the new
+  spot gets all the speed. Nothing is fetched while you're not watching that part.
+* "Keep this movie for later?" is only offered when the whole file is actually downloaded.
+* Switch: Settings → 🧲 Torrent storage → 📶 Save data while streaming (On / Off = whole movie).
+
+ONLINE LINKS
+* The "continue watching" thumbnail no longer opens a stream a second time every 10 minutes
+  during playback — only once when you leave.
+* (7.0.1) one seek per timeline drag, no seek previews on streams, ±10 s taps combined, auto
+  reconnect after a stream error.
+
+ZH PLAY 7.0.1 — Streaming: seeking no longer stalls
+===================================================
+* Timeline: releasing it seeked TWICE (bug from the 5.9 player redesign) — each seek on a stream
+  drops the buffer and reconnects, so back-to-back seeks stalled or failed. Now one seek.
+* Seek preview thumbnails only for files on the device: on streams (Seedr, download links) they
+  opened the video a second time and fought playback for bandwidth while seeking.
+* ±10 s on streams: quick taps are gathered into ONE seek 0.45 s after the last tap
+  (+10 +10 +10 = one jump of 30 s), with the target time shown at once. Local files unchanged.
+* A stream error after it was playing (e.g. right after a seek) now reconnects at the spot you
+  were going to (up to 4 tries) instead of "Cannot play".
+* TV: OK on the timeline only seeks if the bar was actually moved.
+* Torrent streaming engine unchanged (verified: recent changes there were tracker additions only).
+
 ZH PLAY 7.0 — SD Card & USB file manager
 ========================================
 * New "SD Card & USB" tile right after Seedr (phone board and TV Features; on a customised

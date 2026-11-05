@@ -483,7 +483,11 @@ public class Store {
     public static synchronized void putHistory(String title, String url, long pos, long len) {
         List<Watch> l = history();
         Iterator<Watch> i = l.iterator();
-        while (i.hasNext()) if (i.next().u.equals(url)) i.remove();
+        String key = resumeKey(url);
+        while (i.hasNext()) {
+            String old = i.next().u;
+            if (old.equals(url) || resumeKey(old).equals(key)) i.remove();
+        }
         l.add(0, new Watch(title, url, pos, len, System.currentTimeMillis()));
         while (l.size() > 30) l.remove(l.size() - 1);
         saveHistory(l);
@@ -493,9 +497,13 @@ public class Store {
         List<Watch> l = history();
         Iterator<Watch> i = l.iterator();
         boolean changed = false;
-        while (i.hasNext()) if (i.next().u.equals(url)) {
-            i.remove();
-            changed = true;
+        String key = resumeKey(url);
+        while (i.hasNext()) {
+            String old = i.next().u;
+            if (old.equals(url) || resumeKey(old).equals(key)) {
+                i.remove();
+                changed = true;
+            }
         }
         if (changed) saveHistory(l);
     }
@@ -547,12 +555,45 @@ public class Store {
     }
 
     // ---------- resume positions ----------
+    // Keyed by what the video IS, not the exact link: Seedr / download links carry tokens that change
+    // every time (…/Movie.mkv?st=…&e=…), so the movie resumes even when its link is new.
     public static long pos(String url) {
-        return posPrefs == null ? 0 : posPrefs.getLong(pk(url), 0);
+        if (posPrefs == null) return 0;
+        long v = posPrefs.getLong(pk(resumeKey(url)), -1);
+        return v >= 0 ? v : posPrefs.getLong(pk(url), 0);      // positions saved by older versions
     }
 
     public static void setPos(String url, long p) {
-        if (posPrefs != null) posPrefs.edit().putLong(pk(url), p).apply();
+        if (posPrefs != null) posPrefs.edit().putLong(pk(resumeKey(url)), p).apply();
+    }
+
+    private static final java.util.Set<String> VOLATILE = new java.util.HashSet<>(java.util.Arrays.asList(
+            "token", "access_token", "auth", "authorization", "key", "sig", "signature", "hash", "st", "e", "exp", "expire",
+            "expires", "expiry", "ts", "timestamp", "validfrom", "validto", "policy", "key-pair-id", "verify", "session", "sid",
+            "download_token", "dl", "ip", "_"));
+
+    /** The same video under a fresh link gives the same key: its file name, or the link minus token / expiry parts. */
+    public static String resumeKey(String url) {
+        if (url == null) return "";
+        String u = url.split("\\|")[0].split("#")[0];
+        if (!u.startsWith("http") || u.contains("://127.0.0.1") || u.contains("://localhost")) return url;
+        try {
+            int q = u.indexOf('?');
+            String path = q >= 0 ? u.substring(0, q) : u, query = q >= 0 ? u.substring(q + 1) : "";
+            String last = java.net.URLDecoder.decode(path.substring(path.lastIndexOf('/') + 1).replace("+", "%2B"), "UTF-8");
+            if (last.length() >= 8 && (Formats.isVideo(last) || Formats.isAudio(last))) return "file:" + last.toLowerCase(java.util.Locale.ROOT);
+            StringBuilder kept = new StringBuilder();
+            for (String part : query.split("&")) {
+                if (part.isEmpty()) continue;
+                String k = part.split("=", 2)[0].toLowerCase(java.util.Locale.ROOT);
+                if (VOLATILE.contains(k) || k.startsWith("x-amz-") || k.startsWith("x-goog-")) continue;
+                if (kept.length() > 0) kept.append('&');
+                kept.append(part);
+            }
+            return path.replaceFirst("^https?://", "") + (kept.length() > 0 ? "?" + kept : "");
+        } catch (Exception e) {
+            return url;
+        }
     }
 
     // ---------- settings ----------

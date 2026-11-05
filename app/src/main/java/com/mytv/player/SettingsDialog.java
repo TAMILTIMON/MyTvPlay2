@@ -74,7 +74,8 @@ public final class SettingsDialog {
                 "⬇  " + T.t("Downloads") + " · " + T.t("night only") + ": " + T.t(TorrentDownloads.nightOnly() ? "On" : "Off"),
                 "⬆  " + T.t(Updater.playBuild(a) ? "Updates (Google Play)" : "Check for updates") + " (" + Updater.installedName(a) + ")",
                 "💾  " + T.t("Backup & restore"),
-                "🧲  " + T.t("Torrent storage: ") + String.format(java.util.Locale.US, "%.2f GB", TorrentEngine.cacheBytes(a) / 1073741824.0),
+                "🧲  " + T.t("Torrent storage: ") + String.format(java.util.Locale.US, "%.2f GB", TorrentEngine.cacheBytes(a) / 1073741824.0)
+                        + " · " + T.t("Save data") + ": " + T.t(TorrentEngine.saver() ? "On" : "Off"),
                 "§" + T.t("More"),
                 T.t("📱  Use as remote for another TV…"),
                 "👨‍👩‍👧  " + T.t("Profiles & kids lock") + ": " + Family.label(),
@@ -243,8 +244,18 @@ public final class SettingsDialog {
                         break;
                     case 21:
                         new UiDialog(a).setTitle("🧲  " + T.t("Torrent storage: "))
-                                .setItems(new String[]{"🗑 Delete saved torrents (keep my kept movies)", "🗑 Delete everything (also kept movies)"},
-                                        (d2, w2) -> new Thread(() -> TorrentEngine.get(a).clearCache(w2 == 1)).start()).show();
+                                .setItems(new String[]{"🗑 Delete saved torrents (keep my kept movies)", "🗑 Delete everything (also kept movies)",
+                                                "📶 " + T.t("Save data while streaming") + ": " + T.t(TorrentEngine.saver() ? "On — only what you watch" : "Off — whole movie")},
+                                        (d2, w2) -> {
+                                            if (w2 == 2) {
+                                                Store.putBool("t_saver", !TorrentEngine.saver());
+                                                UiKit.makeToast(a, T.t("Save data while streaming") + ": " + T.t(TorrentEngine.saver() ? "On" : "Off")
+                                                        + " — " + T.t("applies to the next torrent you play"), android.widget.Toast.LENGTH_LONG).show();
+                                                show(a);
+                                            } else {
+                                                new Thread(() -> TorrentEngine.get(a).clearCache(w2 == 1)).start();
+                                            }
+                                        }).show();
                         break;
                     case 22:
                         a.startActivity(new Intent(a, ConnectActivity.class));

@@ -44,6 +44,71 @@ public final class TorrentEngine {
     private volatile TorrentInfo info;
     private volatile String hash = "";
     private volatile int activeFile = -1;
+
+    // ---- Save data while streaming (like VLC): download only a window ahead of what is being watched,
+    // not the whole file. Pieces wanted by open streams are counted; a jump releases the old window.
+    static boolean saver() {
+        return Store.getBool("t_saver", true);
+    }
+
+    private final java.util.HashMap<Integer, Integer> wanted = new java.util.HashMap<>();
+
+    /** Nothing is downloaded until a stream asks, except the file's start and end (players read both first). */
+    private void applySaver(TorrentHandle th, TorrentInfo ti, int file) {
+        if (!saver()) return;
+        try {
+            FileStorage fs = ti.files();
+            int pl = ti.pieceLength();
+            long off = fs.fileOffset(file), size = fs.fileSize(file);
+            int first = (int) (off / pl), last = (int) Math.min(ti.numPieces() - 1, (off + Math.max(0, size - 1)) / pl);
+            th.prioritizePieces(Priority.array(Priority.IGNORE, ti.numPieces()));
+            synchronized (wanted) {
+                wanted.clear();
+            }
+            for (int p = first; p <= Math.min(last, first + 3); p++) th.piecePriority(p, Priority.TOP_PRIORITY);
+            for (int p = Math.max(first, last - 1); p <= last; p++) th.piecePriority(p, Priority.TOP_PRIORITY);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    /** True when every byte of this file of the streaming torrent is downloaded. */
+    public boolean fileComplete(String h, int file) {
+        try {
+            TorrentHandle th = handle;
+            TorrentInfo ti = info;
+            if (th == null || ti == null || !hash.equals(h) || file < 0 || file >= ti.files().numFiles()) return false;
+            return th.fileProgress()[file] >= ti.files().fileSize(file);
+        } catch (Throwable e) {
+            return false;
+        }
+    }
+
+    void want(TorrentHandle th, int piece, int deadline) {
+        synchronized (wanted) {
+            Integer n = wanted.get(piece);
+            wanted.put(piece, n == null ? 1 : n + 1);
+        }
+        if (th.havePiece(piece)) return;
+        if (saver()) th.piecePriority(piece, Priority.TOP_PRIORITY);
+        th.setPieceDeadline(piece, deadline);
+    }
+
+    void unwant(TorrentHandle th, int piece) {
+        boolean free;
+        synchronized (wanted) {
+            Integer n = wanted.get(piece);
+            int left = n == null ? 0 : n - 1;
+            if (left <= 0) wanted.remove(piece);
+            else wanted.put(piece, left);
+            free = left <= 0;
+        }
+        if (!free || th.havePiece(piece)) return;
+        try {
+            th.resetPieceDeadline(piece);
+            if (saver()) th.piecePriority(piece, Priority.IGNORE);   // jumped away: stop fetching it
+        } catch (Throwable ignored) {
+        }
+    }
     private volatile String state = "idle";
     private volatile String name = "";
     private volatile int openToken = 0;
@@ -553,6 +618,7 @@ public final class TorrentEngine {
             info = ti;
             hash = h;
             activeFile = media.get(0);
+            applySaver(th, ti, activeFile);
             name = ti.name();
             state = "Downloading";
         }
@@ -646,6 +712,7 @@ public final class TorrentEngine {
             th.prioritizeFiles(pr);
             th.clearPieceDeadlines();
             activeFile = file;
+            applySaver(th, ti, file);
         }
         return fs.fileSize(file);
     }
@@ -683,13 +750,27 @@ public final class TorrentEngine {
             this.end = to;
         }
 
+        private final java.util.LinkedHashSet<Integer> mine = new java.util.LinkedHashSet<>();
+
         private void prioritize(int piece) {
-            // read-ahead window of ~16 MB (at least 6 pieces) with rising deadlines
+            // read-ahead window of ~32 MB (at least 8 pieces) with rising deadlines
             int window = Math.max(8, (32 * 1024 * 1024) / Math.max(1, pieceLen));
+            java.util.HashSet<Integer> now = new java.util.HashSet<>();
             for (int k = 0; k < window; k++) {
                 int p = piece + k;
                 if (p > lastPiece) break;
-                if (!th.havePiece(p)) th.setPieceDeadline(p, 300 + k * 250);
+                now.add(p);
+                if (mine.add(p)) want(th, p, 300 + k * 250);
+                else if (!th.havePiece(p)) th.setPieceDeadline(p, 300 + k * 250);
+            }
+            // pieces of this stream's old window that are no longer ahead of it (a jump): let them go
+            java.util.Iterator<Integer> it = mine.iterator();
+            while (it.hasNext()) {
+                int p = it.next();
+                if (!now.contains(p)) {
+                    it.remove();
+                    unwant(th, p);
+                }
             }
             lastPrioritized = piece;
         }
@@ -764,6 +845,8 @@ public final class TorrentEngine {
 
         @Override
         public void close() throws IOException {
+            if (!closed) for (int p : mine) unwant(th, p);   // the player left this spot: stop fetching it
+            mine.clear();
             closed = true;
             if (raf != null) raf.close();
         }
