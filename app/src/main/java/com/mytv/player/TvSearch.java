@@ -25,7 +25,7 @@ public final class TvSearch {
         }
     }
 
-    private static String sh(String s) {
+    static String sh(String s) {
         return "'" + s.replace("'", "'\\''") + "'";
     }
 
@@ -37,7 +37,7 @@ public final class TvSearch {
     }
 
     /** Opens something on the TV: through ADB if on (always allowed, and tells us if it worked), else directly. */
-    private static boolean launch(Context c, String amArgs, Intent direct) {
+    static boolean launch(Context c, String amArgs, Intent direct) {
         if (AdbClient.enabled()) {
             try {
                 String out = AdbClient.shell(c, "am start " + amArgs + " 2>&1");

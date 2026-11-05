@@ -989,10 +989,30 @@ public class NativeRemoteActivity extends AppCompatActivity {
             liveBox.append(said);        // a text box is open on the TV: type it there
             return;
         }
+        // "play aura song in YouTube", "open Netflix", "play Leo songs on Spotify": understood → done at once
+        final VoiceCmd vc = VoiceCmd.parse(said);
+        if (!inAi && vc.explicit()) {
+            toast("🎤 " + vc.label());
+            call("/voice", m("q", said), r -> toast(r.optString("msg")));
+            return;
+        }
+        boolean smart = !vc.title.isEmpty() || vc.other != null;
         String[] opts = {"🚀 " + T.t("Ask the AI assistant"), "▶ " + T.t("Search on YouTube"), "🔍 " + T.t("Search the whole TV"),
                 "📺 " + T.t("Play in ZH Play"), "⌨ " + T.t("Type into the TV")};
         final String[] where = {"ai", "youtube", "tv", "tcp", "type"};
-        new UiDialog(this).setTitle("“" + said + "”").setItems(opts, (d, w) -> {
+        if (smart) {                                     // the understood action first; the old choices stay
+            String[] o2 = new String[opts.length + 1];
+            o2[0] = vc.label();
+            System.arraycopy(opts, 0, o2, 1, opts.length);
+            opts = o2;
+        }
+        final int shift = smart ? 1 : 0;
+        new UiDialog(this).setTitle("“" + said + "”").setItems(opts, (d, w0) -> {
+            if (smart && w0 == 0) {
+                call("/voice", m("q", said), r -> toast(r.optString("msg")));
+                return;
+            }
+            final int w = w0 - shift;
             if (w == 0) {
                 openAi();
                 aiAsk(said);

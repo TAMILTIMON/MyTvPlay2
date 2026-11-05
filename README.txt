@@ -1,3 +1,33 @@
+ZH PLAY 7.5 — One universal APK · TV home always reachable
+==========================================================
+* BUILD: one APK for phones and TVs — ZHPlay-universal-arm64-release.apk (64-bit ARM only, no
+  separate split files). The in-app updater finds it by "universal".
+* TV HOME MISSING NAS / LOCAL FILES / LIBRARY: when Android doesn't report a device as a TV
+  (many TV boxes, projectors and some Android TVs claim a touchscreen and no "leanback"), ZH Play
+  showed the PHONE home there, which has none of those rows. Now:
+  - detection also uses the TV flags of Android TV / Google TV / Fire TV,
+  - "Device mode: Auto / TV / Phone" lets you force it (TV home list → ⚙ Device mode; and on a
+    device without a SIM the phone home shows a "Use this device as the TV" tile),
+  - the TV home list also gains "SD Card & USB".
+* Nothing removed.
+
+ZH PLAY 7.4 — Voice understands "play X in <app>"
+=================================================
+* Before: the phone mic offered only "Search on YouTube", so "play aura 10/10 song in YouTube" typed the
+  whole sentence into YouTube's search; app names (Netflix, Spotify…) were ignored.
+* Now the sentence is understood first (English / Tamil / Tanglish) and done at once:
+  - "play aura 10/10 song in YouTube"      → plays the top match on YouTube (no search screen)
+  - "play Leo songs on Spotify / YouTube Music" → starts playing there
+  - "play Kanguva in Netflix / Prime / Hotstar / SonyLIV / ZEE5" → that app's search with the title
+    typed (these apps don't let other apps start a title by name) — one tap to play
+  - "open Hotstar", "Netflix open pannu", "open MX Player" → opens the app (any installed app by name)
+  - "play Sun TV" (no app) → your ZH Play playlists first, else YouTube
+  - questions and other phrases → the usual menu (AI, search, type…), now with the understood
+    action as the first choice
+* Works from the phone remote mic, the widget mic, the AI's no-key backup, and
+  "Hey Google … ZH Play" (Assistant). New TV command: /voice. Nothing removed.
+* Smart home (Google Home APIs) — later, after the Google Home Developer Console setup.
+
 ZH PLAY 7.3 — Seedr in the remote · Exit (battery saver) · TV tiles back in reach
 =================================================================================
 * Phone remote board: new "Seedr" tile (cloud torrents; Play on the TV from there) and

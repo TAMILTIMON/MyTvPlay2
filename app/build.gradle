@@ -11,7 +11,7 @@ android {
         minSdk 21
         targetSdk 34
         versionCode = (System.getenv('VCODE') ?: '34').toInteger()
-        versionName = '7.3' + (System.getenv('VCODE') ? '.' + System.getenv('VCODE') : '')
+        versionName = '7.5' + (System.getenv('VCODE') ? '.' + System.getenv('VCODE') : '')
     }
 
     // Two variants from the same code — every feature is in both:
@@ -32,13 +32,16 @@ android {
         }
     }
 
-    // One APK per CPU type keeps the download small. "universal" works on every TV.
-    splits {
-        abi {
-            enable true
-            reset()
-            include 'armeabi-v7a', 'arm64-v8a'
-            universalApk true
+    // ONE universal APK for phones and TVs, 64-bit ARM (arm64-v8a) only — a single file to install anywhere.
+    // (32-bit-only devices can't install it; to build those again add 'armeabi-v7a' to abiFilters.)
+    defaultConfig {
+        ndk {
+            abiFilters 'arm64-v8a'
+        }
+    }
+    applicationVariants.all { variant ->
+        variant.outputs.all {
+            outputFileName = "ZHPlay-universal-arm64-${variant.buildType.name}.apk"
         }
     }
 
@@ -85,7 +88,7 @@ android {
     }
 }
 
-// APK files: ZHPlay-tv-armeabi-v7a-release.apk, ZHPlay-mobile-universal-release.apk …
+// APK file: ZHPlay-arm64-v8a-release.apk (one app for phone + TV)
 base {
     archivesName = 'ZHPlay'
 }

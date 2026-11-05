@@ -118,6 +118,15 @@ public final class AppsHub {
     }
 
     /** Everything the user can choose from: known apps (installed or not) + all installed apps. */
+    /** The installed package of a known app ("Netflix", "YouTube Music"…), or null. */
+    public static String pkgFor(Context c, String name) {
+        for (String[] k : KNOWN) {
+            if (!k[0].equalsIgnoreCase(name)) continue;
+            for (int i = 1; i < k.length; i++) if (installed(c, k[i])) return k[i];
+        }
+        return null;
+    }
+
     public static List<App> choices(Context c) {
         Map<String, App> m = new LinkedHashMap<>();
         for (String[] k : KNOWN) {

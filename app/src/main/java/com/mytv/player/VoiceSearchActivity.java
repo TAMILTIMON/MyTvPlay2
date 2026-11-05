@@ -37,6 +37,29 @@ public class VoiceSearchActivity extends Activity {
             Remote.openHome(this);
             return;
         }
+        // "Hey Google … ZH Play": if the words name another app ("… in Netflix", "open Hotstar") do that
+        VoiceCmd vc = VoiceCmd.parse(q);
+        if ((vc.named && !"zhplay".equals(vc.app)) || vc.other != null) {
+            final android.content.Context app = getApplicationContext();
+            final String said = q;
+            final boolean onTv = Ui.isTv(this);
+            new Thread(() -> {
+                String r;
+                try {
+                    if (onTv) r = VoiceCmd.run(app, said);
+                    else {
+                        java.util.Map<String, String> m = new java.util.HashMap<>();
+                        m.put("q", said);
+                        r = TvClient.post(Store.getStr("last_tv", ""), "/voice", m).optString("msg");
+                    }
+                } catch (Exception e) {
+                    r = e.getMessage();
+                }
+                final String msg = r;
+                new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> UiKit.makeToast(app, msg, Toast.LENGTH_LONG).show());
+            }).start();
+            return;
+        }
         String found = TvSearch.channel(this, q);
         if (found != null) {
             UiKit.makeToast(this, found, Toast.LENGTH_SHORT).show();

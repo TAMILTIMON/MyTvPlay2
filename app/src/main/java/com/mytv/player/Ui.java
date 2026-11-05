@@ -42,11 +42,56 @@ public final class Ui {
     }
 
     public static boolean isTv(Context c) {
+        String mode = "auto";
+        try {
+            mode = Store.getStr("device_mode", "auto");          // Settings: Auto / TV / Phone
+        } catch (Throwable ignored) {
+        }
+        if ("tv".equals(mode)) return true;
+        if ("phone".equals(mode)) return false;
         UiModeManager m = (UiModeManager) c.getSystemService(Context.UI_MODE_SERVICE);
         if (m != null && m.getCurrentModeType() == Configuration.UI_MODE_TYPE_TELEVISION) return true;
         PackageManager pm = c.getPackageManager();
         return pm.hasSystemFeature("android.software.leanback")
+                || pm.hasSystemFeature("android.software.leanback_only")
+                || pm.hasSystemFeature("android.hardware.type.television")
+                || pm.hasSystemFeature("com.google.android.tv.installed")
+                || pm.hasSystemFeature("amazon.hardware.fire_tv")
                 || !pm.hasSystemFeature(PackageManager.FEATURE_TOUCHSCREEN);
+    }
+
+    /** No SIM / phone calls: a TV, TV box or tablet (offer "use this device as the TV"). */
+    public static boolean maybeTv(Context c) {
+        return !c.getPackageManager().hasSystemFeature(PackageManager.FEATURE_TELEPHONY);
+    }
+
+    /** Auto / TV / Phone — then ZH Play restarts in that mode. */
+    public static void chooseDeviceMode(final Activity a) {
+        final String[] keys = {"auto", "tv", "phone"};
+        String cur = Store.getStr("device_mode", "auto");
+        int sel = "tv".equals(cur) ? 1 : "phone".equals(cur) ? 2 : 0;
+        new UiDialog(a).setTitle("📺  " + T.t("Device mode"))
+                .setSingleChoiceItems(new String[]{
+                        T.t("Auto (detect)") + "  ·  " + T.t(isTvAuto(a) ? "TV" : "Phone"),
+                        "📺 " + T.t("TV — the full TV home: Network folders / NAS, Local files, Library, My TV…"),
+                        "📱 " + T.t("Phone — remote control for a TV")}, sel, (d, w) -> {
+                    d.dismiss();
+                    Store.putStr("device_mode", keys[w]);
+                    android.content.Intent i = new android.content.Intent(a, MainActivity.class).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK | android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                    a.startActivity(i);
+                    a.finishAffinity();
+                })
+                .setNegativeButton(T.t("Cancel"), null).show();
+    }
+
+    /** What auto-detection says, ignoring the Device mode setting. */
+    static boolean isTvAuto(Context c) {
+        UiModeManager m = (UiModeManager) c.getSystemService(Context.UI_MODE_SERVICE);
+        if (m != null && m.getCurrentModeType() == Configuration.UI_MODE_TYPE_TELEVISION) return true;
+        PackageManager pm = c.getPackageManager();
+        return pm.hasSystemFeature("android.software.leanback") || pm.hasSystemFeature("android.software.leanback_only")
+                || pm.hasSystemFeature("android.hardware.type.television") || pm.hasSystemFeature("com.google.android.tv.installed")
+                || pm.hasSystemFeature("amazon.hardware.fire_tv") || !pm.hasSystemFeature(PackageManager.FEATURE_TOUCHSCREEN);
     }
 
     /** "dark", "light" or "system". */

@@ -179,6 +179,7 @@ public final class Updater {
         i.code = tag.isEmpty() ? 0 : Integer.parseInt(tag);
         i.name = o.optString("name");
         String abi = Build.SUPPORTED_ABIS.length > 0 ? Build.SUPPORTED_ABIS[0] : "";
+        boolean can64 = Build.SUPPORTED_64_BIT_ABIS.length > 0;
         String want = abi.contains("arm64") ? "arm64-v8a" : abi.contains("armeabi") ? "armeabi-v7a" : "universal";
         JSONArray as = o.optJSONArray("assets");
         String uni = "";

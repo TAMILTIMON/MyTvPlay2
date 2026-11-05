@@ -103,6 +103,10 @@ public class ConnectActivity extends AppCompatActivity {
         phoneTiles.put("scan", UiKit.tile(this, "refresh-cw", T.t("Scan again"), T.t("find TVs on this Wi-Fi"), 0xFF8B5CF6, v -> startScan()));
         phoneTiles.put("address", UiKit.tile(this, "keyboard", T.t("Enter TV address"), T.t("type the TV's IP"), 0xFF3B82F6, v -> manual()));
         phoneTiles.put("group", UiKit.tile(this, "layers", T.t("TV group"), T.t("control several TVs at once"), 0xFF14B8A6, v -> TvGroup.manage(this, null)));
+        if (Ui.maybeTv(this)) {      // a TV / box shown the phone screen: one tap to the full TV home
+            phoneTiles.put("tv_mode", UiKit.tile(this, "tv", T.t("Use this device as the TV"),
+                    T.t("NAS, local files, library…"), 0xFFF59E0B, v -> Ui.chooseDeviceMode(this)));
+        }
         FeatureBoard.add(this, phoneTiles, false);
         phoneBoard = new android.widget.FrameLayout(this);
         phoneBoard.addView(BoardLayout.build(this, phoneTiles, "phone_board"));

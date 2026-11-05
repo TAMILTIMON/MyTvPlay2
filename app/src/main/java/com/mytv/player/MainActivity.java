@@ -547,6 +547,10 @@ public class MainActivity extends AppCompatActivity {
             actions.add(() -> startActivity(new Intent(this, LibraryActivity.class)));
             rows.add("🖧   " + T.t("Network folders") + "  ·  PC / NAS (SMB, DLNA)");
             actions.add(() -> startActivity(new Intent(this, NetworkActivity.class)));
+            rows.add("💾   " + T.t("SD Card & USB") + "  ·  " + T.t("browse, copy, move, delete"));
+            actions.add(() -> StorageActivity.open(this));
+            rows.add("⚙   " + T.t("Device mode") + "  ·  " + T.t(Ui.isTv(this) ? "TV" : "Phone") + "  (" + T.t("change") + ")");
+            actions.add(() -> Ui.chooseDeviceMode(this));
             int left = Family.minutesLeft();
             if (left >= 0) {
                 rows.add("⏰   " + Family.label() + " · " + left + " " + T.t("min left today"));

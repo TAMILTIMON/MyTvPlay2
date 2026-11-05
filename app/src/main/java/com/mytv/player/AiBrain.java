@@ -124,6 +124,7 @@ public final class AiBrain {
             String d = a.optString("do");
             switch (d) {
                 case "play_channel": return msg(tv.post("/search", m("q", a.optString("q"), "where", "tcp")));
+                case "voice": return msg(tv.post("/voice", m("q", a.optString("q"))));
                 case "youtube_play": return msg(tv.post("/search", m("q", a.optString("q"), "where", "ytplay")));
                 case "youtube": return msg(tv.post("/search", m("q", a.optString("q"), "where", "youtube")));
                 case "search_tv": return msg(tv.post("/search", m("q", a.optString("q"), "where", "tv")));
@@ -182,7 +183,11 @@ public final class AiBrain {
         String t = s.toLowerCase(Locale.ROOT).trim();
         try {
             JSONArray acts = new JSONArray();
-            if (t.contains("youtube")) {
+            VoiceCmd vc = VoiceCmd.parse(s);
+            if ((vc.named && !"zhplay".equals(vc.app)) || vc.other != null) {
+                // an app was named ("play aura song in YouTube", "Kanguva Netflix la podu", "open Hotstar")
+                acts.put(new JSONObject().put("do", "voice").put("q", s));
+            } else if (t.contains("youtube")) {
                 // "YouTube Ilaiyaraaja songs", "youtube la AR Rahman songs podu", "search youtube cricket"
                 boolean search = has(t, "search", "find", "thedu", "தேடு");
                 String q = (" " + t.replace("youtube", " ") + " ")

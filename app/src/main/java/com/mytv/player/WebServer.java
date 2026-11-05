@@ -231,6 +231,13 @@ public class WebServer extends NanoHTTPD {
                     return e == null ? msg("✅ The remote now shows videos from other apps") : fail(e);
                 }
 
+                case "/voice": {                 // a spoken sentence: play / search / open, in the app that was named
+                    String q = val(p, "q").trim();
+                    if (q.isEmpty()) return fail("Say something");
+                    String res = VoiceCmd.run(ctx, q);
+                    boolean bad = res.startsWith("✗") || res.startsWith("Couldn't") || res.contains("not installed");
+                    return bad ? fail(res.replace("✗ ", "")) : msg(res);
+                }
                 case "/search": {
                     String q = val(p, "q").trim(), where = val(p, "where");
                     if (q.isEmpty()) return fail("Say or type something");
