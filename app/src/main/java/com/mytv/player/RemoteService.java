@@ -42,6 +42,7 @@ public class RemoteService extends Service {
             error = null;
             PairCode.generate();   // fresh pairing code on service start
             Discovery.register(this);
+            if (Ui.isTv(this)) Cloud.startTv(getApplicationContext());     // commands from the account's phones, anywhere
             if (Ui.isTv(this) || !Store.getStr("dl_list", "[]").equals("[]")) TorrentDownloads.resumeAll(this);
             if (Ui.isTv(this)) FastKeys.ensure(this);   // fast keys ready before the first press
             KeyLine.start(this);                        // always-open key line for phones

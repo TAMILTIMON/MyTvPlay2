@@ -103,6 +103,8 @@ public class ConnectActivity extends AppCompatActivity {
         phoneTiles.put("scan", UiKit.tile(this, "refresh-cw", T.t("Scan again"), T.t("find TVs on this Wi-Fi"), 0xFF8B5CF6, v -> startScan()));
         phoneTiles.put("address", UiKit.tile(this, "keyboard", T.t("Enter TV address"), T.t("type the TV's IP"), 0xFF3B82F6, v -> manual()));
         phoneTiles.put("group", UiKit.tile(this, "layers", T.t("TV group"), T.t("control several TVs at once"), 0xFF14B8A6, v -> TvGroup.manage(this, null)));
+        phoneTiles.put("anywhere", UiKit.tile(this, "globe", T.t("My TVs anywhere"), T.t("control over the internet"), 0xFF0EA5E9,
+                v -> tvsAnywhere()));
         if (Ui.maybeTv(this)) {      // a TV / box shown the phone screen: one tap to the full TV home
             phoneTiles.put("tv_mode", UiKit.tile(this, "tv", T.t("Use this device as the TV"),
                     T.t("NAS, local files, library…"), 0xFFF59E0B, v -> Ui.chooseDeviceMode(this)));
@@ -260,6 +262,50 @@ public class ConnectActivity extends AppCompatActivity {
             lp.setMargins(0, 0, 0, Ui.dp(this, 10));
             list.addView(row, lp);
         }
+    }
+
+    /** The TVs signed in with this Google account — controllable from any network. */
+    private void tvsAnywhere() {
+        if (!Cloud.enabled()) {
+            UiKit.makeToast(this, T.t("The admin hasn't set up ZH Play cloud yet (Firebase in access.json)"), Toast.LENGTH_LONG).show();
+            return;
+        }
+        if (!Cloud.signedIn()) {
+            UiKit.makeToast(this, T.t("Sign in with Google first (Account tile)"), Toast.LENGTH_LONG).show();
+            AuthActivity.open(this);
+            return;
+        }
+        UiKit.makeToast(this, T.t("Looking for your TVs…"), Toast.LENGTH_SHORT).show();
+        new Thread(() -> {
+            try {
+                final org.json.JSONObject tvs = Cloud.tvs();
+                main.post(() -> {
+                    final java.util.List<String> ids = new java.util.ArrayList<>();
+                    java.util.List<String> names = new java.util.ArrayList<>();
+                    for (java.util.Iterator<String> it = tvs.keys(); it.hasNext(); ) {
+                        String id = it.next();
+                        org.json.JSONObject o = tvs.optJSONObject(id);
+                        if (o == null) continue;
+                        long seen = o.optLong("seen", 0);
+                        long mins = seen > 0 ? (System.currentTimeMillis() - seen) / 60000 : -1;
+                        ids.add(id);
+                        names.add("📺  " + o.optString("name", "TV") + "   ·   "
+                                + (mins >= 0 && mins < 10 ? T.t("online") : mins >= 0 ? T.t("last seen") + " " + (mins < 120 ? mins + " min" : (mins / 60) + " h") : "?"));
+                    }
+                    if (ids.isEmpty()) {
+                        UiKit.makeToast(this, T.t("No TV is signed in with this account yet — sign the TV in (QR) at home first"), Toast.LENGTH_LONG).show();
+                        return;
+                    }
+                    new UiDialog(this).setTitle("🌐  " + T.t("My TVs anywhere"))
+                            .setItems(names.toArray(new String[0]), (d, w) -> {
+                                String nm = names.get(w);
+                                open("cloud:" + ids.get(w), nm.substring(4, nm.indexOf("   ·")));
+                            }).show();
+                });
+            } catch (Exception e) {
+                main.post(() -> UiKit.makeToast(this, "⚠ " + e.getMessage(), Toast.LENGTH_LONG).show());
+            }
+        }).start();
     }
 
     private void open(String ip, String name) {

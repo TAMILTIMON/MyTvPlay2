@@ -30,6 +30,42 @@ A typo is safe: invalid JSON is ignored and apps keep the last good copy.
 
 Until `web_client_id` is set, nobody is asked to sign in and nobody can be locked out.
 
+
+## Use ONE project: `zhplay` (the Firebase project)
+
+Firebase made its own Google Cloud project **zhplay** (no. 855520751554). Sign-in clients must be in that
+same project, or Firebase refuses the sign-in. Ignore "My First Project".
+
+1. **Firebase → ⚙ Project settings → General → Your apps → Add app → Android**
+   - Package: `com.tamil.castplay` · SHA-1: your release key (see step 4 below) → **Register app**
+   - Skip downloading google-services.json (ZH Play doesn't need it) → Continue → Done.
+   This creates the Android sign-in client for you.
+2. **https://console.cloud.google.com** → top bar → switch project to **ZHPlay (zhplay)**
+   → **Google Auth Platform → Clients**: copy the Client ID of
+   **"Web client (auto created by Google Service)"** → that is your `web_client_id`.
+3. **Google Auth Platform → Branding**: no logo (avoids brand verification) → Save.
+   **Audience → Publish app** → *In production*.
+4. Put it in `access.json` and commit:
+   ```json
+   "web_client_id": "855520751554-xxxx.apps.googleusercontent.com",
+   ```
+
+## ZH Play cloud (control the TV from anywhere) — Firebase
+
+In `access.json` (not secret; the database rules protect the data):
+```json
+"firebase_api_key": "AIza…",
+"firebase_db_url": "https://zhplay-default-rtdb.asia-southeast1.firebasedatabase.app",
+```
+Realtime Database rules: each account can only read / write `users/<its own id>`.
+
+- Phone signs in with Google → also into ZH Play cloud (same account, automatic).
+- TV signed in by QR / "Sign in this TV" → joins the same account.
+- Same Wi-Fi + same account → no PIN. Away from home → phone home board → **My TVs anywhere**
+  (or the remote switches to the cloud by itself when the TV isn't on the phone's Wi-Fi).
+- Through the cloud: commands, status, voice, links. Live screen and phone-file sharing need the same Wi-Fi.
+- Commands waiting more than 2 minutes (TV off) are dropped, not run later.
+
 ## The fields
 
 | field | meaning |

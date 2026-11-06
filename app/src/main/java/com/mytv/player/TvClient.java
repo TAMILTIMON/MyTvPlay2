@@ -34,8 +34,38 @@ public final class TvClient {
         return postDirect(ip, path, params);
     }
 
-    /** One TV only (used for the group copies). */
+    private static final Map<String, Long> away = new java.util.HashMap<>();
+
+    /** One TV only (used for the group copies). Same Wi-Fi first; through ZH Play cloud when away. */
     public static JSONObject postDirect(String ip, String path, Map<String, String> params) throws Exception {
+        if (ip.startsWith("cloud:")) return Cloud.send(ip.substring(6), path, params);
+        String cid = Store.getStr("cloud_tv_" + ip, "");
+        boolean canCloud = !cid.isEmpty() && Cloud.signedIn();
+        Long a;
+        synchronized (away) {
+            a = away.get(ip);
+        }
+        if (canCloud && a != null && System.currentTimeMillis() < a) return Cloud.send(cid, path, params);
+        try {
+            JSONObject r = directPost(ip, path, params);
+            String id = r.optString("cloud_id", "");
+            if (!id.isEmpty() && !id.equals(cid)) Store.putStr("cloud_tv_" + ip, id);
+            synchronized (away) {
+                away.remove(ip);
+            }
+            return r;
+        } catch (AuthNeeded e) {
+            throw e;
+        } catch (java.io.IOException e) {
+            if (!canCloud) throw e;
+            synchronized (away) {
+                away.put(ip, System.currentTimeMillis() + 60000);       // not on this Wi-Fi: use the cloud for a minute
+            }
+            return Cloud.send(cid, path, params);
+        }
+    }
+
+    private static JSONObject directPost(String ip, String path, Map<String, String> params) throws Exception {
         StringBuilder body = new StringBuilder();
         for (Map.Entry<String, String> e : params.entrySet()) {
             if (body.length() > 0) body.append('&');
@@ -50,6 +80,8 @@ public final class TvClient {
             c.setRequestMethod("POST");
             c.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
             c.setRequestProperty("X-Token", token(ip));
+            String zid = Cloud.cachedIdToken();
+            if (!zid.isEmpty()) c.setRequestProperty("X-ZH-ID", zid);    // same Google account → the TV skips the PIN
             try (OutputStream o = c.getOutputStream()) {
                 o.write(body.toString().getBytes("UTF-8"));
             }

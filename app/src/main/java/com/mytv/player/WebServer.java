@@ -80,6 +80,7 @@ public class WebServer extends NanoHTTPD {
                 String mail = val(p, "email").trim();
                 if (!mail.contains("@")) return fail("Sign in on the phone first");
                 Auth.signIn(mail, val(p, "name"), val(p, "photo"));
+                Cloud.adopt(val(p, "fb_uid"), val(p, "fb_refresh"));      // control from anywhere, same account
                 Auth.tvCodeUsed();
                 Auth.refresh(ctx, true, null);
                 return msg("TV signed in as " + mail);
@@ -799,7 +800,10 @@ public class WebServer extends NanoHTTPD {
         if ("127.0.0.1".equals(ip) || "::1".equals(ip) || Net.ip().equals(ip)) return true;
         String t = s.getHeaders().get("x-token");
         if (t == null || t.isEmpty()) t = p.get("t");
-        return Pair.valid(t);
+        if (Pair.valid(t)) return true;
+        // a phone signed in with the same Google account (checked with Firebase): no PIN needed
+        String z = s.getHeaders().get("x-zh-id");
+        return z != null && !z.isEmpty() && Cloud.signedIn() && Cloud.uid().equals(Cloud.verify(z));
     }
 
     /** Downloads an .m3u/.pls link; returns its channels, or null when it is a single HLS video. */
@@ -999,6 +1003,7 @@ public class WebServer extends NanoHTTPD {
         o.put("scan", ChannelScanner.status());
         o.put("profile", Family.label());
         o.put("signin", Auth.locked(ctx) && !Auth.signedIn());      // TV waiting for sign-in → phone offers it
+        if (Cloud.signedIn()) o.put("cloud_id", Cloud.deviceId());   // the phone remembers it for "from anywhere"
         o.put("num", BgState.num);                  // a number box (PIN…) is open → phone shows its number pad
         o.put("kbd", BgState.kbd);                  // TV keyboard open → phone shows live typing (checked in the background)
         boolean tvDark = !"light".equals(Store.getStr("theme", "dark"));

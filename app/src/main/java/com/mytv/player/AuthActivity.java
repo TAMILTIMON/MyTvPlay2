@@ -263,6 +263,13 @@ public class AuthActivity extends Activity {
                                     String mail = emailFrom(g.getIdToken());
                                     if (mail.isEmpty()) mail = g.getId();
                                     Auth.signIn(mail, g.getDisplayName(), g.getProfilePictureUri() == null ? "" : g.getProfilePictureUri().toString());
+                                    final String gid = g.getIdToken();
+                                    new Thread(() -> {                  // same account in ZH Play cloud (TVs from anywhere)
+                                        try {
+                                            Cloud.signInWithGoogle(gid);
+                                        } catch (Exception ignored) {
+                                        }
+                                    }).start();
                                     toast("✅ " + T.t("Signed in as") + " " + Auth.email());
                                     afterSignIn();
                                     return;
@@ -307,6 +314,7 @@ public class AuthActivity extends Activity {
 
     static void signOut(Activity a, Runnable then) {
         Auth.signOut();
+        Cloud.signOut();
         try {
             CredentialManager.create(a).clearCredentialStateAsync(new ClearCredentialStateRequest(), null, r -> new Handler(Looper.getMainLooper()).post(r),
                     new CredentialManagerCallback<Void, ClearCredentialException>() {
@@ -343,6 +351,8 @@ public class AuthActivity extends Activity {
                 m.put("email", Auth.email());
                 m.put("name", Auth.name());
                 m.put("photo", Store.getStr("au_photo", ""));
+                m.put("fb_uid", Cloud.uid());                         // the TV joins the same cloud account
+                m.put("fb_refresh", Cloud.refreshToken());
                 org.json.JSONObject r = TvClient.post(p[0], "/tvlogin", m);
                 ok = r.optBoolean("ok", false);
                 msg = r.optString("msg", ok ? T.t("The TV is signed in") : T.t("The TV refused it — scan the new code"));

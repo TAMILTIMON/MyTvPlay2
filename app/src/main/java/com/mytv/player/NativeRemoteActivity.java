@@ -2507,7 +2507,8 @@ public class NativeRemoteActivity extends AppCompatActivity {
             new UiDialog(this).setTitle("🔐  " + T.t("Sign in this TV"))
                     .setMessage(T.t("The TV needs a Google account. Sign it in with") + "\n" + Auth.email() + " ?")
                     .setPositiveButton(T.t("Sign in"), (d, w) -> call("/tvlogin", m("email", Auth.email(), "name", Auth.name(),
-                            "photo", Store.getStr("au_photo", "")), r -> toast(r.optString("msg"))))
+                            "photo", Store.getStr("au_photo", ""), "fb_uid", Cloud.uid(), "fb_refresh", Cloud.refreshToken()),
+                            r -> toast(r.optString("msg"))))
                     .setNegativeButton(T.t("Not now"), null).show();
         }
         autoNumPad(S.optBoolean("num"));

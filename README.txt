@@ -1,3 +1,15 @@
+ZH PLAY 8.1 — Same account = no PIN · control the TV from anywhere (Firebase)
+=============================================================================
+* SAME WI-FI: a phone signed in with the same Google account as the TV controls it without the PIN
+  (the TV checks the phone's Firebase token — typing the e-mail can't fake it).
+* FROM ANYWHERE: phone → your Firebase Realtime Database → TV. The TV listens all the time (live
+  stream), runs each command on itself and answers. Phone home board → "My TVs anywhere", and the
+  remote switches to the cloud by itself when the TV isn't on the phone's Wi-Fi. Commands older than
+  2 minutes (TV was off) are dropped. Only the same account can read / write (database rules).
+* Firebase settings come from admin/access.json (firebase_api_key, firebase_db_url) — no rebuild.
+* admin/ADMIN_GUIDE.md: the sign-in clients must be in the Firebase project "zhplay".
+* Plain Firebase REST — no new libraries. Nothing removed.
+
 ZH PLAY 8.0.2 — TVs sign in right after the update
 ==================================================
 * TVs no longer get the 1-day notice: once web_client_id is set in admin/access.json, every TV shows

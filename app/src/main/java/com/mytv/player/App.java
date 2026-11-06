@@ -107,6 +107,14 @@ public class App extends Application {
             public void onActivityStarted(Activity a) {
                 visible++;
                 // Google sign-in / admin gate (admin/access.json on GitHub)
+                if (Cloud.signedIn() && Cloud.cachedIdToken().isEmpty()) {
+                    new Thread(() -> {                                // keep the account proof fresh (1 h tokens)
+                        try {
+                            Cloud.idToken();
+                        } catch (Exception ignored) {
+                        }
+                    }).start();
+                }
                 if (!(a instanceof AuthActivity)) {
                     if (Auth.locked(a)) AuthActivity.open(a);
                     Auth.refresh(a, false, () -> {
