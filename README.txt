@@ -1,3 +1,16 @@
+ZH PLAY 8.0.2 — TVs sign in right after the update
+==================================================
+* TVs no longer get the 1-day notice: once web_client_id is set in admin/access.json, every TV shows
+  the QR sign-in screen straight away and stays locked until it is signed in. Phones unchanged
+  (existing users: 1-day notice; new installs: at once).
+
+ZH PLAY 8.0.1 — sign-in fixes
+=============================
+* TV: the QR sign-in screen closed itself after ~2 s during the 1-day notice period. It now stays
+  until you sign in (QR / phone / Google on the TV) or press "Later".
+* The notice now appears as soon as access.json has been downloaded (not only on the next screen).
+* New installs must sign in at once; only people who already used ZH Play get the 1-day notice.
+
 ZH PLAY 8.0 — Google sign-in · admin control from GitHub · TV sign-in by QR
 ===========================================================================
 * SIGN IN WITH GOOGLE: anyone with a Google account (Android Credential Manager, "Sign in with Google").

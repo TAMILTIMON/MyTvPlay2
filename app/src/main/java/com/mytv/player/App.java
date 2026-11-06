@@ -100,6 +100,7 @@ public class App extends Application {
         Net.cleanSubtitleCache(this);
         TorrentEngine.cleanupAsync(this);
         // after "Exit ZH Play" the phone stays fully closed until the user opens the app again
+        Auth.noteInstall(this);
         if (Ui.isTv(this) || !Store.getBool("exited", false)) RemoteService.start(this);
         seedIptv();
         registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {
@@ -109,7 +110,12 @@ public class App extends Application {
                 if (!(a instanceof AuthActivity)) {
                     if (Auth.locked(a)) AuthActivity.open(a);
                     Auth.refresh(a, false, () -> {
-                        if (!a.isFinishing() && Auth.locked(a) && visible > 0) AuthActivity.open(a);
+                        if (a.isFinishing() || visible == 0) return;
+                        if (Auth.locked(a)) AuthActivity.open(a);
+                        else if (Auth.NOTICE.equals(Auth.state(a)) && !Auth.noticeShown) {
+                            Auth.noticeShown = true;                 // 1-day notice: once per app start
+                            AuthActivity.open(a);
+                        }
                     });
                 }
                 if (Store.getBool("exited", false)) {          // opened again after Exit: back to normal

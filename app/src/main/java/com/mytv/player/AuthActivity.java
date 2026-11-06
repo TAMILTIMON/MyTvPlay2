@@ -95,7 +95,7 @@ public class AuthActivity extends Activity {
         public void run() {
             if (isFinishing()) return;
             String st = Auth.state(AuthActivity.this);
-            if (pendingTv == null && (Auth.OK.equals(st) || Auth.NOTICE.equals(st))) {
+            if (pendingTv == null && Auth.OK.equals(st)) {     // signed in (e.g. from the phone by QR) → done
                 finish();
                 return;
             }

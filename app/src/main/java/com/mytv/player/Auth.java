@@ -188,9 +188,23 @@ final class Auth {
         long first = Store.getLong("au_first", 0);
         if (first == 0) {
             first = System.currentTimeMillis();
+            if (freshInstall) first -= NOTICE_MS;              // new install: no notice, sign in at once
             Store.putLong("au_first", first);
         }
         return first + NOTICE_MS;
+    }
+
+    /** Set at start-up: this is a brand-new install (not an update of an existing ZH Play). */
+    static volatile boolean freshInstall;
+
+    static void noteInstall(Context c) {
+        try {
+            android.content.pm.PackageInfo pi = c.getPackageManager().getPackageInfo(c.getPackageName(), 0);
+            // installed and never updated, and no earlier ZH Play settings on this device
+            freshInstall = pi.firstInstallTime == pi.lastUpdateTime && Store.getStr("last_tv", "").isEmpty()
+                    && Store.getLong("au_first", 0) == 0 && !Store.getBool("seed_done", false);
+        } catch (Exception ignored) {
+        }
     }
 
     /** ok · notice (sign in soon) · signin · blocked · maintenance · update. */
@@ -207,6 +221,7 @@ final class Auth {
             if ("invite_only".equals(cf.optString("mode")) && !admin && !listed("allowed", h)) return BLOCKED;
             return OK;
         }
+        if (Ui.isTv(c)) return SIGNIN;                          // TVs: sign in right after the update, no notice
         return System.currentTimeMillis() < deadline() ? NOTICE : SIGNIN;
     }
 
