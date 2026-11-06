@@ -653,6 +653,11 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        Auth.showMessage(this);                                  // the admin's note from access.json
+        if (Auth.NOTICE.equals(Auth.state(this)) && !Auth.noticeShown) {    // 1 day to sign in
+            Auth.noticeShown = true;
+            AuthActivity.open(this);
+        }
         buildApps();
         buildWatch();
         refresh();

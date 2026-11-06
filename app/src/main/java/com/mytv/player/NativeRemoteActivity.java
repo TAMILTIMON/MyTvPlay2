@@ -781,6 +781,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
                     }));
         boardBox = new android.widget.FrameLayout(this);
         boardTiles = board;
+        Auth.filter(board);                                  // tiles the admin switched off
         boardBox.addView(BoardLayout.build(this, board));
         p.addView(boardBox);
         updateShareSub();
@@ -818,6 +819,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
         return r;
     }
 
+    private boolean askedTvSignIn;
     private Button padN;
     private View numView;
     private boolean numAuto;                         // switched to 123 because the TV asked for a number
@@ -2500,6 +2502,14 @@ public class NativeRemoteActivity extends AppCompatActivity {
         renderQueue();
         accessHint.setVisibility(S.optBoolean("access", true) ? View.GONE : View.VISIBLE);
         boolean kb = S.optBoolean("kbd");
+        if (S.optBoolean("signin") && Auth.signedIn() && !askedTvSignIn) {
+            askedTvSignIn = true;
+            new UiDialog(this).setTitle("🔐  " + T.t("Sign in this TV"))
+                    .setMessage(T.t("The TV needs a Google account. Sign it in with") + "\n" + Auth.email() + " ?")
+                    .setPositiveButton(T.t("Sign in"), (d, w) -> call("/tvlogin", m("email", Auth.email(), "name", Auth.name(),
+                            "photo", Store.getStr("au_photo", "")), r -> toast(r.optString("msg"))))
+                    .setNegativeButton(T.t("Not now"), null).show();
+        }
         autoNumPad(S.optBoolean("num"));
         if (kb && !kbdShown && System.currentTimeMillis() - kbdDismissed > 4000 && !sheetOpen) showKbd(true);
         else if (!kb && kbdShown && System.currentTimeMillis() - kbdTyped > 2500) showKbd(false);

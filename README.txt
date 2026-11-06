@@ -1,3 +1,21 @@
+ZH PLAY 8.0 — Google sign-in · admin control from GitHub · TV sign-in by QR
+===========================================================================
+* SIGN IN WITH GOOGLE: anyone with a Google account (Android Credential Manager, "Sign in with Google").
+  Phones: sign-in screen. TVs: a QR code — scan with the phone camera, open the link, ZH Play on the
+  phone signs the TV in with the same account (or the paired phone remote offers "Sign in this TV",
+  or sign in with Google on the TV itself).
+* EXISTING USERS: 1 day of notice ("sign-in required from …" with Later), then required.
+* ADMIN FROM GITHUB: admin/access.json in the repo (see admin/ADMIN_GUIDE.md) — anyone / invite-only,
+  block people, switch features or tiles off (for everyone or one person), minimum build, a message to
+  all apps, maintenance mode. E-mails are stored scrambled (sha256) so the public repo shows no address.
+  Read every 15 min; a broken file is ignored. You are already the admin.
+* SAFE START: nothing is locked until "web_client_id" (Google Cloud → Web client) is put in
+  access.json — do the one-time setup in admin/ADMIN_GUIDE.md first.
+* Account tile (phone, TV, remote boards): who is signed in, sign out, your scrambled e-mail;
+  admins: scramble any e-mail, edit access.json on GitHub, reload now.
+* A locked TV answers the phone only with status and sign-in until it is signed in.
+* New libraries: androidx.credentials 1.3.0, googleid 1.1.1, zxing core 3.5.3. Nothing removed.
+
 ZH PLAY 7.5.1 — Three APKs again (TVs with 32-bit Android can install)
 =====================================================================
 * Back to the build from before: ZHPlay-arm64-v8a-release.apk, ZHPlay-armeabi-v7a-release.apk and

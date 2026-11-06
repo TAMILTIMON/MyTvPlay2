@@ -486,6 +486,7 @@ public final class TorrentEngine {
     }
 
     private List<Store.Item> openAll(String uri) throws Exception {
+        if (!Auth.featureOn("torrents")) throw new Exception("Torrents are switched off by the admin");
         final int token;
         synchronized (this) {
             if (handle != null && uri.trim().equals(activeUri) && activeItems != null) {

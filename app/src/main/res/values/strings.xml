@@ -4,4 +4,6 @@
     <string name="acc_label">ZH Play phone remote</string>
     <string name="widget_desc">Control your TV: play / pause, ±10 s, TV volume and power</string>
     <string name="widget_pad_desc">Full TV remote on your home screen: arrows, OK, back, home, menu, volume, play — resize it for more buttons</string>
+    <!-- optional: the Google OAuth "Web client ID" (normally set in admin/access.json instead) -->
+    <string name="google_web_client_id" translatable="false"></string>
 </resources>

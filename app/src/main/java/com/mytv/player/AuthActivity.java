@@ -1,0 +1,418 @@
+package com.mytv.player;
+
+import android.app.Activity;
+import android.content.Context;
+import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.text.InputType;
+import android.view.Gravity;
+import android.view.View;
+import android.widget.EditText;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import androidx.credentials.ClearCredentialStateRequest;
+import androidx.credentials.Credential;
+import androidx.credentials.CredentialManager;
+import androidx.credentials.CredentialManagerCallback;
+import androidx.credentials.CustomCredential;
+import androidx.credentials.GetCredentialRequest;
+import androidx.credentials.GetCredentialResponse;
+import androidx.credentials.exceptions.ClearCredentialException;
+import androidx.credentials.exceptions.GetCredentialCancellationException;
+import androidx.credentials.exceptions.GetCredentialException;
+
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption;
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential;
+
+import java.util.HashMap;
+import java.util.concurrent.Executor;
+
+/**
+ * Sign-in gate: "Sign in with Google" (phone), QR code to sign in from a phone (TV), and the screens for
+ * blocked / maintenance / update required. Also opens from the TV's QR link on a phone (zhplay://tvlogin).
+ */
+public class AuthActivity extends Activity {
+    private final Handler main = new Handler(Looper.getMainLooper());
+    private final Executor onMain = r -> main.post(r);
+    private LinearLayout box;
+    private String pendingTv;           // "ip|port|code" from a TV's QR, done after signing in here
+    private String shownState = "";
+
+    static void open(Context c) {
+        Intent i = new Intent(c, AuthActivity.class);
+        if (!(c instanceof Activity)) i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        c.startActivity(i);
+    }
+
+    private int dp(float v) {
+        return Math.round(v * getResources().getDisplayMetrics().density);
+    }
+
+    private void toast(String s) {
+        UiKit.makeToast(this, s, Toast.LENGTH_LONG).show();
+    }
+
+    @Override
+    protected void onCreate(Bundle b) {
+        Ui.apply(this);
+        super.onCreate(b);
+        ScrollView sv = new ScrollView(this);
+        sv.setFillViewport(true);
+        sv.setBackgroundColor(Ui.BG);
+        FrameLayout center = new FrameLayout(this);
+        box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setGravity(Gravity.CENTER_HORIZONTAL);
+        box.setPadding(dp(28), dp(36), dp(28), dp(36));
+        center.addView(box, new FrameLayout.LayoutParams(Math.min(dp(560), getResources().getDisplayMetrics().widthPixels), -2, Gravity.CENTER));
+        sv.addView(center);
+        setContentView(sv);
+        handleLink(getIntent());
+        render();
+        Auth.refresh(this, true, this::render);
+    }
+
+    @Override
+    protected void onNewIntent(Intent i) {
+        super.onNewIntent(i);
+        handleLink(i);
+        render();
+    }
+
+    private final Runnable poll = new Runnable() {          // TV: closes by itself once a phone signed it in
+        public void run() {
+            if (isFinishing()) return;
+            String st = Auth.state(AuthActivity.this);
+            if (pendingTv == null && (Auth.OK.equals(st) || Auth.NOTICE.equals(st))) {
+                finish();
+                return;
+            }
+            if (!st.equals(shownState)) render();
+            main.postDelayed(this, 2000);
+        }
+    };
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        main.removeCallbacks(poll);
+        main.postDelayed(poll, 2000);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        main.removeCallbacks(poll);
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (Auth.locked(this) && pendingTv == null) moveTaskToBack(true);      // can't skip past the gate
+        else super.onBackPressed();
+    }
+
+    // ------------------------------------------------------------------ screens
+
+    private TextView text(float sp, int color, boolean bold) {
+        TextView t = new TextView(this);
+        t.setTextSize(sp);
+        t.setTextColor(color);
+        t.setGravity(Gravity.CENTER);
+        if (bold) t.setTypeface(Typeface.DEFAULT_BOLD);
+        return t;
+    }
+
+    private TextView button(String label, boolean primary, View.OnClickListener l) {
+        TextView t = text(16, primary ? Color.WHITE : Ui.TEXT, true);
+        t.setText(label);
+        t.setPadding(dp(20), dp(14), dp(20), dp(14));
+        t.setBackground(primary ? Ui.gradient(this, 26) : Ui.focusCard(this, 26));
+        t.setFocusable(true);
+        t.setClickable(true);
+        t.setOnClickListener(l);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
+        lp.setMargins(0, dp(12), 0, 0);
+        t.setLayoutParams(lp);
+        return t;
+    }
+
+    private void header(String title, String sub) {
+        ImageView logo = new ImageView(this);
+        logo.setImageResource(R.drawable.zh_logo);
+        box.addView(logo, new LinearLayout.LayoutParams(dp(88), dp(88)));
+        TextView t = text(24, Ui.TEXT, true);
+        t.setText(title);
+        t.setPadding(0, dp(16), 0, dp(8));
+        box.addView(t);
+        if (sub != null && !sub.isEmpty()) {
+            TextView s = text(15, Ui.DIM, false);
+            s.setText(sub);
+            s.setPadding(0, 0, 0, dp(10));
+            box.addView(s);
+        }
+    }
+
+    private void render() {
+        if (box == null) return;
+        box.removeAllViews();
+        boolean tv = Ui.isTv(this);
+        String st = Auth.state(this);
+        shownState = st;
+
+        if (pendingTv != null) {                          // phone, opened from a TV's QR
+            if (!Auth.signedIn()) {
+                header(T.t("Sign in the TV"), T.t("First sign in on this phone; the TV then uses the same Google account."));
+                box.addView(button("G  " + T.t("Sign in with Google"), true, v -> googleSignIn()));
+            } else {
+                header(T.t("Sign in the TV"), T.t("Signing the TV in as") + "\n" + Auth.email() + " …");
+                signInTv();
+            }
+            return;
+        }
+        if (Auth.MAINTENANCE.equals(st)) {
+            String m = Auth.cfg().optString("maintenance_message", "");
+            header("🛠  " + T.t("Back soon"), m.isEmpty() ? T.t("ZH Play is being updated by the admin. Please try again later.") : m);
+            box.addView(button(T.t("Try again"), true, v -> Auth.refresh(this, true, this::render)));
+            box.addView(button(T.t("Exit"), false, v -> finishAffinity()));
+            return;
+        }
+        if (Auth.UPDATE.equals(st)) {
+            header("⬆  " + T.t("Update required"), T.t("This version of ZH Play is too old. Please install the latest version."));
+            box.addView(button(T.t("Update now"), true, v -> Updater.check(this, false)));
+            box.addView(button(T.t("Exit"), false, v -> finishAffinity()));
+            return;
+        }
+        if (Auth.BLOCKED.equals(st)) {
+            header("🚫  " + T.t("No access"), Auth.email() + "\n" + T.t("This account can't use ZH Play. Contact the admin."));
+            box.addView(button(T.t("Use another account"), true, v -> signOut(this, this::render)));
+            box.addView(button(T.t("Exit"), false, v -> finishAffinity()));
+            return;
+        }
+        if (Auth.signedIn()) {                            // opened by hand while signed in
+            header("✅  " + T.t("Signed in"), Auth.name() + "\n" + Auth.email());
+            box.addView(button(T.t("Continue"), true, v -> finish()));
+            return;
+        }
+        if (tv) {
+            header(T.t("Sign in to ZH Play"), T.t("Scan this code with your phone's camera and open the link. ZH Play on your phone signs this TV in with your Google account."));
+            ImageView qr = new ImageView(this);
+            Bitmap bm = QrCode.make(Auth.tvLoginUrl(), dp(260));
+            if (bm != null) qr.setImageBitmap(bm);
+            qr.setBackgroundColor(Color.WHITE);
+            qr.setPadding(dp(12), dp(12), dp(12), dp(12));
+            LinearLayout.LayoutParams qlp = new LinearLayout.LayoutParams(dp(260), dp(260));
+            qlp.setMargins(0, dp(10), 0, dp(10));
+            box.addView(qr, qlp);
+            TextView code = text(28, Ui.ACCENT, true);
+            code.setText(Auth.tvCode());
+            code.setLetterSpacing(0.15f);
+            box.addView(code);
+            TextView how = text(14, Ui.DIM, false);
+            how.setText(T.t("Or on the phone: ZH Play remote → it offers “Sign in this TV”."));
+            how.setPadding(0, dp(8), 0, 0);
+            box.addView(how);
+            box.addView(button(T.t("Sign in with Google on this TV"), false, v -> googleSignIn()));
+            if (Auth.NOTICE.equals(st)) box.addView(button(T.t("Later"), false, v -> finish()));
+            return;
+        }
+        String when = java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.MEDIUM, java.text.DateFormat.SHORT)
+                .format(new java.util.Date(Auth.deadline()));
+        header(T.t("Sign in to ZH Play"), Auth.NOTICE.equals(st)
+                ? T.t("Sign-in with Google is required from") + " " + when + "."
+                : T.t("Sign in with your Google account to use ZH Play."));
+        box.addView(button("G  " + T.t("Sign in with Google"), true, v -> googleSignIn()));
+        if (Auth.NOTICE.equals(st)) box.addView(button(T.t("Later"), false, v -> finish()));
+        TextView note = text(12, Ui.DIM, false);
+        note.setText(T.t("Only your name and e-mail are used, to let you in. Nothing is stored on any server."));
+        note.setPadding(0, dp(18), 0, 0);
+        box.addView(note);
+    }
+
+    // ------------------------------------------------------------------ Google sign-in
+
+    private void googleSignIn() {
+        String cid = Auth.webClientId(this);
+        if (cid.isEmpty()) {
+            toast(T.t("Not set up yet: the admin must put web_client_id in admin/access.json"));
+            return;
+        }
+        GetCredentialRequest req = new GetCredentialRequest.Builder()
+                .addCredentialOption(new GetSignInWithGoogleOption.Builder(cid).build())
+                .build();
+        try {
+            CredentialManager.create(this).getCredentialAsync(this, req, null, onMain,
+                    new CredentialManagerCallback<GetCredentialResponse, GetCredentialException>() {
+                        @Override
+                        public void onResult(GetCredentialResponse r) {
+                            Credential c = r.getCredential();
+                            if (c instanceof CustomCredential && GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL.equals(c.getType())) {
+                                try {
+                                    GoogleIdTokenCredential g = GoogleIdTokenCredential.createFrom(c.getData());
+                                    String mail = emailFrom(g.getIdToken());
+                                    if (mail.isEmpty()) mail = g.getId();
+                                    Auth.signIn(mail, g.getDisplayName(), g.getProfilePictureUri() == null ? "" : g.getProfilePictureUri().toString());
+                                    toast("✅ " + T.t("Signed in as") + " " + Auth.email());
+                                    afterSignIn();
+                                    return;
+                                } catch (Exception e) {
+                                    toast("⚠ " + e.getMessage());
+                                    return;
+                                }
+                            }
+                            toast("⚠ " + T.t("Unexpected sign-in answer"));
+                        }
+
+                        @Override
+                        public void onError(GetCredentialException e) {
+                            if (e instanceof GetCredentialCancellationException) return;
+                            CharSequence m = e.getErrorMessage();
+                            toast("⚠ " + T.t("Sign-in failed") + (m == null ? "" : ": " + m));
+                        }
+                    });
+        } catch (Throwable t) {
+            toast("⚠ " + T.t("Google sign-in isn't available on this device") + ": " + t.getMessage());
+        }
+    }
+
+    /** The e-mail inside Google's ID token (its middle part is base64 JSON). */
+    private static String emailFrom(String idToken) {
+        try {
+            String[] p = idToken.split("\\.");
+            String json = new String(android.util.Base64.decode(p[1], android.util.Base64.URL_SAFE | android.util.Base64.NO_WRAP | android.util.Base64.NO_PADDING), "UTF-8");
+            return new org.json.JSONObject(json).optString("email", "");
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    private void afterSignIn() {
+        Auth.refresh(this, true, () -> {
+            if (pendingTv != null) render();          // now sign the TV in
+            else if (!Auth.locked(this)) finish();
+            else render();
+        });
+    }
+
+    static void signOut(Activity a, Runnable then) {
+        Auth.signOut();
+        try {
+            CredentialManager.create(a).clearCredentialStateAsync(new ClearCredentialStateRequest(), null, r -> new Handler(Looper.getMainLooper()).post(r),
+                    new CredentialManagerCallback<Void, ClearCredentialException>() {
+                        public void onResult(Void v) {
+                        }
+
+                        public void onError(ClearCredentialException e) {
+                        }
+                    });
+        } catch (Throwable ignored) {
+        }
+        if (then != null) then.run();
+    }
+
+    // ------------------------------------------------------------------ phone → TV (QR link)
+
+    /** zhplay://tvlogin?ip=…&port=…&c=… (from the page the TV's QR opens). */
+    private void handleLink(Intent i) {
+        Uri u = i == null ? null : i.getData();
+        if (u == null || !"zhplay".equals(u.getScheme()) || !"tvlogin".equals(u.getHost())) return;
+        String ip = u.getQueryParameter("ip"), port = u.getQueryParameter("port"), c = u.getQueryParameter("c");
+        if (ip == null || c == null) return;
+        pendingTv = ip + "|" + (port == null ? String.valueOf(RemoteService.PORT) : port) + "|" + c;
+    }
+
+    private void signInTv() {
+        final String[] p = pendingTv.split("\\|");
+        new Thread(() -> {
+            String msg;
+            boolean ok = false;
+            try {
+                HashMap<String, String> m = new HashMap<>();
+                m.put("c", p[2]);
+                m.put("email", Auth.email());
+                m.put("name", Auth.name());
+                m.put("photo", Store.getStr("au_photo", ""));
+                org.json.JSONObject r = TvClient.post(p[0], "/tvlogin", m);
+                ok = r.optBoolean("ok", false);
+                msg = r.optString("msg", ok ? T.t("The TV is signed in") : T.t("The TV refused it — scan the new code"));
+            } catch (Exception e) {
+                msg = T.t("Can't reach the TV — is the phone on the same Wi-Fi?");
+            }
+            final String fm = msg;
+            final boolean fok = ok;
+            main.post(() -> {
+                toast((fok ? "✅ " : "⚠ ") + fm);
+                pendingTv = null;
+                finish();
+            });
+        }).start();
+    }
+
+    // ------------------------------------------------------------------ account / admin menu
+
+    /** Account tile: who is signed in, sign out, and the admin tools. */
+    static void accountMenu(final Activity a) {
+        if (!Auth.signedIn()) {
+            open(a);
+            return;
+        }
+        final boolean admin = Auth.isAdmin();
+        java.util.List<String> l = new java.util.ArrayList<>();
+        l.add("🔑  " + T.t("My scrambled e-mail (for the admin)"));
+        if (admin) {
+            l.add("🛡  " + T.t("Admin: scramble an e-mail"));
+            l.add("✏  " + T.t("Admin: edit access.json on GitHub"));
+        }
+        l.add("🔄  " + T.t("Reload admin settings"));
+        l.add("🚪  " + T.t("Sign out"));
+        new UiDialog(a).setTitle("👤  " + Auth.name() + (admin ? "  · admin" : ""))
+                .setItems(l.toArray(new String[0]), (d, w) -> {
+                    String c = l.get(w);
+                    if (c.startsWith("🔑")) showHash(a, Auth.email());
+                    else if (c.startsWith("🛡")) {
+                        final EditText e = new EditText(a);
+                        e.setHint("name@gmail.com");
+                        e.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
+                        new UiDialog(a).setTitle(T.t("Scramble an e-mail")).setView(e)
+                                .setPositiveButton(T.t("Scramble"), (d2, w2) -> showHash(a, e.getText().toString()))
+                                .setNegativeButton(T.t("Cancel"), null).show();
+                    } else if (c.startsWith("✏")) {
+                        try {
+                            a.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(Auth.EDIT_URL)));
+                        } catch (Exception e) {
+                            a.startActivity(new Intent(a, BrowserActivity.class).putExtra(BrowserActivity.EXTRA_URL, Auth.EDIT_URL));
+                        }
+                    } else if (c.startsWith("🔄")) {
+                        Auth.refresh(a, true, () -> UiKit.makeToast(a, T.t("Admin settings reloaded"), Toast.LENGTH_SHORT).show());
+                    } else {
+                        new UiDialog(a).setTitle(T.t("Sign out?")).setMessage(Auth.email())
+                                .setPositiveButton(T.t("Sign out"), (d3, w3) -> signOut(a, () -> open(a)))
+                                .setNegativeButton(T.t("Cancel"), null).show();
+                    }
+                }).show();
+    }
+
+    private static void showHash(Activity a, String email) {
+        if (email == null || !email.contains("@")) return;
+        final String h = Auth.hash(email);
+        new UiDialog(a).setTitle(email.trim().toLowerCase(java.util.Locale.ROOT))
+                .setMessage(h + "\n\n" + T.t("Put this (with quotes) in admins, allowed or blocked in access.json."))
+                .setPositiveButton(T.t("Copy"), (d, w) -> {
+                    android.content.ClipboardManager cm = (android.content.ClipboardManager) a.getSystemService(Context.CLIPBOARD_SERVICE);
+                    if (cm != null) cm.setPrimaryClip(android.content.ClipData.newPlainText("hash", h));
+                    UiKit.makeToast(a, T.t("Copied"), Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton(T.t("Close"), null).show();
+    }
+}

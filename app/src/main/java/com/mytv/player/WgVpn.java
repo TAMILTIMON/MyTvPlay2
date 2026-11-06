@@ -404,6 +404,10 @@ public final class WgVpn {
 
     // ------------------------------------------------------------------ VPN Settings Panel
     public static void panel(final Activity a) {
+        if (!Auth.featureOn("vpn")) {
+            UiKit.makeToast(a, T.t("Switched off by the admin"), android.widget.Toast.LENGTH_LONG).show();
+            return;
+        }
         final org.json.JSONArray all = profiles();
         boolean rotating = isRotating();
         String rotLabel = rotating ? "🔄  " + T.t("Auto-rotate IP") + ": " + T.t("ON") + " (" + formatInterval(getRotateIntervalSeconds()) + ")"

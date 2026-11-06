@@ -1,0 +1,14 @@
+{
+  "web_client_id": "",
+  "mode": "anyone",
+  "admins": ["e4940009d4dd03532e683fa3eb0c803e8b563715fff668323f2ddb5572bdcf4e"],
+  "allowed": [],
+  "blocked": [],
+  "features_off": [],
+  "user_features_off": {},
+  "min_build": 0,
+  "message": "",
+  "maintenance": false,
+  "maintenance_message": "",
+  "login_from": ""
+}

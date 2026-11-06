@@ -54,6 +54,10 @@ public class SeedrActivity extends Activity {
 
     /** Open the Seedr screen and add this magnet / .torrent link (after signing in if needed). */
     public static void open(Context c, String magnet) {
+        if (!Auth.featureOn("seedr")) {
+            UiKit.makeToast(c, T.t("Switched off by the admin"), Toast.LENGTH_LONG).show();
+            return;
+        }
         Intent i = new Intent(c, SeedrActivity.class);
         if (magnet != null) i.putExtra(EXTRA_MAGNET, magnet);
         if (!(c instanceof Activity)) i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);

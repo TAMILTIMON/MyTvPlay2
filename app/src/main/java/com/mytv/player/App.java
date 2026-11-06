@@ -105,6 +105,13 @@ public class App extends Application {
         registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {
             public void onActivityStarted(Activity a) {
                 visible++;
+                // Google sign-in / admin gate (admin/access.json on GitHub)
+                if (!(a instanceof AuthActivity)) {
+                    if (Auth.locked(a)) AuthActivity.open(a);
+                    Auth.refresh(a, false, () -> {
+                        if (!a.isFinishing() && Auth.locked(a) && visible > 0) AuthActivity.open(a);
+                    });
+                }
                 if (Store.getBool("exited", false)) {          // opened again after Exit: back to normal
                     Store.putBool("exited", false);
                     RemoteService.start(a.getApplicationContext());

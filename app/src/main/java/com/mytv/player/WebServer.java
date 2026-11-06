@@ -58,6 +58,33 @@ public class WebServer extends NanoHTTPD {
                 }
             }
 
+            // ---- sign the TV in from a phone (QR code on the TV) ----
+            if ("/login".equals(uri)) {
+                String c = val(p, "c");
+                String ip = Net.ip();
+                String link = "zhplay://tvlogin?ip=" + ip + "&port=" + RemoteService.PORT + "&c=" + android.net.Uri.encode(c);
+                String intent = "intent://tvlogin?ip=" + ip + "&port=" + RemoteService.PORT + "&c=" + android.net.Uri.encode(c)
+                        + "#Intent;scheme=zhplay;package=" + ctx.getPackageName() + ";end";
+                String html = "<!doctype html><html><head><meta name=viewport content='width=device-width,initial-scale=1'>"
+                        + "<title>ZH Play</title><style>body{font-family:sans-serif;background:#0b0f1a;color:#fff;text-align:center;padding:40px 20px}"
+                        + "a{display:block;margin:18px auto;max-width:360px;padding:16px;border-radius:28px;background:#8b5cf6;color:#fff;"
+                        + "text-decoration:none;font-size:18px;font-weight:bold}p{color:#bbb}</style></head><body>"
+                        + "<h2>Sign in ZH Play on the TV</h2><p>Opens ZH Play on this phone, which signs the TV in with your Google account.</p>"
+                        + "<a href=\"" + intent + "\">Open ZH Play</a><a style='background:#334' href=\"" + link + "\">Open (other browsers)</a>"
+                        + "<p>No ZH Play on this phone? Install it first, then scan again.</p></body></html>";
+                return newFixedLengthResponse(Response.Status.OK, "text/html", html);
+            }
+            if ("/tvlogin".equals(uri)) {
+                // the code from the TV's QR — or a phone already paired with the remote PIN
+                if (!Auth.tvCodeOk(val(p, "c")) && !allowed(s, uri, p)) return fail("That code has expired — scan the new QR on the TV");
+                String mail = val(p, "email").trim();
+                if (!mail.contains("@")) return fail("Sign in on the phone first");
+                Auth.signIn(mail, val(p, "name"), val(p, "photo"));
+                Auth.tvCodeUsed();
+                Auth.refresh(ctx, true, null);
+                return msg("TV signed in as " + mail);
+            }
+
             // ---- remote PIN ----
             if ("/pair".equals(uri)) {
                 if (!Pair.enabled()) return json("{\"ok\":true,\"token\":\"open\"}");
@@ -78,6 +105,10 @@ public class WebServer extends NanoHTTPD {
                         "{\"ok\":false,\"auth\":true,\"msg\":\"Enter the PIN shown on the TV\"}");
                 r.addHeader("Cache-Control", "no-store");
                 return r;
+            }
+            // a TV that must sign in (or is blocked / in maintenance) only answers status until then
+            if (Auth.locked(ctx) && !"/ping".equals(uri) && !"/state".equals(uri) && !"/status".equals(uri)) {
+                return fail("The TV must sign in first — scan the QR code on the TV, or tap “Sign in this TV” on your phone");
             }
 
             switch (uri) {
@@ -967,6 +998,7 @@ public class WebServer extends NanoHTTPD {
         o.put("adb", AdbClient.enabled());
         o.put("scan", ChannelScanner.status());
         o.put("profile", Family.label());
+        o.put("signin", Auth.locked(ctx) && !Auth.signedIn());      // TV waiting for sign-in → phone offers it
         o.put("num", BgState.num);                  // a number box (PIN…) is open → phone shows its number pad
         o.put("kbd", BgState.kbd);                  // TV keyboard open → phone shows live typing (checked in the background)
         boolean tvDark = !"light".equals(Store.getStr("theme", "dark"));
