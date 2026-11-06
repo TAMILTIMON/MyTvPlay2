@@ -213,10 +213,13 @@ final class Cloud {
                                 .put("seen", new JSONObject().put(".sv", "timestamp"));
                         http("PUT", db("/tvinfo/" + deviceId()), info.toString());
                         beat = System.currentTimeMillis();
+                        Store.putLong("fb_beat", beat);
+                        Store.putStr("fb_err", "");
                     }
                     listen(app);                                  // returns when the stream ends / token expires
                     fails = 0;
                 } catch (Throwable e) {
+                    Store.putStr("fb_err", String.valueOf(e.getMessage()));
                     fails++;
                     try {
                         Thread.sleep(Math.min(60000, 3000L * fails));

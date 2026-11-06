@@ -271,8 +271,8 @@ public class ConnectActivity extends AppCompatActivity {
             return;
         }
         if (!Cloud.signedIn()) {
-            UiKit.makeToast(this, T.t("Sign in with Google first (Account tile)"), Toast.LENGTH_LONG).show();
-            AuthActivity.open(this);
+            // signed in to Google but not to ZH Play cloud yet (e.g. before it was set up): connect now
+            startActivity(new Intent(this, AuthActivity.class).putExtra("cloud", true));
             return;
         }
         UiKit.makeToast(this, T.t("Looking for your TVs…"), Toast.LENGTH_SHORT).show();
@@ -293,7 +293,9 @@ public class ConnectActivity extends AppCompatActivity {
                                 + (mins >= 0 && mins < 10 ? T.t("online") : mins >= 0 ? T.t("last seen") + " " + (mins < 120 ? mins + " min" : (mins / 60) + " h") : "?"));
                     }
                     if (ids.isEmpty()) {
-                        UiKit.makeToast(this, T.t("No TV is signed in with this account yet — sign the TV in (QR) at home first"), Toast.LENGTH_LONG).show();
+                        new UiDialog(this).setTitle("🌐  " + T.t("No TV linked yet"))
+                                .setMessage(T.t("Your TV hasn't joined ZH Play cloud yet. Once, at home: put the phone on the TV's Wi-Fi and open the remote for that TV — it links the TV to your account by itself. After that it works from anywhere."))
+                                .setPositiveButton(T.t("OK"), null).show();
                         return;
                     }
                     new UiDialog(this).setTitle("🌐  " + T.t("My TVs anywhere"))

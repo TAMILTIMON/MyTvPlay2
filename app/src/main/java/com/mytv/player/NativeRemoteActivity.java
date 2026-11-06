@@ -819,7 +819,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
         return r;
     }
 
-    private boolean askedTvSignIn;
+    private boolean askedTvSignIn, cloudLinked;
     private Button padN;
     private View numView;
     private boolean numAuto;                         // switched to 123 because the TV asked for a number
@@ -2502,6 +2502,12 @@ public class NativeRemoteActivity extends AppCompatActivity {
         renderQueue();
         accessHint.setVisibility(S.optBoolean("access", true) ? View.GONE : View.VISIBLE);
         boolean kb = S.optBoolean("kbd");
+        if (!ip.startsWith("cloud:") && !cloudLinked && Cloud.signedIn() && !S.has("cloud_id") && !S.optBoolean("signin")) {
+            cloudLinked = true;                    // the TV isn't in ZH Play cloud yet: give it this account
+            call("/tvlogin", m("email", Auth.email(), "name", Auth.name(), "photo", Store.getStr("au_photo", ""),
+                    "fb_uid", Cloud.uid(), "fb_refresh", Cloud.refreshToken()),
+                    r -> toast("☁ " + T.t("TV linked — you can now control it from anywhere")));
+        }
         if (S.optBoolean("signin") && Auth.signedIn() && !askedTvSignIn) {
             askedTvSignIn = true;
             new UiDialog(this).setTitle("🔐  " + T.t("Sign in this TV"))

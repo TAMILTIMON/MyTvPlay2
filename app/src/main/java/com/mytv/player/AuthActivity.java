@@ -81,6 +81,9 @@ public class AuthActivity extends Activity {
         setContentView(sv);
         handleLink(getIntent());
         render();
+        if (getIntent().getBooleanExtra("cloud", false) && Auth.signedIn() && Cloud.enabled() && !Cloud.signedIn()) {
+            main.postDelayed(this::googleSignIn, 400);       // from "My TVs anywhere": connect the cloud at once
+        }
         Auth.refresh(this, true, this::render);
     }
 
@@ -202,6 +205,16 @@ public class AuthActivity extends Activity {
         }
         if (Auth.signedIn()) {                            // opened by hand while signed in
             header("✅  " + T.t("Signed in"), Auth.name() + "\n" + Auth.email());
+            if (Cloud.enabled() && !Cloud.signedIn()) {
+                // signed in before ZH Play cloud was set up: one more tap links this account to the cloud
+                String err = Store.getStr("fb_err", "");
+                TextView w = text(14, Ui.DIM, false);
+                w.setText(T.t("ZH Play cloud (TVs from anywhere) is not connected yet.") + (err.isEmpty() ? "" : "\n" + err));
+                box.addView(w);
+                box.addView(button("☁  " + T.t("Connect ZH Play cloud"), true, v -> googleSignIn()));
+                box.addView(button(T.t("Continue"), false, v -> finish()));
+                return;
+            }
             box.addView(button(T.t("Continue"), true, v -> finish()));
             return;
         }
@@ -265,10 +278,20 @@ public class AuthActivity extends Activity {
                                     Auth.signIn(mail, g.getDisplayName(), g.getProfilePictureUri() == null ? "" : g.getProfilePictureUri().toString());
                                     final String gid = g.getIdToken();
                                     new Thread(() -> {                  // same account in ZH Play cloud (TVs from anywhere)
+                                        String res;
                                         try {
                                             Cloud.signInWithGoogle(gid);
-                                        } catch (Exception ignored) {
+                                            res = Cloud.signedIn() ? "☁ " + T.t("ZH Play cloud connected") : null;
+                                            Store.putStr("fb_err", "");
+                                        } catch (Exception e) {
+                                            Store.putStr("fb_err", String.valueOf(e.getMessage()));
+                                            res = "⚠ " + T.t("Cloud") + ": " + e.getMessage();
                                         }
+                                        final String fr = res;
+                                        if (fr != null) main.post(() -> {
+                                            toast(fr);
+                                            render();
+                                        });
                                     }).start();
                                     toast("✅ " + T.t("Signed in as") + " " + Auth.email());
                                     afterSignIn();
@@ -384,6 +407,7 @@ public class AuthActivity extends Activity {
             l.add("🛡  " + T.t("Admin: scramble an e-mail"));
             l.add("✏  " + T.t("Admin: edit access.json on GitHub"));
         }
+        l.add("☁  " + T.t("ZH Play cloud status"));
         l.add("🔄  " + T.t("Reload admin settings"));
         l.add("🚪  " + T.t("Sign out"));
         new UiDialog(a).setTitle("👤  " + Auth.name() + (admin ? "  · admin" : ""))
@@ -403,6 +427,18 @@ public class AuthActivity extends Activity {
                         } catch (Exception e) {
                             a.startActivity(new Intent(a, BrowserActivity.class).putExtra(BrowserActivity.EXTRA_URL, Auth.EDIT_URL));
                         }
+                    } else if (c.startsWith("☁")) {
+                        String st = (Cloud.enabled() ? "✓ " + T.t("Set up by the admin") : "✗ " + T.t("Not set up (Firebase keys missing in access.json)"))
+                                + "\n" + (Cloud.signedIn() ? "✓ " + T.t("Connected") + " (" + Cloud.uid().substring(0, Math.min(6, Cloud.uid().length())) + "…)" : "✗ " + T.t("Not connected"))
+                                + "\n" + T.t("This device") + ": " + Cloud.deviceId()
+                                + (Ui.isTv(a) ? "\n" + T.t("Online since") + ": " + (Store.getLong("fb_beat", 0) > 0
+                                ? java.text.DateFormat.getTimeInstance().format(new java.util.Date(Store.getLong("fb_beat", 0))) : "—") : "")
+                                + (Store.getStr("fb_err", "").isEmpty() ? "" : "\n⚠ " + Store.getStr("fb_err", ""));
+                        UiDialog cd = new UiDialog(a);
+                        cd.setTitle("☁  " + T.t("ZH Play cloud")).setMessage(st).setPositiveButton(T.t("OK"), null);
+                        if (Cloud.enabled() && !Cloud.signedIn() && !Ui.isTv(a))
+                            cd.setNeutralButton(T.t("Connect"), (d4, w4) -> a.startActivity(new Intent(a, AuthActivity.class).putExtra("cloud", true)));
+                        cd.show();
                     } else if (c.startsWith("🔄")) {
                         Auth.refresh(a, true, () -> UiKit.makeToast(a, T.t("Admin settings reloaded"), Toast.LENGTH_SHORT).show());
                     } else {

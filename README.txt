@@ -1,3 +1,12 @@
+ZH PLAY 8.1.1 — ZH Play cloud: connect + link the TV, with visible errors
+=========================================================================
+* Accounts signed in before the cloud was set up had no cloud session (errors were hidden).
+  "My TVs anywhere" now connects it right there (one Google tap); the account screen shows
+  "Connect ZH Play cloud" and the Firebase error if it fails.
+* The phone remote on the TV's Wi-Fi links a signed-in TV to the cloud by itself (once).
+* Account → "ZH Play cloud status": set up? connected? device id, TV online since, last error.
+* Empty "My TVs anywhere" explains how to link the TV.
+
 ZH PLAY 8.1 — Same account = no PIN · control the TV from anywhere (Firebase)
 =============================================================================
 * SAME WI-FI: a phone signed in with the same Google account as the TV controls it without the PIN
