@@ -1,3 +1,11 @@
+ZH PLAY 7.5.1 — Three APKs again (TVs with 32-bit Android can install)
+=====================================================================
+* Back to the build from before: ZHPlay-arm64-v8a-release.apk, ZHPlay-armeabi-v7a-release.apk and
+  ZHPlay-universal-release.apk. The arm64-only APK of 7.5 could not install on TVs running 32-bit
+  Android (common even with 64-bit chips). For the TV, install the universal (or armeabi-v7a) APK.
+* The in-app updater picks the right one for each device, as before.
+* Everything from 7.5 (Device mode Auto / TV / Phone, better TV detection, SD Card & USB row) stays.
+
 ZH PLAY 7.5 — One universal APK · TV home always reachable
 ==========================================================
 * BUILD: one APK for phones and TVs — ZHPlay-universal-arm64-release.apk (64-bit ARM only, no
