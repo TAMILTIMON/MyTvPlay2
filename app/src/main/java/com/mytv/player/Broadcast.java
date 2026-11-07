@@ -273,7 +273,13 @@ final class Broadcast {
             PendingIntent pi = PendingIntent.getActivity(c, 4402, open,
                     PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0));
             android.app.Notification.Builder nb = Build.VERSION.SDK_INT >= 26 ? new android.app.Notification.Builder(c, CH) : new android.app.Notification.Builder(c);
-            nb.setSmallIcon(R.drawable.lc_tv).setContentTitle(title).setContentText(body).setAutoCancel(true).setContentIntent(pi);
+            nb.setSmallIcon(R.drawable.lc_tv).setContentTitle(title).setContentText(body).setAutoCancel(true).setContentIntent(pi)
+                    .setStyle(new android.app.Notification.BigTextStyle().bigText(body));      // full message, not one cut line
+            if (Build.VERSION.SDK_INT >= 21) nb.setColor(0xFF8B5CF6).setCategory(android.app.Notification.CATEGORY_RECOMMENDATION);
+            try {
+                nb.setLargeIcon(android.graphics.BitmapFactory.decodeResource(c.getResources(), R.drawable.zh_logo));
+            } catch (Throwable ignored) {
+            }
             if (Build.VERSION.SDK_INT < 26) nb.setPriority(android.app.Notification.PRIORITY_HIGH);
             NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
             if (nm != null) nm.notify(4403, nb.build());

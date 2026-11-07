@@ -166,7 +166,7 @@ final class Auth {
         String m = cfg().optString("message", "").trim();
         if (m.isEmpty() || m.equals(Store.getStr("au_msg_seen", ""))) return;
         Store.putStr("au_msg_seen", m);
-        new UiDialog(a).setTitle("📢  ZH Play").setMessage(m).setPositiveButton(T.t("OK"), null).show();
+        ZhPopup.message(a, "📢", "ZH Play", m);                 // styled card, not a plain Android dialog
     }
 
     /** Removes the tiles the admin switched off (features_off). */

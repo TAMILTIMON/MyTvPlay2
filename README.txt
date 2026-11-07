@@ -1,3 +1,20 @@
+ZH PLAY 8.4 — Redesigned admin panel · ZH Play-style popups
+===========================================================
+* ADMIN PANEL is now a dashboard: profile card, stat cards (users / today / week / TVs) and feature
+  cards, each opening its own page: Users · Broadcast · News scroller · Send notification · Live monitor
+  · Push setup. Back goes to the previous page.
+* USERS: search, filter chips (All / Active today / Phones / TVs), cards with avatar, online dot,
+  device and version. A user's page: menus grouped (Media, Tools, Cloud & network, TV & remote) with
+  on/off switches, "All on", Block (asks first), Save.
+* BROADCAST: status pill (LIVE / SCHEDULED / NOT LIVE), type chips with an explanation, labelled
+  fields, date/time button; Save / Save + notify / Start now / End now (confirm cards).
+* SCROLLER and NOTIFICATION pages show a live preview of what users will see.
+* POPUPS: ZH Play's own banners (slide in, success / error / info) and confirm / message cards instead
+  of Android's plain toasts and dialogs; the admin's announcement shows as a styled card; a push that
+  arrives while ZH Play is open slides in as a banner (tap opens it); system notifications show the
+  full message with the ZH Play logo and colour.
+* Nothing removed (GitHub sending stays under Push setup → Advanced).
+
 ZH PLAY 8.3 — Push straight from the admin panel (no GitHub)
 ===========================================================
 * Admin panel → Push setup → "Import Firebase key (.json)" once (stays only on the admin's phone).
