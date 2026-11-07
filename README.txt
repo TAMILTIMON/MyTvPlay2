@@ -1,3 +1,27 @@
+ZH PLAY 8.3 — Push straight from the admin panel (no GitHub)
+===========================================================
+* Admin panel → Push setup → "Import Firebase key (.json)" once (stays only on the admin's phone).
+  Then "Send a notification to everyone" (title, message, optional link) goes out directly: the key signs
+  a Google login (RS256 JWT, verified against a real crypto library) → Firebase Cloud Messaging v1.
+* "Save + notify all" and "▶ Start now" push directly too. GitHub is only an optional backup.
+* Tapping a notification opens its link (video plays in ZH Play, YouTube in YouTube, pages in ZH
+  Browser) or the live broadcast.
+
+ZH PLAY 8.2 — Admin panel · broadcasts · news scroller · users & menus · instant push
+====================================================================================
+* ADMIN PANEL (Account → 📡, admins only): user count (today / week / TVs) with each user's device,
+  version, last seen; per-user menu access and block; news scroller; broadcasts; live monitor; push setup.
+* BROADCAST: YouTube Live · Premiere (any video file link, everyone in sync, late joiners jump to the
+  current point) · Live stream (.m3u8). Schedule (start + length), Save / Save + notify all / Start now /
+  End now. Apps show "📅 … live at …", then "🔴 LIVE NOW — tap to watch", and remind at start time.
+* LIVE MONITOR: watching now, joined, peak, and who.
+* NEWS SCROLLER on every home screen (phone + TV).
+* INSTANT PUSH: Firebase Cloud Messaging via the GitHub workflow "Broadcast" (.github/workflows/
+  broadcast.yml) — run it on GitHub or from the admin panel. Secret: FCM_SERVICE_ACCOUNT.
+* Security: Firebase rules accept changes only from the admin e-mail (see admin/ADMIN_GUIDE.md).
+* New library: firebase-messaging (BOM 33.5.1), set up from access.json (firebase_app_id).
+* Nothing removed.
+
 ZH PLAY 8.1.1 — ZH Play cloud: connect + link the TV, with visible errors
 =========================================================================
 * Accounts signed in before the cloud was set up had no cloud session (errors were hidden).

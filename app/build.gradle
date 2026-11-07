@@ -11,7 +11,7 @@ android {
         minSdk 21
         targetSdk 34
         versionCode = (System.getenv('VCODE') ?: '34').toInteger()
-        versionName = '8.1.1' + (System.getenv('VCODE') ? '.' + System.getenv('VCODE') : '')
+        versionName = '8.3' + (System.getenv('VCODE') ? '.' + System.getenv('VCODE') : '')
     }
 
     // Two variants from the same code — every feature is in both:
@@ -99,6 +99,9 @@ dependencies {
     implementation 'androidx.credentials:credentials-play-services-auth:1.3.0'
     implementation 'com.google.android.libraries.identity.googleid:googleid:1.1.1'
     implementation 'com.google.zxing:core:3.5.3'
+    // instant broadcast notifications (Firebase Cloud Messaging; set up from admin/access.json, no google-services.json)
+    implementation platform('com.google.firebase:firebase-bom:33.5.1')
+    implementation 'com.google.firebase:firebase-messaging'
 
     // VLC engine: plays almost every format/codec, equalizer, volume boost, subtitles, tracks.
     implementation 'org.videolan.android:libvlc-all:3.6.2'

@@ -101,6 +101,8 @@ public class App extends Application {
         TorrentEngine.cleanupAsync(this);
         // after "Exit ZH Play" the phone stays fully closed until the user opens the app again
         Auth.noteInstall(this);
+        Broadcast.channel(this);
+        Push.init(this);                                         // instant broadcast notifications (if set up)
         if (Ui.isTv(this) || !Store.getBool("exited", false)) RemoteService.start(this);
         seedIptv();
         registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {
@@ -115,6 +117,8 @@ public class App extends Application {
                         }
                     }).start();
                 }
+                Push.init(a.getApplicationContext());
+                Broadcast.sync(a.getApplicationContext(), false);   // scroller, broadcast, my menus, user list
                 if (!(a instanceof AuthActivity)) {
                     if (Auth.locked(a)) AuthActivity.open(a);
                     Auth.refresh(a, false, () -> {
@@ -133,7 +137,10 @@ public class App extends Application {
             }
             public void onActivityStopped(Activity a) { visible = Math.max(0, visible - 1); }
             public void onActivityCreated(Activity a, Bundle b) { }
-            public void onActivityResumed(Activity a) { top = new java.lang.ref.WeakReference<>(a); }
+            public void onActivityResumed(Activity a) {
+                top = new java.lang.ref.WeakReference<>(a);
+                if (a instanceof ConnectActivity || a instanceof MainActivity) Broadcast.attach(a);   // 📢 / 🔴 LIVE bar
+            }
             public void onActivityPaused(Activity a) { }
             public void onActivitySaveInstanceState(Activity a, Bundle b) { }
             public void onActivityDestroyed(Activity a) { }

@@ -404,6 +404,7 @@ public class AuthActivity extends Activity {
         java.util.List<String> l = new java.util.ArrayList<>();
         l.add("🔑  " + T.t("My scrambled e-mail (for the admin)"));
         if (admin) {
+            l.add("📡  " + T.t("Admin panel: users, broadcast, scroller"));
             l.add("🛡  " + T.t("Admin: scramble an e-mail"));
             l.add("✏  " + T.t("Admin: edit access.json on GitHub"));
         }
@@ -414,6 +415,7 @@ public class AuthActivity extends Activity {
                 .setItems(l.toArray(new String[0]), (d, w) -> {
                     String c = l.get(w);
                     if (c.startsWith("🔑")) showHash(a, Auth.email());
+                    else if (c.startsWith("📡")) AdminActivity.open(a);
                     else if (c.startsWith("🛡")) {
                         final EditText e = new EditText(a);
                         e.setHint("name@gmail.com");

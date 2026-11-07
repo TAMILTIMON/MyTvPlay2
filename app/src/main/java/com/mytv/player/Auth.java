@@ -149,6 +149,7 @@ final class Auth {
 
     /** A tile / feature the admin hasn't switched off (for everyone, or for this person). */
     static boolean featureOn(String key) {
+        if (Broadcast.permOff(key)) return false;               // switched off for this user in the admin panel
         JSONObject c = cfg();
         JSONArray off = c.optJSONArray("features_off");
         if (off != null) for (int i = 0; i < off.length(); i++) if (key.equals(off.optString(i))) return false;
@@ -217,7 +218,7 @@ final class Auth {
         if (webClientId(c).isEmpty()) return OK;              // not set up yet: nobody is locked out
         if (signedIn()) {
             String h = hash(email());
-            if (listed("blocked", h)) return BLOCKED;
+            if (listed("blocked", h) || (Broadcast.blockedHere() && !admin)) return BLOCKED;
             if ("invite_only".equals(cf.optString("mode")) && !admin && !listed("allowed", h)) return BLOCKED;
             return OK;
         }

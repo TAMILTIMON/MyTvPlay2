@@ -66,6 +66,65 @@ Realtime Database rules: each account can only read / write `users/<its own id>`
 - Through the cloud: commands, status, voice, links. Live screen and phone-file sharing need the same Wi-Fi.
 - Commands waiting more than 2 minutes (TV off) are dropped, not run later.
 
+
+## Admin panel, broadcasts, users (Account → 📡 Admin panel)
+
+### 1. New Firebase rules (replace the old ones → Publish)
+Realtime Database → **Rules**. Only your e-mail can change broadcasts, the scroller and users' menus;
+each user writes only their own entries; only you can read the user list and viewers.
+```json
+{
+  "rules": {
+    "users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+    "pub": {
+      ".read": "auth != null",
+      ".write": "auth != null && auth.token.email === 'tamilarasan5333@gmail.com'"
+    },
+    "members": {
+      ".read": "auth != null && auth.token.email === 'tamilarasan5333@gmail.com'",
+      "$uid": { ".write": "auth != null && auth.uid === $uid" }
+    },
+    "perms": {
+      ".read": "auth != null && auth.token.email === 'tamilarasan5333@gmail.com'",
+      ".write": "auth != null && auth.token.email === 'tamilarasan5333@gmail.com'",
+      "$uid": { ".read": "auth != null && auth.uid === $uid" }
+    },
+    "live": {
+      ".read": "auth != null && auth.token.email === 'tamilarasan5333@gmail.com'",
+      "$bid": { "$uid": { ".write": "auth != null && auth.uid === $uid" } }
+    }
+  }
+}
+```
+
+### 2. Instant push to everyone — straight from the admin panel
+a. **Firebase → ⚙ Project settings → General → Your apps → the Android app** (`com.tamil.castplay`;
+   "Add app → Android" if it isn't there) → copy **App ID** (`1:855520751554:android:…`) →
+   in `access.json`: `"firebase_app_id": "1:855520751554:android:…",`  (so every app can receive pushes)
+b. **Firebase → ⚙ Project settings → Service accounts → Generate new private key** → a .json downloads
+   to your phone.
+c. ZH Play → **Account → 📡 Admin panel → Push setup → 📂 Import Firebase key** → pick that file.
+   It stays only on your phone. **Never upload it** (not to GitHub, not anywhere).
+d. **Send a notification to everyone**: title, message, optional link (video / YouTube / web page) →
+   📣 Send. Also sent automatically by **Save + notify all** and **▶ Start now**.
+
+(Optional backup: the GitHub workflow "Broadcast" with the secret `FCM_SERVICE_ACCOUNT` still works.)
+
+### 3. What the panel does
+- **Users**: how many use ZH Play (today / this week / TVs), each with device, version, last seen.
+  Tap a user → tick the menus they get, or **Block**. Applies on their app within a minute.
+- **News scroller**: a scrolling line on every home screen (phone + TV).
+- **Broadcast**: type **YouTube Live** (your stream's link) · **Premiere** (any video file link — everyone
+  watches in sync, late joiners jump to the current point) · **Live stream (.m3u8)**; title, link, start
+  time, length. **Save** / **Save + notify all** / **▶ Start now** / **■ End now**. Every app shows
+  "📅 … live at …", then "🔴 LIVE NOW — tap to watch", and reminds users at the start time.
+- **Live monitor**: watching now, joined, peak, and who (🟢 = watching now).
+
 ## The fields
 
 | field | meaning |
