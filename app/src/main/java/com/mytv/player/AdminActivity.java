@@ -717,6 +717,33 @@ public class AdminActivity extends Activity {
         final EditText msg = input(c, T.t("Message"), T.t("What do you want to tell everyone?"), "", true);
         final EditText link = input(c, T.t("Link (optional)"), T.t("video, YouTube or web page"), "", false);
         link.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+        c.addView(label(T.t("Open the link in")), gap(14));
+        final String[] modes = {"auto", "player", "browser"};
+        final String[] modeNames = {"✨ " + T.t("Auto"), "▶ " + T.t("ZH Play player"), "🌐 " + T.t("Browser")};
+        final int[] mode = {0};
+        final LinearLayout modeRow = new LinearLayout(this);
+        final Runnable[] drawModes = new Runnable[1];
+        drawModes[0] = () -> {
+            modeRow.removeAllViews();
+            for (int i = 0; i < modes.length; i++) {
+                final int k = i;
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
+                lp.setMargins(0, 0, dp(8), 0);
+                modeRow.addView(chip(modeNames[i], i == mode[0], v -> {
+                    mode[0] = k;
+                    drawModes[0].run();
+                }), lp);
+            }
+        };
+        drawModes[0].run();
+        HorizontalScrollView ms = new HorizontalScrollView(this);
+        ms.setHorizontalScrollBarEnabled(false);
+        ms.addView(modeRow);
+        c.addView(ms);
+        TextView mh = text(12, Ui.DIM, false);
+        mh.setText(T.t("Auto: videos, Drive / Dropbox video links and streams play in ZH Play; YouTube in YouTube; pages in the browser."));
+        mh.setPadding(dp(2), dp(8), 0, 0);
+        c.addView(mh);
         body.addView(c, gap(4));
         // preview of how it looks
         body.addView(label(T.t("Preview")), gap(18));
@@ -762,7 +789,8 @@ public class AdminActivity extends Activity {
                 ZhPopup.confirm(this, "🔑", T.t("Push isn't set up"), T.t("Import the Firebase key once (Push setup)."), T.t("Open"), false, () -> go(this::pushSetup));
                 return;
             }
-            ZhPopup.confirm(this, "📣", T.t("Send to everyone?"), t + "\n" + m, T.t("Send"), false, () -> pushAsync(t, m, l, ""));
+            final String om = modes[mode[0]];
+            ZhPopup.confirm(this, "📣", T.t("Send to everyone?"), t + "\n" + m, T.t("Send"), false, () -> pushAsync(t, m, l, "", om));
         }), gap(18));
         ((LinearLayout.LayoutParams) body.getChildAt(body.getChildCount() - 1).getLayoutParams()).height = dp(52);
     }
@@ -930,9 +958,13 @@ public class AdminActivity extends Activity {
     }
 
     private void pushAsync(final String title, final String body, final String link, final String bid) {
+        pushAsync(title, body, link, bid, "auto");
+    }
+
+    private void pushAsync(final String title, final String body, final String link, final String bid, final String open) {
         say("📣 " + T.t("Sending…"));
         new Thread(() -> {
-            final String r = Push.send(title, body, link, bid);
+            final String r = Push.send(title, body, link, bid, open);
             main.post(() -> say(r));
         }).start();
     }

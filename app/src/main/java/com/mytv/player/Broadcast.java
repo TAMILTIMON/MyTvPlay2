@@ -192,6 +192,7 @@ final class Broadcast {
             return;
         }
         String id = b.optString("id"), url = b.optString("url"), title = b.optString("title", "Live");
+        if (!"youtube".equals(b.optString("kind"))) url = Links.direct(url);       // Drive / Dropbox share links → direct
         watching = id;
         join(a.getApplicationContext(), id);
         String kind = b.optString("kind", "hls");
@@ -267,9 +268,14 @@ final class Broadcast {
     }
 
     static void notify(Context c, String title, String body, String link) {
+        notify(c, title, body, link, "auto");
+    }
+
+    static void notify(Context c, String title, String body, String link, String mode) {
         try {
             channel(c);
-            Intent open = new Intent(c, LiveActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtra("url", link == null ? "" : link);
+            Intent open = new Intent(c, LiveActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    .putExtra("url", link == null ? "" : link).putExtra("open", mode == null ? "auto" : mode);
             PendingIntent pi = PendingIntent.getActivity(c, 4402, open,
                     PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0));
             android.app.Notification.Builder nb = Build.VERSION.SDK_INT >= 26 ? new android.app.Notification.Builder(c, CH) : new android.app.Notification.Builder(c);

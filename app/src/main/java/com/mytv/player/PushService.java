@@ -16,14 +16,15 @@ public class PushService extends FirebaseMessagingService {
             if (m.getData().get("body") != null) body = m.getData().get("body");
         }
         final String link = m.getData() == null ? "" : m.getData().get("url");
+        final String open = m.getData() == null || m.getData().get("open") == null ? "auto" : m.getData().get("open");
         final android.app.Activity top = App.visible > 0 ? App.top() : null;
         if (top != null) {
             // ZH Play is open: a banner slides in at the top (tap = open the link / the live show)
             final String ft = title, fb = body;
             top.runOnUiThread(() -> ZhPopup.banner(top, ft, fb, ZhPopup.PUSH, () -> top.startActivity(
-                    new android.content.Intent(top, LiveActivity.class).putExtra("url", link == null ? "" : link))));
+                    new android.content.Intent(top, LiveActivity.class).putExtra("url", link == null ? "" : link).putExtra("open", open))));
         } else {
-            Broadcast.notify(this, title, body, link);
+            Broadcast.notify(this, title, body, link, open);
         }
         Broadcast.sync(getApplicationContext(), true);
     }

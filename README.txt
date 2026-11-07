@@ -1,3 +1,22 @@
+ZH PLAY 8.4.1 — Pushed / premiere links play in ZH Player (Seedr, Google Drive, Dropbox)
+=======================================================================================
+* Seedr links (…/Movie.mkv?st=…&e=…) were not recognised because of the part after the file name, and
+  Google Drive share links are pages — both opened in the browser, which downloaded them.
+* Links.java: Drive (/file/d/…, open?id=, uc?id=) → direct stream (file must be "Anyone with the link");
+  Dropbox ?dl=0 → raw; Seedr / tokened links recognised; links without an extension are checked with the
+  server (headers only) before deciding. Used for notification links and premieres.
+* Admin "Send notification": Open in Auto / ZH Player / Browser.
+* IMPORTANT: Links.java must be in the repo — push the whole zip (it was missing on GitHub).
+
+ZH PLAY 8.4.1 — Pushed video links play inside ZH Play
+=====================================================
+* Links without a file extension (download pages, Google Drive, Dropbox, short links) went to the
+  browser, which downloaded them. Now: Drive / Dropbox share links become direct video links; for
+  other unknown links ZH Play asks the server what it is (headers only) and plays videos, songs and
+  streams in its own player. Web pages and other files still open in the browser.
+* Admin → Send notification → "Open the link in": Auto / ZH Play player / Browser.
+* Premiere and .m3u8 broadcasts also use the direct form of Drive / Dropbox links.
+
 ZH PLAY 8.4 — Redesigned admin panel · ZH Play-style popups
 ===========================================================
 * ADMIN PANEL is now a dashboard: profile card, stat cards (users / today / week / TVs) and feature

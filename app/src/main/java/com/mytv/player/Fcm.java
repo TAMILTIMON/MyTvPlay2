@@ -62,10 +62,15 @@ final class Fcm {
 
     /** Sends to every ZH Play (topic "all"). Blocking. A message for the admin. */
     static String send(String title, String body, String link, String bid) {
+        return send(title, body, link, bid, "auto");
+    }
+
+    static String send(String title, String body, String link, String bid, String open) {
         try {
             JSONObject sa = new JSONObject(Store.getStr(KEY, "{}"));
             String at = accessToken(sa);
             JSONObject data = new JSONObject().put("kind", "broadcast").put("bid", bid == null ? "" : bid).put("url", link == null ? "" : link)
+                    .put("open", open == null ? "auto" : open)
                     .put("title", title).put("body", body);
             JSONObject msg = new JSONObject().put("message", new JSONObject()
                     .put("topic", "all")

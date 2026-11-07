@@ -59,7 +59,11 @@ final class Push {
 
     /** Direct from this phone if the Firebase key is imported (Admin → Push setup); else via GitHub. */
     static String send(String title, String body, String link, String bid) {
-        if (Fcm.ready()) return Fcm.send(title, body, link, bid);
+        return send(title, body, link, bid, "auto");
+    }
+
+    static String send(String title, String body, String link, String bid, String open) {
+        if (Fcm.ready()) return Fcm.send(title, body, link, bid, open);
         String tok = Store.getStr("gh_pat", "");
         if (tok.isEmpty()) return "✗ " + T.t("Import the Firebase key first (Admin → Push setup)");
         try {

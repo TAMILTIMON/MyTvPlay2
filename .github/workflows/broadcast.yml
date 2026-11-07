@@ -1,0 +1,50 @@
+# Sends a notification to every ZH Play (Firebase Cloud Messaging, topic "all").
+# Start it here (Actions → Broadcast → Run workflow) or from the ZH Play admin panel.
+# Needs the repository secret FCM_SERVICE_ACCOUNT = the Firebase service-account key (JSON).
+name: Broadcast
+
+on:
+  workflow_dispatch:
+    inputs:
+      title:
+        description: "Title"
+        required: true
+        default: "ZH Play"
+      body:
+        description: "Message"
+        required: true
+  repository_dispatch:
+    types: [zh_broadcast]
+
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send to every ZH Play
+        env:
+          SA: ${{ secrets.FCM_SERVICE_ACCOUNT }}
+          TITLE: ${{ github.event.inputs.title || github.event.client_payload.title }}
+          BODY: ${{ github.event.inputs.body || github.event.client_payload.body }}
+          BID: ${{ github.event.client_payload.bid }}
+        run: |
+          pip install --quiet google-auth requests
+          python3 - <<'PY'
+          import json, os, requests
+          from google.oauth2 import service_account
+          from google.auth.transport.requests import Request
+          if not os.environ.get("SA"):
+              raise SystemExit("Add the repository secret FCM_SERVICE_ACCOUNT (Firebase service-account key JSON)")
+          info = json.loads(os.environ["SA"])
+          creds = service_account.Credentials.from_service_account_info(
+              info, scopes=["https://www.googleapis.com/auth/firebase.messaging"])
+          creds.refresh(Request())
+          msg = {"message": {
+              "topic": "all",
+              "notification": {"title": os.environ.get("TITLE") or "ZH Play", "body": os.environ.get("BODY") or ""},
+              "data": {"kind": "broadcast", "bid": os.environ.get("BID") or ""},
+              "android": {"priority": "high", "notification": {"channel_id": "zh_live"}}}}
+          r = requests.post("https://fcm.googleapis.com/v1/projects/%s/messages:send" % info["project_id"],
+                            headers={"Authorization": "Bearer " + creds.token}, json=msg, timeout=30)
+          print(r.status_code, r.text)
+          r.raise_for_status()
+          PY
