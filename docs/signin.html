@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ZH Play — Sign in</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  :root { --bg:#0b0f1a; --card:#161d2e; --fg:#f3f4f6; --dim:#9ca3af; --accent:#8b5cf6; }
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center; background:var(--bg);
+         color:var(--fg); font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  main { width:min(420px, 92vw); background:var(--card); border-radius:26px; padding:34px 26px; text-align:center;
+         box-shadow:0 20px 60px rgba(0,0,0,.45); }
+  h1 { font-size:24px; margin:10px 0 6px; } p { color:var(--dim); margin:8px 0 22px; }
+  .logo { width:72px; height:72px; border-radius:20px; background:linear-gradient(135deg,#f97316,#8b5cf6);
+          display:inline-flex; align-items:center; justify-content:center; font-size:34px; }
+  #btn { display:flex; justify-content:center; min-height:46px; }
+  .ok { color:#22c55e; font-size:18px; font-weight:700; } .err { color:#ef4444; }
+</style>
+</head>
+<body>
+<main>
+  <div class="logo">▶</div>
+  <h1>Sign in to ZH Play</h1>
+  <p id="msg">Choose the Google account to use on your phone or TV.</p>
+  <div id="btn"></div>
+</main>
+<script>
+  // The code links this page to the phone / TV that showed the QR (random, used once).
+  const code = new URLSearchParams(location.search).get('c') || '';
+  const CONFIG = 'https://raw.githubusercontent.com/TAMILTIMON/MyTvPlay2/main/admin/access.json';
+  const msg = document.getElementById('msg');
+  let db = '';
+
+  function show(text, cls) { msg.textContent = text; msg.className = cls || ''; }
+
+  async function start() {
+    if (code.length < 24) { show('This link is incomplete — scan the QR code on ZH Play again.', 'err'); return; }
+    try {
+      const cfg = await (await fetch(CONFIG + '?t=' + Date.now(), { cache: 'no-store' })).json();
+      db = String(cfg.firebase_db_url || '').replace(/\/+$/, '');
+      google.accounts.id.initialize({ client_id: cfg.web_client_id, callback: done, ux_mode: 'popup' });
+      google.accounts.id.renderButton(document.getElementById('btn'),
+        { theme: 'filled_black', size: 'large', shape: 'pill', text: 'signin_with', width: 280 });
+    } catch (e) {
+      show('Couldn\'t load ZH Play settings. Check the internet and reload.', 'err');
+    }
+  }
+
+  async function done(r) {
+    show('Signing in…');
+    try {
+      const res = await fetch(db + '/handoff/' + encodeURIComponent(code) + '.json', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ t: r.credential, at: { '.sv': 'timestamp' } })
+      });
+      if (!res.ok) throw new Error(res.status);
+      document.getElementById('btn').style.display = 'none';
+      show('✓ Signed in — go back to ZH Play. It continues by itself.', 'ok');
+    } catch (e) {
+      show('That didn\'t work (' + e.message + '). Scan a new QR code on ZH Play and try again.', 'err');
+    }
+  }
+
+  window.addEventListener('load', function wait() {
+    if (window.google && google.accounts && google.accounts.id) start(); else setTimeout(wait, 150);
+  });
+</script>
+</body>
+</html>

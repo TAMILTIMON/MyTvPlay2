@@ -223,8 +223,9 @@ final class ZhCrypt {
             String body = sb.toString().trim();
             if (!body.startsWith("{")) throw new Unsupported();
             r = new org.json.JSONObject(body);
-        } finally {
+        } catch (Exception e) {
             c.disconnect();
+            throw e;
         }
         if (r.optString("pub").isEmpty() || r.optString("sid").isEmpty()) throw new Unsupported();
         Session s = new Session(r.getString("sid"), derive(kp, r.getString("pub"), mine, r.getString("pub")));

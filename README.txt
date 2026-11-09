@@ -1,3 +1,20 @@
+ZH PLAY 9.1 — Faster encrypted remote · sign in with a QR code / browser
+=======================================================================
+LAG (encryption stays ON):
+* The TV now answers decrypted commands directly in memory instead of calling its own web server again
+  (one HTTP request per command instead of two) — and keeps the phone's real address, which also fixes
+  phone-shared videos that were fetched from the TV itself.
+* Connections are kept open between commands (keep-alive) instead of reconnecting every time.
+* Pictures load directly with a 10-minute pass (no double base64 inside the encryption).
+* The account proof is only sent when there's no pairing key (smaller messages).
+SIGN IN WITH A QR CODE / BROWSER (phones where Google sign-in fails):
+* "▦ Sign in with a QR code or browser" under the Google button (phone and TV): a QR for the ZH Play
+  sign-in page (GitHub Pages, docs/signin.html) — sign in on any other phone / computer, or in this
+  phone's own browser; the sign-in reaches this device through Firebase (random one-time code).
+* One-time setup in admin/ADMIN_GUIDE.md: GitHub Pages (/docs), add https://tamiltimon.github.io as an
+  Authorized JavaScript origin of "ZH Play Web", and the "handoff" Firebase rule.
+* Nothing removed.
+
 ZH PLAY 9.0.2 — Phone ↔ TV encryption back ON (as in 9.0)
 =========================================================
 * The lag seen after 9.0 was a sync delay, not the encryption. 9.0.1 (on GitHub) had switched it off;

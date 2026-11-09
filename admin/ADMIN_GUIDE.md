@@ -98,6 +98,12 @@ each user writes only their own entries; only you can read the user list and vie
     "live": {
       ".read": "auth != null && auth.token.email === 'tamilarasan5333@gmail.com'",
       "$bid": { "$uid": { ".write": "auth != null && auth.uid === $uid" } }
+    },
+    "handoff": {
+      "$code": {
+        ".read": "$code.length >= 30",
+        ".write": "$code.length >= 30 && (!data.exists() || !newData.exists())"
+      }
     }
   }
 }
@@ -127,6 +133,16 @@ The app now retries with Google's second sign-in method and then shows why, with
 **SHA-1** and where it was installed from. Amazon Appstore installs are signed by Amazon: add the shown
 SHA-1 to the Android client in Google Cloud (Clients → ZH Play Android → add fingerprint, or create a
 second Android client with package `com.tamil.castplay` and that SHA-1).
+
+### Sign in with a QR code / browser (phones where Google sign-in fails)
+The sign-in screen has "▦ Sign in with a QR code or browser". It shows a QR for
+`https://tamiltimon.github.io/MyTvPlay2/signin.html?c=…` — scan it with any other phone / computer, or open it
+in the phone's own browser, and sign in with Google there; the phone receives the sign-in by itself.
+One-time setup:
+1. GitHub → Settings → Pages: Deploy from branch **main**, folder **/docs** (also hosts the privacy policy).
+2. Google Cloud → Google Auth Platform → Clients → **ZH Play Web** → **Authorized JavaScript origins** →
+   add `https://tamiltimon.github.io` → Save (can take a few minutes).
+3. Firebase rules: the `"handoff"` block above (a random code links the page to the phone; used once).
 
 ### 3. What the panel does
 - **Users**: how many use ZH Play (today / this week / TVs), each with device, version, last seen.

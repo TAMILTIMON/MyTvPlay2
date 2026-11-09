@@ -92,7 +92,9 @@ public final class TvClient {
     /** One request inside the encryption: {p, q, t, z} or a GET {g}. */
     private static JSONObject securePost(String ip, String path, Map<String, String> params, String get, boolean retry) throws Exception {
         ZhCrypt.Session se = ZhCrypt.session(ip, RemoteService.PORT);
-        JSONObject env = new JSONObject().put("t", token(ip)).put("z", Cloud.cachedIdToken());
+        String tk = token(ip);
+        JSONObject env = new JSONObject().put("t", tk);
+        if (tk.isEmpty()) env.put("z", Cloud.cachedIdToken());      // the account proof only when there's no pairing key
         if (get != null) env.put("g", get);
         else {
             JSONObject q = new JSONObject();
@@ -123,9 +125,11 @@ public final class TvClient {
             String body = sb.toString().trim();
             if (!body.startsWith("{")) throw new ZhCrypt.Unsupported();
             r = new JSONObject(body);
-        } finally {
-            c.disconnect();
+        } catch (Exception e) {
+            c.disconnect();                                     // broken: drop the connection
+            throw e;
         }
+        // (no disconnect on success: the connection is reused for the next command — keep-alive)
         if (r.optBoolean("rehello")) {                          // the TV restarted / forgot us: new key, once
             ZhCrypt.drop(ip);
             if (retry) return securePost(ip, path, params, get, false);
@@ -146,6 +150,21 @@ public final class TvClient {
         } catch (Exception e) {
             return new JSONObject().put("ok", inner.optInt("c") < 400).put("raw", b);
         }
+    }
+
+    private static final Map<String, Object[]> passes = new java.util.HashMap<>();
+
+    /** A 10-minute reusable pass for pictures (asked once over the encrypted channel). */
+    private static String picturePass(String ip) {
+        synchronized (passes) {
+            Object[] p = passes.get(ip);
+            if (p != null && System.currentTimeMillis() < (Long) p[1]) return (String) p[0];
+        }
+        String t = ticket(ip, 10 * 60 * 1000L, true);
+        if (t.startsWith("tk_")) synchronized (passes) {
+            passes.put(ip, new Object[]{t, System.currentTimeMillis() + 9 * 60 * 1000L});
+        }
+        return t;
     }
 
     /** A short-lived pass for a plain connection (upload, screen cast, web remote) — the real key never travels in the clear. */
@@ -202,11 +221,23 @@ public final class TvClient {
     /** GET raw bytes (thumbnails). */
     public static byte[] bytes(String ip, String pathAndQuery) throws Exception {
         if (ZhCrypt.usable(ip) && !ZhCrypt.isOld(ip)) {
-            try {
-                JSONObject g = securePost(ip, null, null, pathAndQuery, true);
-                return g.optInt("c") == 200 ? Fcm.b64decode(g.optString("x")) : null;
-            } catch (ZhCrypt.Unsupported u) {
-                ZhCrypt.markOld(ip);
+            // pictures aren't secret: fetched directly (fast) with a 10-minute pass instead of the lasting key
+            String pass = picturePass(ip);
+            if (!pass.isEmpty()) {
+                String sep = pathAndQuery.contains("?") ? "&" : "?";
+                String clean = pathAndQuery.replaceAll("([?&])t=[^&]*&?", "$1");
+                HttpURLConnection c = (HttpURLConnection) new URL("http://" + ip + ":" + RemoteService.PORT + clean
+                        + (clean.contains("?") ? (clean.endsWith("?") || clean.endsWith("&") ? "" : "&") : "?") + "t=" + URLEncoder.encode(pass, "UTF-8")).openConnection();
+                c.setConnectTimeout(5000);
+                c.setReadTimeout(15000);
+                if (c.getResponseCode() != 200) return null;
+                try (InputStream in = c.getInputStream()) {
+                    java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
+                    byte[] b = new byte[16384];
+                    int n;
+                    while ((n = in.read(b)) > 0) bo.write(b, 0, n);
+                    return bo.toByteArray();
+                }
             }
         }
         String sep = pathAndQuery.contains("?") ? "&" : "?";

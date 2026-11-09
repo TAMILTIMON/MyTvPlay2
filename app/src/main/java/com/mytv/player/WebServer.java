@@ -819,8 +819,100 @@ public class WebServer extends NanoHTTPD {
         return u;
     }
 
+    /** True while a decrypted request (already checked) is being answered in memory. */
+    private static final ThreadLocal<Boolean> TRUSTED = new ThreadLocal<>();
+
+    /**
+     * Answers a decrypted request directly, in memory: no second HTTP call, and it keeps the phone's
+     * real address (so phone-shared videos are fetched from the phone, not from the TV itself).
+     */
+    private Object[] inner(final IHTTPSession outer, final String method, String pathAndQuery, JSONObject q) throws Exception {
+        final String path = pathAndQuery.split("\\?", 2)[0];
+        final Map<String, String> parms = new HashMap<>();
+        if (pathAndQuery.contains("?")) {
+            for (String kv : pathAndQuery.split("\\?", 2)[1].split("&")) {
+                if (kv.isEmpty()) continue;
+                String[] x = kv.split("=", 2);
+                parms.put(java.net.URLDecoder.decode(x[0], "UTF-8"), x.length > 1 ? java.net.URLDecoder.decode(x[1], "UTF-8") : "");
+            }
+        }
+        if (q != null) for (java.util.Iterator<String> it = q.keys(); it.hasNext(); ) {
+            String k = it.next();
+            parms.put(k, q.optString(k));
+        }
+        final Map<String, String> headers = new HashMap<>(outer.getHeaders());
+        headers.remove("x-token");
+        IHTTPSession fake = new IHTTPSession() {
+            public void execute() {
+            }
+
+            public CookieHandler getCookies() {
+                return outer.getCookies();
+            }
+
+            public Map<String, String> getHeaders() {
+                return headers;
+            }
+
+            public InputStream getInputStream() {
+                return new java.io.ByteArrayInputStream(new byte[0]);
+            }
+
+            public Method getMethod() {
+                return "GET".equals(method) ? Method.GET : Method.POST;
+            }
+
+            @SuppressWarnings("deprecation")
+            public Map<String, String> getParms() {
+                return parms;
+            }
+
+            public Map<String, java.util.List<String>> getParameters() {
+                Map<String, java.util.List<String>> m = new HashMap<>();
+                for (Map.Entry<String, String> e : parms.entrySet()) m.put(e.getKey(), java.util.Collections.singletonList(e.getValue()));
+                return m;
+            }
+
+            public String getQueryParameterString() {
+                return "";
+            }
+
+            public String getUri() {
+                return path;
+            }
+
+            public void parseBody(Map<String, String> files) {
+            }
+
+            public String getRemoteIpAddress() {
+                return outer.getRemoteIpAddress();          // the phone's real address
+            }
+
+            public String getRemoteHostName() {
+                return outer.getRemoteHostName();
+            }
+        };
+        TRUSTED.set(Boolean.TRUE);
+        Response r;
+        try {
+            r = serve(fake);
+        } finally {
+            TRUSTED.remove();
+        }
+        java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
+        InputStream in = r.getData();
+        if (in != null) {
+            byte[] b = new byte[16384];
+            int n;
+            while ((n = in.read(b)) > 0 && bo.size() < 4 * 1024 * 1024) bo.write(b, 0, n);
+            in.close();
+        }
+        return new Object[]{r.getStatus().getRequestStatus(), bo.toByteArray()};
+    }
+
     /** From this TV itself (also: requests that arrived encrypted and were opened here). */
     private static boolean isLocal(IHTTPSession s) {
+        if (Boolean.TRUE.equals(TRUSTED.get())) return true;
         String ip = s.getRemoteIpAddress();
         return "127.0.0.1".equals(ip) || "::1".equals(ip) || Net.ip().equals(ip);
     }
@@ -847,10 +939,10 @@ public class WebServer extends NanoHTTPD {
             if (!auth && !open) {
                 out.put("c", 401).put("b", "{\"ok\":false,\"auth\":true,\"msg\":\"Enter the PIN shown on the TV\"}");
             } else if (!get.isEmpty()) {
-                Object[] r = loop("GET", get, null);
+                Object[] r = inner(s, "GET", get, null);
                 out.put("c", (Integer) r[0]).put("x", Fcm.b64url((byte[]) r[1]));
             } else {
-                Object[] r = loop("POST", path, q);
+                Object[] r = inner(s, "POST", path, q);
                 out.put("c", (Integer) r[0]).put("b", new String((byte[]) r[1], "UTF-8"));
             }
             return json(new JSONObject().put("d", ZhCrypt.seal(key, out.toString())).toString());
@@ -895,6 +987,7 @@ public class WebServer extends NanoHTTPD {
     }
 
     private boolean allowed(IHTTPSession s, String uri, Map<String, String> p) {
+        if (Boolean.TRUE.equals(TRUSTED.get())) return true;       // decrypted + already checked in encrypted()
         if (!Pair.enabled()) return true;
         if (uri.equals("/") || uri.equals("/index.html") || uri.equals("/ping") || uri.equals("/favicon.ico")) return true;
         String ip = s.getRemoteIpAddress();

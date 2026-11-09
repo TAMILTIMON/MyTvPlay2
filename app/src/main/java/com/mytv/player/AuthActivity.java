@@ -237,6 +237,7 @@ public class AuthActivity extends Activity {
             how.setPadding(0, dp(8), 0, 0);
             box.addView(how);
             box.addView(button(T.t("Sign in with Google on this TV"), false, v -> googleSignIn()));
+            box.addView(qrLink());
             if (Auth.NOTICE.equals(st)) box.addView(button(T.t("Later"), false, v -> finish()));
             return;
         }
@@ -246,6 +247,7 @@ public class AuthActivity extends Activity {
                 ? T.t("Sign-in with Google is required from") + " " + when + "."
                 : T.t("Sign in with your Google account to use ZH Play."));
         box.addView(button("G  " + T.t("Sign in with Google"), true, v -> googleSignIn()));
+        box.addView(qrLink());                                 // phones where Google sign-in fails
         if (Auth.NOTICE.equals(st)) box.addView(button(T.t("Later"), false, v -> finish()));
         TextView note = text(12, Ui.DIM, false);
         note.setText(T.t("Only your name and e-mail are used, to let you in. Nothing is stored on any server."));
@@ -330,6 +332,121 @@ public class AuthActivity extends Activity {
         } catch (Throwable t) {
             toast("⚠ " + T.t("Google sign-in isn't available on this device") + ": " + t.getMessage());
         }
+    }
+
+    // ------------------------------------------------------------------ sign in with a QR code / browser
+
+    /** Small link under the Google button. */
+    private View qrLink() {
+        TextView t = text(14, Ui.ACCENT, true);
+        t.setText("▦  " + T.t("Sign in with a QR code or browser"));
+        t.setPadding(dp(8), dp(16), dp(8), dp(8));
+        t.setFocusable(true);
+        t.setClickable(true);
+        t.setBackground(Ui.focusCard(this, 18));
+        t.setOnClickListener(v -> qrSignIn());
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
+        lp.gravity = Gravity.CENTER_HORIZONTAL;
+        lp.topMargin = dp(10);
+        t.setLayoutParams(lp);
+        return t;
+    }
+
+    private volatile String qrCode;
+
+    /**
+     * Shows a QR for the ZH Play sign-in web page: sign in there on any phone / computer, or in this
+     * phone's own browser (Chrome's Google sign-in works where the phone's built-in one doesn't).
+     * The page hands the Google sign-in to this device through Firebase (handoff/{random code}).
+     */
+    private void qrSignIn() {
+        if (Auth.webClientId(this).isEmpty() || !Cloud.enabled()) {
+            ZhPopup.message(this, "▦", T.t("Not available yet"), T.t("The admin hasn't set up sign-in (access.json)."));
+            return;
+        }
+        byte[] r = new byte[24];
+        new java.security.SecureRandom().nextBytes(r);
+        final String code = Fcm.b64url(r);
+        qrCode = code;
+        final String page = Auth.cfg().optString("signin_page", "https://tamiltimon.github.io/MyTvPlay2/signin.html") + "?c=" + code;
+
+        box.removeAllViews();
+        header("▦  " + T.t("Sign in with a QR code"), T.t("Scan with another phone's camera (or open it on a computer) and sign in with Google there. Or open the page in this phone's browser."));
+        ImageView qr = new ImageView(this);
+        android.graphics.Bitmap bm = QrCode.make(page, dp(240));
+        if (bm != null) qr.setImageBitmap(bm);
+        qr.setBackgroundColor(Color.WHITE);
+        qr.setPadding(dp(12), dp(12), dp(12), dp(12));
+        LinearLayout.LayoutParams ql = new LinearLayout.LayoutParams(dp(240), dp(240));
+        ql.setMargins(0, dp(10), 0, dp(8));
+        box.addView(qr, ql);
+        final TextView status = text(14, Ui.DIM, false);
+        status.setText("⏳  " + T.t("Waiting for you to sign in…"));
+        box.addView(status);
+        if (!Ui.isTv(this)) {
+            box.addView(button("🌐  " + T.t("Open in this phone's browser"), true, v -> {
+                try {
+                    startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(page)).addCategory(Intent.CATEGORY_BROWSABLE));
+                } catch (Exception e) {
+                    toast("⚠ " + T.t("No browser found"));
+                }
+            }));
+        }
+        box.addView(button(T.t("Back"), false, v -> {
+            qrCode = null;
+            render();
+        }));
+
+        // wait for the page to hand the sign-in over (up to 10 minutes)
+        final long until = System.currentTimeMillis() + 10 * 60 * 1000L;
+        new Thread(() -> {
+            while (code.equals(qrCode) && System.currentTimeMillis() < until && !isFinishing()) {
+                try {
+                    Thread.sleep(2000);
+                    String s = Cloud.http("GET", Cloud.dbUrl() + "/handoff/" + code + ".json", null);
+                    if (s == null || s.trim().equals("null")) continue;
+                    String tok = new org.json.JSONObject(s).optString("t");
+                    if (tok.isEmpty()) continue;
+                    try {
+                        Cloud.http("DELETE", Cloud.dbUrl() + "/handoff/" + code + ".json", null);   // used once
+                    } catch (Exception ignored) {
+                    }
+                    finishQrSignIn(tok);
+                    return;
+                } catch (Exception ignored) {
+                }
+            }
+            if (code.equals(qrCode)) main.post(() -> status.setText("⌛  " + T.t("The code expired — tap Back and try again")));
+        }).start();
+    }
+
+    /** The Google sign-in arrived from the web page: same as signing in here. */
+    private void finishQrSignIn(final String idToken) {
+        String mail = emailFrom(idToken), name = "";
+        try {
+            String[] p = idToken.split("\\.");
+            org.json.JSONObject c = new org.json.JSONObject(new String(Fcm.b64decode(p[1]), "UTF-8"));
+            name = c.optString("name", "");
+            if (mail.isEmpty()) mail = c.optString("email", "");
+        } catch (Exception ignored) {
+        }
+        if (mail.isEmpty()) {
+            main.post(() -> toast("⚠ " + T.t("Sign-in didn't include an e-mail — try again")));
+            return;
+        }
+        try {
+            Cloud.signInWithGoogle(idToken);                  // ZH Play cloud, same account
+            Store.putStr("fb_err", "");
+        } catch (Exception e) {
+            Store.putStr("fb_err", String.valueOf(e.getMessage()));
+        }
+        final String fm = mail, fn = name;
+        main.post(() -> {
+            qrCode = null;
+            Auth.signIn(fm, fn, "");
+            ZhPopup.banner(this, "✅ " + T.t("Signed in as") + " " + fm);
+            afterSignIn();
+        });
     }
 
     /** Why Google sign-in failed on this phone, with this install's fingerprint for the admin. */
