@@ -170,8 +170,11 @@ final class BtHid {
         BluetoothHidDevice h = hid;
         if (h == null) return;
         onRegistered = then;
+        // Minor device class = "Remote Control" (not "Combo keyboard/pointer", which some launchers show
+        // as a gamepad/joystick icon and which may not match the TV's wake-on-reconnect device filter).
+        byte subclass = (byte) (BluetoothHidDevice.SUBCLASS1_NONE | BluetoothHidDevice.SUBCLASS2_REMOTE_CONTROL);
         BluetoothHidDeviceAppSdpSettings sdp = new BluetoothHidDeviceAppSdpSettings(
-                "ZH Play Remote", "ZH Play TV remote and keyboard", "ZH Play", BluetoothHidDevice.SUBCLASS1_COMBO, descriptor());
+                "ZH Play Remote", "ZH Play TV remote and keyboard", "ZH Play", subclass, descriptor());
         boolean ok = h.registerApp(sdp, null, null, EXEC, CALLBACK);
         if (!ok) {
             // another app (e.g. a Bluetooth keyboard app) holds the keyboard role, or Bluetooth is busy

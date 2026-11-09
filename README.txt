@@ -1,3 +1,19 @@
+ZH PLAY 9.2.2 — Bluetooth device type fixed (was "gamepad", now "remote control")
+===================================================================================
+* Your screenshot showed the phone listed with a gamepad/joystick icon on the TV, unlike the Mi remote.
+  Cause: the code only set the device's top category to "Combo" (keyboard+pointer) and never set a
+  specific sub-type. Per the Bluetooth spec, "Combo" hides the sub-type field entirely, so "Remote
+  Control" could never be selected — Android/the TV's launcher falls back to a gamepad icon for
+  unspecified combo devices.
+* Fix: top category is now "None" and the sub-type is "Remote Control" (BluetoothHidDevice.SUBCLASS1_NONE
+  | SUBCLASS2_REMOTE_CONTROL) — the exact Bluetooth-standard combination for this device type, matching
+  how a genuine TV remote (like the Mi RC) is expected to announce itself.
+* IMPORTANT: forget/unpair the old "Redmi Note 8 Pro" entry on the TV's Remotes & Accessories screen,
+  then pair again from the app — the TV remembers the old device type until re-paired.
+* Honest note: this fixes the *device type announcement* (confirmed against the Bluetooth spec's bit
+  layout) and should make the icon match the Mi remote's. Whether it also fixes wake-from-off depends on
+  how this specific TV's standby wake filter works, which can only be confirmed by testing on the device.
+
 ZH PLAY 9.2.1 — Build fix
 =========================
 * 9.2 declared ACCESS_FINE_LOCATION twice in AndroidManifest.xml (once already there, once with
