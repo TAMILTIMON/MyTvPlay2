@@ -1,3 +1,10 @@
+ZH PLAY 9.0.2 — Phone ↔ TV encryption back ON (as in 9.0)
+=========================================================
+* The lag seen after 9.0 was a sync delay, not the encryption. 9.0.1 (on GitHub) had switched it off;
+  9.0.2 switches it back on: ZhCrypt.ENABLED = true, the TV refuses unencrypted sign-in hand-overs again,
+  and pairing over plain Wi-Fi gets a 6-hour pass. Same behaviour as 9.0.
+* Secrets on the device stay encrypted (Android Keystore).
+
 ZH PLAY 9.0.1 — Phone ↔ TV encryption switched off (speed back to normal)
 =========================================================================
 * 9.0's encrypted phone ↔ TV channel made each command take an extra internal round trip on the TV,

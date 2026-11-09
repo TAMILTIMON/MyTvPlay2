@@ -33,8 +33,8 @@ final class ZhCrypt {
     }
 
     static final int VERSION = 1;
-    /** Phone ↔ TV encryption is OFF (it slowed the remote on TV boxes): everything goes direct, as before 9.0. */
-    static final boolean ENABLED = false;
+    /** Phone ↔ TV encryption ON (as in 9.0). Set false only to go back to the plain connection. */
+    static final boolean ENABLED = true;
     private static final SecureRandom RNG = new SecureRandom();
 
     static final class Session {
