@@ -33,6 +33,8 @@ final class ZhCrypt {
     }
 
     static final int VERSION = 1;
+    /** Phone ↔ TV encryption is OFF (it slowed the remote on TV boxes): everything goes direct, as before 9.0. */
+    static final boolean ENABLED = false;
     private static final SecureRandom RNG = new SecureRandom();
 
     static final class Session {
@@ -161,6 +163,7 @@ final class ZhCrypt {
 
     /** Encryption is used for TVs on the network (not for this device talking to itself). */
     static boolean usable(String ip) {
+        if (!ENABLED) return false;
         if (ip == null || ip.startsWith("127.") || ip.equals("localhost") || ip.equals("::1") || ip.startsWith("cloud:")) return false;
         synchronized (oldTvs) {
             Long t = oldTvs.get(ip);

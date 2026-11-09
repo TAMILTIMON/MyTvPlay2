@@ -83,7 +83,6 @@ public class WebServer extends NanoHTTPD {
                 return newFixedLengthResponse(Response.Status.OK, "text/html", html);
             }
             if ("/tvlogin".equals(uri)) {
-                if (!isLocal(s)) return fail("Update ZH Play on this phone — signing in now uses the encrypted connection");
                 // the code from the TV's QR — or a phone already paired with the remote PIN
                 if (!Auth.tvCodeOk(val(p, "c")) && !allowed(s, uri, p)) return fail("That code has expired — scan the new QR on the TV");
                 String mail = val(p, "email").trim();
@@ -108,8 +107,6 @@ public class WebServer extends NanoHTTPD {
                 if (val(p, "pin").isEmpty()) return fail("Enter the PIN shown on the TV");
                 String tok = Pair.pair(val(p, "pin"));
                 if (tok == null) return fail("Wrong PIN. Look at the TV screen.");
-                // paired over plain Wi-Fi (web page, older app): a 6-hour pass instead of the lasting key
-                if (!isLocal(s)) tok = ZhCrypt.issueTicket(6 * 3600 * 1000L, true);
                 return json(new JSONObject().put("ok", true).put("token", tok).toString());
             }
             if (!allowed(s, uri, p)) {
@@ -284,7 +281,6 @@ public class WebServer extends NanoHTTPD {
                     return json(new JSONObject().put("ok", true).put("ticket", ZhCrypt.issueTicket(ttl, "1".equals(val(p, "multi")))).toString());
                 }
                 case "/seedr/login": {           // the phone signs the TV into its Seedr account
-                    if (!isLocal(s)) return fail("Update ZH Play on this phone — this now uses the encrypted connection");
                     if (val(p, "access").isEmpty()) return fail("Sign in to Seedr on the phone first");
                     SeedrApi.adopt(val(p, "access"), val(p, "refresh"), val(p, "device"), val(p, "email"));
                     return msg("Seedr on the TV: signed in as " + val(p, "email"));

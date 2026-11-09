@@ -1,3 +1,11 @@
+ZH PLAY 9.0.1 — Phone ↔ TV encryption switched off (speed back to normal)
+=========================================================================
+* 9.0's encrypted phone ↔ TV channel made each command take an extra internal round trip on the TV,
+  which lagged the remote on TV boxes. It is OFF (ZhCrypt.ENABLED = false): commands, key presses,
+  thumbnails, uploads, screen cast and the web remote go direct exactly as before 9.0.
+* Pairing gives the lasting key again (no 6-hour pass); the TV accepts sign-in hand-overs directly again.
+* KEPT (no effect on speed): secrets stored encrypted on the device (Android Keystore).
+
 ZH PLAY 9.0 — Encrypted phone ↔ TV · secrets encrypted on the device
 ====================================================================
 PHONE ↔ TV (local Wi-Fi), ZhCrypt:
