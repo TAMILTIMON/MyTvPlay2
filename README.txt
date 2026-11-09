@@ -1,3 +1,9 @@
+ZH PLAY 9.2.1 — Build fix
+=========================
+* 9.2 declared ACCESS_FINE_LOCATION twice in AndroidManifest.xml (once already there, once with
+  maxSdkVersion=30 for Bluetooth search) → the manifest merger stopped the build. The duplicate is removed
+  (the existing declaration already covers Bluetooth search). Both manifests checked: no other duplicates.
+
 ZH PLAY 9.2 — ⏻ Bluetooth power-on (phone as a Bluetooth keyboard / remote)
 ===========================================================================
 * Android 9+ phones register as a classic Bluetooth keyboard + TV remote (BluetoothHidDevice): keyboard
