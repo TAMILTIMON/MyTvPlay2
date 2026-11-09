@@ -1304,10 +1304,13 @@ public class NativeRemoteActivity extends AppCompatActivity {
     }
 
     private void powerMenu() {
-        String[] items = {T.t("Sleep / screen off"), T.t("Wake up"), T.t("Power key"), T.t("Restart the TV"), T.t("Restart ZH Play")};
-        final String[] acts = {"sleep", "wake", "power", "reboot", "restartapp"};
+        String[] items = {T.t("Sleep / screen off"), T.t("Wake up"), T.t("Power key"), T.t("Restart the TV"), T.t("Restart ZH Play"),
+                "⏻ " + T.t("Power on (Bluetooth) — TV is off")};
+        final String[] acts = {"sleep", "wake", "power", "reboot", "restartapp", "btpower"};
         new UiDialog(this).setTitle(T.t("Power")).setItems(items, (d, w) -> {
-            if (acts[w].equals("reboot")) {
+            if (acts[w].equals("btpower")) {
+                BtRemoteActivity.open(this, true);              // works when the TV's Wi-Fi is off
+            } else if (acts[w].equals("reboot")) {
                 new UiDialog(this).setTitle(T.t("Restart the TV") + "?")
                         .setPositiveButton(T.t("OK"), (d2, w2) -> call("/power", m("do", "reboot"), null))
                         .setNegativeButton(T.t("Cancel"), null).show();

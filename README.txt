@@ -1,3 +1,20 @@
+ZH PLAY 9.2 — ⏻ Bluetooth power-on (phone as a Bluetooth keyboard / remote)
+===========================================================================
+* Android 9+ phones register as a classic Bluetooth keyboard + TV remote (BluetoothHidDevice): keyboard
+  (arrows, OK), media keys (volume, mute, play/pause, Home, Back, Menu) and system keys (Wake Up, Sleep).
+  Report descriptor verified (99 bytes; reports 8 / 2 / 1 bytes).
+* POWER ON: the phone reconnects to the paired TV (a bonded keyboard reconnecting can page the TV awake —
+  the method proven on Mi Box S in skrepkaq/Bluetooth-HID-Wake), waits ~1.6 s, then sends "Wake Up" twice.
+  Never "Power" (that toggles and would switch a running TV off).
+* PAIRING, both ways: find the TV from the phone (bond + connect), or make the phone visible and add it on the
+  TV (Settings → Remotes & accessories → Add accessory).
+* Backup remote over Bluetooth (works when Wi-Fi is down). Phone board tile "Power on TV" and the remote's
+  Power menu → "⏻ Power on (Bluetooth)".
+* Note: Xiaomi TVs with a MediaTek chip may only wake for their own remote's signal (ssw112/xiaomi-tv-ble-wake);
+  then an ESP32 beacon is needed (Option B).
+* Permissions: BLUETOOTH_CONNECT / SCAN / ADVERTISE (and location on Android 6–11 for finding devices);
+  Bluetooth is optional hardware. Nothing removed; encryption stays ON.
+
 ZH PLAY 9.1 — Faster encrypted remote · sign in with a QR code / browser
 =======================================================================
 LAG (encryption stays ON):

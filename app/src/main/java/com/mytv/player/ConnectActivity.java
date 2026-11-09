@@ -103,6 +103,8 @@ public class ConnectActivity extends AppCompatActivity {
         phoneTiles.put("scan", UiKit.tile(this, "refresh-cw", T.t("Scan again"), T.t("find TVs on this Wi-Fi"), 0xFF8B5CF6, v -> startScan()));
         phoneTiles.put("address", UiKit.tile(this, "keyboard", T.t("Enter TV address"), T.t("type the TV's IP"), 0xFF3B82F6, v -> manual()));
         phoneTiles.put("group", UiKit.tile(this, "layers", T.t("TV group"), T.t("control several TVs at once"), 0xFF14B8A6, v -> TvGroup.manage(this, null)));
+        phoneTiles.put("bt_power", UiKit.tile(this, "power", T.t("Power on TV"), T.t("over Bluetooth, when it's off"), 0xFF22C55E,
+                v -> BtRemoteActivity.open(this, false)));
         phoneTiles.put("anywhere", UiKit.tile(this, "globe", T.t("My TVs anywhere"), T.t("control over the internet"), 0xFF0EA5E9,
                 v -> tvsAnywhere()));
         if (Ui.maybeTv(this)) {      // a TV / box shown the phone screen: one tap to the full TV home
