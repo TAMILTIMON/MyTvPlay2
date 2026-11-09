@@ -38,7 +38,8 @@ public class LiveActivity extends Activity {
     }
 
     private void play(String url) {
-        Remote.play(this, java.util.Collections.singletonList(new Store.Item("ZH Play", url, "")), 0);
+        String t = getIntent().getStringExtra("title");
+        Remote.play(this, java.util.Collections.singletonList(new Store.Item(t == null || t.isEmpty() ? "ZH Play" : t, url, "")), 0);
     }
 
     private void web(String url) {

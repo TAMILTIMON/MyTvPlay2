@@ -98,6 +98,16 @@ final class Broadcast {
                 Store.putStr("pub_json", p == null || p.trim().equals("null") ? "{}" : p);
                 String m = Cloud.http("GET", url("/perms/" + Cloud.uid()), null);
                 Store.putStr("my_perms", m == null || m.trim().equals("null") ? "{}" : m);
+                long so = perms().optLong("signout", 0);
+                if (so > 0 && so > Store.getLong("au_at", 0) && Auth.signedIn()) {      // the admin signed this user out
+                    Auth.signOut();
+                    Cloud.signOut();
+                    Remote.MAIN.post(() -> {
+                        android.app.Activity top = App.top();
+                        if (top != null) AuthActivity.open(top);
+                    });
+                    return;
+                }
                 if (System.currentTimeMillis() - lastMember > 30 * 60 * 1000L) {     // "I'm using ZH Play"
                     JSONObject me = new JSONObject().put("name", Auth.name()).put("email", Auth.email())
                             .put("device", Build.MANUFACTURER + " " + Build.MODEL).put("tv", Ui.isTv(c))
@@ -105,8 +115,19 @@ final class Broadcast {
                     Cloud.http("PUT", url("/members/" + Cloud.uid()), me.toString());
                     lastMember = System.currentTimeMillis();
                 }
+                if (!"live".equals(phase(current()))) {
+                    cleanUpEnded();                                     // ended: nothing left to replay
+                    if (watching != null) {
+                        watching = null;
+                        Remote.MAIN.post(() -> {                        // stop it for people still watching
+                            android.app.Activity top = App.top();
+                            if (top instanceof PlayerActivity) ((PlayerActivity) top).broadcastEnded();
+                        });
+                    }
+                }
                 if (watching != null && App.visible > 0) beat(watching);
                 remind(c);
+                TvHome.refresh(c);                                  // TV home screen: live / upcoming card
                 Remote.MAIN.post(() -> refreshBars());
             } catch (Exception ignored) {
             }
@@ -193,6 +214,8 @@ final class Broadcast {
         }
         String id = b.optString("id"), url = b.optString("url"), title = b.optString("title", "Live");
         if (!"youtube".equals(b.optString("kind"))) url = Links.direct(url);       // Drive / Dropbox share links → direct
+        remember(b.optString("url"));                       // its link may only play while it is live
+        remember(url);
         watching = id;
         join(a.getApplicationContext(), id);
         String kind = b.optString("kind", "hls");
@@ -304,6 +327,62 @@ final class Broadcast {
     }
 
     // ------------------------------------------------------------------ admin helpers
+
+    // ------------------------------------------------------------------ ended broadcasts can't be replayed
+
+    private static java.util.Set<String> keys() {
+        java.util.Set<String> s = new java.util.HashSet<>();
+        try {
+            JSONArray a = new JSONArray(Store.getStr("bc_urls", "[]"));
+            for (int i = 0; i < a.length(); i++) s.add(a.optString(i));
+        } catch (Exception ignored) {
+        }
+        return s;
+    }
+
+    private static void remember(String url) {
+        if (url == null || url.isEmpty()) return;
+        java.util.Set<String> s = keys();
+        if (s.add(Store.resumeKey(url))) {
+            JSONArray a = new JSONArray();
+            for (String k : s) a.put(k);
+            while (a.length() > 40) a.remove(0);
+            Store.putStr("bc_urls", a.toString());
+        }
+    }
+
+    /** Broadcast items are titled "🔴 …" (so the same movie from your own Seedr isn't affected). */
+    static boolean fromBroadcast(String title) {
+        return title != null && title.startsWith("🔴 ");
+    }
+
+    /** A link that came from an admin broadcast (kept out of Recent / Continue watching). */
+    static boolean isBroadcastUrl(String url) {
+        if (url == null || url.isEmpty()) return false;
+        String k = Store.resumeKey(url);
+        if (keys().contains(k)) return true;
+        JSONObject b = current();                                  // also the current one, before anyone tapped it
+        if (b == null) return false;
+        String u = b.optString("url");
+        return !u.isEmpty() && (Store.resumeKey(u).equals(k) || Store.resumeKey(Links.direct(u)).equals(k));
+    }
+
+    /** True while this broadcast link is live (otherwise it must not play). */
+    static boolean liveUrl(String url) {
+        JSONObject b = current();
+        if (b == null || !"live".equals(phase(b))) return false;
+        String k = Store.resumeKey(url), u = b.optString("url");
+        return Store.resumeKey(u).equals(k) || Store.resumeKey(Links.direct(u)).equals(k);
+    }
+
+    /** The broadcast is over: remove its links from Recent / Continue watching and their positions. */
+    private static void cleanUpEnded() {
+        for (String k : keys()) {
+            if (liveUrl(k)) continue;
+            Store.removeRecent(k);
+            Store.removeHistory(k);
+        }
+    }
 
     static String kindLabel(String k) {
         return "youtube".equals(k) ? "YouTube Live" : "premiere".equals(k) ? T.t("Premiere (video file, in sync)") : T.t("Live stream (.m3u8)");

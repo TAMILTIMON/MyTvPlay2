@@ -51,6 +51,11 @@ final class FeatureBoard {
         t.put("updates", UiKit.tile(a, "refresh-cw", T.t("Updates"), Updater.installedName(a), 0xFF8B5CF6, v -> Updater.menu(a)));
         t.put("settings", UiKit.tile(a, "settings", T.t("Settings"), T.t("language, theme, …"), 0xFF64748B, v -> SettingsDialog.show(a)));
         if (!tv) t.put("exit", UiKit.tile(a, "power", T.t("Exit ZH Play"), T.t("close all, save battery"), 0xFFEF4444, v -> App.confirmExit(a)));
+        int unread = InboxActivity.unread();
+        boolean live = "live".equals(Broadcast.phase(Broadcast.current()));
+        t.put("inbox", UiKit.tile(a, "bell", T.t("Notifications"),
+                live ? "🔴 " + T.t("LIVE now") : unread > 0 ? unread + " " + T.t("new") : T.t("announcements & live"),
+                0xFFF97316, v -> InboxActivity.open(a)));
         t.put("account", UiKit.tile(a, "user", Auth.signedIn() ? Auth.name() : T.t("Sign in"),
                 Auth.signedIn() ? Auth.email() : T.t("Google account"), 0xFF6366F1, v -> AuthActivity.accountMenu(a)));
         Auth.filter(t);

@@ -30,6 +30,9 @@
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+    <!-- Android TV home screen: ZH Play's "Continue watching" / live cards -->
+    <uses-permission android:name="com.android.providers.tv.permission.READ_EPG_DATA" />
+    <uses-permission android:name="com.android.providers.tv.permission.WRITE_EPG_DATA" />
     <!-- browser downloads into Downloads/ZH Play on Android 9 and older -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
 
@@ -129,6 +132,10 @@
             android:exported="false"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden" />
 
+        <activity
+            android:name=".InboxActivity"
+            android:exported="false"
+            android:label="Notifications" />
         <activity
             android:name=".AdminActivity"
             android:exported="false"

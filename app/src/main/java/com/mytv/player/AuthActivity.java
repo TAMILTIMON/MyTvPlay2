@@ -256,13 +256,24 @@ public class AuthActivity extends Activity {
     // ------------------------------------------------------------------ Google sign-in
 
     private void googleSignIn() {
+        googleSignIn(false);
+    }
+
+    private long signInStarted;
+
+    /** alt = Google's second sign-in method (bottom sheet); used when the first one fails on a phone. */
+    private void googleSignIn(final boolean alt) {
+        signInStarted = System.currentTimeMillis();
         String cid = Auth.webClientId(this);
         if (cid.isEmpty()) {
             toast(T.t("Not set up yet: the admin must put web_client_id in admin/access.json"));
             return;
         }
         GetCredentialRequest req = new GetCredentialRequest.Builder()
-                .addCredentialOption(new GetSignInWithGoogleOption.Builder(cid).build())
+                .addCredentialOption(alt
+                        ? new com.google.android.libraries.identity.googleid.GetGoogleIdOption.Builder()
+                        .setFilterByAuthorizedAccounts(false).setServerClientId(cid).setAutoSelectEnabled(false).build()
+                        : new GetSignInWithGoogleOption.Builder(cid).build())
                 .build();
         try {
             CredentialManager.create(this).getCredentialAsync(this, req, null, onMain,
@@ -306,13 +317,68 @@ public class AuthActivity extends Activity {
 
                         @Override
                         public void onError(GetCredentialException e) {
-                            if (e instanceof GetCredentialCancellationException) return;
-                            CharSequence m = e.getErrorMessage();
-                            toast("⚠ " + T.t("Sign-in failed") + (m == null ? "" : ": " + m));
+                            long took = System.currentTimeMillis() - signInStarted;
+                            // a real "cancel" takes the person a few seconds; an instant one is Google refusing
+                            if (e instanceof GetCredentialCancellationException && took > 4000) return;
+                            if (!alt) {
+                                googleSignIn(true);                 // try Google's other sign-in method once
+                                return;
+                            }
+                            explainSignInFailure(e.getType(), e.getErrorMessage());
                         }
                     });
         } catch (Throwable t) {
             toast("⚠ " + T.t("Google sign-in isn't available on this device") + ": " + t.getMessage());
+        }
+    }
+
+    /** Why Google sign-in failed on this phone, with this install's fingerprint for the admin. */
+    private void explainSignInFailure(String type, CharSequence msg) {
+        String installer = "";
+        try {
+            installer = getPackageManager().getInstallerPackageName(getPackageName());
+        } catch (Exception ignored) {
+        }
+        boolean amazon = installer != null && installer.contains("amazon");
+        String sha = sha1();
+        StringBuilder sb = new StringBuilder();
+        sb.append(T.t("Google refused the sign-in on this phone.")).append("\n\n");
+        if (amazon) {
+            sb.append("• ").append(T.t("This ZH Play came from the Amazon Appstore, which signs it with Amazon's key. The admin must add this fingerprint to the Android sign-in client in Google Cloud (or install ZH Play from GitHub):")).append("\n");
+        } else {
+            sb.append("• ").append(T.t("Update “Google Play services” in the Play Store, and make sure a Google account is added in the phone's Settings → Accounts.")).append("\n");
+            sb.append("• ").append(T.t("Check the phone's date and time are automatic.")).append("\n");
+            sb.append("• ").append(T.t("If it still fails, the admin can add this fingerprint to the Android sign-in client in Google Cloud:")).append("\n");
+        }
+        sb.append("SHA-1: ").append(sha).append("\n\n");
+        sb.append(T.t("Installed from")).append(": ").append(installer == null || installer.isEmpty() ? T.t("file (APK)") : installer).append("\n");
+        sb.append(T.t("Details")).append(": ").append(type == null ? "" : type.replace("android.credentials.GetCredentialException.", ""))
+                .append(msg == null ? "" : " — " + msg);
+        final String shaF = sha;
+        ZhPopup.confirm(this, "⚠", T.t("Sign-in didn't work"), sb.toString(), T.t("Copy SHA-1"), false, () -> {
+            android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+            if (cm != null) cm.setPrimaryClip(android.content.ClipData.newPlainText("SHA-1", shaF));
+            ZhPopup.banner(this, "✓ " + T.t("SHA-1 copied"));
+        });
+    }
+
+    /** SHA-1 fingerprint of the key this installed ZH Play is signed with. */
+    @SuppressWarnings("deprecation")
+    private String sha1() {
+        try {
+            android.content.pm.Signature[] sig;
+            if (Build.VERSION.SDK_INT >= 28) {
+                sig = getPackageManager().getPackageInfo(getPackageName(), android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES)
+                        .signingInfo.getApkContentsSigners();
+            } else {
+                sig = getPackageManager().getPackageInfo(getPackageName(), android.content.pm.PackageManager.GET_SIGNATURES).signatures;
+            }
+            byte[] d = java.security.MessageDigest.getInstance("SHA-1").digest(sig[0].toByteArray());
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < d.length; i++) sb.append(i == 0 ? "" : ":").append(String.format(java.util.Locale.ROOT, "%02X", d[i]));
+            return sb.toString();
+        } catch (Exception e) {
+            return "?";
         }
     }
 

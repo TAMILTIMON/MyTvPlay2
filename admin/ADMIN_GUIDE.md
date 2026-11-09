@@ -87,6 +87,7 @@ each user writes only their own entries; only you can read the user list and vie
     },
     "members": {
       ".read": "auth != null && auth.token.email === 'tamilarasan5333@gmail.com'",
+      ".write": "auth != null && auth.token.email === 'tamilarasan5333@gmail.com'",
       "$uid": { ".write": "auth != null && auth.uid === $uid" }
     },
     "perms": {
@@ -114,6 +115,18 @@ d. **Send a notification to everyone**: title, message, optional link (video / Y
    📣 Send. Also sent automatically by **Save + notify all** and **▶ Start now**.
 
 (Optional backup: the GitHub workflow "Broadcast" with the secret `FCM_SERVICE_ACCOUNT` still works.)
+
+### Users: sign out, remove, block
+On a user's page → **Manage**: **Sign out user** (they must sign in again; open apps react within a
+minute) · **Remove user** (signs them out, deletes their record and — with the Firebase key imported —
+their cloud account; they can join again by signing in) · **Block** (by e-mail too, so it holds even if
+they sign in again). Needs the rules above (the admin may write `members`).
+
+### Sign-in fails on one phone
+The app now retries with Google's second sign-in method and then shows why, with that install's
+**SHA-1** and where it was installed from. Amazon Appstore installs are signed by Amazon: add the shown
+SHA-1 to the Android client in Google Cloud (Clients → ZH Play Android → add fingerprint, or create a
+second Android client with package `com.tamil.castplay` and that SHA-1).
 
 ### 3. What the panel does
 - **Users**: how many use ZH Play (today / this week / TVs), each with device, version, last seen.

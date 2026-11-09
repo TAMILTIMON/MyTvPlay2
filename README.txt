@@ -1,3 +1,39 @@
+ZH PLAY 8.7 — Android TV home screen row · 🔔 Notifications inbox
+=================================================================
+* TV HOME SCREEN (Android 8+ TVs whose launcher shows "Watch Next / Continue watching"): ZH Play adds
+  your unfinished movies (with progress; select = resume) and the admin's broadcast ("🔴 LIVE: …" /
+  "📅 … at 8:00 PM"; select = watch). Updates after watching and when a broadcast starts / ends;
+  finished movies and ended broadcasts are removed. Android's own TV provider (TvContract), no library.
+* 🔔 NOTIFICATIONS (phone board, TV home list, TV ✨ All features): the live / upcoming broadcast on top,
+  then every announcement the admin sent (newest first, unread marked, link opens / plays). Missed
+  notifications are never lost. The admin panel saves each notification it sends to pub/inbox
+  (latest 50 kept). The tile / row shows "N new" or "🔴 LIVE now".
+* Nothing removed.
+
+ZH PLAY 8.6 — Ended broadcasts can't be replayed · Seedr on the TV
+=================================================================
+* BROADCAST VIDEOS are never saved to Recent / Continue watching. When the admin ends a broadcast
+  (or its time frame is over), any saved copies and positions are removed, people still watching see
+  "The broadcast has ended" and the player stops, and the link refuses to play afterwards. Only items
+  that came from a broadcast (titled 🔴) are affected — the same movie from your own Seedr plays normally.
+* SEEDR ON THE TV: "☁ Seedr — your cloud videos" in the TV home list (unless the admin switched Seedr
+  off); also on the TV's ✨ All features board. On the TV a file's menu says "Play".
+* No typing on the TV: phone → Seedr → ⚙ → "Sign in the TV with this account" (new TV route
+  /seedr/login, paired / same-account phones only). Or "Sign in with a code" on the TV.
+* Nothing removed.
+
+ZH PLAY 8.5 — Manage users (sign out / remove / block) · sign-in diagnostics
+============================================================================
+* ADMIN → Users → a user → Manage: "Sign out user" (open apps go back to sign-in within a minute),
+  "Remove user" (sign out + delete their record + delete their ZH Play cloud account with the imported
+  Firebase key; they may sign in again), Block now also by e-mail (holds after a new sign-in).
+* A removed / disabled cloud account sends that app back to the sign-in screen at once.
+* SIGN-IN ON A PROBLEM PHONE: an instant "cancelled" answer is treated as a failure (not as the user
+  closing the sheet); the app retries with Google's second sign-in method, then shows why — with this
+  install's SHA-1, where it was installed from (Amazon Appstore installs are signed by Amazon), and fixes.
+* Firebase rules: the admin may write "members" (needed to remove users) — see admin/ADMIN_GUIDE.md.
+* Nothing removed.
+
 ZH PLAY 8.4.1 — Pushed / premiere links play in ZH Player (Seedr, Google Drive, Dropbox)
 =======================================================================================
 * Seedr links (…/Movie.mkv?st=…&e=…) were not recognised because of the part after the file name, and

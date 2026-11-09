@@ -104,8 +104,19 @@ final class Cloud {
         if (!id.isEmpty() && System.currentTimeMillis() < Store.getLong("fb_exp", 0)) return id;
         String rt = refreshToken();
         if (rt.isEmpty()) throw new Exception("Not signed in to ZH Play cloud");
-        JSONObject r = new JSONObject(http("POST", "https://securetoken.googleapis.com/v1/token?key=" + apiKey(),
-                "grant_type=refresh_token&refresh_token=" + URLEncoder.encode(rt, "UTF-8")));
+        JSONObject r;
+        try {
+            r = new JSONObject(http("POST", "https://securetoken.googleapis.com/v1/token?key=" + apiKey(),
+                    "grant_type=refresh_token&refresh_token=" + URLEncoder.encode(rt, "UTF-8")));
+        } catch (Exception e) {
+            String m = String.valueOf(e.getMessage());
+            if (m.contains("USER_NOT_FOUND") || m.contains("USER_DISABLED") || m.contains("INVALID_REFRESH_TOKEN")) {
+                // the admin removed this account: back to the sign-in screen
+                signOut();
+                Auth.signOut();
+            }
+            throw e;
+        }
         save(r.optString("user_id", uid()), r.optString("refresh_token", rt), r.optString("id_token"), r.optLong("expires_in", 3600));
         return Store.getStr("fb_id", "");
     }

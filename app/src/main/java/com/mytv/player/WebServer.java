@@ -263,6 +263,11 @@ public class WebServer extends NanoHTTPD {
                     return e == null ? msg("✅ The remote now shows videos from other apps") : fail(e);
                 }
 
+                case "/seedr/login": {           // the phone signs the TV into its Seedr account
+                    if (val(p, "access").isEmpty()) return fail("Sign in to Seedr on the phone first");
+                    SeedrApi.adopt(val(p, "access"), val(p, "refresh"), val(p, "device"), val(p, "email"));
+                    return msg("Seedr on the TV: signed in as " + val(p, "email"));
+                }
                 case "/voice": {                 // a spoken sentence: play / search / open, in the app that was named
                     String q = val(p, "q").trim();
                     if (q.isEmpty()) return fail("Say something");

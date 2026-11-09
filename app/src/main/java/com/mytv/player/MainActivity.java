@@ -545,6 +545,15 @@ public class MainActivity extends AppCompatActivity {
             }
             rows.add("🎬   " + T.t("Library") + "  ·  " + T.t("movie posters, watched ✓, sort & filter"));
             actions.add(() -> startActivity(new Intent(this, LibraryActivity.class)));
+            int unread = InboxActivity.unread();
+            boolean liveNow = "live".equals(Broadcast.phase(Broadcast.current()));
+            rows.add("🔔   " + T.t("Notifications") + "  ·  " + (liveNow ? "🔴 " + T.t("LIVE now")
+                    : unread > 0 ? unread + " " + T.t("new") : T.t("announcements & live")));
+            actions.add(() -> InboxActivity.open(this));
+            if (Auth.featureOn("seedr")) {
+                rows.add("☁   Seedr  ·  " + T.t("your cloud videos — play on the TV"));
+                actions.add(() -> SeedrActivity.open(this));
+            }
             rows.add("🖧   " + T.t("Network folders") + "  ·  PC / NAS (SMB, DLNA)");
             actions.add(() -> startActivity(new Intent(this, NetworkActivity.class)));
             rows.add("💾   " + T.t("SD Card & USB") + "  ·  " + T.t("browse, copy, move, delete"));

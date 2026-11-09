@@ -324,6 +324,7 @@ public class Store {
     }
 
     public static synchronized void addRecent(Item item) {
+        if (item == null || (Broadcast.fromBroadcast(item.t) && Broadcast.isBroadcastUrl(item.u))) return;   // admin broadcasts: never in Recent
         boolean isNew = !data.containsKey(RECENT);
         List<Item> l = list(RECENT);
         Iterator<Item> i = l.iterator();
@@ -480,7 +481,25 @@ public class Store {
         }
     }
 
+    /** Removes a link from Recent (e.g. an ended broadcast). */
+    public static synchronized void removeRecent(String url) {
+        List<Item> l = data.get(RECENT);
+        if (l == null || url == null) return;
+        boolean gone = false;
+        String key = resumeKey(url);
+        Iterator<Item> i = l.iterator();
+        while (i.hasNext()) {
+            String u = i.next().u;
+            if (u.equals(url) || resumeKey(u).equals(key)) {
+                i.remove();
+                gone = true;
+            }
+        }
+        if (gone) changed(RECENT, false);
+    }
+
     public static synchronized void putHistory(String title, String url, long pos, long len) {
+        if (Broadcast.fromBroadcast(title) && Broadcast.isBroadcastUrl(url)) return;   // admin broadcasts: never in Continue watching
         List<Watch> l = history();
         Iterator<Watch> i = l.iterator();
         String key = resumeKey(url);

@@ -74,6 +74,25 @@ public final class SeedrApi {
         return Store.getStr(K_EMAIL, "");
     }
 
+    /** This phone's Seedr session, to sign the TV in with the same account. */
+    static java.util.Map<String, String> session() {
+        java.util.Map<String, String> m = new java.util.HashMap<>();
+        m.put("access", Store.getStr(K_ACCESS, ""));
+        m.put("refresh", Store.getStr(K_REFRESH, ""));
+        m.put("device", Store.getStr(K_DEVICE, ""));
+        m.put("email", Store.getStr(K_EMAIL, ""));
+        return m;
+    }
+
+    /** TV: takes the phone's Seedr session (no typing with the remote). */
+    static void adopt(String access, String refresh, String device, String email) {
+        if (access == null || access.isEmpty()) return;
+        Store.putStr(K_ACCESS, access);
+        Store.putStr(K_REFRESH, refresh == null ? "" : refresh);
+        Store.putStr(K_DEVICE, device == null ? "" : device);
+        Store.putStr(K_EMAIL, email == null ? "" : email);
+    }
+
     public static void clearAll() {
         Store.putStr(K_ACCESS, "");
         Store.putStr(K_REFRESH, "");

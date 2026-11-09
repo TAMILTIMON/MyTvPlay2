@@ -1694,7 +1694,25 @@ public class PlayerActivity extends AppCompatActivity {
         startMedia(it, start, null);
     }
 
+    /** The admin ended the broadcast this player is showing. */
+    public void broadcastEnded() {
+        Store.Item it = current();
+        if (it != null && Broadcast.fromBroadcast(it.t) && Broadcast.isBroadcastUrl(it.u) && !Broadcast.liveUrl(it.u)) {
+            ZhPopup.message(this, "■", T.t("The broadcast has ended"), T.t("Thanks for watching!"));
+            if (mp != null) mp.stop();
+            handler.postDelayed(this::finish, 3500);
+        }
+    }
+
     private void startMedia(Store.Item it, long startMs, List<String> keepSubs) {
+        if (it != null && Broadcast.fromBroadcast(it.t) && Broadcast.isBroadcastUrl(it.u) && !Broadcast.liveUrl(it.u)) {
+            // an ended broadcast (e.g. from an old list): it may only be watched while it is live
+            Store.removeRecent(it.u);
+            Store.removeHistory(it.u);
+            UiKit.makeToast(this, "■ " + T.t("This broadcast has ended"), android.widget.Toast.LENGTH_LONG).show();
+            finish();
+            return;
+        }
         Store.Item loc = localForTorrent(it);
         if (loc != null) {
             if (index >= 0 && index < queue.size() && queue.get(index) == it) queue.set(index, loc);
@@ -2168,11 +2186,13 @@ public class PlayerActivity extends AppCompatActivity {
         if (nearEnd) {
             Store.removeHistory(it.u);
             Store.setWatched(it.u, true);
+            TvHome.refresh(this);                                 // finished: leaves the TV home row
         }
         else if (resumable && pos > 5000) {
             Store.putHistory(it.t, it.u, pos, len);
             // a stream's thumbnail opens the video a second time: only when leaving, never mid-playback
             if (it.u.startsWith("/") || !periodicSave) Thumbs.request(this, it.u, pos);
+            if (!periodicSave) TvHome.refresh(this);              // TV home screen: Continue watching
         }
     }
 

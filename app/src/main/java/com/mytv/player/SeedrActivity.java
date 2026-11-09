@@ -470,11 +470,14 @@ public class SeedrActivity extends Activity {
     private void fileActions(final SeedrApi.SeedrFile f) {
         final List<String> labels = new ArrayList<>();
         final List<Integer> ids = new ArrayList<>();
+        boolean onTv = Ui.isTv(this);
         if (f.playable()) {
-            labels.add("▶  " + T.t("Play on this phone"));
+            labels.add("▶  " + T.t(onTv ? "Play" : "Play on this phone"));
             ids.add(0);
-            labels.add("📺  " + T.t("Play on the TV"));
-            ids.add(1);
+            if (!onTv) {                                     // on the TV itself "Play" already plays here
+                labels.add("📺  " + T.t("Play on the TV"));
+                ids.add(1);
+            }
         }
         labels.add("⬇  " + T.t("Download to this phone"));
         ids.add(2);
@@ -774,7 +777,8 @@ public class SeedrActivity extends Activity {
         box.setOrientation(LinearLayout.VERTICAL);
         box.setPadding(dp(20), dp(6), dp(20), 0);
         TextView info = text(13, SUB, false);
-        info.setText(T.t("Sign in with your Seedr account. ZH Play keeps you signed in."));
+        info.setText(T.t("Sign in with your Seedr account. ZH Play keeps you signed in.")
+                + (Ui.isTv(this) ? "\n\n" + T.t("Easier on a TV: on your phone open Seedr → ⚙ → “Sign in the TV with this account”.") : ""));
         box.addView(info);
         final EditText mail = new EditText(this);
         mail.setHint(T.t("E-mail"));
@@ -895,6 +899,7 @@ public class SeedrActivity extends Activity {
         List<String> l = new ArrayList<>();
         if (in) {
             l.add("🔄  " + T.t("Refresh"));
+            if (!Ui.isTv(this) && !Store.getStr("last_tv", "").isEmpty()) l.add("📺  " + T.t("Sign in the TV with this account"));
             l.add("🌐  " + T.t("Open seedr.cc"));
             l.add("🚪  " + T.t("Sign out"));
         } else {
@@ -903,12 +908,15 @@ public class SeedrActivity extends Activity {
         }
         new UiDialog(this).setTitle("Seedr" + (SeedrApi.email().isEmpty() ? "" : " · " + SeedrApi.email()))
                 .setItems(l.toArray(new String[0]), (d, w) -> {
-                    if (w == 0 && !in) {
+                    String pick = l.get(w);                          // chosen by label (the list depends on the device)
+                    if (pick.startsWith("📺")) {
+                        signInTv();
+                    } else if (pick.startsWith("🔑")) {
                         signIn();
-                    } else if (w == 0) {
+                    } else if (pick.startsWith("🔄")) {
                         refreshAccount();
                         reload();
-                    } else if (w == 1) {
+                    } else if (pick.startsWith("🌐")) {
                         startActivity(new Intent(this, BrowserActivity.class).putExtra(BrowserActivity.EXTRA_URL, "https://www.seedr.cc/files"));
                     } else {
                         SeedrApi.clearAll();
@@ -918,5 +926,24 @@ public class SeedrActivity extends Activity {
                         message(T.t("Signed out.") + "\n\n" + T.t("Tap ⚙ to sign in."));
                     }
                 }).show();
+    }
+
+    /** Phone: signs the connected TV into this Seedr account (no typing on the TV). */
+    private void signInTv() {
+        final String tv = Store.getStr("last_tv", "");
+        toast("📺 " + T.t("Signing the TV in…"));
+        new Thread(() -> {
+            String msg;
+            try {
+                org.json.JSONObject r = TvClient.post(tv, "/seedr/login", new HashMap<>(SeedrApi.session()));
+                msg = (r.optBoolean("ok", true) ? "✓ " : "⚠ ") + r.optString("msg", T.t("Done"));
+            } catch (TvClient.AuthNeeded e) {
+                msg = "⚠ " + T.t("Open the remote and enter the TV PIN first");
+            } catch (Exception e) {
+                msg = "⚠ " + T.t("Cannot reach the TV — same Wi-Fi?");
+            }
+            final String m = msg;
+            main.post(() -> toast(m));
+        }).start();
     }
 }

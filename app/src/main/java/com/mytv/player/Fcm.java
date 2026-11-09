@@ -88,6 +88,39 @@ final class Fcm {
 
     /** OAuth access token for FCM (cached ~55 min). */
     private static synchronized String accessToken(JSONObject sa) throws Exception {
+        return accessToken(sa, "https://www.googleapis.com/auth/firebase.messaging");
+    }
+
+    private static final java.util.Map<String, Object[]> tokens = new java.util.HashMap<>();
+
+    private static synchronized String accessToken(JSONObject sa, String scope) throws Exception {
+        Object[] c = tokens.get(scope);
+        if (c != null && System.currentTimeMillis() < (Long) c[1]) return (String) c[0];
+        String jwt = jwt(sa, System.currentTimeMillis() / 1000, scope);
+        String r = post("https://oauth2.googleapis.com/token",
+                "grant_type=" + URLEncoder.encode("urn:ietf:params:oauth:grant-type:jwt-bearer", "UTF-8") + "&assertion=" + jwt,
+                "application/x-www-form-urlencoded", null);
+        JSONObject o = new JSONObject(r);
+        String t = o.getString("access_token");
+        tokens.put(scope, new Object[]{t, System.currentTimeMillis() + (o.optLong("expires_in", 3600) - 300) * 1000L});
+        return t;
+    }
+
+    /** Admin: deletes a user's ZH Play cloud account (Firebase Authentication). They can sign in again later. */
+    static String deleteUser(String uid) {
+        if (!ready()) return "✗ " + T.t("Import the Firebase key first (Push setup)");
+        try {
+            JSONObject sa = new JSONObject(Store.getStr(KEY, "{}"));
+            String at = accessToken(sa, "https://www.googleapis.com/auth/cloud-platform");
+            post("https://identitytoolkit.googleapis.com/v1/projects/" + sa.optString("project_id") + "/accounts:delete",
+                    new JSONObject().put("localId", uid).toString(), "application/json", at);
+            return null;
+        } catch (Exception e) {
+            return e.getMessage();
+        }
+    }
+
+    private static synchronized String accessTokenOld(JSONObject sa) throws Exception {
         if (token != null && System.currentTimeMillis() < tokenUntil) return token;
         String jwt = jwt(sa, System.currentTimeMillis() / 1000);
         String r = post("https://oauth2.googleapis.com/token",
@@ -101,9 +134,13 @@ final class Fcm {
 
     /** The signed Google login (RS256) for this service account. */
     static String jwt(JSONObject sa, long now) throws Exception {
+        return jwt(sa, now, "https://www.googleapis.com/auth/firebase.messaging");
+    }
+
+    static String jwt(JSONObject sa, long now, String scope) throws Exception {
         String header = b64url("{\"alg\":\"RS256\",\"typ\":\"JWT\"}".getBytes(StandardCharsets.UTF_8));
         JSONObject c = new JSONObject().put("iss", sa.getString("client_email"))
-                .put("scope", "https://www.googleapis.com/auth/firebase.messaging")
+                .put("scope", scope)
                 .put("aud", "https://oauth2.googleapis.com/token").put("iat", now).put("exp", now + 3600);
         String claims = b64url(c.toString().getBytes(StandardCharsets.UTF_8));
         Signature s = Signature.getInstance("SHA256withRSA");

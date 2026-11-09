@@ -529,6 +529,22 @@ public class AdminActivity extends Activity {
                 br.addView(block, new LinearLayout.LayoutParams(dp(48), dp(28)));
                 bc.addView(br);
                 body.addView(bc);
+
+                // ---- manage: sign out / remove
+                body.addView(label("⚙  " + T.t("Manage")), gap(18));
+                LinearLayout mc = card();
+                TextView mh = text(13, Ui.DIM, false);
+                mh.setText(T.t("Sign out: they must sign in again on all their devices.") + "\n"
+                        + T.t("Remove: signs them out, deletes their record and their ZH Play cloud account. They can join again by signing in (use Block to stop that)."));
+                mh.setLineSpacing(0, 1.15f);
+                mc.addView(mh);
+                body.addView(mc);
+                buttons(body, button("🚪  " + T.t("Sign out user"), false, false, v -> ZhPopup.confirm(this, "🚪",
+                                T.t("Sign out") + " " + u.optString("name") + "?", T.t("Within a minute on their open apps; at the latest when they next open ZH Play."),
+                                T.t("Sign out"), false, () -> signOutUser(id, null))),
+                        button("🗑  " + T.t("Remove user"), false, true, v -> ZhPopup.confirm(this, "🗑",
+                                T.t("Remove") + " " + u.optString("name") + "?", u.optString("email") + "\n" + T.t("They are signed out everywhere and disappear from the list."),
+                                T.t("Remove"), true, () -> removeUser(id, u))));
                 buttons(body, button(T.t("All on"), false, false, v -> {
                     for (ZhPopup.Toggle t : toggles.values()) t.set(true, true);
                 }), button("💾  " + T.t("Save"), true, false, v -> {
@@ -536,7 +552,11 @@ public class AdminActivity extends Activity {
                         JSONArray newOff = new JSONArray();
                         for (java.util.Map.Entry<String, ZhPopup.Toggle> e : toggles.entrySet()) if (!e.getValue().on()) newOff.put(e.getKey());
                         final JSONObject np = new JSONObject().put("off", newOff).put("blocked", block.on());
-                        Runnable save = () -> put("/perms/" + id, np, "✓ " + T.t("Saved — applies on their app within a minute"));
+                        final boolean blockNow = block.on();
+                        Runnable save = () -> {
+                            put("/perms/" + id, np, "✓ " + T.t("Saved — applies on their app within a minute"));
+                            blockEmail(u.optString("email"), blockNow);   // also by e-mail: holds if they sign in again
+                        };
                         if (block.on() && !perms.optBoolean("blocked", false)) {
                             ZhPopup.confirm(this, "🚫", T.t("Block") + " " + u.optString("name") + "?",
                                     T.t("They won't be able to use ZH Play until you unblock them."), T.t("Block"), true, save);
@@ -546,6 +566,57 @@ public class AdminActivity extends Activity {
                     }
                 }));
             });
+        }).start();
+    }
+
+    /** Marks the user signed out (their apps check it every minute). */
+    private void signOutUser(final String id, final Runnable then) {
+        new Thread(() -> {
+            String msg = "✓ " + T.t("Signed out — their apps return to the sign-in screen");
+            try {
+                Cloud.http("PUT", Broadcast.url("/perms/" + id + "/signout"), new JSONObject().put(".sv", "timestamp").toString());
+            } catch (Exception e) {
+                msg = "⚠ " + e.getMessage() + (String.valueOf(e.getMessage()).contains("401") ? " — " + T.t("update the Firebase rules (ADMIN_GUIDE)") : "");
+            }
+            final String m = msg;
+            main.post(() -> {
+                say(m);
+                if (then != null && !m.startsWith("⚠")) then.run();
+            });
+        }).start();
+    }
+
+    /** Sign out + delete their record + delete their cloud account (needs the Firebase key). */
+    private void removeUser(final String id, final JSONObject u) {
+        signOutUser(id, () -> new Thread(() -> {
+            String msg = "✓ " + u.optString("name") + " " + T.t("removed");
+            try {
+                Cloud.http("DELETE", Broadcast.url("/members/" + id), null);
+                String err = Fcm.ready() ? Fcm.deleteUser(id) : null;
+                if (err != null) msg = "⚠ " + T.t("Removed from the list, but the cloud account wasn't deleted") + ": " + err;
+                else if (!Fcm.ready()) msg += " — " + T.t("import the Firebase key to also delete their cloud account");
+            } catch (Exception e) {
+                msg = "⚠ " + e.getMessage() + (String.valueOf(e.getMessage()).contains("401") ? " — " + T.t("update the Firebase rules (ADMIN_GUIDE)") : "");
+            }
+            final String m = msg;
+            main.post(() -> {
+                say(m);
+                members.remove(id);
+                onBackPressed();                              // back to the user list
+            });
+        }).start());
+    }
+
+    /** Blocks / unblocks an e-mail (scrambled) for everyone — holds even if they sign in again. */
+    private void blockEmail(final String email, final boolean on) {
+        if (email == null || !email.contains("@")) return;
+        new Thread(() -> {
+            try {
+                String path = Broadcast.url("/pub/blocked/" + Auth.hash(email));
+                if (on) Cloud.http("PUT", path, "true");
+                else Cloud.http("DELETE", path, null);
+            } catch (Exception ignored) {
+            }
         }).start();
     }
 
@@ -965,8 +1036,27 @@ public class AdminActivity extends Activity {
         say("📣 " + T.t("Sending…"));
         new Thread(() -> {
             final String r = Push.send(title, body, link, bid, open);
+            saveToInbox(title, body, link, open);           // missed it? it's in 🔔 Notifications
             main.post(() -> say(r));
         }).start();
+    }
+
+    /** Keeps the message in pub/inbox so every app can show it later; trims to the latest 50. */
+    private void saveToInbox(String title, String body, String link, String open) {
+        try {
+            JSONObject m = new JSONObject().put("title", title).put("body", body).put("link", link == null ? "" : link)
+                    .put("open", open == null ? "auto" : open).put("at", new JSONObject().put(".sv", "timestamp"));
+            Cloud.http("POST", Broadcast.url("/pub/inbox"), m.toString());
+            String s = Cloud.http("GET", Broadcast.url("/pub/inbox"), null);
+            if (s == null || s.trim().equals("null")) return;
+            JSONObject all = new JSONObject(s);
+            if (all.length() <= 50) return;
+            List<String> ids = new ArrayList<>();
+            for (Iterator<String> it = all.keys(); it.hasNext(); ) ids.add(it.next());
+            Collections.sort(ids, (a, b) -> Long.compare(all.optJSONObject(a).optLong("at"), all.optJSONObject(b).optLong("at")));
+            for (int i = 0; i < ids.size() - 50; i++) Cloud.http("DELETE", Broadcast.url("/pub/inbox/" + ids.get(i)), null);
+        } catch (Exception ignored) {
+        }
     }
 
     private void loadMembers(final Runnable then) {

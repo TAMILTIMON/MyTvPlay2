@@ -103,6 +103,7 @@ public class App extends Application {
         Auth.noteInstall(this);
         Broadcast.channel(this);
         Push.init(this);                                         // instant broadcast notifications (if set up)
+        TvHome.refresh(this);                                    // ZH Play row on the Android TV home screen
         if (Ui.isTv(this) || !Store.getBool("exited", false)) RemoteService.start(this);
         seedIptv();
         registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {

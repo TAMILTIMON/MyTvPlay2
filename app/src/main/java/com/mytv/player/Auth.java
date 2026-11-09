@@ -219,6 +219,8 @@ final class Auth {
         if (signedIn()) {
             String h = hash(email());
             if (listed("blocked", h) || (Broadcast.blockedHere() && !admin)) return BLOCKED;
+            JSONObject bl = Broadcast.pub().optJSONObject("blocked");     // blocked in the admin panel (by e-mail)
+            if (bl != null && bl.optBoolean(h, false) && !admin) return BLOCKED;
             if ("invite_only".equals(cf.optString("mode")) && !admin && !listed("allowed", h)) return BLOCKED;
             return OK;
         }
