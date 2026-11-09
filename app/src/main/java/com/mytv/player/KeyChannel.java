@@ -50,6 +50,14 @@ public final class KeyChannel {
         }
     }
 
+    private volatile byte[] key;                             // the channel's encryption key (null: older TV)
+
+    /** A line as it goes on the Wi-Fi: sealed when the channel is encrypted. */
+    private String wire(String line) throws Exception {
+        byte[] k = key;
+        return k == null ? line : "e " + ZhCrypt.seal(k, line);
+    }
+
     private boolean connect() {
         try {
             sock = new Socket();
@@ -58,7 +66,18 @@ public final class KeyChannel {
             sock.setKeepAlive(true);
             sock.setSoTimeout(3000);
             out = sock.getOutputStream();
-            out.write(("auth " + TvClient.token(ip) + "\n").getBytes("UTF-8"));
+            key = null;
+            if (ZhCrypt.usable(ip) && !ZhCrypt.isOld(ip)) {
+                try {                                            // encrypted: who we are travels sealed too
+                    ZhCrypt.Session se = ZhCrypt.session(ip, RemoteService.PORT);
+                    String who = new org.json.JSONObject().put("t", TvClient.token(ip)).put("z", Cloud.cachedIdToken()).toString();
+                    out.write(("eauth " + se.sid + " " + ZhCrypt.seal(se.key, who) + "\n").getBytes("UTF-8"));
+                    key = se.key;
+                } catch (ZhCrypt.Unsupported u) {
+                    ZhCrypt.markOld(ip);
+                }
+            }
+            if (key == null) out.write(("auth " + TvClient.token(ip) + "\n").getBytes("UTF-8"));
             out.flush();
             String r = new BufferedReader(new InputStreamReader(sock.getInputStream(), "UTF-8")).readLine();
             if (!"ok".equals(r)) throw new Exception("refused");
@@ -89,7 +108,7 @@ public final class KeyChannel {
             if (sock != null) {
                 if (line.isEmpty()) continue;
                 try {
-                    out.write((line + "\n").getBytes("UTF-8"));
+                    out.write((wire(line) + "\n").getBytes("UTF-8"));
                     out.flush();
                     sent = true;
                 } catch (Exception e) {
@@ -100,7 +119,7 @@ public final class KeyChannel {
                     sock = null;
                     if (connect()) {
                         try {
-                            out.write((line + "\n").getBytes("UTF-8"));
+                            out.write((wire(line) + "\n").getBytes("UTF-8"));
                             out.flush();
                             sent = true;
                         } catch (Exception ignored) {

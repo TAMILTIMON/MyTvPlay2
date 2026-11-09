@@ -94,8 +94,13 @@ final class Broadcast {
         lastSync = now;
         new Thread(() -> {
             try {
-                String p = Cloud.http("GET", url("/pub"), null);
-                Store.putStr("pub_json", p == null || p.trim().equals("null") ? "{}" : p);
+                // only the small parts (pictures in pub/thumbs are loaded once, when shown)
+                JSONObject pub = new JSONObject();
+                for (String part : new String[]{"ticker", "broadcast", "inbox", "blocked"}) {
+                    String v = Cloud.http("GET", url("/pub/" + part), null);
+                    if (v != null && !v.trim().equals("null")) pub.put(part, new org.json.JSONTokener(v).nextValue());
+                }
+                Store.putStr("pub_json", pub.toString());
                 String m = Cloud.http("GET", url("/perms/" + Cloud.uid()), null);
                 Store.putStr("my_perms", m == null || m.trim().equals("null") ? "{}" : m);
                 long so = perms().optLong("signout", 0);

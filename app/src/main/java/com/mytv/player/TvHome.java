@@ -113,6 +113,8 @@ final class TvHome {
             v.put(TvContract.WatchNextPrograms.COLUMN_POSTER_ART_ASPECT_RATIO, TvContract.WatchNextPrograms.ASPECT_RATIO_16_9);
             v.put(TvContract.WatchNextPrograms.COLUMN_INTENT_URI, open.toUri(Intent.URI_INTENT_SCHEME));
             v.put(TvContract.WatchNextPrograms.COLUMN_LIVE, live ? 1 : 0);
+            String pic = Thumb.web(b.optString("img"));
+            if (!pic.isEmpty()) v.put(TvContract.WatchNextPrograms.COLUMN_POSTER_ART_URI, pic);
             v.put(TvContract.WatchNextPrograms.COLUMN_START_TIME_UTC_MILLIS, b.optLong("start"));
             v.put(TvContract.WatchNextPrograms.COLUMN_END_TIME_UTC_MILLIS, b.optLong("end"));
             // live first in the row: newest engagement

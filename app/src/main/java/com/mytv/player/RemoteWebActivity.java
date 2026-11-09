@@ -166,12 +166,13 @@ public class RemoteWebActivity extends AppCompatActivity {
 
         @JavascriptInterface
         public void setToken(String t) {
+            if (t != null && t.startsWith("tk_") && !TvClient.token(ip).isEmpty()) return;   // keep the lasting key
             TvClient.setToken(ip, t);
         }
 
         @JavascriptInterface
         public String getToken() {
-            return TvClient.token(ip);
+            return TvClient.ticket(ip, 6 * 3600 * 1000L, true);        // the page gets a 6-hour pass, not the lasting key
         }
 
         @JavascriptInterface

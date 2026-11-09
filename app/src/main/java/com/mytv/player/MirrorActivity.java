@@ -100,7 +100,8 @@ public class MirrorActivity extends AppCompatActivity implements SurfaceHolder.C
             MirrorProto.Msg hello = MirrorProto.read(in);
             String tok = new String(hello.data, "UTF-8").trim();
             boolean local = sock.getInetAddress().isLoopbackAddress();
-            if (!(local || !Pair.enabled() || Pair.valid(tok))) throw new Exception(T.t("This phone is not paired with the TV"));
+            if (!(local || !Pair.enabled() || Pair.valid(tok) || ZhCrypt.ticketOk(tok)))
+                throw new Exception(T.t("This phone is not paired with the TV"));
             main.post(() -> status.setText(T.t("Connected — starting…")));
             while (alive) {
                 MirrorProto.Msg m = MirrorProto.read(in);

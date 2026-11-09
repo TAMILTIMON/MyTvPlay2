@@ -58,6 +58,14 @@ public class WebServer extends NanoHTTPD {
                 }
             }
 
+            // ---- encrypted connection with the phone (ZhCrypt) ----
+            if ("/hello".equals(uri)) {
+                String pub = val(p, "pub");
+                if (pub.isEmpty()) return fail("no key");
+                return json(ZhCrypt.hello(pub).toString());
+            }
+            if ("/e".equals(uri)) return encrypted(s, p);
+
             // ---- sign the TV in from a phone (QR code on the TV) ----
             if ("/login".equals(uri)) {
                 String c = val(p, "c");
@@ -75,6 +83,7 @@ public class WebServer extends NanoHTTPD {
                 return newFixedLengthResponse(Response.Status.OK, "text/html", html);
             }
             if ("/tvlogin".equals(uri)) {
+                if (!isLocal(s)) return fail("Update ZH Play on this phone — signing in now uses the encrypted connection");
                 // the code from the TV's QR — or a phone already paired with the remote PIN
                 if (!Auth.tvCodeOk(val(p, "c")) && !allowed(s, uri, p)) return fail("That code has expired — scan the new QR on the TV");
                 String mail = val(p, "email").trim();
@@ -99,6 +108,8 @@ public class WebServer extends NanoHTTPD {
                 if (val(p, "pin").isEmpty()) return fail("Enter the PIN shown on the TV");
                 String tok = Pair.pair(val(p, "pin"));
                 if (tok == null) return fail("Wrong PIN. Look at the TV screen.");
+                // paired over plain Wi-Fi (web page, older app): a 6-hour pass instead of the lasting key
+                if (!isLocal(s)) tok = ZhCrypt.issueTicket(6 * 3600 * 1000L, true);
                 return json(new JSONObject().put("ok", true).put("token", tok).toString());
             }
             if (!allowed(s, uri, p)) {
@@ -263,7 +274,17 @@ public class WebServer extends NanoHTTPD {
                     return e == null ? msg("✅ The remote now shows videos from other apps") : fail(e);
                 }
 
+                case "/ticket": {                // a short-lived pass for a plain connection (asked over the encrypted one)
+                    long ttl;
+                    try {
+                        ttl = Long.parseLong(val(p, "ttl"));
+                    } catch (Exception e) {
+                        ttl = 120000;
+                    }
+                    return json(new JSONObject().put("ok", true).put("ticket", ZhCrypt.issueTicket(ttl, "1".equals(val(p, "multi")))).toString());
+                }
                 case "/seedr/login": {           // the phone signs the TV into its Seedr account
+                    if (!isLocal(s)) return fail("Update ZH Play on this phone — this now uses the encrypted connection");
                     if (val(p, "access").isEmpty()) return fail("Sign in to Seedr on the phone first");
                     SeedrApi.adopt(val(p, "access"), val(p, "refresh"), val(p, "device"), val(p, "email"));
                     return msg("Seedr on the TV: signed in as " + val(p, "email"));
@@ -798,6 +819,81 @@ public class WebServer extends NanoHTTPD {
         return u;
     }
 
+    /** From this TV itself (also: requests that arrived encrypted and were opened here). */
+    private static boolean isLocal(IHTTPSession s) {
+        String ip = s.getRemoteIpAddress();
+        return "127.0.0.1".equals(ip) || "::1".equals(ip) || Net.ip().equals(ip);
+    }
+
+    /** An encrypted request: open it, check who sent it, run it here, answer encrypted. */
+    private Response encrypted(IHTTPSession s, Map<String, String> p) {
+        byte[] key = ZhCrypt.tvKey(s.getHeaders().get("x-zh-s"));
+        if (key == null) return json("{\"ok\":false,\"rehello\":true}");
+        JSONObject in;
+        try {
+            in = new JSONObject(ZhCrypt.tvOpen(key, val(p, "d")));
+        } catch (Exception e) {
+            return json("{\"ok\":false,\"rehello\":true}");
+        }
+        try {
+            String path = in.optString("p", "/ping"), get = in.optString("g", "");
+            JSONObject q = in.optJSONObject("q");
+            String target = get.isEmpty() ? path : get.split("\\?")[0];
+            boolean auth = !Pair.enabled() || Pair.valid(in.optString("t")) || ZhCrypt.ticketOk(in.optString("t"))
+                    || (!in.optString("z").isEmpty() && Cloud.signedIn() && Cloud.uid().equals(Cloud.verify(in.optString("z"))));
+            boolean open = target.equals("/ping") || target.equals("/pair") || target.equals("/");     // same as before, no extras
+            if ("/tvlogin".equals(target) && q != null && Auth.tvCodeOk(q.optString("c"))) open = true;
+            JSONObject out = new JSONObject();
+            if (!auth && !open) {
+                out.put("c", 401).put("b", "{\"ok\":false,\"auth\":true,\"msg\":\"Enter the PIN shown on the TV\"}");
+            } else if (!get.isEmpty()) {
+                Object[] r = loop("GET", get, null);
+                out.put("c", (Integer) r[0]).put("x", Fcm.b64url((byte[]) r[1]));
+            } else {
+                Object[] r = loop("POST", path, q);
+                out.put("c", (Integer) r[0]).put("b", new String((byte[]) r[1], "UTF-8"));
+            }
+            return json(new JSONObject().put("d", ZhCrypt.seal(key, out.toString())).toString());
+        } catch (Exception e) {
+            return fail("encrypted request failed");
+        }
+    }
+
+    /** Runs a request on this TV's own server (loopback). → {status, body bytes} */
+    private static Object[] loop(String method, String path, JSONObject q) throws Exception {
+        java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL("http://127.0.0.1:" + RemoteService.PORT + path).openConnection();
+        try {
+            c.setConnectTimeout(5000);
+            c.setReadTimeout(60000);
+            c.setRequestMethod(method);
+            if ("POST".equals(method)) {
+                StringBuilder body = new StringBuilder();
+                if (q != null) for (java.util.Iterator<String> it = q.keys(); it.hasNext(); ) {
+                    String k = it.next();
+                    if (body.length() > 0) body.append('&');
+                    body.append(java.net.URLEncoder.encode(k, "UTF-8")).append('=').append(java.net.URLEncoder.encode(q.optString(k), "UTF-8"));
+                }
+                c.setDoOutput(true);
+                c.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+                try (java.io.OutputStream o = c.getOutputStream()) {
+                    o.write(body.toString().getBytes("UTF-8"));
+                }
+            }
+            int code = c.getResponseCode();
+            java.io.InputStream in = code >= 400 ? c.getErrorStream() : c.getInputStream();
+            java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
+            if (in != null) {
+                byte[] b = new byte[16384];
+                int n;
+                while ((n = in.read(b)) > 0 && bo.size() < 4 * 1024 * 1024) bo.write(b, 0, n);
+                in.close();
+            }
+            return new Object[]{code, bo.toByteArray()};
+        } finally {
+            c.disconnect();
+        }
+    }
+
     private boolean allowed(IHTTPSession s, String uri, Map<String, String> p) {
         if (!Pair.enabled()) return true;
         if (uri.equals("/") || uri.equals("/index.html") || uri.equals("/ping") || uri.equals("/favicon.ico")) return true;
@@ -805,7 +901,7 @@ public class WebServer extends NanoHTTPD {
         if ("127.0.0.1".equals(ip) || "::1".equals(ip) || Net.ip().equals(ip)) return true;
         String t = s.getHeaders().get("x-token");
         if (t == null || t.isEmpty()) t = p.get("t");
-        if (Pair.valid(t)) return true;
+        if (Pair.valid(t) || ZhCrypt.ticketOk(t)) return true;
         // a phone signed in with the same Google account (checked with Firebase): no PIN needed
         String z = s.getHeaders().get("x-zh-id");
         return z != null && !z.isEmpty() && Cloud.signedIn() && Cloud.uid().equals(Cloud.verify(z));

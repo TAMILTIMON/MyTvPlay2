@@ -40,7 +40,27 @@ public final class KeyLine {
             String first = in.readLine();
             String ip = s.getInetAddress().getHostAddress();
             boolean local = s.getInetAddress().isLoopbackAddress();
-            if (first == null || !first.startsWith("auth ") || !(local || Pair.valid(first.substring(5).trim()))) {
+            byte[] key = null;                                   // set when the channel is encrypted
+            if (first != null && first.startsWith("eauth ")) {
+                // "eauth <session> <sealed {t, z}>": who it is, inside the encryption
+                String[] f = first.split(" ", 3);
+                key = f.length == 3 ? ZhCrypt.tvKey(f[1]) : null;
+                boolean ok = false;
+                if (key != null) {
+                    try {
+                        org.json.JSONObject a = new org.json.JSONObject(ZhCrypt.tvOpen(key, f[2]));
+                        String t = a.optString("t"), z = a.optString("z");
+                        ok = local || !Pair.enabled() || Pair.valid(t) || ZhCrypt.ticketOk(t)
+                                || (!z.isEmpty() && Cloud.signedIn() && Cloud.uid().equals(Cloud.verify(z)));
+                    } catch (Exception ignored) {
+                    }
+                }
+                if (!ok) {
+                    s.close();
+                    return;
+                }
+            } else if (first == null || !first.startsWith("auth ")
+                    || !(local || Pair.valid(first.substring(5).trim()) || ZhCrypt.ticketOk(first.substring(5).trim()))) {
                 s.close();
                 return;
             }
@@ -49,6 +69,10 @@ public final class KeyLine {
             String line;
             while ((line = in.readLine()) != null) {
                 try {
+                    if (key != null) {                           // encrypted channel: only sealed lines count
+                        if (!line.startsWith("e ")) continue;
+                        line = ZhCrypt.tvOpen(key, line.substring(2).trim());
+                    }
                     if (line.startsWith("k ")) Remote.press(ctx, line.substring(2).trim());
                     else if (line.startsWith("t ")) Remote.type(ctx, java.net.URLDecoder.decode(line.substring(2), "UTF-8"));
                 } catch (Throwable ignored) {

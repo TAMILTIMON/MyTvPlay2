@@ -632,12 +632,52 @@ public class Store {
         if (setPrefs != null) setPrefs.edit().putFloat(k, v).apply();
     }
 
+    // Secrets are kept encrypted with a key that never leaves the phone's secure hardware (Android
+    // Keystore, SecretBox): sign-in tokens, the pairing keys, the admin's Firebase key, the GitHub token.
+    // Read once, then kept in memory. Values saved by older versions are encrypted on first read.
+    private static final java.util.Set<String> SECRET = new java.util.HashSet<>(java.util.Arrays.asList(
+            "fb_refresh", "fb_id", "seedr_access", "seedr_refresh", "seedr_device", "fcm_sa", "gh_pat"));
+    private static final java.util.Map<String, String> secretCache = new java.util.HashMap<>();
+
+    static boolean secret(String k) {
+        return k != null && (SECRET.contains(k) || k.startsWith("tok_"));
+    }
+
     public static String getStr(String k, String d) {
-        return setPrefs == null ? d : setPrefs.getString(k, d);
+        if (setPrefs == null) return d;
+        if (!secret(k)) return setPrefs.getString(k, d);
+        synchronized (secretCache) {
+            if (secretCache.containsKey(k)) {
+                String v = secretCache.get(k);
+                return v == null || v.isEmpty() ? d : v;
+            }
+            String raw = setPrefs.getString(k, null);
+            String v;
+            if (raw == null || raw.isEmpty()) v = "";
+            else if (raw.startsWith("k:") || raw.startsWith("p:")) v = SecretBox.open(raw);
+            else {                                              // saved readable by an older version: encrypt it now
+                v = raw;
+                String sealed = SecretBox.seal(raw);
+                if (!sealed.isEmpty()) setPrefs.edit().putString(k, sealed).apply();
+            }
+            secretCache.put(k, v);
+            return v.isEmpty() ? d : v;
+        }
     }
 
     public static void putStr(String k, String v) {
-        if (setPrefs != null) setPrefs.edit().putString(k, v).apply();
+        if (setPrefs == null) return;
+        if (!secret(k)) {
+            setPrefs.edit().putString(k, v).apply();
+            return;
+        }
+        synchronized (secretCache) {
+            String val = v == null ? "" : v;
+            secretCache.put(k, val);
+            String sealed = val.isEmpty() ? "" : SecretBox.seal(val);
+            if (!val.isEmpty() && sealed.isEmpty()) sealed = "p:" + val;     // Keystore unavailable: never lose it
+            setPrefs.edit().putString(k, sealed).apply();
+        }
     }
 
     public static boolean getBool(String k, boolean d) {

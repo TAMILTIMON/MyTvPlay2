@@ -63,7 +63,11 @@ final class Push {
     }
 
     static String send(String title, String body, String link, String bid, String open) {
-        if (Fcm.ready()) return Fcm.send(title, body, link, bid, open);
+        return send(title, body, link, bid, open, "");
+    }
+
+    static String send(String title, String body, String link, String bid, String open, String img) {
+        if (Fcm.ready()) return Fcm.send(title, body, link, bid, open, img);
         String tok = Store.getStr("gh_pat", "");
         if (tok.isEmpty()) return "✗ " + T.t("Import the Firebase key first (Admin → Push setup)");
         try {

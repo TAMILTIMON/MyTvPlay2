@@ -147,7 +147,7 @@ public class CastScreenService extends Service {
             primaryOut = new BufferedOutputStream(sock.getOutputStream(), 1 << 16);
             out = new DataOutputStream(primaryOut);
             // first line: the pairing token, so only paired phones can show their screen
-            String token = liveKey != null ? liveKey : TvClient.token(tv);
+            String token = liveKey != null ? liveKey : TvClient.ticket(tv, 120000, false);   // one-time pass
             byte[] t = ((token == null ? "" : token) + "\n").getBytes("UTF-8");
             MirrorProto.write(out, MirrorProto.BYE + 1, false, 0, t, 0, t.length);   // type 10 = hello
             // a TV group: the same picture to every other TV of the group
@@ -170,7 +170,7 @@ public class CastScreenService extends Service {
                     }
                     if (os == null) continue;
                     GroupOut.Peer peer = new GroupOut.Peer(other, os);
-                    String ot = TvClient.token(other);
+                    String ot = TvClient.ticket(other, 120000, false);
                     byte[] oh = ((ot == null ? "" : ot) + "\n").getBytes("UTF-8");
                     MirrorProto.write(peer.out, MirrorProto.BYE + 1, false, 0, oh, 0, oh.length);
                     peers.add(peer);

@@ -66,6 +66,10 @@ final class Fcm {
     }
 
     static String send(String title, String body, String link, String bid, String open) {
+        return send(title, body, link, bid, open, "");
+    }
+
+    static String send(String title, String body, String link, String bid, String open, String img) {
         try {
             JSONObject sa = new JSONObject(Store.getStr(KEY, "{}"));
             String at = accessToken(sa);
@@ -74,7 +78,8 @@ final class Fcm {
                     .put("title", title).put("body", body);
             JSONObject msg = new JSONObject().put("message", new JSONObject()
                     .put("topic", "all")
-                    .put("notification", new JSONObject().put("title", title).put("body", body))
+                    .put("notification", Thumb.web(img).isEmpty() ? new JSONObject().put("title", title).put("body", body)
+                            : new JSONObject().put("title", title).put("body", body).put("image", Thumb.web(img)))
                     .put("data", data)
                     .put("android", new JSONObject().put("priority", "high")
                             .put("notification", new JSONObject().put("channel_id", Broadcast.CH).put("click_action", "com.tamil.castplay.OPEN_PUSH"))));

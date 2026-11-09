@@ -672,6 +672,10 @@ public class AdminActivity extends Activity {
         final EditText title = input(form, T.t("Title"), T.t("e.g. Friday movie night"), cur.optString("title"), false);
         final EditText url = input(form, T.t("Link"), "https://…", cur.optString("url"), false);
         url.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+        final ThumbPicker bcPic = new ThumbPicker(form, cur.optString("img"), () -> url.getText().toString().trim());
+        url.setOnFocusChangeListener((v, has) -> {
+            if (!has) bcPic.show();
+        });
         final Calendar start = Calendar.getInstance();
         if (cur.optLong("start", 0) > 0) start.setTimeInMillis(cur.optLong("start"));
         else start.add(Calendar.HOUR_OF_DAY, 1);
@@ -692,13 +696,18 @@ public class AdminActivity extends Activity {
         minutes.setInputType(InputType.TYPE_CLASS_NUMBER);
         body.addView(form, gap(12));
 
-        buttons(body, button("💾  " + T.t("Save"), false, false, v -> saveBroadcast(cur, kinds[kind[0]], title, url, start, minutes, false)),
-                button("📣  " + T.t("Save + notify"), true, false, v -> saveBroadcast(cur, kinds[kind[0]], title, url, start, minutes, true)));
+        buttons(body, button("💾  " + T.t("Save"), false, false, v -> saveBroadcast(cur, kinds[kind[0]], title, url, start, minutes, false, bcPic)),
+                button("📣  " + T.t("Save + notify"), true, false, v -> saveBroadcast(cur, kinds[kind[0]], title, url, start, minutes, true, bcPic)));
         buttons(body, button("▶  " + T.t("Start now"), true, false, v -> setState("live")),
                 button("■  " + T.t("End now"), false, true, v -> setState("ended")));
     }
 
     private void saveBroadcast(JSONObject cur, String kind, EditText title, EditText url, Calendar start, EditText minutes, boolean notify) {
+        saveBroadcast(cur, kind, title, url, start, minutes, notify, null);
+    }
+
+    private void saveBroadcast(final JSONObject cur, final String kind, EditText title, EditText url, final Calendar start, EditText minutes,
+                               final boolean notify, final ThumbPicker pic) {
         String u = url.getText().toString().trim(), t = title.getText().toString().trim();
         if (u.isEmpty() || t.isEmpty()) {
             say("⚠ " + T.t("Fill in the title and the link"));
@@ -710,15 +719,21 @@ public class AdminActivity extends Activity {
         } catch (Exception e) {
             len = 120;
         }
-        try {
-            String id = cur.optString("url").equals(u) && !cur.optString("id").isEmpty() ? cur.optString("id") : Broadcast.newId();
-            JSONObject b = new JSONObject().put("id", id).put("title", t).put("kind", kind).put("url", u)
-                    .put("start", start.getTimeInMillis()).put("end", start.getTimeInMillis() + len * 60000).put("state", "scheduled");
-            put("/pub/broadcast", b, "💾 " + T.t("Broadcast saved"));
-            if (notify) pushAsync("📅 " + t, T.t("Live on ZH Play at") + " " + Broadcast.when(start.getTimeInMillis()), "", id);
-        } catch (Exception e) {
-            say("⚠ " + e.getMessage());
-        }
+        final long flen = len;
+        new Thread(() -> {
+            try {
+                String img = pic == null ? cur.optString("img") : pic.resolve();      // uploads a gallery picture
+                String id = cur.optString("url").equals(u) && !cur.optString("id").isEmpty() ? cur.optString("id") : Broadcast.newId();
+                JSONObject b = new JSONObject().put("id", id).put("title", t).put("kind", kind).put("url", u).put("img", img)
+                        .put("start", start.getTimeInMillis()).put("end", start.getTimeInMillis() + flen * 60000).put("state", "scheduled");
+                main.post(() -> {
+                    put("/pub/broadcast", b, "💾 " + T.t("Broadcast saved"));
+                    if (notify) pushAsync("📅 " + t, T.t("Live on ZH Play at") + " " + Broadcast.when(start.getTimeInMillis()), "", id, "auto", img);
+                });
+            } catch (Exception e) {
+                main.post(() -> say("⚠ " + e.getMessage()));
+            }
+        }).start();
     }
 
     private void setState(final String st) {
@@ -735,7 +750,8 @@ public class AdminActivity extends Activity {
                         b.put("state", st).put(live ? "startedAt" : "endedAt", System.currentTimeMillis());
                         if (live) b.put("start", Math.min(b.optLong("start", System.currentTimeMillis()), System.currentTimeMillis()));
                         put("/pub/broadcast", b, live ? "🔴 " + T.t("Live — everyone sees it now") : "✓ " + T.t("Broadcast ended"));
-                        if (live) pushAsync("🔴 " + T.t("LIVE NOW") + ": " + b.optString("title"), T.t("Tap to watch on ZH Play"), "", b.optString("id"));
+                        if (live) pushAsync("🔴 " + T.t("LIVE NOW") + ": " + b.optString("title"), T.t("Tap to watch on ZH Play"), "", b.optString("id"),
+                                "auto", b.optString("img"));
                         main.postDelayed(this::broadcast, 1500);
                     } catch (Exception e) {
                         say("⚠ " + e.getMessage());
@@ -788,6 +804,10 @@ public class AdminActivity extends Activity {
         final EditText msg = input(c, T.t("Message"), T.t("What do you want to tell everyone?"), "", true);
         final EditText link = input(c, T.t("Link (optional)"), T.t("video, YouTube or web page"), "", false);
         link.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+        final ThumbPicker notePic = new ThumbPicker(c, "", () -> link.getText().toString().trim());
+        link.setOnFocusChangeListener((v, has) -> {
+            if (!has) notePic.show();                          // a YouTube / Drive link shows its picture
+        });
         c.addView(label(T.t("Open the link in")), gap(14));
         final String[] modes = {"auto", "player", "browser"};
         final String[] modeNames = {"✨ " + T.t("Auto"), "▶ " + T.t("ZH Play player"), "🌐 " + T.t("Browser")};
@@ -861,7 +881,16 @@ public class AdminActivity extends Activity {
                 return;
             }
             final String om = modes[mode[0]];
-            ZhPopup.confirm(this, "📣", T.t("Send to everyone?"), t + "\n" + m, T.t("Send"), false, () -> pushAsync(t, m, l, "", om));
+            ZhPopup.confirm(this, "📣", T.t("Send to everyone?"), t + "\n" + m, T.t("Send"), false, () -> new Thread(() -> {
+                String img;
+                try {
+                    img = notePic.resolve();                       // uploads a gallery picture
+                } catch (Exception e) {
+                    img = "";
+                }
+                final String fi = img;
+                main.post(() -> pushAsync(t, m, l, "", om, fi));
+            }).start());
         }), gap(18));
         ((LinearLayout.LayoutParams) body.getChildAt(body.getChildCount() - 1).getLayoutParams()).height = dp(52);
     }
@@ -987,9 +1016,113 @@ public class AdminActivity extends Activity {
         }));
     }
 
+    // ------------------------------------------------------------------ thumbnail picker
+
+    private ThumbPicker activePicker;
+
+    /** Picture for a notification / broadcast: gallery, web link, or automatic from the video link. */
+    private final class ThumbPicker {
+        String gallery = "";                       // base64 from the gallery (uploaded when sending)
+        EditText url;                              // set below (used later by the buttons)
+        final android.widget.ImageView preview;
+        final TextView hint;
+        final java.util.concurrent.Callable<String> link;
+        String current;
+
+        ThumbPicker(LinearLayout into, String current, java.util.concurrent.Callable<String> link) {
+            this.current = current == null ? "" : current;
+            this.link = link;
+            into.addView(label(T.t("Picture")), gap(14));
+            preview = new android.widget.ImageView(AdminActivity.this);
+            preview.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
+            preview.setBackground(round(Ui.dark() ? 0xFF0F1524 : 0xFFE5E7EB, dp(14)));
+            preview.setClipToOutline(true);
+            into.addView(preview, new LinearLayout.LayoutParams(-1, dp(170)));
+            hint = text(12, Ui.DIM, false);
+            hint.setPadding(dp(2), dp(6), 0, 0);
+            into.addView(hint);
+            LinearLayout r = new LinearLayout(AdminActivity.this);
+            TextView pick = button("🖼  " + T.t("Choose image"), false, false, v -> {
+                activePicker = this;
+                startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("image/*"), 78);
+            });
+            TextView clear = button(T.t("No picture"), false, false, v -> {
+                gallery = "";
+                url.setText("");
+                this.current = "none";
+                show();
+            });
+            LinearLayout.LayoutParams a = new LinearLayout.LayoutParams(0, dp(46), 1);
+            LinearLayout.LayoutParams b = new LinearLayout.LayoutParams(0, dp(46), 1);
+            b.setMargins(dp(8), 0, 0, 0);
+            r.addView(pick, a);
+            r.addView(clear, b);
+            into.addView(r, gap(8));
+            url = input(into, T.t("…or a picture link (optional)"), "https://….jpg", this.current.startsWith("http") ? this.current : "", false);
+            url.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+            url.setOnFocusChangeListener((v, has) -> {
+                if (!has) show();
+            });
+            show();
+        }
+
+        private String linkNow() {
+            try {
+                return link.call();
+            } catch (Exception e) {
+                return "";
+            }
+        }
+
+        /** What will be used (without uploading). */
+        String choice() {
+            if (!gallery.isEmpty()) return "gallery";
+            String u = url.getText().toString().trim();
+            if (u.startsWith("http")) return u;
+            if ("none".equals(current)) return "";
+            String a = Thumb.auto(linkNow());
+            if (!a.isEmpty()) return a;
+            return current.startsWith("thumb:") || current.startsWith("http") ? current : "";
+        }
+
+        void show() {
+            String c = choice();
+            preview.setImageDrawable(null);
+            if ("gallery".equals(c)) {
+                byte[] d = android.util.Base64.decode(gallery, android.util.Base64.DEFAULT);
+                preview.setImageBitmap(android.graphics.BitmapFactory.decodeByteArray(d, 0, d.length));
+                hint.setText("🖼 " + T.t("Picture from your gallery"));
+            } else if (!c.isEmpty()) {
+                Thumb.load(preview, c);
+                hint.setText(c.contains("img.youtube.com") ? "▶ " + T.t("Automatic: YouTube thumbnail")
+                        : c.contains("drive.google.com/thumbnail") ? "☁ " + T.t("Automatic: Google Drive preview") : "🔗 " + T.t("Picture link"));
+            } else {
+                hint.setText(T.t("No picture — YouTube and Google Drive links get theirs automatically."));
+            }
+        }
+
+        /** The final picture reference (uploads a gallery picture). Blocking. */
+        String resolve() throws Exception {
+            String c = choice();
+            if ("gallery".equals(c)) return Thumb.upload(gallery);
+            return c;
+        }
+    }
+
     @Override
     protected void onActivityResult(int req, int res, Intent data) {
         super.onActivityResult(req, res, data);
+        if (req == 78) {
+            if (res == RESULT_OK && data != null && data.getData() != null && activePicker != null) {
+                try {
+                    activePicker.gallery = Thumb.encode(this, data.getData());
+                    activePicker.show();
+                } catch (Exception e) {
+                    say("⚠ " + e.getMessage());
+                }
+            }
+            return;
+        }
         if (req != 77 || res != RESULT_OK || data == null || data.getData() == null) return;
         try (java.io.InputStream in = getContentResolver().openInputStream(data.getData())) {
             java.io.ByteArrayOutputStream o = new java.io.ByteArrayOutputStream();
@@ -1033,18 +1166,23 @@ public class AdminActivity extends Activity {
     }
 
     private void pushAsync(final String title, final String body, final String link, final String bid, final String open) {
+        pushAsync(title, body, link, bid, open, Thumb.auto(link));
+    }
+
+    private void pushAsync(final String title, final String body, final String link, final String bid, final String open, final String img) {
         say("📣 " + T.t("Sending…"));
         new Thread(() -> {
-            final String r = Push.send(title, body, link, bid, open);
-            saveToInbox(title, body, link, open);           // missed it? it's in 🔔 Notifications
+            final String r = Push.send(title, body, link, bid, open, img);
+            saveToInbox(title, body, link, open, img);      // missed it? it's in 🔔 Notifications
             main.post(() -> say(r));
         }).start();
     }
 
     /** Keeps the message in pub/inbox so every app can show it later; trims to the latest 50. */
-    private void saveToInbox(String title, String body, String link, String open) {
+    private void saveToInbox(String title, String body, String link, String open, String img) {
         try {
             JSONObject m = new JSONObject().put("title", title).put("body", body).put("link", link == null ? "" : link)
+                    .put("img", img == null ? "" : img)
                     .put("open", open == null ? "auto" : open).put("at", new JSONObject().put(".sv", "timestamp"));
             Cloud.http("POST", Broadcast.url("/pub/inbox"), m.toString());
             String s = Cloud.http("GET", Broadcast.url("/pub/inbox"), null);

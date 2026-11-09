@@ -1,3 +1,37 @@
+ZH PLAY 9.0 — Encrypted phone ↔ TV · secrets encrypted on the device
+====================================================================
+PHONE ↔ TV (local Wi-Fi), ZhCrypt:
+* Phone and TV agree a fresh key with ECDH (EC P-256) — the key itself is never sent — and every
+  command, answer, typed text, key press, thumbnail and sign-in hand-over is AES-256-GCM encrypted.
+  Replayed or altered messages are refused. Tested: a snooper sees no token, text, e-mail or command.
+* Who may control the TV is still the pairing key / same Google account — now sent inside the
+  encryption. The PIN pairing itself runs encrypted. No re-pairing needed (the key is agreed automatically;
+  a restarted TV is re-keyed by itself).
+* Plain connections kept for speed (file upload, screen cast, web-page remote) use short-lived passes
+  ("tickets"): one-time for upload / cast, 6 hours for the web remote — never the lasting key.
+* Pairing over plain Wi-Fi (browser / older app) now gets a 6-hour pass, not the lasting key.
+* The TV refuses sign-in hand-overs (/tvlogin, /seedr/login) that arrive unencrypted.
+* Video streams are not encrypted by this layer (speed) — Seedr / Drive / YouTube already use HTTPS.
+* An older TV still works (plain) and the phone shows "Update ZH Play on the TV" once.
+ON THE DEVICE:
+* Firebase and Seedr sign-in tokens, pairing keys, the admin's Firebase key and the GitHub token are
+  stored encrypted with Android Keystore (hardware-backed). Old readable values are encrypted on first use.
+* Nothing removed. Update BOTH phone and TV.
+
+ZH PLAY 8.8 — Pictures for notifications & broadcasts · Netflix-style inbox
+==========================================================================
+* PICTURES, no extra setup: YouTube links → the video's thumbnail and Google Drive videos → Drive's
+  preview, automatically. Any other link: admin panel → "🖼 Choose image" (gallery, shrunk to ~40 KB,
+  kept in Firebase pub/thumbs) or a picture link. Live preview in the admin panel.
+* Used in: 🔔 Notifications (hero + cards), phone notifications (big picture when the image is a web link),
+  the TV home screen broadcast card, and the broadcast hero.
+* 🔔 NOTIFICATIONS is Netflix-style: a big picture hero for the live / upcoming broadcast, sideways rows
+  of picture cards ("New", "Earlier") that grow when focused with the TV remote, and a detail sheet
+  (picture, message, ▶ Play / Close).
+* Less data: apps now sync only the small parts of pub (scroller, broadcast, inbox, blocks); each
+  picture downloads once and is cached on the device.
+* Nothing removed.
+
 ZH PLAY 8.7 — Android TV home screen row · 🔔 Notifications inbox
 =================================================================
 * TV HOME SCREEN (Android 8+ TVs whose launcher shows "Watch Next / Continue watching"): ZH Play adds
