@@ -126,7 +126,7 @@ final class Broadcast {
                         watching = null;
                         Remote.MAIN.post(() -> {                        // stop it for people still watching
                             android.app.Activity top = App.top();
-                            if (top instanceof PlayerActivity) top.finish();
+                            if (top instanceof PlayerActivity) ((PlayerActivity) top).broadcastEnded();
                         });
                     }
                 }
