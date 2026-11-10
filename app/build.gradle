@@ -92,6 +92,9 @@ base {
 }
 
 dependencies {
+    implementation "io.github.junkfood02.youtubedl-android:library:0.18.1"
+    implementation "io.github.junkfood02.youtubedl-android:ffmpeg:0.18.1"
+
     implementation 'androidx.appcompat:appcompat:1.6.1'
     // Google sign-in (Credential Manager + Sign in with Google) and QR codes for TV sign-in
     implementation platform('org.jetbrains.kotlin:kotlin-bom:1.9.24')

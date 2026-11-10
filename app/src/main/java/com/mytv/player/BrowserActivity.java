@@ -2522,12 +2522,17 @@ public class BrowserActivity extends AppCompatActivity {
         acts.add(() -> {
             if (!enterPipMode()) UiKit.makeToast(this, T.t("Start the video first"), Toast.LENGTH_SHORT).show();
         });
-        labels.add("ℹ  " + T.t("Why no download?"));
-        acts.add(() -> new UiDialog(this).setTitle(T.t("Why no download?"))
-                .setMessage(T.t("YouTube protects its videos (encrypted, changing stream addresses) and its terms don't allow downloading. "
-                        + "Use Listen or Add to Music to hear it any time, or YouTube Premium for offline. Videos from other sites can be "
-                        + "downloaded (long-press a video link → Download) and turned into songs with Features → Video → Audio."))
-                .setPositiveButton(T.t("OK"), null).show());
+        // In-app yt-dlp; falls back to YTDLnis if library not built in
+        labels.add("⬇  " + T.t("Download video"));
+        acts.add(() -> downloadInAppOrYtdlnis(url, false));
+        labels.add("🎵  " + T.t("Download audio"));
+        acts.add(() -> downloadInAppOrYtdlnis(url, true));
+        labels.add("ℹ  " + T.t("About downloads"));
+        acts.add(() -> new UiDialog(this).setTitle(T.t("About downloads"))
+                .setMessage(T.t("ZH Play can download with built-in yt-dlp (after you add the library in Gradle). "
+                        + "Files go to Download/ZHPlay. You can also use free YTDLnis as a fallback."))
+                .setPositiveButton(T.t("OK"), null)
+                .setNeutralButton(T.t("Get YTDLnis"), (d, w) -> openYtdlnisInstall()).show());
         new UiDialog(this).setTitle(title).setItems(labels.toArray(new String[0]), (d, w) -> acts.get(w).run()).show();
     }
 
@@ -2607,6 +2612,11 @@ public class BrowserActivity extends AppCompatActivity {
             labels.add("⬇ " + T.t(tv ? "Download to this TV" : "Download to this phone"));
             acts.add(() -> BrowserDownloads.start(this, url, dl != null ? dl[0] : web.getSettings().getUserAgentString(),
                     dl != null ? dl[1] : null, dl != null ? dl[2] : null, web.getUrl()));
+            // In-app yt-dlp; falls back to YTDLnis app if the library is not built in
+            labels.add("⬇ " + T.t("Download video"));
+            acts.add(() -> downloadInAppOrYtdlnis(url, false));
+            labels.add("🎵 " + T.t("Download audio"));
+            acts.add(() -> downloadInAppOrYtdlnis(url, true));
         }
         if (!Formats.isTorrent(url) && url.startsWith("http")) {
             labels.add("🎵 " + T.t("Add to Music (Links)"));
@@ -2621,6 +2631,92 @@ public class BrowserActivity extends AppCompatActivity {
         acts.add(() -> copy(url));
         new UiDialog(this).setTitle((Formats.isTorrent(url) ? "🧲 " + T.t("Torrent found — play or download?") + "\n" : "") + t)
                 .setItems(labels.toArray(new String[0]), (d, w) -> acts.get(w).run()).show();
+    }
+
+    /** Prefer in-app yt-dlp; if not ready, hand off to YTDLnis. */
+    private void downloadInAppOrYtdlnis(String url, boolean audio) {
+        // Always try queue first (works when library is present; shows manager UI)
+        try {
+            YtDlQueue.init(getApplicationContext());
+            String title = web != null && web.getTitle() != null ? web.getTitle() : url;
+            YtDlQueue.enqueue(this, url, audio, title);
+            return;
+        } catch (Throwable ignored) {}
+        if (isYtdlnisInstalled()) {
+            sendToYtdlnis(url, audio ? "audio" : "video", false);
+            return;
+        }
+        new UiDialog(this).setTitle(T.t("Download"))
+                .setMessage(T.t("Built-in downloader needs the yt-dlp library in the app build. "
+                        + "Or install free YTDLnis to download now."))
+                .setPositiveButton(T.t("Get YTDLnis"), (d, w) -> openYtdlnisInstall())
+                .setNegativeButton(T.t("Cancel"), null).show();
+    }
+
+    private static final String YTDLNIS_PKG = "com.deniscerri.ytdl";
+
+    private boolean isYtdlnisInstalled() {
+        try {
+            getPackageManager().getPackageInfo(YTDLNIS_PKG, 0);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * Hand off a URL to YTDLnis (official intent API).
+     * type: "video" | "audio" | "command"
+     * background: true = no download card, runs in YTDLnis queue
+     */
+    private void sendToYtdlnis(String url, String type, boolean background) {
+        if (url == null || url.isEmpty()) return;
+        if (!isYtdlnisInstalled()) {
+            new UiDialog(this).setTitle("YTDLnis")
+                    .setMessage(T.t("YTDLnis is not installed. It is a free yt-dlp downloader for 1000+ sites. Install it, then try again."))
+                    .setPositiveButton(T.t("Get YTDLnis"), (d, w) -> openYtdlnisInstall())
+                    .setNegativeButton(T.t("Cancel"), null).show();
+            return;
+        }
+        try {
+            Intent i = new Intent(Intent.ACTION_SEND);
+            i.setType("text/*");
+            i.setPackage(YTDLNIS_PKG);
+            i.putExtra(Intent.EXTRA_TEXT, url);
+            i.putExtra("TYPE", type == null ? "video" : type);
+            i.putExtra("BACKGROUND", background ? "true" : "false");
+            startActivity(i);
+            UiKit.makeToast(this, "⬇ YTDLnis: " + type, Toast.LENGTH_SHORT).show();
+        } catch (Exception e) {
+            // fallback: generic share so user can still pick YTDLnis from the sheet
+            try {
+                Intent share = new Intent(Intent.ACTION_SEND);
+                share.setType("text/plain");
+                share.putExtra(Intent.EXTRA_TEXT, url);
+                startActivity(Intent.createChooser(share, T.t("Download with…")));
+            } catch (Exception e2) {
+                UiKit.makeToast(this, T.t("Could not open YTDLnis"), Toast.LENGTH_LONG).show();
+            }
+        }
+    }
+
+    private void openYtdlnisInstall() {
+        // Prefer F-Droid / GitHub release page; Play may not list it
+        String[] urls = {
+                "https://f-droid.org/packages/com.deniscerri.ytdl/",
+                "https://github.com/deniscerri/ytdlnis/releases",
+                "https://ytdlnis.org/"
+        };
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(urls[0])));
+        } catch (Exception e) {
+            try {
+                startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(urls[1])));
+            } catch (Exception e2) {
+                copy(urls[1]);
+                UiKit.makeToast(this, T.t("Link copied") + ": github.com/deniscerri/ytdlnis", Toast.LENGTH_LONG).show();
+            }
+        }
     }
 
     private android.webkit.ValueCallback<Uri[]> fileCb;

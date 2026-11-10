@@ -83,6 +83,7 @@ public class App extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
+        try { YtDl.init(this); YtDlQueue.init(this); } catch (Throwable ignored) {}
         TrackerList.warmUp(this);   // fetch & rank public trackers in background
         Store.init(this);
         // remember why the app closed, to show it next time (helps fixing problems)
