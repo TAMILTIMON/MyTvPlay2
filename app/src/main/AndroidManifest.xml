@@ -96,7 +96,7 @@
         android:largeHeap="true"
         android:requestLegacyExternalStorage="true"
         android:theme="@style/AppTheme"
-        android:usesCleartextTraffic="true" android:extractNativeLibs="true">
+        android:usesCleartextTraffic="true">
 
         <activity
             android:name=".MainActivity"
