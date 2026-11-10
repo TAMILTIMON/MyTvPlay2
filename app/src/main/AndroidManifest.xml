@@ -96,7 +96,7 @@
         android:largeHeap="true"
         android:requestLegacyExternalStorage="true"
         android:theme="@style/AppTheme"
-        android:usesCleartextTraffic="true" android:extractNativeLibs="true">
+        android:usesCleartextTraffic="true">
 
         <activity
             android:name=".MainActivity"
@@ -464,11 +464,5 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
-    
-        <activity
-            android:name=".YtDlActivity"
-            android:label="Downloads"
-            android:exported="false"
-            android:theme="@style/Theme.AppCompat.NoActionBar" />
     </application>
 </manifest>

@@ -239,8 +239,7 @@ public class PlayerActivity extends AppCompatActivity {
     protected void onStart() {
         super.onStart();
         if (mp != null && !viewsAttached) {
-            mp.attachViews(videoLayout, null, true, false);
-            viewsAttached = true;
+            attachVideo();
             applyFit();
         }
         handler.removeCallbacks(tick);
@@ -552,15 +551,14 @@ public class PlayerActivity extends AppCompatActivity {
                 timelineDragging = true;
                 sb.setThumb(thumbDrawable(true));
                 handler.removeCallbacks(hideOverlay);
-                handler.removeCallbacks(hideOverlay);
+                handler.removeCallbacks(timelineSeek);
             }
 
             public void onStopTrackingTouch(SeekBar sb) {
                 timelineDragging = false;
                 sb.setThumb(thumbDrawable(false));
-                timelineSeek.run();
-                handler.postDelayed(hideOverlay, 5000);
-                timelineSeek.run();
+                handler.removeCallbacks(timelineSeek);
+                timelineSeek.run();                      // exactly one seek when the finger lifts
                 handler.postDelayed(hideOverlay, 5000);
             }
         });
@@ -854,6 +852,63 @@ public class PlayerActivity extends AppCompatActivity {
 
     private View dimView;
     private boolean lastBoost;
+    private boolean textureOut;                    // video drawn into a TextureView (only for the brightness boost)
+    private boolean swHintShown;
+
+    private static boolean wantTexture() {
+        return Store.getInt("bright", 100) > 100;
+    }
+
+    /** Hooks the video to the screen: a SurfaceView normally (fastest, like VLC), a TextureView for the boost. */
+    private void attachVideo() {
+        textureOut = wantTexture();
+        mp.attachViews(videoLayout, null, true, textureOut);
+        viewsAttached = true;
+        handler.postDelayed(this::applyBoost, 400);
+    }
+
+    /** Brightness crossed 100%: swap the video output in place (no reload, no software decoding). */
+    private void switchVideoOutput() {
+        if (mp == null || !viewsAttached) return;
+        if (textureOut != wantTexture()) {
+            mp.detachViews();
+            attachVideo();
+            handler.postDelayed(this::applyFit, 300);
+        } else {
+            applyBoost();
+        }
+    }
+
+    /** 100..150%: brighten on the GPU with a colour matrix on the video's TextureView. */
+    private void applyBoost() {
+        android.view.TextureView tv = findTexture(videoLayout);
+        if (tv == null) return;
+        int b = Store.getInt("bright", 100);
+        if (b <= 100) {
+            tv.setLayerPaint(null);
+            return;
+        }
+        float scale = b / 100f, contrast = 1f + (b - 100) / 400f, k = scale * contrast, t = 128f * (1f - contrast);
+        android.graphics.Paint p = new android.graphics.Paint();
+        p.setColorFilter(new android.graphics.ColorMatrixColorFilter(new android.graphics.ColorMatrix(new float[]{
+                k, 0, 0, 0, t,
+                0, k, 0, 0, t,
+                0, 0, k, 0, t,
+                0, 0, 0, 1, 0})));
+        tv.setLayerPaint(p);
+    }
+
+    private static android.view.TextureView findTexture(View v) {
+        if (v instanceof android.view.TextureView) return (android.view.TextureView) v;
+        if (v instanceof ViewGroup) {
+            ViewGroup g = (ViewGroup) v;
+            for (int i = 0; i < g.getChildCount(); i++) {
+                android.view.TextureView t = findTexture(g.getChildAt(i));
+                if (t != null) return t;
+            }
+        }
+        return null;
+    }
 
     /** 10..100% = dim the picture with a dark layer (works on every TV); 100..150% = VLC brighten filter. */
     private void applyBrightnessLayer() {
@@ -1053,7 +1108,11 @@ public class PlayerActivity extends AppCompatActivity {
             finish();
             return;
         }
-        if (System.currentTimeMillis() - lastSave > 15000) savePosition();
+        if (System.currentTimeMillis() - lastSave > 15000) {
+            periodicSave = true;
+            savePosition();
+            periodicSave = false;
+        }
         if (mp != null && mp.isPlaying()) {
             Family.tick(0.5f);
             if (Family.minutesLeft() == 0 && !timesUpShown) {
@@ -1079,6 +1138,7 @@ public class PlayerActivity extends AppCompatActivity {
         ArrayList<String> o = new ArrayList<>();
         o.add("--network-caching=" + Store.getInt("cache", 2000));
         o.add("--http-reconnect");
+        o.add("--avcodec-skiploopfilter=1");      // VLC for Android's default: keeps software-decoded HD smooth
         o.add("--audio-time-stretch");
         List<String> af = new ArrayList<>();
         int dl = dialogLevel();
@@ -1119,8 +1179,7 @@ public class PlayerActivity extends AppCompatActivity {
         libVLC = new LibVLC(this, o);
         mp = new MediaPlayer(libVLC);
         mp.setEventListener(events);
-        mp.attachViews(videoLayout, null, true, false);
-        viewsAttached = true;
+        attachVideo();
         loadEqInfo();
         if (Store.getBool("eq_pending", false)) {
             Store.putBool("eq_pending", false);
@@ -1519,8 +1578,7 @@ public class PlayerActivity extends AppCompatActivity {
     };
 
     private static boolean previewable(String u) {
-        return u.startsWith("/") || (u.startsWith("http") && !u.contains("/torrent/") && !u.contains("/local/")
-                && !u.toLowerCase(Locale.ROOT).contains(".m3u8"));
+        return u.startsWith("/");          // local files only — a preview of a stream competes with playback
     }
 
     private static void setSource(android.media.MediaMetadataRetriever m, String u) {
@@ -1636,7 +1694,25 @@ public class PlayerActivity extends AppCompatActivity {
         startMedia(it, start, null);
     }
 
+    /** The admin ended the broadcast this player is showing. */
+    public void broadcastEnded() {
+        Store.Item it = current();
+        if (it != null && Broadcast.fromBroadcast(it.t) && Broadcast.isBroadcastUrl(it.u) && !Broadcast.liveUrl(it.u)) {
+            ZhPopup.message(this, "■", T.t("The broadcast has ended"), T.t("Thanks for watching!"));
+            if (mp != null) mp.stop();
+            handler.postDelayed(this::finish, 3500);
+        }
+    }
+
     private void startMedia(Store.Item it, long startMs, List<String> keepSubs) {
+        if (it != null && Broadcast.fromBroadcast(it.t) && Broadcast.isBroadcastUrl(it.u) && !Broadcast.liveUrl(it.u)) {
+            // an ended broadcast (e.g. from an old list): it may only be watched while it is live
+            Store.removeRecent(it.u);
+            Store.removeHistory(it.u);
+            UiKit.makeToast(this, "■ " + T.t("This broadcast has ended"), android.widget.Toast.LENGTH_LONG).show();
+            finish();
+            return;
+        }
         Store.Item loc = localForTorrent(it);
         if (loc != null) {
             if (index >= 0 && index < queue.size() && queue.get(index) == it) queue.set(index, loc);
@@ -1662,14 +1738,8 @@ public class PlayerActivity extends AppCompatActivity {
         if (startMs > 0) m.addOption(String.format(Locale.US, ":start-time=%.2f", startMs / 1000.0));
         if (Store.getInt("hw", 0) == 1) m.setHWDecoderEnabled(false, false);
         if (it.u.contains("127.0.0.1:" + RemoteService.PORT + "/torrent/")) m.addOption(":network-caching=8000");
-        int br = Store.getInt("bright", 100);
-        if (br > 100) {
-            // brighter than normal: VLC picture filter (software)
-            m.addOption(":video-filter=adjust");
-            m.addOption(String.format(Locale.US, ":brightness=%.2f", br / 100f));
-            m.addOption(String.format(Locale.US, ":contrast=%.2f", 1f + (br - 100) / 400f));
-            m.setHWDecoderEnabled(false, false);
-        }
+        // brighter than normal is done on the GPU (applyBoost) — the video chip keeps decoding,
+        // so 1080p / HEVC stays smooth (VLC's software filter used to switch decoding to the CPU)
         if (it.u.startsWith("http")) {
             String ua = Net.UA, ref = null;
             int bar = it.u.indexOf('|');
@@ -1825,6 +1895,8 @@ public class PlayerActivity extends AppCompatActivity {
     private boolean switchedLocal;
     private long lastGoodTime;
     private int earlyEnds;
+    private int streamRetries;
+    private boolean periodicSave;                  // the every-15-s save during playback (no stream thumbnails then)                     // reconnects after a stream error (reset once it plays again)
 
     /** Restarts a finished torrent and jumps to the same file (used by "Continue watching"). */
     private void reopenTorrent(final int i, final String src, final String streamUrl) {
@@ -1933,7 +2005,13 @@ public class PlayerActivity extends AppCompatActivity {
             switch (e.type) {
                 case MediaPlayer.Event.Playing:
                     hideLoading();
+                    handler.postDelayed(PlayerActivity.this::applyBoost, 300);
+                    if (Store.getInt("hw", 0) == 1 && !swHintShown) {
+                        swHintShown = true;
+                        handler.postDelayed(() -> osd(T.t("Software decoder is on — for smooth 1080p choose ⚙ Decoder: Hardware")), 2500);
+                    }
                     torrentRetries = 0;
+                    handler.postDelayed(() -> { if (mp != null && mp.isPlaying()) streamRetries = 0; }, 20000);
                     if (mp != null && mp.getTime() > 60000) earlyEnds = Math.max(0, earlyEnds - 1);
                     if (audioOnly) handler.postDelayed(() -> { if (mp != null && audioOnly) mp.setVideoTrack(-1); }, 600);
                     handler.postDelayed(PlayerActivity.this::applyAfr, 1500);
@@ -1975,6 +2053,19 @@ public class PlayerActivity extends AppCompatActivity {
                         @Override
                         public void run() {
                             Store.Item it = current();
+                            if (it != null && !it.u.startsWith("/") && lastGoodTime > 0 && streamRetries < 4 && !isFinishing()) {
+                                // it was playing: a network hiccup / seek on a stream — reconnect where the viewer is
+                                streamRetries++;
+                                boolean recentSeek = seekTarget >= 0 && System.currentTimeMillis() - seekAt < 15000;
+                                final long at = recentSeek ? seekTarget : lastGoodTime;
+                                final List<String> subs = new ArrayList<>(addedSubs);
+                                showLoading(T.t("Reconnecting…"));
+                                handler.postDelayed(() -> {
+                                    if (isFinishing() || current() == null) return;
+                                    startMedia(current(), at, subs);
+                                }, 1200L * streamRetries);
+                                return;
+                            }
                             onPlayError(T.t("Cannot play: ") + (it == null ? "" : it.t));
                         }
                     });
@@ -2007,7 +2098,9 @@ public class PlayerActivity extends AppCompatActivity {
         earlyEnds = 0;
         Store.Item fin = current();
         final String th = fin == null ? null : hashOf(fin.u);
-        if (th != null && !Store.getBool("tkeep_" + th, false) && !Store.getBool("tasked_" + th, false)) {
+        // "keep it for later" only makes sense if the whole file is here (Save data streams only what's watched)
+        boolean whole = th != null && (!TorrentEngine.saver() || TorrentEngine.get(this).fileComplete(th, torrentFile(fin.u)));
+        if (th != null && whole && !Store.getBool("tkeep_" + th, false) && !Store.getBool("tasked_" + th, false)) {
             Store.putBool("tasked_" + th, true);
             askKeep(fin, th);
             return;
@@ -2093,10 +2186,13 @@ public class PlayerActivity extends AppCompatActivity {
         if (nearEnd) {
             Store.removeHistory(it.u);
             Store.setWatched(it.u, true);
+            TvHome.refresh(this);                                 // finished: leaves the TV home row
         }
         else if (resumable && pos > 5000) {
             Store.putHistory(it.t, it.u, pos, len);
-            Thumbs.request(this, it.u, pos);
+            // a stream's thumbnail opens the video a second time: only when leaving, never mid-playback
+            if (it.u.startsWith("/") || !periodicSave) Thumbs.request(this, it.u, pos);
+            if (!periodicSave) TvHome.refresh(this);              // TV home screen: Continue watching
         }
     }
 
@@ -2325,7 +2421,10 @@ public class PlayerActivity extends AppCompatActivity {
             if (getCurrentFocus() instanceof SeekBar && (code == KeyEvent.KEYCODE_DPAD_CENTER
                     || code == KeyEvent.KEYCODE_ENTER || code == KeyEvent.KEYCODE_NUMPAD_ENTER)) {
                 if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
-                    timelineSeek.run();
+                    // seek only if the bar was moved (a needless seek drops a stream's buffer)
+                    handler.removeCallbacks(timelineSeek);
+                    if (mp != null && mp.getLength() > 0
+                            && Math.abs(mp.getLength() * timeline.getProgress() / 1000 - mp.getTime()) > 3000) timelineSeek.run();
                     togglePause();
                 }
                 return true;
@@ -2513,9 +2612,36 @@ public class PlayerActivity extends AppCompatActivity {
     private void seekBy(long delta) {
         long now = System.currentTimeMillis();
         long base = (seekTarget >= 0 && now - seekAt < 1500) ? seekTarget : mp.getTime();
-        seekTo(base + delta);
-        osd((delta > 0 ? "+" : "−") + (Math.abs(delta) / 1000) + " s");
+        Store.Item it = current();
+        boolean stream = it != null && !it.u.startsWith("/");
+        if (!stream) {
+            seekTo(base + delta);
+            osd((delta > 0 ? "+" : "−") + (Math.abs(delta) / 1000) + " s");
+            return;
+        }
+        if (!mp.isSeekable()) {
+            osd(T.t("This stream cannot be seeked"));
+            return;
+        }
+        long len = mp.getLength();
+        long t = base + delta;
+        if (len > 0) t = Math.min(t, len - 1000);
+        t = Math.max(0, t);
+        seekTarget = t;                                  // the next tap adds to this target
+        seekAt = now;
+        handler.removeCallbacks(applyStreamSeek);
+        handler.postDelayed(applyStreamSeek, 450);       // one seek after the taps stop
+        long diff = t - Math.max(0, mp.getTime());
+        osd((diff >= 0 ? "⏩ +" : "⏪ −") + (Math.abs(diff) / 1000) + " s  →  " + Net.fmtTime(t));
+        showOverlay();
     }
+
+    private final Runnable applyStreamSeek = new Runnable() {
+        public void run() {
+            if (mp == null || seekTarget < 0) return;
+            seekTo(seekTarget);
+        }
+    };
 
     private void seekTo(long t) {
         if (!mp.isSeekable()) {
@@ -2702,22 +2828,6 @@ public class PlayerActivity extends AppCompatActivity {
         }
         labels.add("📸  " + T.t("Screenshot"));
         acts.add(new Runnable() { public void run() { screenshot(); } });
-        // In-app video/audio download (yt-dlp) for http(s) items
-        final Store.Item curDl = current();
-        if (curDl != null && curDl.u != null) {
-            String u0 = curDl.u;
-            int bar = u0.indexOf('|');
-            if (bar > 0) u0 = u0.substring(0, bar);
-            if (u0.startsWith("http")) {
-                final String httpUrl = u0;
-                labels.add("⬇  " + T.t("Download video"));
-                acts.add(new Runnable() { public void run() { YtDl.downloadVideo(PlayerActivity.this, httpUrl); } });
-                labels.add("🎵  " + T.t("Download audio"));
-                acts.add(new Runnable() { public void run() { YtDl.downloadAudio(PlayerActivity.this, httpUrl); } });
-                labels.add("📋  " + T.t("Download manager"));
-                acts.add(new Runnable() { public void run() { YtDlQueue.open(PlayerActivity.this); } });
-            }
-        }
         labels.add("🎵  " + T.t("Audio only (picture off)") + ": " + T.t(audioOnly ? "On" : "Off"));
         acts.add(new Runnable() { public void run() { command("audioonly", audioOnly ? "0" : "1", ""); } });
         labels.add("🗣  " + T.t("Clear dialogue (quiet voices, loud music)") + ": " + dialogName(dialogLevel()));
@@ -3481,9 +3591,8 @@ public class PlayerActivity extends AppCompatActivity {
                 msg = "";
                 break;
             case "bright": {
-                boolean wasBoost = lastBoost;
                 applyBrightnessLayer();
-                if (wasBoost != (Store.getInt("bright", 100) > 100) || Store.getInt("bright", 100) > 100) reloadCurrent();
+                switchVideoOutput();
                 break;
             }
             case "quality":

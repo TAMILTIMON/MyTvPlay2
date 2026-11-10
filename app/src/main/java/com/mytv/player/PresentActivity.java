@@ -11,7 +11,6 @@ import android.graphics.Path;
 import android.graphics.RectF;
 import android.graphics.pdf.PdfRenderer;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -61,18 +60,11 @@ import java.util.concurrent.Executors;
 public class PresentActivity extends AppCompatActivity {
     public static final String EXTRA_IP = "ip", EXTRA_BOARD = "board";
     private static final int LASER = 0, PEN = 1, HL = 2, ERASE = 3, SHAPE = 4, RULER = 5, TEXT = 6, SPOT = 7, MOVE = 8,
-            PROTRACTOR = 9, COMPASS = 10, STICKY = 11;
+            PROTRACTOR = 9, COMPASS = 10;
     private static final String[][] TOOLS = {{"🔴", "Laser"}, {"✏", "Pen"}, {"🖍", "Highlighter"}, {"🧽", "Eraser"}, {"⬜", "Shapes"},
             {"📏", "Ruler"}, {"T", "Text"}, {"🔦", "Spotlight"}, {"✋", "Move"},
-            {"📐", "Protractor"}, {"⭕", "Compass"}, {"📝", "Sticky note"}};
-    // sticky note paper colours (EZWrite-style)
-    private static final int[] STICKY_COLORS = {0xFFFEF08A, 0xFFBBF7D0, 0xFFBFDBFE, 0xFFFBCFE8, 0xFFFED7AA, 0xFFE9D5FF};
-    // EZWrite-style palette (12 colours)
-    private static final int[] COLORS = {
-            0xFFEF4444, 0xFFF97316, 0xFFFACC15, 0xFF22C55E, 0xFF14B8A6, 0xFF3B82F6,
-            0xFF8B5CF6, 0xFFEC4899, 0xFFA78BFA, 0xFF94A3B8, 0xFFFFFFFF, 0xFF111827
-    };
-    private static final String[] SIZE_LABELS = {"XS", "S", "M", "L", "XL"};
+            {"📐", "Protractor"}, {"⭕", "Compass"}};
+    private static final int[] COLORS = {0xFFEF4444, 0xFFFACC15, 0xFF22C55E, 0xFF3B82F6, 0xFFFFFFFF, 0xFF111827};
     // Outline + filled variants (EZWrite-style) and extra polygons
     private static final String[] SHAPES = {
             "line", "arrow",
@@ -125,9 +117,6 @@ public class PresentActivity extends AppCompatActivity {
     private Button blankBtn, paperBtn;
     private long started, pausedAt, pausedTotal;
     private boolean timerPaused, multi;
-    /** 0 = stopwatch (count up); >0 = countdown total seconds. */
-    private int countdownSec = 0;
-    private boolean countdownDone;
     private ScaleGestureDetector pinch;
     private GestureDetector taps;
     private float lastMidX, lastMidY;
@@ -221,13 +210,8 @@ public class PresentActivity extends AppCompatActivity {
         topBar.addView(tc, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
         timer = Ui.text(this, 15, 0xFFFBBF24, true);
         timer.setPadding(dp(8), 0, dp(8), 0);
-        timer.setContentDescription(T.t("Timer — tap pause, hold for options"));
+        timer.setContentDescription(T.t("Timer — tap to pause, hold to reset"));
         timer.setOnClickListener(v -> {
-            if (countdownDone && countdownSec > 0) {
-                // restart same countdown
-                resetTimerClock();
-                return;
-            }
             if (timerPaused) {
                 pausedTotal += SystemClock.elapsedRealtime() - pausedAt;
                 timerPaused = false;
@@ -237,7 +221,9 @@ public class PresentActivity extends AppCompatActivity {
             }
         });
         timer.setOnLongClickListener(v -> {
-            showTimerDialog();
+            started = SystemClock.elapsedRealtime();
+            pausedTotal = 0;
+            timerPaused = false;
             return true;
         });
         topBar.addView(timer);
@@ -378,27 +364,6 @@ public class PresentActivity extends AppCompatActivity {
         zoomT = Ui.text(this, 11, 0x99FFFFFF, false);
         zoomT.setPadding(dp(4), dp(6), dp(4), dp(2));
         in.addView(zoomT);
-        // classroom toolbox (EZWrite-style)
-        in.addView(UiRows.header(this, T.t("Classroom tools")));
-        LinearLayout toolsRow = new LinearLayout(this);
-        toolsRow.addView(small("🏆 " + T.t("Score"), v -> { showDrawer(false); showScoreboard(); }),
-                new LinearLayout.LayoutParams(0, dp(38), 1));
-        toolsRow.addView(small("🎡 " + T.t("Spin"), v -> { showDrawer(false); showSpinner(); }),
-                new LinearLayout.LayoutParams(0, dp(38), 1));
-        in.addView(toolsRow);
-        LinearLayout toolsRow2 = new LinearLayout(this);
-        toolsRow2.addView(small("🔢 " + T.t("Calculator"), v -> { showDrawer(false); showCalculator(); }),
-                new LinearLayout.LayoutParams(0, dp(38), 1));
-        toolsRow2.addView(small("📝 " + T.t("Sticky"), v -> {
-            showDrawer(false);
-            setTool(STICKY);
-            UiKit.makeToast(this, T.t("Tap the board to place a sticky note"), android.widget.Toast.LENGTH_SHORT).show();
-        }), new LinearLayout.LayoutParams(0, dp(38), 1));
-        in.addView(toolsRow2);
-        in.addView(small("⏱ " + T.t("Timer") + " / " + T.t("Countdown"), v -> {
-            showDrawer(false);
-            showTimerDialog();
-        }), new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(38)));
         // keep & share
         in.addView(UiRows.header(this, T.t("Keep & share")));
         if (board) {
@@ -523,9 +488,7 @@ public class PresentActivity extends AppCompatActivity {
             if (i < COLORS.length) {
                 b.setBackground(Ui.card(this, COLORS[i], COLORS[i] == color ? 0xFFFFFFFF : 0x66FFFFFF, (int) (small / 2)));
                 if (COLORS[i] == color) b.setText("✓");
-                int ci = COLORS[i];
-                boolean darkText = ci == 0xFFFFFFFF || ci == 0xFFFACC15 || ci == 0xFFF97316 || ci == 0xFFA78BFA || ci == 0xFF94A3B8;
-                b.setTextColor(darkText ? Color.BLACK : Color.WHITE);
+                b.setTextColor(COLORS[i] == 0xFFFFFFFF || COLORS[i] == 0xFFFACC15 ? Color.BLACK : Color.WHITE);
                 b.setContentDescription(T.t("Colour"));
                 b.setOnClickListener(v -> {
                     color = COLORS[k];
@@ -534,13 +497,13 @@ public class PresentActivity extends AppCompatActivity {
                     toggleRadial();                       // re-open: the tick moves
                 });
             } else {
-                b.setText(SIZE_LABELS[Math.min(size, SIZE_LABELS.length - 1)]);
+                b.setText(new String[]{"S", "M", "L"}[size]);
                 b.setBackground(Ui.card(this, 0xF226262E, 0x55FFFFFF, (int) (small / 2)));
                 b.setContentDescription(T.t("Size"));
                 b.setOnClickListener(v -> {
-                    size = (size + 1) % SIZE_LABELS.length;
+                    size = (size + 1) % 3;
                     paintOpts();
-                    ((TextView) v).setText(SIZE_LABELS[size]);
+                    ((TextView) v).setText(new String[]{"S", "M", "L"}[size]);
                 });
             }
             place(b, cx + (float) (R2 * Math.cos(ang)), cy + (float) (R2 * Math.sin(ang)), small);
@@ -610,184 +573,12 @@ public class PresentActivity extends AppCompatActivity {
         new UiDialog(this).setTitle(T.t("Geometry")).setItems(tr(GEO_NAMES), (d, w) -> setTool(GEO_TOOLS[w])).show();
     }
 
-    // ---- Classroom tools (EZWrite-style toolbox) ----
-    private final int[] teamScores = {0, 0, 0, 0};
-    private final String[] teamNames = {"A", "B", "C", "D"};
-
-    /** Scoreboard: 2–4 teams, +1 / −1, reset. */
-    private void showScoreboard() {
-        final LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(12), dp(8), dp(12), dp(4));
-        final TextView[] scoreViews = new TextView[4];
-        for (int i = 0; i < 4; i++) {
-            final int ti = i;
-            LinearLayout row = new LinearLayout(this);
-            row.setGravity(Gravity.CENTER_VERTICAL);
-            row.setPadding(0, dp(4), 0, dp(4));
-            TextView name = Ui.text(this, 16, Color.WHITE, true);
-            name.setText(T.t("Team") + " " + teamNames[i]);
-            name.setMinWidth(dp(72));
-            row.addView(name);
-            Button minus = small("−", v -> {
-                teamScores[ti] = Math.max(0, teamScores[ti] - 1);
-                scoreViews[ti].setText(String.valueOf(teamScores[ti]));
-            });
-            row.addView(minus, new LinearLayout.LayoutParams(dp(44), dp(40)));
-            TextView sc = Ui.text(this, 28, 0xFFFBBF24, true);
-            sc.setGravity(Gravity.CENTER);
-            sc.setText(String.valueOf(teamScores[i]));
-            sc.setMinWidth(dp(56));
-            scoreViews[i] = sc;
-            row.addView(sc);
-            Button plus = small("＋", v -> {
-                teamScores[ti]++;
-                scoreViews[ti].setText(String.valueOf(teamScores[ti]));
-            });
-            row.addView(plus, new LinearLayout.LayoutParams(dp(44), dp(40)));
-            box.addView(row);
-        }
-        new AlertDialog.Builder(this)
-                .setTitle("🏆 " + T.t("Scoreboard"))
-                .setView(box)
-                .setPositiveButton(T.t("Close"), null)
-                .setNeutralButton(T.t("Reset"), (d, w) -> {
-                    for (int i = 0; i < 4; i++) teamScores[i] = 0;
-                })
-                .show();
-    }
-
-    /** Spinner / random pick: number 1–N or names list. */
-    private void showSpinner() {
-        final EditText input = new EditText(this);
-        input.setHint(T.t("Max number (e.g. 30) or names: Ali, Ben, Cara"));
-        input.setText("30");
-        input.setPadding(dp(20), dp(12), dp(20), dp(12));
-        new AlertDialog.Builder(this)
-                .setTitle("🎡 " + T.t("Spinner / random"))
-                .setView(input)
-                .setPositiveButton(T.t("Spin"), (d, w) -> {
-                    String raw = input.getText().toString().trim();
-                    String result;
-                    if (raw.contains(",") || raw.contains("\n")) {
-                        String[] parts = raw.split("[,\\n]+");
-                        java.util.List<String> names = new java.util.ArrayList<>();
-                        for (String p : parts) {
-                            String t = p.trim();
-                            if (!t.isEmpty()) names.add(t);
-                        }
-                        if (names.isEmpty()) result = "—";
-                        else result = names.get(new java.util.Random().nextInt(names.size()));
-                    } else {
-                        int max = 30;
-                        try { max = Math.max(1, Integer.parseInt(raw)); } catch (Exception ignored) {}
-                        result = String.valueOf(1 + new java.util.Random().nextInt(max));
-                    }
-                    new AlertDialog.Builder(this)
-                            .setTitle("🎉 " + T.t("Result"))
-                            .setMessage(result)
-                            .setPositiveButton(T.t("OK"), null)
-                            .setNeutralButton(T.t("Spin again"), (d2, w2) -> showSpinner())
-                            .show();
-                })
-                .setNegativeButton(T.t("Cancel"), null)
-                .show();
-    }
-
-    /** Simple calculator dialog. */
-    private void showCalculator() {
-        final LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(12), dp(8), dp(12), dp(4));
-        final TextView display = Ui.text(this, 26, Color.WHITE, true);
-        display.setGravity(Gravity.END);
-        display.setText("0");
-        display.setPadding(dp(8), dp(8), dp(8), dp(12));
-        display.setBackground(Ui.card(this, 0xFF1E1E28, 0x33FFFFFF, 10));
-        box.addView(display, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(52)));
-        final StringBuilder expr = new StringBuilder();
-        final double[] acc = {0};
-        final char[] op = {'\0'};
-        final boolean[] fresh = {true};
-        View.OnClickListener digit = v -> {
-            String d = ((Button) v).getText().toString();
-            if (fresh[0]) { expr.setLength(0); fresh[0] = false; }
-            if (expr.length() == 1 && expr.charAt(0) == '0' && !".".equals(d)) expr.setLength(0);
-            expr.append(d);
-            display.setText(expr.toString());
-        };
-        Runnable applyOp = () -> {
-            double v = 0;
-            try { v = Double.parseDouble(expr.length() == 0 ? "0" : expr.toString()); } catch (Exception ignored) {}
-            if (op[0] == '\0') acc[0] = v;
-            else if (op[0] == '+') acc[0] += v;
-            else if (op[0] == '-') acc[0] -= v;
-            else if (op[0] == '*') acc[0] *= v;
-            else if (op[0] == '/') acc[0] = v == 0 ? Double.NaN : acc[0] / v;
-            String shown = (acc[0] == Math.rint(acc[0]) && !Double.isInfinite(acc[0]) && !Double.isNaN(acc[0]))
-                    ? String.valueOf((long) acc[0]) : String.format(Locale.US, "%.6g", acc[0]);
-            display.setText(shown);
-            expr.setLength(0);
-            expr.append(shown);
-            fresh[0] = true;
-        };
-        String[][] rows = {
-                {"C", "÷", "×", "⌫"},
-                {"7", "8", "9", "−"},
-                {"4", "5", "6", "+"},
-                {"1", "2", "3", "="},
-                {"0", ".", "+/−", "="}
-        };
-        for (String[] row : rows) {
-            LinearLayout r = new LinearLayout(this);
-            for (String lab : row) {
-                Button b = small(lab, null);
-                final String L = lab;
-                b.setOnClickListener(v -> {
-                    switch (L) {
-                        case "C":
-                            expr.setLength(0); acc[0] = 0; op[0] = '\0'; fresh[0] = true;
-                            display.setText("0");
-                            break;
-                        case "⌫":
-                            if (expr.length() > 0) expr.deleteCharAt(expr.length() - 1);
-                            display.setText(expr.length() == 0 ? "0" : expr.toString());
-                            break;
-                        case "+": case "−": case "×": case "÷":
-                            applyOp.run();
-                            op[0] = L.equals("+") ? '+' : L.equals("−") ? '-' : L.equals("×") ? '*' : '/';
-                            fresh[0] = true;
-                            break;
-                        case "=":
-                            applyOp.run();
-                            op[0] = '\0';
-                            break;
-                        case "+/−":
-                            if (expr.length() > 0 && expr.charAt(0) == '-') expr.deleteCharAt(0);
-                            else expr.insert(0, '-');
-                            display.setText(expr.toString());
-                            break;
-                        default:
-                            digit.onClick(v);
-                    }
-                });
-                r.addView(b, new LinearLayout.LayoutParams(0, dp(44), 1));
-            }
-            box.addView(r);
-        }
-        new AlertDialog.Builder(this)
-                .setTitle("🔢 " + T.t("Calculator"))
-                .setView(box)
-                .setPositiveButton(T.t("Close"), null)
-                .show();
-    }
-
     /** The round button shows the tool, in the pen colour. */
     private void paintOpts() {
         if (fab == null) return;
         fab.setText(TOOLS[Math.min(tool, TOOLS.length - 1)][0]);
         boolean ink = tool == PEN || tool == HL || tool == SHAPE || tool == RULER
-                || tool == PROTRACTOR || tool == COMPASS || tool == TEXT || tool == STICKY;
+                || tool == PROTRACTOR || tool == COMPASS || tool == TEXT;
         fab.setBackground(Ui.card(this, 0xF226262E, ink ? color : 0xFF22D3EE, dp(29)));
         if (paperBtn != null) paperBtn.setText("📄 " + T.t("Paper") + ": "
                 + T.t(InkDraw.PAPER_NAMES[Math.max(0, java.util.Arrays.asList(InkDraw.PAPERS).indexOf(paper))]));
@@ -809,8 +600,8 @@ public class PresentActivity extends AppCompatActivity {
     // ------------------------------------------------------------------ whiteboard
     private void startBoard() {
         paper = Store.getStr("wb_paper", "white");
-        if ("chalk".equals(paper)) color = COLORS[COLORS.length - 2]; // white on chalk
-        else color = COLORS[COLORS.length - 1];                         // black on white paper
+        if ("chalk".equals(paper)) color = COLORS[4];
+        else color = COLORS[5];
         pageW = 960;
         pageH = 540;
         count = 1;
@@ -851,9 +642,8 @@ public class PresentActivity extends AppCompatActivity {
         new UiDialog(this).setTitle(T.t("Paper")).setItems(tr(InkDraw.PAPER_NAMES), (d, w) -> {
             paper = InkDraw.PAPERS[w];
             Store.putStr("wb_paper", paper);
-            int white = COLORS[COLORS.length - 2], black = COLORS[COLORS.length - 1];
-            if ("chalk".equals(paper) && color == black) color = white;
-            if (!"chalk".equals(paper) && color == white) color = black;
+            if ("chalk".equals(paper) && color == COLORS[5]) color = COLORS[4];
+            if (!"chalk".equals(paper) && color == COLORS[4]) color = COLORS[5];
             send("paper", paper);
             thumbs.evictAll();
             buildStrip();
@@ -1193,12 +983,6 @@ public class PresentActivity extends AppCompatActivity {
                     downY = e.getY();
                 } else if (a == MotionEvent.ACTION_UP && Math.hypot(e.getX() - downX, e.getY() - downY) < dp(12)) textAt(f);
                 break;
-            case STICKY:
-                if (a == MotionEvent.ACTION_DOWN) {
-                    downX = e.getX();
-                    downY = e.getY();
-                } else if (a == MotionEvent.ACTION_UP && Math.hypot(e.getX() - downX, e.getY() - downY) < dp(12)) stickyAt(f);
-                break;
             case SPOT: pointer("spot", a, f); break;
             case MOVE:
                 if (a == MotionEvent.ACTION_DOWN) {
@@ -1249,9 +1033,8 @@ public class PresentActivity extends AppCompatActivity {
 
     // ------------------------------------------------------------------ ink elements
     private int width() {
-        // 5 pen sizes (XS→XL); highlighter is thicker
-        if (tool == HL) return new int[]{12, 18, 28, 40, 56}[Math.min(size, 4)];
-        return new int[]{2, 4, 7, 12, 18}[Math.min(size, 4)];
+        if (tool == HL) return new int[]{18, 28, 40}[size];
+        return new int[]{3, 6, 11}[size];
     }
 
     private JSONObject newEl(String t) {
@@ -1383,7 +1166,7 @@ public class PresentActivity extends AppCompatActivity {
                 JSONObject el = newEl("text");
                 el.put("p", new JSONArray().put(r4(f[0])).put(r4(f[1])));
                 el.put("s", s);
-                el.put("z", new int[]{40, 56, 80}[Math.min(size, 2)]);
+                el.put("z", new int[]{40, 56, 80}[size]);
                 pageInk(page).put(el.getString("id"), el);
                 sendEl(el, false);
                 pushUndo("add", page, el);
@@ -1391,56 +1174,6 @@ public class PresentActivity extends AppCompatActivity {
             } catch (Exception ignored) {
             }
         }).setNegativeButton(T.t("Cancel"), null).show();
-    }
-
-    /** EZWrite-style sticky note: coloured paper + text on the board. */
-    private void stickyAt(final float[] f) {
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(16), dp(6), dp(16), 0);
-        final EditText e = new EditText(this);
-        e.setHint(T.t("Sticky note text"));
-        e.setMinLines(3);
-        e.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
-        box.addView(e);
-        final int[] chosen = {STICKY_COLORS[0]};
-        LinearLayout colors = new LinearLayout(this);
-        colors.setPadding(0, dp(8), 0, dp(4));
-        for (final int col : STICKY_COLORS) {
-            TextView sw = Ui.text(this, 14, Color.BLACK, true);
-            sw.setText(col == chosen[0] ? "✓" : " ");
-            sw.setGravity(Gravity.CENTER);
-            sw.setBackground(Ui.card(this, col, 0xFF333333, dp(8)));
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(36), dp(36));
-            lp.setMargins(dp(3), 0, dp(3), 0);
-            colors.addView(sw, lp);
-            sw.setOnClickListener(v -> {
-                chosen[0] = col;
-                for (int i = 0; i < colors.getChildCount(); i++) {
-                    TextView t = (TextView) colors.getChildAt(i);
-                    t.setText(" ");
-                }
-                sw.setText("✓");
-            });
-        }
-        box.addView(colors);
-        new UiDialog(this).setTitle("📝 " + T.t("Sticky note")).setView(box)
-                .setPositiveButton(T.t("Place"), (d, w) -> {
-                    String s = e.getText().toString().trim();
-                    if (s.isEmpty()) s = "…";
-                    try {
-                        JSONObject el = newEl("sticky");
-                        el.put("p", new JSONArray().put(r4(f[0])).put(r4(f[1])));
-                        el.put("s", s);
-                        el.put("c", String.format("#%06X", chosen[0] & 0xFFFFFF));
-                        el.put("z", new int[]{36, 44, 56, 68, 80}[Math.min(size, 4)]);
-                        pageInk(page).put(el.getString("id"), el);
-                        sendEl(el, false);
-                        pushUndo("add", page, el);
-                        overlay.invalidate();
-                    } catch (Exception ignored) {
-                    }
-                }).setNegativeButton(T.t("Cancel"), null).show();
     }
 
     private void removeEl(int pg, String id, boolean tell) {
@@ -1838,89 +1571,12 @@ public class PresentActivity extends AppCompatActivity {
         }
     }
 
-    private void resetTimerClock() {
-        started = SystemClock.elapsedRealtime();
-        pausedTotal = 0;
-        pausedAt = 0;
-        timerPaused = false;
-        countdownDone = false;
-        timer.setTextColor(0xFFFBBF24);
-    }
-
-    /** Classroom timer: stopwatch or countdown (1 / 3 / 5 / 10 min / custom). */
-    private void showTimerDialog() {
-        String[] items = {
-                "▶ " + T.t("Stopwatch") + " (0:00 ↑)",
-                "1 " + T.t("min"),
-                "3 " + T.t("min"),
-                "5 " + T.t("min"),
-                "10 " + T.t("min"),
-                "⏱ " + T.t("Custom…"),
-                "↺ " + T.t("Reset")
-        };
-        new UiDialog(this).setTitle("⏱ " + T.t("Timer")).setItems(items, (d, w) -> {
-            if (w == 6) { // reset
-                countdownSec = 0;
-                resetTimerClock();
-                return;
-            }
-            if (w == 0) { // stopwatch
-                countdownSec = 0;
-                resetTimerClock();
-                return;
-            }
-            if (w == 5) { // custom
-                final EditText e = new EditText(this);
-                e.setInputType(InputType.TYPE_CLASS_NUMBER);
-                e.setHint(T.t("Minutes") + " (e.g. 2)");
-                e.setText("2");
-                new UiDialog(this).setTitle(T.t("Countdown minutes")).setView(e)
-                        .setPositiveButton(T.t("Start"), (d2, w2) -> {
-                            int m = 2;
-                            try { m = Math.max(1, Math.min(180, Integer.parseInt(e.getText().toString().trim()))); }
-                            catch (Exception ignored) {}
-                            countdownSec = m * 60;
-                            resetTimerClock();
-                        }).setNegativeButton(T.t("Cancel"), null).show();
-                return;
-            }
-            int[] mins = {1, 3, 5, 10};
-            countdownSec = mins[w - 1] * 60;
-            resetTimerClock();
-        }).show();
-    }
-
     private final Runnable tick = new Runnable() {
         public void run() {
             long now = timerPaused ? pausedAt : SystemClock.elapsedRealtime();
-            long elapsed = Math.max(0, (now - started - pausedTotal) / 1000);
-            if (countdownSec > 0) {
-                long left = Math.max(0, countdownSec - elapsed);
-                String mark = timerPaused ? " ⏸" : (left == 0 ? " ⏰" : " ↓");
-                timer.setText(String.format(Locale.US, "%d:%02d%s", left / 60, left % 60, mark));
-                if (left <= 10 && left > 0) timer.setTextColor(0xFFF87171);
-                else if (left == 0) {
-                    timer.setTextColor(0xFFEF4444);
-                    if (!countdownDone && !timerPaused) {
-                        countdownDone = true;
-                        timerPaused = true;
-                        pausedAt = SystemClock.elapsedRealtime();
-                        try {
-                            android.os.Vibrator vib = (android.os.Vibrator) getSystemService(VIBRATOR_SERVICE);
-                            if (vib != null && vib.hasVibrator()) {
-                                if (Build.VERSION.SDK_INT >= 26)
-                                    vib.vibrate(android.os.VibrationEffect.createWaveform(new long[]{0, 200, 100, 200, 100, 400}, -1));
-                                else vib.vibrate(new long[]{0, 200, 100, 200, 100, 400}, -1);
-                            }
-                        } catch (Exception ignored) {}
-                        UiKit.makeToast(PresentActivity.this, "⏰ " + T.t("Time's up!"), android.widget.Toast.LENGTH_LONG).show();
-                    }
-                } else timer.setTextColor(0xFFFBBF24);
-            } else {
-                timer.setTextColor(0xFFFBBF24);
-                timer.setText(String.format(Locale.US, "%d:%02d%s", elapsed / 60, elapsed % 60, timerPaused ? " ⏸" : ""));
-            }
-            main.postDelayed(this, 250);
+            long s = Math.max(0, (now - started - pausedTotal) / 1000);
+            timer.setText(String.format(Locale.US, "%d:%02d%s", s / 60, s % 60, timerPaused ? " ⏸" : ""));
+            main.postDelayed(this, 500);
         }
     };
 

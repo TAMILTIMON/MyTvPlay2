@@ -15,7 +15,7 @@ import java.util.Locale;
 /**
  * Drawing of whiteboard / slide ink, shared by the phone and the TV so both look the same.
  * Element (JSON, slide coordinates 0…1): {id, pg, t: pen|hl|line|arrow|rect|rect_f|oval|oval_f|tri|tri_f|
- * diamond|diamond_f|star|star_f|pent|pent_f|hex|hex_f|ruler|protractor|compass|text|sticky,
+ * diamond|diamond_f|star|star_f|pent|pent_f|hex|hex_f|ruler|protractor|compass|text,
  * c: "#RRGGBB", w: width in 1/1000 of the page height, p: [x1, y1, x2, y2, …], s: text, z: text size (1/1000 of page height)}.
  */
 public final class InkDraw {
@@ -105,55 +105,6 @@ public final class InkDraw {
             for (String line : e.optString("s", "").split("\n")) {
                 c.drawText(line, at[0], y, tp);
                 y += tp.getTextSize() * 1.25f;
-            }
-            return;
-        }
-        if ("sticky".equals(t)) {
-            if (p == null || p.length() < 2) return;
-            float[] at = m.at((float) p.optDouble(0), (float) p.optDouble(1));
-            float tw = pageH * 0.28f, th = pageH * 0.22f;
-            float left = at[0], top = at[1];
-            // paper
-            Paint paper = new Paint(Paint.ANTI_ALIAS_FLAG);
-            paper.setStyle(Paint.Style.FILL);
-            paper.setColor(col);
-            paper.setShadowLayer(pageH * 0.008f, pageH * 0.004f, pageH * 0.004f, 0x66000000);
-            RectF r = new RectF(left, top, left + tw, top + th);
-            c.drawRoundRect(r, pageH * 0.012f, pageH * 0.012f, paper);
-            // top stripe
-            Paint stripe = new Paint(Paint.ANTI_ALIAS_FLAG);
-            stripe.setColor(0x33000000);
-            c.drawRect(left, top, left + tw, top + pageH * 0.018f, stripe);
-            // text
-            Paint tp = new Paint(Paint.ANTI_ALIAS_FLAG);
-            tp.setColor(0xFF1F2937);
-            tp.setTextSize(Math.max(10f, (float) e.optDouble("z", 44) / 1000f * pageH));
-            float pad = pageH * 0.02f;
-            float y = top + pad + tp.getTextSize();
-            float maxW = tw - pad * 2;
-            for (String line : e.optString("s", "").split("\n")) {
-                // simple wrap
-                if (tp.measureText(line) <= maxW) {
-                    c.drawText(line, left + pad, y, tp);
-                    y += tp.getTextSize() * 1.25f;
-                } else {
-                    StringBuilder cur = new StringBuilder();
-                    for (int i = 0; i < line.length(); i++) {
-                        cur.append(line.charAt(i));
-                        if (tp.measureText(cur.toString()) > maxW) {
-                            if (cur.length() > 1) cur.deleteCharAt(cur.length() - 1);
-                            c.drawText(cur.toString(), left + pad, y, tp);
-                            y += tp.getTextSize() * 1.25f;
-                            if (y > top + th - pad) break;
-                            cur = new StringBuilder().append(line.charAt(i));
-                        }
-                    }
-                    if (cur.length() > 0 && y <= top + th - pad) {
-                        c.drawText(cur.toString(), left + pad, y, tp);
-                        y += tp.getTextSize() * 1.25f;
-                    }
-                }
-                if (y > top + th - pad) break;
             }
             return;
         }
@@ -394,11 +345,6 @@ public final class InkDraw {
         if ("text".equals(t)) {
             double dx = x - p.optDouble(0), dy = y - p.optDouble(1);
             return dx >= -0.01 && dx < 0.3 && dy > -0.08 && dy < 0.02 ? 0 : 9;
-        }
-        if ("sticky".equals(t)) {
-            double dx = x - p.optDouble(0), dy = y - p.optDouble(1);
-            // sticky is ~0.28 x 0.22 of page height in width terms; use generous hit box
-            return dx >= -0.01 && dx < 0.32 && dy >= -0.01 && dy < 0.28 ? 0 : 9;
         }
         if (!"pen".equals(t) && !"hl".equals(t) && p.length() >= 4) {
             float x1 = (float) p.optDouble(0), y1 = (float) p.optDouble(1), x2 = (float) p.optDouble(p.length() - 2), y2 = (float) p.optDouble(p.length() - 1);
