@@ -5,8 +5,11 @@ import android.app.UiModeManager;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.StateListDrawable;
@@ -22,6 +25,44 @@ public final class Ui {
 
     public static int ACCENT = 0xFF8B5CF6, ACCENT2 = 0xFFEC4899, ACCENT3 = 0xFF3B82F6;
     public static int BG, BG2, CARD, STROKE, TEXT, DIM, FIELD;
+    private static Bitmap bgBitmap;
+    private static int bgBitmapGen = -1;
+
+    /** Call after changing the saved background picture, so it's reloaded next time a screen opens. */
+    static void invalidateBg() {
+        bgBitmap = null;
+        bgBitmapGen = -1;
+    }
+
+    private static void applyBgImage(Activity a) {
+        if (!Store.getBool("bg_image_on", false)) {
+            try {
+                a.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+            } catch (Throwable ignored) {
+            }
+            return;
+        }
+        int gen = Store.getInt("bg_image_gen", 0);
+        if (bgBitmap == null || bgBitmapGen != gen) {
+            try {
+                java.io.File f = new java.io.File(a.getFilesDir(), "app_bg.jpg");
+                bgBitmap = f.isFile() ? BitmapFactory.decodeFile(f.getPath()) : null;
+                bgBitmapGen = gen;
+            } catch (Throwable ignored) {
+                bgBitmap = null;
+            }
+        }
+        if (bgBitmap == null) return;
+        try {
+            a.getWindow().setBackgroundDrawable(new BitmapDrawable(a.getResources(), bgBitmap));
+        } catch (Throwable ignored) {
+        }
+        // higher "image strength" (lower colour opacity) = the solid colours over it are more see-through
+        int strength = Math.max(0, Math.min(100, Store.getInt("bg_image_opacity", 55)));
+        int alpha = Math.round((100 - strength) / 100f * 255);
+        BG = (alpha << 24) | (BG & 0xFFFFFF);
+        BG2 = (alpha << 24) | (BG2 & 0xFFFFFF);
+    }
     /** Opaque card colour and top/bottom bar colour (from the chosen palette). */
     public static int SOLID = 0xFF17122A, BAR = 0xFF1A1430;
     private static boolean dark = true;
@@ -126,6 +167,7 @@ public final class Ui {
         BAR = c[6];
         TEXT = c[7];
         DIM = c[8];
+        applyBgImage(a);
         boolean darkBg = Palette.lum(BG) < 0.5f;
         CARD = Store.getInt("c_card", 0) != 0 ? (0xE6000000 | (SOLID & 0xFFFFFF)) : (darkBg ? 0x1FFFFFFF : 0xE6FFFFFF);
         STROKE = darkBg ? 0x29FFFFFF : 0x1F2A1B5C;

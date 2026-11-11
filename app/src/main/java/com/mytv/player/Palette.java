@@ -97,6 +97,7 @@ public final class Palette {
                 "▭  " + T.t("Background"),
                 "▭  " + T.t("Cards"),
                 "▬  " + T.t("Top / bottom bars"),
+                "🖼  " + T.t("Background picture") + ": " + (Store.getBool("bg_image_on", false) ? T.t("On") : T.t("Off")),
                 "↺  " + T.t("Reset custom colours")};
         new UiDialog(a).setTitle("🎨  " + T.t("Colours & style")).setItems(items, (d, w) -> {
             switch (w) {
@@ -106,6 +107,7 @@ public final class Palette {
                 case 3: pickColor(a, "c_bg", T.t("Background")); break;
                 case 4: pickColor(a, "c_card", T.t("Cards")); break;
                 case 5: pickColor(a, "c_bar", T.t("Top / bottom bars")); break;
+                case 6: pickBgImage(a); break;
                 default:
                     for (String k : new String[]{"c_acc", "c_acc2", "c_bg", "c_card", "c_bar"}) Store.putInt(k, 0);
                     a.recreate();
@@ -162,6 +164,40 @@ public final class Palette {
                 .setNegativeButton(T.t("Close"), null).show();
     }
 
+    /** A custom background picture: choose one, adjust its opacity, or turn it off. */
+    private static void pickBgImage(final Activity a) {
+        boolean on = Store.getBool("bg_image_on", false);
+        String[] items = on
+                ? new String[]{T.t("Choose a different picture"), T.t("Opacity"), T.t("Turn off")}
+                : new String[]{T.t("Choose a picture")};
+        new UiDialog(a).setTitle("🖼  " + T.t("Background picture")).setItems(items, (d, w) -> {
+            if (!on || w == 0) a.startActivity(new android.content.Intent(a, BgImagePickActivity.class));
+            else if (w == 1) opacityDialog(a);
+            else {
+                Store.putBool("bg_image_on", false);
+                a.recreate();
+            }
+        }).show();
+    }
+
+    private static void opacityDialog(final Activity a) {
+        LinearLayout box = new LinearLayout(a);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(Ui.dp(a, 20), Ui.dp(a, 16), Ui.dp(a, 20), 0);
+        final UiKit.PillSlider slider = new UiKit.PillSlider(a, "image", 0, 100, false);
+        slider.setValue(Store.getInt("bg_image_opacity", 55));
+        slider.setListener((value, done) -> {
+            Store.putInt("bg_image_opacity", value);
+            if (done) Ui.invalidateBg();
+        });
+        box.addView(slider, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(a, 54)));
+        new UiDialog(a).setTitle(T.t("How much the picture shows through")).setView(box)
+                .setPositiveButton(T.t("Done"), (d, w) -> {
+                    Ui.invalidateBg();
+                    a.recreate();
+                }).show();
+    }
+
     /** Colour swatch grid (works with the TV remote and touch). */
     private static void pickColor(final Activity a, final String key, String title) {
         ScrollView sv = new ScrollView(a);
@@ -205,6 +241,31 @@ public final class Palette {
             lp.setMargins(Ui.dp(a, 6), Ui.dp(a, 6), Ui.dp(a, 6), Ui.dp(a, 6));
             row.addView(v, lp);
         }
+        if ((SWATCHES.length) % per == 0) {
+            row = new LinearLayout(a);
+            row.setGravity(Gravity.CENTER);
+            box.addView(row);
+        }
+        TextView custom = new TextView(a);
+        custom.setText("🎨");
+        custom.setTextSize(18);
+        custom.setGravity(Gravity.CENTER);
+        GradientDrawable cg = new GradientDrawable();
+        cg.setShape(GradientDrawable.OVAL);
+        cg.setColor(0xFF2A2A33);
+        cg.setStroke(Ui.dp(a, 1), 0x88FFFFFF);
+        custom.setBackground(cg);
+        custom.setFocusable(true);
+        custom.setClickable(true);
+        custom.setContentDescription(T.t("Custom colour"));
+        custom.setOnClickListener(x -> ColorPick.pick(a, cur == 0 ? Ui.ACCENT : cur, picked -> {
+            Store.putInt(key, picked);
+            a.recreate();
+        }));
+        int cs = Ui.dp(a, 40);
+        LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(cs, cs);
+        clp.setMargins(Ui.dp(a, 6), Ui.dp(a, 6), Ui.dp(a, 6), Ui.dp(a, 6));
+        row.addView(custom, clp);
         dlg[0] = new UiDialog(a).setTitle(title).setView(sv)
                 .setNeutralButton(T.t("Default"), (d, w) -> {
                     Store.putInt(key, 0);

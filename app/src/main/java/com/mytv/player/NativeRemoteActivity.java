@@ -170,7 +170,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
         final android.widget.ImageView lockBtn = UiKit.roundButton(this, "lock", 42, scrollLocked, v -> {
             scrollLocked = !scrollLocked;
             applyScrollLock();
-            ((android.widget.ImageView) v).setImageDrawable(new UiKit.Icon(this, "lock", Ui.dp(this, 19), scrollLocked ? Color.WHITE : Ui.TEXT));
+            ((android.widget.ImageView) v).setImageDrawable(new UiKit.Icon(this, "lock", 19, scrollLocked ? Color.WHITE : Ui.TEXT));
             v.setBackground(Ui.card(this, scrollLocked ? Ui.ACCENT : 0xF226262E, 0, Ui.dp(this, 21)));
             UiKit.makeToast(this, scrollLocked ? "🔒 " + T.t("Scrolling locked") : "🔓 " + T.t("Scrolling unlocked"),
                     android.widget.Toast.LENGTH_SHORT).show();
