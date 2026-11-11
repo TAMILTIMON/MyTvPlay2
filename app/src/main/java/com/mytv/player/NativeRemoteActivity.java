@@ -15,6 +15,7 @@ import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.util.Base64;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.InputMethodManager;
@@ -166,6 +167,15 @@ public class NativeRemoteActivity extends AppCompatActivity {
                     .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP));
             finish();
         }));
+        final android.widget.ImageView lockBtn = UiKit.roundButton(this, "lock", 42, scrollLocked, v -> {
+            scrollLocked = !scrollLocked;
+            applyScrollLock();
+            ((android.widget.ImageView) v).setImageDrawable(new UiKit.Icon(this, "lock", Ui.dp(this, 19), scrollLocked ? Color.WHITE : Ui.TEXT));
+            v.setBackground(Ui.card(this, scrollLocked ? Ui.ACCENT : 0xF226262E, 0, Ui.dp(this, 21)));
+            UiKit.makeToast(this, scrollLocked ? "🔒 " + T.t("Scrolling locked") : "🔓 " + T.t("Scrolling unlocked"),
+                    android.widget.Toast.LENGTH_SHORT).show();
+        });
+        top.addView(lockBtn);
         top.addView(UiKit.roundButton(this, Ui.dark() ? "sun" : "moon", 42, false, v -> {
             Store.putStr("theme", Ui.dark() ? "light" : "dark");
             recreate();
@@ -214,11 +224,40 @@ public class NativeRemoteActivity extends AppCompatActivity {
         return b;
     }
 
+    private boolean scrollLocked = Store.getBool("remote_scroll_locked", false);
+    private final java.util.List<LockableScroll> allScrolls = new java.util.ArrayList<>();
+
+    /** A ScrollView that can be told to ignore swipes (button taps inside it still work as normal). */
+    private static final class LockableScroll extends ScrollView {
+        boolean locked;
+
+        LockableScroll(android.content.Context c) {
+            super(c);
+        }
+
+        @Override
+        public boolean onInterceptTouchEvent(MotionEvent ev) {
+            return !locked && super.onInterceptTouchEvent(ev);
+        }
+
+        @Override
+        public boolean onTouchEvent(MotionEvent ev) {
+            return !locked && super.onTouchEvent(ev);
+        }
+    }
+
+    private void applyScrollLock() {
+        Store.putBool("remote_scroll_locked", scrollLocked);
+        for (LockableScroll s : allScrolls) s.locked = scrollLocked;
+    }
+
     private View scroll(View inner) {
-        ScrollView sv = new ScrollView(this);
+        LockableScroll sv = new LockableScroll(this);
+        sv.locked = scrollLocked;
         sv.setFillViewport(true);
         sv.setClipToPadding(false);
         sv.addView(inner);
+        allScrolls.add(sv);
         return sv;
     }
 

@@ -140,6 +140,10 @@
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden" />
 
         <activity
+            android:name=".PairedTvsActivity"
+            android:exported="false"
+            android:label="Paired TVs" />
+        <activity
             android:name=".BtRemoteActivity"
             android:exported="false"
             android:label="Bluetooth power-on" />

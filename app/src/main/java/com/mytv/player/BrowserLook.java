@@ -3,6 +3,7 @@ package com.mytv.player;
 import android.app.Activity;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Color;
 import android.net.Uri;
 import android.util.Base64;
 
@@ -18,8 +19,8 @@ public final class BrowserLook {
     }
 
     // built-in backgrounds (animated gradients, no download needed)
-    static final String[] BG_IDS = {"none", "aurora", "sunset", "ocean", "forest", "midnight", "rose", "mesh", "gold", "photo"};
-    static final String[] BG_NAMES = {"Plain", "Aurora", "Sunset", "Ocean", "Forest", "Midnight", "Rose", "Neon mesh", "Golden hour", "My photo…"};
+    static final String[] BG_IDS = {"none", "aurora", "sunset", "ocean", "forest", "midnight", "rose", "mesh", "gold", "custom", "photo"};
+    static final String[] BG_NAMES = {"Plain", "Aurora", "Sunset", "Ocean", "Forest", "Midnight", "Rose", "Neon mesh", "Golden hour", "Mix my own…", "My photo…"};
     private static final String[][] GRAD = {
             {}, {"#0f2027", "#2c5364", "#7b2ff7", "#00d2ff"}, {"#ff512f", "#dd2476", "#ff9a3c", "#4a148c"},
             {"#000428", "#004e92", "#00b4db", "#0083b0"}, {"#0b3d0b", "#134e5e", "#71b280", "#2c5f2d"},
@@ -56,6 +57,18 @@ public final class BrowserLook {
 
     static String searchUrl() {
         return ENGINE_URLS[Math.max(0, Math.min(ENGINE_URLS.length - 1, Store.getInt("bl_engine", 0)))];
+    }
+
+    /** The two colours mixed for "custom" — a sensible default until the person picks their own. */
+    static String[] customGrad() {
+        String s = Store.getStr("bl_custom_grad", "#8B5CF6,#EC4899");
+        String[] p = s.split(",", 2);
+        return p.length == 2 ? p : new String[]{"#8B5CF6", "#EC4899"};
+    }
+
+    static void setCustomGrad(String c1, String c2) {
+        Store.putStr("bl_custom_grad", c1 + "," + c2);
+        Store.putStr("bl_bg", "custom");
     }
 
     static String accent() {
@@ -110,8 +123,11 @@ public final class BrowserLook {
         if ("photo".equals(id)) {
             String d = photoDataUri(a);
             if (d != null) layer = "url(" + d + ") center/cover no-repeat";
+        } else if ("custom".equals(id)) {
+            String[] cg = customGrad();
+            layer = "linear-gradient(-45deg," + cg[0] + "," + cg[1] + "," + cg[0] + "," + cg[1] + ")";
         } else {
-            for (int i = 1; i < BG_IDS.length - 1; i++) {
+            for (int i = 1; i < GRAD.length; i++) {
                 if (BG_IDS[i].equals(id)) {
                     String[] g = GRAD[i];
                     layer = "linear-gradient(-45deg," + g[0] + "," + g[1] + "," + g[2] + "," + g[3] + ")";
@@ -169,7 +185,27 @@ public final class BrowserLook {
                 case 0:
                     new UiDialog(a).setTitle(T.t("Background")).setItems(tr(BG_NAMES), (d2, k) -> {
                         if ("photo".equals(BG_IDS[k])) pickPhoto.run();
-                        else {
+                        else if ("custom".equals(BG_IDS[k])) {
+                            String[] cur = customGrad();
+                            int c1;
+                            try {
+                                c1 = Color.parseColor(cur[0]);
+                            } catch (Exception ex) {
+                                c1 = 0xFF8B5CF6;
+                            }
+                            ColorPick.pick(a, c1, picked1 -> {
+                                int c2;
+                                try {
+                                    c2 = Color.parseColor(cur[1]);
+                                } catch (Exception ex) {
+                                    c2 = 0xFFEC4899;
+                                }
+                                ColorPick.pick(a, c2, picked2 -> {
+                                    setCustomGrad(String.format("#%06X", picked1 & 0xFFFFFF), String.format("#%06X", picked2 & 0xFFFFFF));
+                                    again(a, changed, pickPhoto);
+                                });
+                            });
+                        } else {
                             Store.putStr("bl_bg", BG_IDS[k]);
                             again(a, changed, pickPhoto);
                         }
@@ -184,8 +220,21 @@ public final class BrowserLook {
                 case 3: Store.putBool("bl_glass", !glass()); break;
                 case 4: Store.putBool("bl_anim", !anim()); break;
                 case 5: {
-                    String[] n = {T.t("App colour"), "Violet", "Red", "Sky", "Green", "Amber", "Pink", "Teal", "Indigo"};
+                    String[] n = {T.t("App colour"), "Violet", "Red", "Sky", "Green", "Amber", "Pink", "Teal", "Indigo", "🎨 " + T.t("Custom…")};
                     new UiDialog(a).setTitle(T.t("Accent colour")).setItems(n, (d2, k) -> {
+                        if (k == n.length - 1) {
+                            int cur;
+                            try {
+                                cur = Color.parseColor(accent());
+                            } catch (Exception ex) {
+                                cur = Ui.ACCENT;
+                            }
+                            ColorPick.pick(a, cur, picked -> {
+                                Store.putStr("bl_accent", String.format("#%06X", picked & 0xFFFFFF));
+                                again(a, changed, pickPhoto);
+                            });
+                            return;
+                        }
                         Store.putStr("bl_accent", k == 0 ? "" : ACCENTS[k - 1]);
                         again(a, changed, pickPhoto);
                     }).show();

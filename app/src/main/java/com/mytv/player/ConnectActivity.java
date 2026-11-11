@@ -60,6 +60,7 @@ public class ConnectActivity extends AppCompatActivity {
         t.addView(h);
         t.addView(s);
         top.addView(t, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        top.addView(UiKit.roundButton(this, "list-video", 44, false, v -> startActivity(new Intent(this, PairedTvsActivity.class))));
         top.addView(UiKit.roundButton(this, Ui.dark() ? "sun" : "moon", 44, false, v -> {
             Store.putStr("theme", Ui.dark() ? "light" : "dark");
             getIntent().putExtra("no_auto", true);
@@ -195,7 +196,7 @@ public class ConnectActivity extends AppCompatActivity {
                         if (id != scanId || found.containsKey(d.ip)) return;
                         found.put(d.ip, d);
                         renderList();
-                        if (!autoOpened && d.ip.equals(last)) {
+                        if (!autoOpened && Store.getBool("auto_connect_tv", true) && d.ip.equals(last)) {
                             autoOpened = true;
                             open(d.ip, d.name, d.mac);
                         }
@@ -319,6 +320,7 @@ public class ConnectActivity extends AppCompatActivity {
     private void open(String ip, String name, String mac) {
         Store.putStr("last_tv", ip);
         if (mac != null && !mac.isEmpty()) Store.putStr("last_tv_mac", mac);
+        TvList.upsert(name, ip, mac);
         PadWidget.refreshAll(this);            // the home-screen remote shows the new TV
         startActivity(new Intent(this, NativeRemoteActivity.class)
                 .putExtra(NativeRemoteActivity.EXTRA_IP, ip)
