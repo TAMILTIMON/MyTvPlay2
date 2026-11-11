@@ -140,6 +140,10 @@
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden" />
 
         <activity
+            android:name=".BgImagePickActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <activity
             android:name=".PairedTvsActivity"
             android:exported="false"
             android:label="Paired TVs" />
