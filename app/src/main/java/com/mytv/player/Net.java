@@ -29,6 +29,38 @@ public final class Net {
      * with mobile data or the VPN on that could be a 10.x address the TV / PC can't reach (PDF slides, phone videos
      * didn't open while the whiteboard, which downloads nothing, worked).
      */
+    /** This TV's hardware MAC (Wi-Fi first, then Ethernet), so the phone can find it again if its IP changes. */
+    public static String mac() {
+        try {
+            String[] order = {"wlan0", "eth0"};
+            for (String name : order) {
+                java.net.NetworkInterface ni = java.net.NetworkInterface.getByName(name);
+                String m = macOf(ni);
+                if (m != null) return m;
+            }
+            java.util.Enumeration<java.net.NetworkInterface> all = java.net.NetworkInterface.getNetworkInterfaces();
+            while (all != null && all.hasMoreElements()) {
+                String m = macOf(all.nextElement());
+                if (m != null) return m;
+            }
+        } catch (Throwable ignored) {
+        }
+        return "";
+    }
+
+    private static String macOf(java.net.NetworkInterface ni) {
+        try {
+            if (ni == null || ni.isLoopback()) return null;
+            byte[] b = ni.getHardwareAddress();
+            if (b == null || b.length != 6) return null;
+            StringBuilder sb = new StringBuilder();
+            for (byte x : b) sb.append(sb.length() > 0 ? ":" : "").append(String.format(java.util.Locale.ROOT, "%02x", x));
+            return sb.toString();
+        } catch (Throwable e) {
+            return null;
+        }
+    }
+
     public static String ip() {
         String tv = Store.getStr("last_tv", "");
         String r = ipFor(tv);

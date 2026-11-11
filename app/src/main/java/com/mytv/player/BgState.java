@@ -24,7 +24,7 @@ public final class BgState {
         new Thread(() -> {
             while (System.currentTimeMillis() - lastAsk < 15000) {
                 try {
-                    kbd = FastKeys.imeShown(c) || System.currentTimeMillis() - TvAccess.editFocusAt < 5000;
+                    kbd = FastKeys.imeShown(c) || TvAccess.editFocused || System.currentTimeMillis() - TvAccess.editFocusAt < 20000;
                     num = (kbd && TvAccess.editNumeric && System.currentTimeMillis() - TvAccess.editFocusAt < 60000)
                             || Remote.ownNumberFocus();
                     other = Remote.player == null ? SessionWatcher.info(c) : null;

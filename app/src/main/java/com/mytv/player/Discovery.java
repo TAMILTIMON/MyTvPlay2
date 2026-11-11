@@ -24,15 +24,19 @@ public final class Discovery {
     public static final String TYPE = "_mytvplayer._tcp.";
 
     public static final class Device {
-        public final String name, ip, pairCode;
+        public final String name, ip, pairCode, mac;
         public final boolean tv;
 
         Device(String name, String ip, boolean tv) {
-            this(name, ip, tv, "");
+            this(name, ip, tv, "", "");
         }
         Device(String name, String ip, boolean tv, String pairCode) {
+            this(name, ip, tv, pairCode, "");
+        }
+        Device(String name, String ip, boolean tv, String pairCode, String mac) {
             this.name = name; this.ip = ip; this.tv = tv;
             this.pairCode = pairCode == null ? "" : pairCode;
+            this.mac = mac == null ? "" : mac;
         }
     }
 
@@ -104,12 +108,39 @@ public final class Discovery {
             JSONObject o = new JSONObject(sb.toString());
             if (!"mytvplayer".equals(o.optString("app"))) return null;
             return new Device(o.optString("name", ip), ip, o.optBoolean("tv", true),
-                    o.optString("code",""));   // pairing code from TV
+                    o.optString("code",""), o.optString("mac",""));   // pairing code + mac from TV
         } catch (Exception e) {
             return null;
         } finally {
             if (c != null) c.disconnect();
         }
+    }
+
+    /**
+     * Blocking: scans the local /24 for a TV whose mac matches (used when a previously paired TV's
+     * saved IP stops answering — its address changed, but it's still the same device).
+     */
+    public static Device findByMac(final String mac, long timeoutMs) {
+        if (mac == null || mac.isEmpty()) return null;
+        final java.util.concurrent.atomic.AtomicReference<Device> found = new java.util.concurrent.atomic.AtomicReference<>();
+        final java.util.concurrent.CountDownLatch done = new java.util.concurrent.CountDownLatch(1);
+        scan(new Listener() {
+            public void onFound(Device d) {
+                if (mac.equalsIgnoreCase(d.mac)) {
+                    found.set(d);
+                    done.countDown();
+                }
+            }
+
+            public void onDone() {
+                done.countDown();
+            }
+        });
+        try {
+            done.await(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS);
+        } catch (InterruptedException ignored) {
+        }
+        return found.get();
     }
 
     /** Scans the local /24 network. Calls the listener from background threads. */

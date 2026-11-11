@@ -36,6 +36,9 @@ public class TvAccess extends AccessibilityService {
 
     /** When focus lands on a text box in any app (e.g. a search field) → the phone opens its keyboard. */
     public static volatile long editFocusAt;
+    /** True while that text box is still the one focused (unlike editFocusAt, doesn't go stale while the
+     *  person is still mid-sentence — e.g. the YouTube search box speech can take several seconds). */
+    public static volatile boolean editFocused;
     /** The focused text box takes numbers only (PIN / parental lock / channel number). */
     public static volatile boolean editNumeric;
 
@@ -51,8 +54,11 @@ public class TvAccess extends AccessibilityService {
                 AccessibilityNodeInfo n = e.getSource();
                 if (n != null && n.isEditable()) {
                     editFocusAt = System.currentTimeMillis();
+                    editFocused = true;
                     editNumeric = android.os.Build.VERSION.SDK_INT >= 19 && isNumberType(n.getInputType());
                 }
+            } else if (e.getEventType() == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+                editFocused = false;        // left that screen/app — the old field is no longer in front
             }
         } catch (Throwable ignored) {
         }

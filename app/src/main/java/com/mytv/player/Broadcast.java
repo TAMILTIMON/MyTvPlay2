@@ -121,7 +121,7 @@ final class Broadcast {
                     lastMember = System.currentTimeMillis();
                 }
                 if (!"live".equals(phase(current()))) {
-                    cleanUpEnded();                                     // ended: nothing left to replay
+                    cleanUpEnded(c);                                    // ended: nothing left to replay, no stale notification
                     if (watching != null) {
                         watching = null;
                         Remote.MAIN.post(() -> {                        // stop it for people still watching
@@ -381,11 +381,16 @@ final class Broadcast {
     }
 
     /** The broadcast is over: remove its links from Recent / Continue watching and their positions. */
-    private static void cleanUpEnded() {
+    private static void cleanUpEnded(Context c) {
         for (String k : keys()) {
             if (liveUrl(k)) continue;
             Store.removeRecent(k);
             Store.removeHistory(k);
+        }
+        try {
+            NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (nm != null) nm.cancel(4403);          // the "🔴 LIVE NOW" / scheduled notification, now stale
+        } catch (Throwable ignored) {
         }
     }
 

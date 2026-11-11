@@ -197,7 +197,7 @@ public class ConnectActivity extends AppCompatActivity {
                         renderList();
                         if (!autoOpened && d.ip.equals(last)) {
                             autoOpened = true;
-                            open(d.ip, d.name);
+                            open(d.ip, d.name, d.mac);
                         }
                     }
                 });
@@ -256,7 +256,7 @@ public class ConnectActivity extends AppCompatActivity {
             row.addView(UiKit.icon(this, "chevron-right", 22, Ui.ACCENT));
             row.setOnClickListener(new View.OnClickListener() {
                 public void onClick(View v) {
-                    open(d.ip, d.name);
+                    open(d.ip, d.name, d.mac);
                 }
             });
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
@@ -313,7 +313,12 @@ public class ConnectActivity extends AppCompatActivity {
     }
 
     private void open(String ip, String name) {
+        open(ip, name, "");
+    }
+
+    private void open(String ip, String name, String mac) {
         Store.putStr("last_tv", ip);
+        if (mac != null && !mac.isEmpty()) Store.putStr("last_tv_mac", mac);
         PadWidget.refreshAll(this);            // the home-screen remote shows the new TV
         startActivity(new Intent(this, NativeRemoteActivity.class)
                 .putExtra(NativeRemoteActivity.EXTRA_IP, ip)

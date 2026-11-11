@@ -57,11 +57,32 @@ public final class TvClient {
         } catch (AuthNeeded e) {
             throw e;
         } catch (java.io.IOException e) {
+            String newIp = resolveByMac(ip);
+            if (newIp != null) {
+                // same TV, new address (e.g. the router gave it a different IP): carry the pairing over
+                String tok = Store.getStr("tok_" + ip, "");
+                if (!tok.isEmpty() && Store.getStr("tok_" + newIp, "").isEmpty()) Store.putStr("tok_" + newIp, tok);
+                if (ip.equals(Store.getStr("last_tv", ""))) Store.putStr("last_tv", newIp);
+                return directPost(newIp, path, params);
+            }
             if (!canCloud) throw e;
             synchronized (away) {
                 away.put(ip, System.currentTimeMillis() + 60000);       // not on this Wi-Fi: use the cloud for a minute
             }
             return Cloud.send(cid, path, params);
+        }
+    }
+
+    /** Only for the TV the phone already knows and was just talking to — never for a random address. */
+    private static String resolveByMac(String ip) {
+        try {
+            if (!ip.equals(Store.getStr("last_tv", ""))) return null;
+            String mac = Store.getStr("last_tv_mac", "");
+            if (mac.isEmpty()) return null;
+            Discovery.Device d = Discovery.findByMac(mac, 4000);
+            return d != null && !d.ip.equals(ip) ? d.ip : null;
+        } catch (Throwable e) {
+            return null;
         }
     }
 
