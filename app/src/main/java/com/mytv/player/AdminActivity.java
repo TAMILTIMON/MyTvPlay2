@@ -750,8 +750,13 @@ public class AdminActivity extends Activity {
                         b.put("state", st).put(live ? "startedAt" : "endedAt", System.currentTimeMillis());
                         if (live) b.put("start", Math.min(b.optLong("start", System.currentTimeMillis()), System.currentTimeMillis()));
                         put("/pub/broadcast", b, live ? "🔴 " + T.t("Live — everyone sees it now") : "✓ " + T.t("Broadcast ended"));
-                        if (live) pushAsync("🔴 " + T.t("LIVE NOW") + ": " + b.optString("title"), T.t("Tap to watch on ZH Play"), "", b.optString("id"),
-                                "auto", b.optString("img"));
+                        if (live) {
+                            pushAsync("🔴 " + T.t("LIVE NOW") + ": " + b.optString("title"), T.t("Tap to watch on ZH Play"), "", b.optString("id"),
+                                    "auto", b.optString("img"));
+                        } else if (Fcm.ready()) {
+                            final String bid = b.optString("id");
+                            new Thread(() -> Fcm.sendQuiet(bid)).start();      // clears the old notification everywhere, even a closed app
+                        }
                         main.postDelayed(this::broadcast, 1500);
                     } catch (Exception e) {
                         say("⚠ " + e.getMessage());

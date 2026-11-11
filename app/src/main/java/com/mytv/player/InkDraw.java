@@ -1,7 +1,9 @@
 package com.mytv.player;
 
+import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.DashPathEffect;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.RectF;
@@ -93,6 +95,10 @@ public final class InkDraw {
         if ("hl".equals(t)) {
             s.setAlpha(95);
             s.setStrokeCap(Paint.Cap.SQUARE);
+        } else if ("marker".equals(t)) {
+            s.setStrokeCap(Paint.Cap.SQUARE);               // bold, flat-tipped
+        } else if ("dash".equals(t)) {
+            s.setPathEffect(new DashPathEffect(new float[]{w * 2.2f, w * 1.6f}, 0));
         }
         if ("text".equals(t)) {
             if (p == null || p.length() < 2) return;
@@ -154,6 +160,51 @@ public final class InkDraw {
                     }
                 }
                 if (y > top + th - pad) break;
+            }
+            return;
+        }
+        if ("image".equals(t) || "video".equals(t)) {
+            if (p == null || p.length() < 2) return;
+            float[] at = m.at((float) p.optDouble(0), (float) p.optDouble(1));
+            float tw = pageH * 0.28f, th = pageH * 0.22f;
+            RectF box = new RectF(at[0], at[1], at[0] + tw, at[1] + th);
+            Bitmap bmp = Thumb.cached(e.optString("img", ""));
+            Paint bg = new Paint(Paint.ANTI_ALIAS_FLAG);
+            bg.setColor(0xFF1F2937);
+            bg.setShadowLayer(pageH * 0.008f, pageH * 0.004f, pageH * 0.004f, 0x66000000);
+            c.drawRoundRect(box, pageH * 0.012f, pageH * 0.012f, bg);
+            if (bmp != null) {
+                RectF clip = new RectF(box);
+                c.save();
+                c.clipRect(clip);
+                c.drawBitmap(bmp, null, box, null);
+                c.restore();
+            } else {
+                Paint glyph = new Paint(Paint.ANTI_ALIAS_FLAG);
+                glyph.setColor(0x99FFFFFF);
+                glyph.setTextSize(th * 0.4f);
+                glyph.setTextAlign(Paint.Align.CENTER);
+                c.drawText("image".equals(t) ? "🖼" : "🎬", box.centerX(), box.centerY() + glyph.getTextSize() * 0.35f, glyph);
+            }
+            Paint border = new Paint(Paint.ANTI_ALIAS_FLAG);
+            border.setStyle(Paint.Style.STROKE);
+            border.setStrokeWidth(pageH * 0.003f);
+            border.setColor(0x55FFFFFF);
+            c.drawRoundRect(box, pageH * 0.012f, pageH * 0.012f, border);
+            if ("video".equals(t)) {
+                Paint pb = new Paint(Paint.ANTI_ALIAS_FLAG);
+                pb.setColor(0xCC000000);
+                float r = th * 0.16f;
+                c.drawCircle(box.centerX(), box.centerY(), r, pb);
+                Path tri = new Path();
+                float tr = r * 0.55f;
+                tri.moveTo(box.centerX() - tr * 0.5f, box.centerY() - tr * 0.85f);
+                tri.lineTo(box.centerX() - tr * 0.5f, box.centerY() + tr * 0.85f);
+                tri.lineTo(box.centerX() + tr, box.centerY());
+                tri.close();
+                Paint pw = new Paint(Paint.ANTI_ALIAS_FLAG);
+                pw.setColor(Color.WHITE);
+                c.drawPath(tri, pw);
             }
             return;
         }

@@ -7,6 +7,11 @@ import com.google.firebase.messaging.RemoteMessage;
 public class PushService extends FirebaseMessagingService {
     @Override
     public void onMessageReceived(RemoteMessage m) {
+        if (m.getData() != null && "end".equals(m.getData().get("kind"))) {
+            // the admin ended the broadcast: just sync (which cancels the stale notification) — show nothing new
+            Broadcast.sync(getApplicationContext(), true);
+            return;
+        }
         String title = "ZH Play", body = "";
         if (m.getNotification() != null) {
             if (m.getNotification().getTitle() != null) title = m.getNotification().getTitle();

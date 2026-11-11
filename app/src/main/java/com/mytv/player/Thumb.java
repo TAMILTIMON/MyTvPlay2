@@ -91,6 +91,21 @@ final class Thumb {
     private static final ExecutorService pool = Executors.newFixedThreadPool(3);
 
     /** Shows the picture in the view (placeholder stays if there's none / it fails). */
+    /** A cached picture if it's already loaded, else null (never triggers a fetch — pure peek). */
+    static Bitmap cached(String img) {
+        return img == null || img.isEmpty() ? null : mem.get(img);
+    }
+
+    /** Starts loading a picture into the shared cache if it isn't there yet (no ImageView needed). */
+    static void prefetch(final Context c, final String img) {
+        if (img == null || img.isEmpty() || mem.get(img) != null) return;
+        final Context app = c.getApplicationContext();
+        pool.execute(() -> {
+            Bitmap b = fetch(app, img);
+            if (b != null) mem.put(img, b);
+        });
+    }
+
     static void load(final ImageView iv, final String img) {
         if (img == null || img.isEmpty()) return;
         iv.setTag(img);

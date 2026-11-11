@@ -5,10 +5,12 @@ import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.LinearGradient;
 import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.RectF;
+import android.graphics.Shader;
 import android.graphics.pdf.PdfRenderer;
 import android.net.Uri;
 import android.os.Build;
@@ -30,6 +32,7 @@ import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.Toast;
 import android.widget.GridLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
@@ -48,6 +51,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -61,7 +65,9 @@ import java.util.concurrent.Executors;
 public class PresentActivity extends AppCompatActivity {
     public static final String EXTRA_IP = "ip", EXTRA_BOARD = "board";
     private static final int LASER = 0, PEN = 1, HL = 2, ERASE = 3, SHAPE = 4, RULER = 5, TEXT = 6, SPOT = 7, MOVE = 8,
-            PROTRACTOR = 9, COMPASS = 10, STICKY = 11;
+            PROTRACTOR = 9, COMPASS = 10, STICKY = 11, MARKER = 12, FINE = 13, DASH = 14, IMAGE_TOOL = 15, VIDEO_TOOL = 16;
+    private static final String[][] PEN_STYLES = {{"✏", "Pen"}, {"🖊", "Marker"}, {"🖋", "Fine pen"}, {"┅", "Dashed"}};
+    private static final int[] PEN_TOOLS = {PEN, MARKER, FINE, DASH};
     private static final String[][] TOOLS = {{"🔴", "Laser"}, {"✏", "Pen"}, {"🖍", "Highlighter"}, {"🧽", "Eraser"}, {"⬜", "Shapes"},
             {"📏", "Ruler"}, {"T", "Text"}, {"🔦", "Spotlight"}, {"✋", "Move"},
             {"📐", "Protractor"}, {"⭕", "Compass"}, {"📝", "Sticky note"}};
@@ -241,6 +247,7 @@ public class PresentActivity extends AppCompatActivity {
             return true;
         });
         topBar.addView(timer);
+        topBar.addView(UiKit.darkButton(this, "sparkles", 36, false, v -> askAi()), new LinearLayout.LayoutParams(dp(36), dp(36)));
         Button end = small(T.t("End"), v -> {
             send("end", "");
             finish();
@@ -395,6 +402,18 @@ public class PresentActivity extends AppCompatActivity {
             UiKit.makeToast(this, T.t("Tap the board to place a sticky note"), android.widget.Toast.LENGTH_SHORT).show();
         }), new LinearLayout.LayoutParams(0, dp(38), 1));
         in.addView(toolsRow2);
+        LinearLayout toolsRow3 = new LinearLayout(this);
+        toolsRow3.addView(small("🖼 " + T.t("Image"), v -> {
+            showDrawer(false);
+            setTool(IMAGE_TOOL);
+            UiKit.makeToast(this, T.t("Tap the board to place a picture"), android.widget.Toast.LENGTH_SHORT).show();
+        }), new LinearLayout.LayoutParams(0, dp(38), 1));
+        toolsRow3.addView(small("🎬 " + T.t("Video"), v -> {
+            showDrawer(false);
+            setTool(VIDEO_TOOL);
+            UiKit.makeToast(this, T.t("Tap the board to add a video — tap a placed one to play it"), android.widget.Toast.LENGTH_LONG).show();
+        }), new LinearLayout.LayoutParams(0, dp(38), 1));
+        in.addView(toolsRow3);
         in.addView(small("⏱ " + T.t("Timer") + " / " + T.t("Countdown"), v -> {
             showDrawer(false);
             showTimerDialog();
@@ -490,6 +509,11 @@ public class PresentActivity extends AppCompatActivity {
             b.setOnClickListener(v -> {
                 // First 9 ring slots map to tools 0–8, except 4=Shapes picker and 5=Geometry picker
                 if (k <= MOVE) {
+                    if (k == PEN) {
+                        toggleRadial();
+                        pickPenStyle();
+                        return;
+                    }
                     if (k == SHAPE) {
                         toggleRadial();
                         pickShape();
@@ -513,10 +537,10 @@ public class PresentActivity extends AppCompatActivity {
             lab.setShadowLayer(4, 0, 1, Color.BLACK);
             place(lab, cx + (float) ((R1 + item * 0.78f) * Math.cos(ang)), cy + (float) ((R1 + item * 0.78f) * Math.sin(ang)), dp(70), dp(16));
         }
-        // inner ring: colours + size
-        for (int i = 0; i <= COLORS.length; i++) {
+        // inner ring: colours + a full colour picker + size
+        for (int i = 0; i <= COLORS.length + 1; i++) {
             final int k = i;
-            double ang = -Math.PI / 2 + 2 * Math.PI * i / (COLORS.length + 1);
+            double ang = -Math.PI / 2 + 2 * Math.PI * i / (COLORS.length + 2);
             TextView b = Ui.text(this, 12, Color.WHITE, true);
             b.setGravity(Gravity.CENTER);
             b.setElevation(dp(8));
@@ -532,6 +556,20 @@ public class PresentActivity extends AppCompatActivity {
                     paintOpts();
                     toggleRadial();
                     toggleRadial();                       // re-open: the tick moves
+                });
+            } else if (i == COLORS.length) {
+                // every shade, not just the presets above — pick exactly, or type a hex code
+                boolean customActive = true;
+                for (int cc : COLORS) if (cc == color) customActive = false;
+                b.setBackground(Ui.card(this, customActive ? color : 0xF226262E, customActive ? 0xFFFFFFFF : 0x55FFFFFF, (int) (small / 2)));
+                b.setText(customActive ? "✓" : "🎨");
+                b.setContentDescription(T.t("More colours"));
+                b.setOnClickListener(v -> {
+                    toggleRadial();
+                    pickFullColor(color, picked -> {
+                        color = picked;
+                        paintOpts();
+                    });
                 });
             } else {
                 b.setText(SIZE_LABELS[Math.min(size, SIZE_LABELS.length - 1)]);
@@ -603,6 +641,17 @@ public class PresentActivity extends AppCompatActivity {
             shape = SHAPES[w];
             setTool(SHAPE);
         }).show();
+    }
+
+    /** Pen · Marker · Fine pen · Dashed. */
+    private void pickPenStyle() {
+        new UiDialog(this).setTitle(T.t("Pen style")).setItems(tr(penNames()), (d, w) -> setTool(PEN_TOOLS[w])).show();
+    }
+
+    private String[] penNames() {
+        String[] n = new String[PEN_STYLES.length];
+        for (int i = 0; i < n.length; i++) n[i] = PEN_STYLES[i][0] + "  " + PEN_STYLES[i][1];
+        return n;
     }
 
     /** EZWrite-style geometry tools: Ruler · Protractor · Compass. */
@@ -786,7 +835,7 @@ public class PresentActivity extends AppCompatActivity {
     private void paintOpts() {
         if (fab == null) return;
         fab.setText(TOOLS[Math.min(tool, TOOLS.length - 1)][0]);
-        boolean ink = tool == PEN || tool == HL || tool == SHAPE || tool == RULER
+        boolean ink = tool == PEN || tool == HL || tool == MARKER || tool == FINE || tool == DASH || tool == SHAPE || tool == RULER
                 || tool == PROTRACTOR || tool == COMPASS || tool == TEXT || tool == STICKY;
         fab.setBackground(Ui.card(this, 0xF226262E, ink ? color : 0xFF22D3EE, dp(29)));
         if (paperBtn != null) paperBtn.setText("📄 " + T.t("Paper") + ": "
@@ -908,6 +957,33 @@ public class PresentActivity extends AppCompatActivity {
     @Override
     protected void onActivityResult(int req, int res, Intent data) {
         super.onActivityResult(req, res, data);
+        if (req == 9001) {
+            if (res != RESULT_OK || data == null || data.getData() == null || pendingPoint == null) return;
+            final float[] f = pendingPoint;
+            pendingPoint = null;
+            new Thread(() -> {
+                try {
+                    String b64 = Thumb.encode(this, data.getData());
+                    String ref = Thumb.upload(b64);
+                    runOnUiThread(() -> {
+                        try {
+                            JSONObject el = newEl("image");
+                            el.put("p", new JSONArray().put(r4(f[0])).put(r4(f[1])));
+                            el.put("img", ref);
+                            el.put("z", new int[]{36, 44, 56, 68, 80}[Math.min(size, 4)]);
+                            pageInk(page).put(el.getString("id"), el);
+                            sendEl(el, false);
+                            pushUndo("add", page, el);
+                            overlay.invalidate();
+                        } catch (Exception ignored) {
+                        }
+                    });
+                } catch (Exception ex) {
+                    runOnUiThread(() -> UiKit.makeToast(this, "⚠ " + ex.getMessage(), Toast.LENGTH_LONG).show());
+                }
+            }).start();
+            return;
+        }
         if (req != 91) return;
         if (res != RESULT_OK || data == null || data.getData() == null) {
             if (renderer == null) {
@@ -1181,7 +1257,10 @@ public class PresentActivity extends AppCompatActivity {
         float[] f = toSlide(e.getX(), e.getY());
         switch (tool) {
             case PEN:
-            case HL: stroke(a, f); break;
+            case HL:
+            case MARKER:
+            case FINE:
+            case DASH: stroke(a, f); break;
             case SHAPE:
             case RULER:
             case PROTRACTOR:
@@ -1198,6 +1277,22 @@ public class PresentActivity extends AppCompatActivity {
                     downX = e.getX();
                     downY = e.getY();
                 } else if (a == MotionEvent.ACTION_UP && Math.hypot(e.getX() - downX, e.getY() - downY) < dp(12)) stickyAt(f);
+                break;
+            case IMAGE_TOOL:
+                if (a == MotionEvent.ACTION_DOWN) {
+                    downX = e.getX();
+                    downY = e.getY();
+                } else if (a == MotionEvent.ACTION_UP && Math.hypot(e.getX() - downX, e.getY() - downY) < dp(12)) imageAt(f);
+                break;
+            case VIDEO_TOOL:
+                if (a == MotionEvent.ACTION_DOWN) {
+                    downX = e.getX();
+                    downY = e.getY();
+                } else if (a == MotionEvent.ACTION_UP && Math.hypot(e.getX() - downX, e.getY() - downY) < dp(12)) {
+                    JSONObject hit = videoElementAt(f);
+                    if (hit != null) playVideoEl(hit);
+                    else videoAt(f);
+                }
                 break;
             case SPOT: pointer("spot", a, f); break;
             case MOVE:
@@ -1249,8 +1344,10 @@ public class PresentActivity extends AppCompatActivity {
 
     // ------------------------------------------------------------------ ink elements
     private int width() {
-        // 5 pen sizes (XS→XL); highlighter is thicker
+        // 5 pen sizes (XS→XL); highlighter and marker are thicker, fine pen thinner
         if (tool == HL) return new int[]{12, 18, 28, 40, 56}[Math.min(size, 4)];
+        if (tool == MARKER) return new int[]{6, 10, 16, 24, 34}[Math.min(size, 4)];
+        if (tool == FINE) return new int[]{1, 2, 3, 5, 8}[Math.min(size, 4)];
         return new int[]{2, 4, 7, 12, 18}[Math.min(size, 4)];
     }
 
@@ -1280,7 +1377,7 @@ public class PresentActivity extends AppCompatActivity {
     private void stroke(int a, float[] f) {
         try {
             if (a == MotionEvent.ACTION_DOWN) {
-                drawing = newEl(tool == HL ? "hl" : "pen");
+                drawing = newEl(tool == HL ? "hl" : tool == MARKER ? "marker" : tool == FINE ? "fine" : tool == DASH ? "dash" : "pen");
                 drawing.getJSONArray("p").put(r4(f[0])).put(r4(f[1]));
                 pageInk(page).put(drawing.getString("id"), drawing);
                 sendEl(drawing, false);
@@ -1391,6 +1488,306 @@ public class PresentActivity extends AppCompatActivity {
             } catch (Exception ignored) {
             }
         }).setNegativeButton(T.t("Cancel"), null).show();
+    }
+
+    /** A horizontal strip across every hue; tap/drag picks one. */
+    private final class HueBar extends View {
+        float hue;
+        java.util.function.Consumer<Float> onHue;
+
+        HueBar(Context c) {
+            super(c);
+        }
+
+        @Override
+        protected void onDraw(Canvas cv) {
+            int w = getWidth(), h = getHeight();
+            if (w <= 0 || h <= 0) return;
+            int n = 13;
+            int[] stops = new int[n];
+            float[] pos = new float[n];
+            for (int i = 0; i < n; i++) {
+                stops[i] = Color.HSVToColor(new float[]{360f * i / (n - 1), 1f, 1f});
+                pos[i] = (float) i / (n - 1);
+            }
+            Paint p = new Paint();
+            p.setShader(new LinearGradient(0, 0, w, 0, stops, pos, Shader.TileMode.CLAMP));
+            cv.drawRoundRect(0, 0, w, h, h / 2f, h / 2f, p);
+            float x = hue / 360f * w;
+            Paint ring = new Paint(Paint.ANTI_ALIAS_FLAG);
+            ring.setStyle(Paint.Style.STROKE);
+            ring.setStrokeWidth(dp(2));
+            ring.setColor(Color.WHITE);
+            cv.drawCircle(x, h / 2f, h / 2f - dp(1), ring);
+        }
+
+        @Override
+        public boolean onTouchEvent(MotionEvent e) {
+            hue = Math.max(0, Math.min(360, e.getX() / Math.max(1, getWidth()) * 360f));
+            invalidate();
+            if (onHue != null) onHue.accept(hue);
+            return true;
+        }
+    }
+
+    /** White→hue left-to-right, transparent→black top-to-bottom; tap/drag picks saturation + value. */
+    private final class SatValBox extends View {
+        float hue, sat = 1, val = 1;
+        java.util.function.BiConsumer<Float, Float> onSatVal;
+
+        SatValBox(Context c) {
+            super(c);
+        }
+
+        @Override
+        protected void onDraw(Canvas cv) {
+            int w = getWidth(), h = getHeight();
+            if (w <= 0 || h <= 0) return;
+            int hueColor = Color.HSVToColor(new float[]{hue, 1f, 1f});
+            Paint p = new Paint();
+            p.setShader(new LinearGradient(0, 0, w, 0, Color.WHITE, hueColor, Shader.TileMode.CLAMP));
+            cv.drawRoundRect(0, 0, w, h, dp(10), dp(10), p);
+            Paint black = new Paint();
+            black.setShader(new LinearGradient(0, 0, 0, h, 0x00000000, 0xFF000000, Shader.TileMode.CLAMP));
+            cv.drawRoundRect(0, 0, w, h, dp(10), dp(10), black);
+            float px = sat * w, py = (1 - val) * h;
+            Paint ring = new Paint(Paint.ANTI_ALIAS_FLAG);
+            ring.setStyle(Paint.Style.STROKE);
+            ring.setStrokeWidth(dp(2));
+            ring.setColor(val > 0.6f && sat < 0.6f ? Color.BLACK : Color.WHITE);
+            cv.drawCircle(px, py, dp(7), ring);
+        }
+
+        @Override
+        public boolean onTouchEvent(MotionEvent e) {
+            int w = getWidth(), h = getHeight();
+            sat = Math.max(0, Math.min(1, e.getX() / Math.max(1, w)));
+            val = Math.max(0, Math.min(1, 1 - e.getY() / Math.max(1, h)));
+            invalidate();
+            if (onSatVal != null) onSatVal.accept(sat, val);
+            return true;
+        }
+    }
+
+    private void pickFullColor(final int current, final java.util.function.IntConsumer onPick) {
+        float[] hsv = new float[3];
+        Color.colorToHSV(current | 0xFF000000, hsv);
+        final int[] live = {current | 0xFF000000};
+
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(18), dp(6), dp(18), 0);
+
+        final View preview = new View(this);
+        preview.setBackground(Ui.card(this, live[0], 0xFF888888, dp(10)));
+        LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(-1, dp(44));
+        plp.setMargins(0, 0, 0, dp(10));
+        box.addView(preview, plp);
+
+        final SatValBox sv = new SatValBox(this);
+        sv.hue = hsv[0];
+        sv.sat = hsv[1];
+        sv.val = hsv[2];
+        box.addView(sv, new LinearLayout.LayoutParams(-1, dp(170)));
+
+        final HueBar hb = new HueBar(this);
+        hb.hue = hsv[0];
+        LinearLayout.LayoutParams hlp = new LinearLayout.LayoutParams(-1, dp(28));
+        hlp.setMargins(0, dp(14), 0, dp(14));
+        box.addView(hb, hlp);
+
+        final EditText hex = new EditText(this);
+        hex.setSingleLine(true);
+        hex.setHint("#RRGGBB");
+        hex.setText(String.format("#%06X", live[0] & 0xFFFFFF));
+        box.addView(hex);
+
+        final boolean[] fromHex = {false};
+        Runnable refresh = () -> {
+            live[0] = Color.HSVToColor(new float[]{hb.hue, sv.sat, sv.val});
+            preview.setBackground(Ui.card(this, live[0], 0xFF888888, dp(10)));
+            if (!fromHex[0]) hex.setText(String.format("#%06X", live[0] & 0xFFFFFF));
+        };
+        hb.onHue = h -> {
+            sv.hue = h;
+            sv.invalidate();
+            fromHex[0] = false;
+            refresh.run();
+        };
+        sv.onSatVal = (s, v) -> {
+            fromHex[0] = false;
+            refresh.run();
+        };
+        hex.addTextChangedListener(new android.text.TextWatcher() {
+            public void beforeTextChanged(CharSequence s, int a, int b, int c) {
+            }
+
+            public void onTextChanged(CharSequence s, int a, int b, int c) {
+            }
+
+            public void afterTextChanged(android.text.Editable ed) {
+                try {
+                    int c = Color.parseColor(ed.toString().trim());
+                    fromHex[0] = true;
+                    live[0] = c | 0xFF000000;
+                    float[] out = new float[3];
+                    Color.colorToHSV(live[0], out);
+                    hb.hue = out[0];
+                    sv.hue = out[0];
+                    sv.sat = out[1];
+                    sv.val = out[2];
+                    hb.invalidate();
+                    sv.invalidate();
+                    preview.setBackground(Ui.card(PresentActivity.this, live[0], 0xFF888888, dp(10)));
+                } catch (Exception ignored) {
+                    // still typing a valid code
+                }
+            }
+        });
+
+        new UiDialog(this).setTitle("🎨 " + T.t("Colour")).setView(box)
+                .setPositiveButton(T.t("Use this colour"), (d, w) -> onPick.accept(live[0]))
+                .setNegativeButton(T.t("Cancel"), null).show();
+    }
+
+    /** Ask the AI a question (same AI integration used elsewhere — your own API key, text only). */
+    private void askAi() {
+        if (!AiClient.ready()) {
+            new UiDialog(this).setTitle("🤖 " + T.t("AI")).setMessage(T.t("Add your AI key first: Settings → AI assistant."))
+                    .setPositiveButton(T.t("OK"), null).show();
+            return;
+        }
+        final EditText e = new EditText(this);
+        e.setHint(T.t("Ask anything — explain, summarise, brainstorm…"));
+        e.setMinLines(2);
+        e.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+        new UiDialog(this).setTitle("🤖 " + T.t("Ask AI")).setView(pad(e))
+                .setPositiveButton(T.t("Ask"), (d, w) -> {
+                    String q = e.getText().toString().trim();
+                    if (q.isEmpty()) return;
+                    runAi(q);
+                })
+                .setNegativeButton(T.t("Cancel"), null).show();
+    }
+
+    private View pad(View v) {
+        FrameLayout f = new FrameLayout(this);
+        f.setPadding(dp(20), dp(6), dp(20), 0);
+        f.addView(v);
+        return f;
+    }
+
+    private void runAi(final String question) {
+        final String tvIp = ip;
+        final android.app.ProgressDialog wait = new android.app.ProgressDialog(this);
+        wait.setMessage(T.t("Asking AI…"));
+        wait.setCancelable(false);
+        wait.show();
+        new Thread(() -> {
+            String answer;
+            try {
+                AiBrain.Tv tv = (path, params) -> TvClient.post(tvIp, path, params);
+                answer = AiBrain.ask(question, tv, null);
+            } catch (Exception ex) {
+                answer = "⚠ " + ex.getMessage();
+            }
+            final String fa = answer;
+            runOnUiThread(() -> {
+                try {
+                    wait.dismiss();
+                } catch (Exception ignored) {
+                }
+                new UiDialog(this).setTitle("🤖 AI").setMessage(fa)
+                        .setPositiveButton(T.t("📌 Place as sticky note"), (d, w) -> placeAiNote(fa))
+                        .setNegativeButton(T.t("Close"), null).show();
+            });
+        }).start();
+    }
+
+    /** Pins the AI's answer onto the board, the same way a hand-written sticky note is placed. */
+    private void placeAiNote(String text) {
+        try {
+            JSONObject el = newEl("sticky");
+            el.put("p", new JSONArray().put(120).put(160));
+            el.put("s", text);
+            el.put("c", String.format("#%06X", STICKY_COLORS[0] & 0xFFFFFF));
+            el.put("z", 56);
+            pageInk(page).put(el.getString("id"), el);
+            sendEl(el, false);
+            pushUndo("add", page, el);
+            overlay.invalidate();
+            UiKit.makeToast(this, "📌 " + T.t("Placed near the top-left — drag it where you like"), Toast.LENGTH_LONG).show();
+        } catch (Exception ignored) {
+        }
+    }
+
+    private float[] pendingPoint;
+
+    /** Tap the board with 🖼 Image selected → pick a picture → it's placed where you tapped. */
+    private void imageAt(final float[] f) {
+        pendingPoint = f;
+        startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("image/*"), 9001);
+    }
+
+    /** Tap the board with 🎬 Video selected (on empty space) → paste a video link → it's placed where you tapped. */
+    private void videoAt(final float[] f) {
+        final EditText e = new EditText(this);
+        e.setHint("https://… (Seedr, Google Drive, a direct video link)");
+        e.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+        new UiDialog(this).setTitle("🎬 " + T.t("Add a video")).setView(pad(e))
+                .setPositiveButton(T.t("Place"), (d, w) -> {
+                    String url = e.getText().toString().trim();
+                    if (url.isEmpty()) return;
+                    try {
+                        JSONObject el = newEl("video");
+                        el.put("p", new JSONArray().put(r4(f[0])).put(r4(f[1])));
+                        el.put("s", url);
+                        String img = Thumb.auto(url);
+                        el.put("img", img);
+                        el.put("z", new int[]{36, 44, 56, 68, 80}[Math.min(size, 4)]);
+                        pageInk(page).put(el.getString("id"), el);
+                        sendEl(el, false);
+                        pushUndo("add", page, el);
+                        overlay.invalidate();
+                        if (!img.isEmpty()) Thumb.prefetch(PresentActivity.this, img);
+                    } catch (Exception ignored) {
+                    }
+                }).setNegativeButton(T.t("Cancel"), null).show();
+    }
+
+    /**
+     * A placed video / image box is the same size and position convention as a sticky note
+     * (pageH * 0.28 wide, pageH * 0.22 tall, in the same virtual-page units pageW/pageH use) —
+     * converted here into the 0..1 fraction-of-page space that toSlide() and stored positions use,
+     * so this matches InkDraw's own drawing exactly.
+     */
+    private static final float BOX_H_FRAC = 0.22f;
+
+    private float boxWFrac() {
+        return (pageH * 0.28f) / pageW;
+    }
+
+    /** A placed video element whose on-board rectangle contains this point, or null. */
+    private JSONObject videoElementAt(float[] f) {
+        Map<String, JSONObject> m = pageInk(page);
+        if (m == null) return null;
+        float bw = boxWFrac(), bh = BOX_H_FRAC;
+        for (JSONObject el : new ArrayList<>(m.values())) {
+            if (!"video".equals(el.optString("t"))) continue;
+            JSONArray p = el.optJSONArray("p");
+            if (p == null || p.length() < 2) continue;
+            float x = (float) p.optDouble(0), y = (float) p.optDouble(1);
+            if (f[0] >= x && f[0] <= x + bw && f[1] >= y && f[1] <= y + bh) return el;
+        }
+        return null;
+    }
+
+    private void playVideoEl(JSONObject el) {
+        String url = el.optString("s", "");
+        if (url.isEmpty()) return;
+        String direct = Links.direct(url);
+        Store.Item it = new Store.Item("🎬 " + T.t("From the board"), direct, "");
+        Remote.play(this, java.util.Collections.singletonList(it), 0);
     }
 
     /** EZWrite-style sticky note: coloured paper + text on the board. */
@@ -1657,7 +2054,16 @@ public class PresentActivity extends AppCompatActivity {
             redo.clear();
             for (int pg = 0; pg < pages.length(); pg++) {
                 JSONArray els = pages.getJSONArray(pg);
-                for (int k = 0; k < els.length(); k++) pageInk(pg).put(els.getJSONObject(k).optString("id"), els.getJSONObject(k));
+                for (int k = 0; k < els.length(); k++) {
+                    JSONObject el = els.getJSONObject(k);
+                    pageInk(pg).put(el.optString("id"), el);
+                    String img = el.optString("img", "");
+                    if (!img.isEmpty()) Thumb.prefetch(this, img);
+                }
+            }
+            if (!pages.toString().isEmpty()) {
+                main.postDelayed(() -> overlay.invalidate(), 900);
+                main.postDelayed(() -> overlay.invalidate(), 2500);
             }
             titleT.setText(title);
             page = 0;

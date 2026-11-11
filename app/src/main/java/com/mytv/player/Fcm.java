@@ -70,17 +70,28 @@ final class Fcm {
     }
 
     static String send(String title, String body, String link, String bid, String open, String img) {
+        return send(title, body, link, bid, open, img, "broadcast");
+    }
+
+    /** kind "end": wakes every device (even closed) to clear a stale broadcast notification — shows nothing new. */
+    static String sendQuiet(String bid) {
+        return send("", "", "", bid, "auto", "", "end");
+    }
+
+    static String send(String title, String body, String link, String bid, String open, String img, String kind) {
         try {
             JSONObject sa = new JSONObject(Store.getStr(KEY, "{}"));
             String at = accessToken(sa);
-            JSONObject data = new JSONObject().put("kind", "broadcast").put("bid", bid == null ? "" : bid).put("url", link == null ? "" : link)
+            JSONObject data = new JSONObject().put("kind", kind == null ? "broadcast" : kind).put("bid", bid == null ? "" : bid)
+                    .put("url", link == null ? "" : link)
                     .put("open", open == null ? "auto" : open)
                     .put("title", title).put("body", body);
-            JSONObject msg = new JSONObject().put("message", new JSONObject()
-                    .put("topic", "all")
-                    .put("notification", Thumb.web(img).isEmpty() ? new JSONObject().put("title", title).put("body", body)
-                            : new JSONObject().put("title", title).put("body", body).put("image", Thumb.web(img)))
-                    .put("data", data)
+            JSONObject msgRoot = new JSONObject().put("topic", "all").put("data", data);
+            if (!"end".equals(kind)) {
+                msgRoot.put("notification", Thumb.web(img).isEmpty() ? new JSONObject().put("title", title).put("body", body)
+                        : new JSONObject().put("title", title).put("body", body).put("image", Thumb.web(img)));
+            }
+            JSONObject msg = new JSONObject().put("message", msgRoot
                     .put("android", new JSONObject().put("priority", "high")
                             .put("notification", new JSONObject().put("channel_id", Broadcast.CH).put("click_action", "com.tamil.castplay.OPEN_PUSH"))));
             String r = post("https://fcm.googleapis.com/v1/projects/" + sa.optString("project_id") + "/messages:send",
