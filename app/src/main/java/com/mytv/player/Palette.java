@@ -171,7 +171,13 @@ public final class Palette {
                 ? new String[]{T.t("Choose a different picture"), T.t("Opacity"), T.t("Turn off")}
                 : new String[]{T.t("Choose a picture")};
         new UiDialog(a).setTitle("🖼  " + T.t("Background picture")).setItems(items, (d, w) -> {
-            if (!on || w == 0) a.startActivity(new android.content.Intent(a, BgImagePickActivity.class));
+            if (!on || w == 0) {
+                try {
+                    a.startActivity(new android.content.Intent(a, BgImagePickActivity.class));
+                } catch (Exception ex) {
+                    UiKit.makeToast(a, "⚠ " + T.t("Can't open the picture picker") + ": " + ex.getMessage(), android.widget.Toast.LENGTH_LONG).show();
+                }
+            }
             else if (w == 1) opacityDialog(a);
             else {
                 Store.putBool("bg_image_on", false);
