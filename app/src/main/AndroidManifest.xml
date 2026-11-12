@@ -29,6 +29,7 @@
         android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
     <!-- ⏻ Bluetooth power-on: the phone acts as a Bluetooth keyboard / remote for the TV -->
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
@@ -139,6 +140,26 @@
             android:exported="false"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden" />
 
+        <activity
+            android:name=".ShortcutsActivity"
+            android:exported="false"
+            android:label="Add to home screen" />
+        <activity
+            android:name=".ShortcutLaunchActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <activity
+            android:name=".PanelHostActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <activity
+            android:name=".GalleryActivity"
+            android:exported="false"
+            android:label="Gallery" />
+        <activity
+            android:name=".PhotoEditActivity"
+            android:exported="false"
+            android:label="Edit photo" />
         <activity
             android:name=".BgImagePickActivity"
             android:exported="false"
