@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Your own widget logos are found by name (zh_widget_<feature>.png), so tell the build never to strip them. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/zh_widget_*" />

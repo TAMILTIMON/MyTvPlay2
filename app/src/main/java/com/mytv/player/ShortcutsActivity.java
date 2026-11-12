@@ -99,7 +99,7 @@ public class ShortcutsActivity extends Activity {
             row.setBackground(g);
 
             ImageView icon = new ImageView(this);
-            icon.setImageDrawable(new BitmapDrawable(getResources(), Shortcuts.icon(this, it.icon, it.color)));
+            icon.setImageDrawable(new BitmapDrawable(getResources(), Shortcuts.iconFor(this, it)));
             row.addView(icon, new LinearLayout.LayoutParams(dp(48), dp(48)));
 
             LinearLayout col = new LinearLayout(this);

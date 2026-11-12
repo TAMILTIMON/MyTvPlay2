@@ -33,7 +33,7 @@ public class FeatureWidget extends AppWidgetProvider {
         Shortcuts.Item it = Shortcuts.find(fid);
         RemoteViews v = new RemoteViews(c.getPackageName(), R.layout.widget_feature);
         if (it == null) return v;
-        v.setImageViewBitmap(R.id.fw_icon, Shortcuts.icon(c, it.icon, it.color));
+        v.setImageViewBitmap(R.id.fw_icon, Shortcuts.iconFor(c, it));
         v.setTextViewText(R.id.fw_label, it.label);
         Intent open = new Intent(c, ShortcutLaunchActivity.class).setAction(Intent.ACTION_VIEW)
                 .putExtra(ShortcutLaunchActivity.EXTRA_ID, it.id)

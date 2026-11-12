@@ -141,7 +141,7 @@ final class Shortcuts {
         ShortcutInfo info = new ShortcutInfo.Builder(a, "zh_" + it.id)
                 .setShortLabel(it.label)
                 .setLongLabel(it.label + " — " + T.t(it.sub))
-                .setIcon(Icon.createWithBitmap(icon(a, it.icon, it.color)))
+                .setIcon(Icon.createWithBitmap(iconFor(a, it)))
                 .setIntent(target)
                 .build();
         try {
@@ -152,6 +152,39 @@ final class Shortcuts {
     }
 
     // ------------------------------------------------------------------ the icon
+
+    /**
+     * Your own logo for a feature, if you added one to the project:
+     *   app/src/main/res/drawable-nodpi/zh_widget_<id>.png   (e.g. zh_widget_browser.png, zh_widget_vpn.png)
+     * Square PNG, about 192×192 or bigger. Features without a file keep the generated tile.
+     */
+    static int customLogo(Context c, String id) {
+        return c.getResources().getIdentifier("zh_widget_" + id, "drawable", c.getPackageName());
+    }
+
+    /** The icon for a feature: your own logo if you added one, otherwise the generated ZH tile. */
+    static Bitmap iconFor(Context c, Item it) {
+        int res = customLogo(c, it.id);
+        if (res != 0) {
+            try {
+                Bitmap raw = android.graphics.BitmapFactory.decodeResource(c.getResources(), res);
+                if (raw != null) {
+                    int s = 192;                                   // fit it into a square, keeping its shape
+                    Bitmap out = Bitmap.createBitmap(s, s, Bitmap.Config.ARGB_8888);
+                    Canvas cv = new Canvas(out);
+                    float k = Math.min((float) s / raw.getWidth(), (float) s / raw.getHeight());
+                    float w = raw.getWidth() * k, h = raw.getHeight() * k;
+                    android.graphics.RectF dst = new android.graphics.RectF((s - w) / 2f, (s - h) / 2f, (s + w) / 2f, (s + h) / 2f);
+                    cv.drawBitmap(raw, null, dst, new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG));
+                    raw.recycle();
+                    return out;
+                }
+            } catch (Throwable ignored) {
+                // a broken file: fall back to the generated tile
+            }
+        }
+        return icon(c, it.icon, it.color);
+    }
 
     /** A square tile: the feature's own symbol on its colour, with a small "ZH" badge in the corner. */
     static Bitmap icon(Context c, String glyph, int color) {
