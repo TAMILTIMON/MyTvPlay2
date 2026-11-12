@@ -49,11 +49,15 @@ public class BgImagePickActivity extends Activity {
                 try (FileOutputStream out = new FileOutputStream(f)) {
                     b.compress(Bitmap.CompressFormat.JPEG, 85, out);
                 }
+                int fallback = Ui.ACCENT;
+                int main = ColorExtract.dominant(b, fallback);
+                Store.putInt("c_acc", main);
+                Store.putInt("c_acc2", ColorExtract.pair(main));
                 Store.putBool("bg_image_on", true);
                 Store.putInt("bg_image_gen", Store.getInt("bg_image_gen", 0) + 1);
                 runOnUiThread(() -> {
                     Ui.invalidateBg();
-                    UiKit.makeToast(this, "✓ " + T.t("Background set — it shows from the next screen you open"), Toast.LENGTH_LONG).show();
+                    UiKit.makeToast(this, "✓ " + T.t("Background set, and the app's colours now match it — shows from the next screen you open"), Toast.LENGTH_LONG).show();
                     finish();
                 });
             } catch (Exception e) {
