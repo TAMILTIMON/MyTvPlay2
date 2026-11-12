@@ -106,6 +106,24 @@ final class Thumb {
         });
     }
 
+    /** Like prefetch, then runs onReady (on the main thread) once the picture is in the cache. */
+    static void prefetch(final Context c, final String img, final Runnable onReady) {
+        if (img == null || img.isEmpty()) return;
+        final android.os.Handler h = new android.os.Handler(android.os.Looper.getMainLooper());
+        if (mem.get(img) != null) {
+            h.post(onReady);
+            return;
+        }
+        final Context app = c.getApplicationContext();
+        pool.execute(() -> {
+            Bitmap b = fetch(app, img);
+            if (b != null) {
+                mem.put(img, b);
+                h.post(onReady);
+            }
+        });
+    }
+
     static void load(final ImageView iv, final String img) {
         if (img == null || img.isEmpty()) return;
         iv.setTag(img);
@@ -135,6 +153,10 @@ final class Thumb {
                 if (s == null || s.trim().equals("null")) return null;
                 String b64 = new org.json.JSONTokener(s).nextValue().toString();
                 data = android.util.Base64.decode(b64, android.util.Base64.DEFAULT);
+            } else if (img.startsWith("data:")) {
+                int comma = img.indexOf(',');
+                if (comma < 0) return null;
+                data = android.util.Base64.decode(img.substring(comma + 1), android.util.Base64.DEFAULT);
             } else if (img.startsWith("http")) {
                 HttpURLConnection h = (HttpURLConnection) new URL(img).openConnection();
                 h.setConnectTimeout(10000);

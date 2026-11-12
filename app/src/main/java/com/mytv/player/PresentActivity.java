@@ -886,6 +886,8 @@ public class PresentActivity extends AppCompatActivity {
                     Thread.sleep(1200);
                     JSONObject st = TvClient.post(ip, "/presentstate", new HashMap<String, String>());
                     if (!st.has("ink")) m = "⚠ " + T.t("Update ZH Play on the TV for the whiteboard");
+                    else if (st.optInt("inkv", 1) < 2)
+                        m = "⚠ " + T.t("Update ZH Play on the TV to see pictures, videos, sticky notes and pen styles there");
                 } catch (Exception ignored) {
                 }
                 final String m2 = m;
@@ -964,7 +966,8 @@ public class PresentActivity extends AppCompatActivity {
             new Thread(() -> {
                 try {
                     String b64 = Thumb.encode(this, data.getData());
-                    String ref = Thumb.upload(b64);
+                    String ref = "data:image/jpeg;base64," + b64;         // sent straight to the TV with the board item
+                    Thumb.prefetch(this, ref, () -> overlay.invalidate());   // show it on this phone too
                     runOnUiThread(() -> {
                         try {
                             JSONObject el = newEl("image");

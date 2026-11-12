@@ -446,12 +446,13 @@ public final class InkDraw {
             double dx = x - p.optDouble(0), dy = y - p.optDouble(1);
             return dx >= -0.01 && dx < 0.3 && dy > -0.08 && dy < 0.02 ? 0 : 9;
         }
-        if ("sticky".equals(t)) {
+        if ("sticky".equals(t) || "image".equals(t) || "video".equals(t)) {
             double dx = x - p.optDouble(0), dy = y - p.optDouble(1);
-            // sticky is ~0.28 x 0.22 of page height in width terms; use generous hit box
+            // sticky / picture / video boxes are ~0.28 x 0.22 of page height in width terms; use generous hit box
             return dx >= -0.01 && dx < 0.32 && dy >= -0.01 && dy < 0.28 ? 0 : 9;
         }
-        if (!"pen".equals(t) && !"hl".equals(t) && p.length() >= 4) {
+        boolean freehand = "pen".equals(t) || "hl".equals(t) || "marker".equals(t) || "fine".equals(t) || "dash".equals(t);
+        if (!freehand && p.length() >= 4) {
             float x1 = (float) p.optDouble(0), y1 = (float) p.optDouble(1), x2 = (float) p.optDouble(p.length() - 2), y2 = (float) p.optDouble(p.length() - 1);
             if ("rect".equals(t) || "rect_f".equals(t) || "oval".equals(t) || "oval_f".equals(t)
                     || "tri".equals(t) || "tri_f".equals(t)

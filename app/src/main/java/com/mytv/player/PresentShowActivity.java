@@ -74,7 +74,8 @@ public class PresentShowActivity extends AppCompatActivity {
 
     public static JSONObject state() throws Exception {
         return new JSONObject().put("open", inst != null).put("page", page).put("count", count).put("title", title)
-                .put("blank", blank).put("status", status).put("zoom", zoom).put("board", board).put("ink", true);
+                .put("blank", blank).put("status", status).put("zoom", zoom).put("board", board).put("ink", true)
+                .put("inkv", 2);
     }
 
     @Override
@@ -419,6 +420,8 @@ public class PresentShowActivity extends AppCompatActivity {
                         org.json.JSONArray op = old.getJSONArray("p"), np = e.optJSONArray("p");
                         if (np != null) for (int k = 0; k < np.length(); k++) op.put(np.get(k));
                     } else m.put(e.optString("id"), e);
+                    String img = e.optString("img", "");
+                    if (!img.isEmpty()) Thumb.prefetch(this, img, () -> pointer.invalidate());   // a board picture / video thumbnail
                     pointer.invalidate();
                     break;
                 }
