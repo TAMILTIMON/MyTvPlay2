@@ -49,28 +49,46 @@ public class ShortcutsActivity extends Activity {
         head.setPadding(dp(14), dp(14), dp(14), dp(6));
         head.addView(UiKit.darkButton(this, "arrow-left", 42, false, v -> finish()), new LinearLayout.LayoutParams(dp(42), dp(42)));
         TextView t = text(21, Ui.TEXT, true);
-        t.setText("📌  " + T.t("Add to home screen"));
+        t.setText("📌  " + T.t("Home-screen icons"));
         t.setPadding(dp(12), 0, 0, 0);
         head.addView(t);
         outer.addView(head);
 
+        // ---- the usual way: home-screen widgets
+        LinearLayout how = new LinearLayout(this);
+        how.setOrientation(LinearLayout.VERTICAL);
+        how.setPadding(dp(16), dp(14), dp(16), dp(14));
+        GradientDrawable hg = new GradientDrawable();
+        hg.setColor(Ui.dark() ? 0xFF161D2E : 0xFFFFFFFF);
+        hg.setCornerRadius(dp(16));
+        hg.setStroke(dp(1), Ui.ACCENT);
+        how.setBackground(hg);
+        TextView ht = text(15, Ui.TEXT, true);
+        ht.setText("🧩  " + T.t("Add as widgets"));
+        TextView hs = text(13, Ui.DIM, false);
+        hs.setText(T.t("1. Long-press an empty spot on your home screen") + "\n"
+                + T.t("2. Tap Widgets") + "\n"
+                + T.t("3. Find ZH Play — pick ZH Browser, ZH VPN, ZH Music, … (each is its own 1×1 icon)"));
+        hs.setLineSpacing(0, 1.2f);
+        hs.setPadding(0, dp(6), 0, 0);
+        how.addView(ht);
+        how.addView(hs);
+        LinearLayout.LayoutParams hlp = new LinearLayout.LayoutParams(-1, -2);
+        hlp.setMargins(dp(16), 0, dp(16), dp(6));
+        outer.addView(how, hlp);
+
+        final boolean canPin = Shortcuts.pinSupported(this);
         TextView sub = text(13, Ui.DIM, false);
-        sub.setText(T.t("Each one becomes its own icon, separate from ZH Play itself — tap Add, then confirm on your home screen."));
-        sub.setPadding(dp(16), 0, dp(16), dp(10));
+        sub.setText(canPin ? T.t("Or tap Add below — the icon is placed for you (your home screen asks to confirm).")
+                : T.t("Your home screen can't place icons directly — use the widget steps above."));
+        sub.setPadding(dp(16), dp(10), dp(16), dp(6));
         outer.addView(sub);
 
         LinearLayout body = new LinearLayout(this);
         body.setOrientation(LinearLayout.VERTICAL);
         body.setPadding(dp(16), 0, dp(16), dp(32));
 
-        if (!Shortcuts.supported()) {
-            TextView warn = text(14, Ui.DIM, false);
-            warn.setText("⚠ " + T.t("This needs Android 8 or newer."));
-            warn.setPadding(0, dp(20), 0, 0);
-            body.addView(warn);
-        }
-
-        for (final Shortcuts.Item it : Shortcuts.all(this)) {
+        for (final Shortcuts.Item it : Shortcuts.ITEMS) {
             LinearLayout row = new LinearLayout(this);
             row.setGravity(Gravity.CENTER_VERTICAL);
             row.setPadding(dp(14), dp(12), dp(14), dp(12));
@@ -81,10 +99,8 @@ public class ShortcutsActivity extends Activity {
             row.setBackground(g);
 
             ImageView icon = new ImageView(this);
-            Bitmap bmp = Shortcuts.icon(this, it.icon, it.color);
-            icon.setImageDrawable(new BitmapDrawable(getResources(), bmp));
-            LinearLayout.LayoutParams ilp = new LinearLayout.LayoutParams(dp(48), dp(48));
-            row.addView(icon, ilp);
+            icon.setImageDrawable(new BitmapDrawable(getResources(), Shortcuts.icon(this, it.icon, it.color)));
+            row.addView(icon, new LinearLayout.LayoutParams(dp(48), dp(48)));
 
             LinearLayout col = new LinearLayout(this);
             col.setOrientation(LinearLayout.VERTICAL);
@@ -92,22 +108,23 @@ public class ShortcutsActivity extends Activity {
             TextView n = text(15, Ui.TEXT, true);
             n.setText(it.label);
             TextView s2 = text(12, Ui.DIM, false);
-            s2.setText(it.sub);
+            s2.setText(T.t(it.sub));
             col.addView(n);
             col.addView(s2);
             row.addView(col, new LinearLayout.LayoutParams(0, -2, 1));
 
-            TextView add = text(13, Color.WHITE, true);
-            add.setText("+ " + T.t("Add"));
-            add.setGravity(Gravity.CENTER);
-            add.setPadding(dp(14), 0, dp(14), 0);
-            GradientDrawable ag = new GradientDrawable();
-            ag.setColor(Ui.ACCENT);
-            ag.setCornerRadius(dp(16));
-            add.setBackground(ag);
-            add.setOnClickListener(v -> Shortcuts.pin(this, it));
-            row.addView(add, new LinearLayout.LayoutParams(-2, dp(36)));
-
+            if (canPin) {
+                TextView add = text(13, Color.WHITE, true);
+                add.setText("+ " + T.t("Add"));
+                add.setGravity(Gravity.CENTER);
+                add.setPadding(dp(14), 0, dp(14), 0);
+                GradientDrawable ag = new GradientDrawable();
+                ag.setColor(Ui.ACCENT);
+                ag.setCornerRadius(dp(16));
+                add.setBackground(ag);
+                add.setOnClickListener(v -> Shortcuts.pin(this, it));
+                row.addView(add, new LinearLayout.LayoutParams(-2, dp(36)));
+            }
             LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(-1, -2);
             rlp.setMargins(0, dp(8), 0, 0);
             body.addView(row, rlp);

@@ -59,81 +59,115 @@ public class PhotoEditActivity extends Activity {
 
     // ------------------------------------------------------------------ state
 
+    private static final int HISTORY = 6;           // undo / redo steps kept (full photos are big)
     private Bitmap base;                              // the committed image so far
     private final Deque<Bitmap> undo = new ArrayDeque<>();
-    private ImageView preview;
+    private final Deque<Bitmap> redo = new ArrayDeque<>();
+    private ImageView preview, undoBtn, redoBtn;
     private FrameLayout stage, panelHost;
     private LinearLayout tools;
+    private android.widget.ProgressBar spinner;
+    private TextView saveBtn;
     private int tool = -1;
     private static final int T_CROP = 0, T_ROTATE = 1, T_ADJUST = 2, T_FILTER = 3, T_DRAW = 4, T_TEXT = 5;
 
     @Override
     protected void onCreate(Bundle b) {
-        Ui.apply(this);
+        Ui.apply(this, true);                         // the editor is always dark, whatever the app theme
         super.onCreate(b);
-        Uri uri = Uri.parse(getIntent().getStringExtra(EXTRA_URI));
-        base = loadScaled(uri);
-        if (base == null) {
-            UiKit.makeToast(this, "⚠ " + T.t("Can't open this picture"), Toast.LENGTH_LONG).show();
-            finish();
-            return;
-        }
+        final Uri uri = Uri.parse(getIntent().getStringExtra(EXTRA_URI));
 
         FrameLayout frame = new FrameLayout(this);
         frame.setBackgroundColor(0xFF000000);
         LinearLayout outer = new LinearLayout(this);
         outer.setOrientation(LinearLayout.VERTICAL);
 
+        // ---- header: back · title ············ undo · redo · save
         LinearLayout head = new LinearLayout(this);
         head.setGravity(Gravity.CENTER_VERTICAL);
-        head.setPadding(dp(10), dp(10), dp(10), dp(6));
+        head.setPadding(dp(10), dp(10), dp(10), dp(8));
+        head.setBackgroundColor(0xFF0B0F1A);
         head.addView(UiKit.darkButton(this, "arrow-left", 40, false, v -> confirmExit()), new LinearLayout.LayoutParams(dp(40), dp(40)));
-        TextView undoBtn = iconText("↩", v -> onUndo());
-        head.addView(undoBtn, new LinearLayout.LayoutParams(dp(40), dp(40)));
-        head.addView(new View(this), new LinearLayout.LayoutParams(0, -2, 1));
-        TextView save = text(15, Color.WHITE, true);
-        save.setText("💾  " + T.t("Save"));
-        save.setGravity(Gravity.CENTER);
-        save.setPadding(dp(18), 0, dp(18), 0);
-        GradientDrawable sg = new GradientDrawable();
-        sg.setColor(Ui.ACCENT);
+        TextView title = text(17, Color.WHITE, true);
+        title.setText(T.t("Edit photo"));
+        title.setPadding(dp(12), 0, 0, 0);
+        title.setSingleLine(true);
+        head.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
+        undoBtn = UiKit.darkButton(this, "undo-2", 40, false, v -> onUndo());
+        undoBtn.setContentDescription(T.t("Undo"));
+        LinearLayout.LayoutParams ulp = new LinearLayout.LayoutParams(dp(40), dp(40));
+        ulp.setMargins(0, 0, dp(8), 0);
+        head.addView(undoBtn, ulp);
+        redoBtn = UiKit.darkButton(this, "redo-2", 40, false, v -> onRedo());
+        redoBtn.setContentDescription(T.t("Redo"));
+        LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(dp(40), dp(40));
+        rlp.setMargins(0, 0, dp(10), 0);
+        head.addView(redoBtn, rlp);
+        saveBtn = text(15, Color.WHITE, true);
+        saveBtn.setText(T.t("Save"));
+        saveBtn.setGravity(Gravity.CENTER);
+        saveBtn.setPadding(dp(20), 0, dp(20), 0);
+        GradientDrawable sg = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, new int[]{Ui.ACCENT, Ui.ACCENT2});
         sg.setCornerRadius(dp(20));
-        save.setBackground(sg);
-        save.setOnClickListener(v -> save());
-        head.addView(save, new LinearLayout.LayoutParams(-2, dp(40)));
-        outer.addView(head);
+        saveBtn.setBackground(sg);
+        saveBtn.setOnClickListener(v -> save());
+        head.addView(saveBtn, new LinearLayout.LayoutParams(-2, dp(40)));
+        outer.addView(head, new LinearLayout.LayoutParams(-1, -2));
 
+        // ---- the photo (with a spinner until it's loaded)
         stage = new FrameLayout(this);
         preview = new ImageView(this);
         preview.setScaleType(ImageView.ScaleType.FIT_CENTER);
         stage.addView(preview, new FrameLayout.LayoutParams(-1, -1));
+        spinner = new android.widget.ProgressBar(this);
+        stage.addView(spinner, new FrameLayout.LayoutParams(dp(48), dp(48), Gravity.CENTER));
         outer.addView(stage, new LinearLayout.LayoutParams(-1, 0, 1));
 
         panelHost = new FrameLayout(this);
+        panelHost.setBackgroundColor(0xFF0B0F1A);
         outer.addView(panelHost, new LinearLayout.LayoutParams(-1, -2));
 
+        // ---- tools
         tools = new LinearLayout(this);
         tools.setGravity(Gravity.CENTER);
         tools.setPadding(0, dp(6), 0, dp(10));
+        tools.setBackgroundColor(0xFF0B0F1A);
         String[][] t = {{"crop", "Crop"}, {"rotate-cw", "Rotate"}, {"sliders-horizontal", "Adjust"},
                 {"sparkles", "Filters"}, {"pencil", "Draw"}, {"T", "Text"}};
         for (int i = 0; i < t.length; i++) {
             final int k = i;
             tools.addView(toolButton(t[i][0], t[i][1], v -> selectTool(k)), new LinearLayout.LayoutParams(0, -2, 1));
         }
-        outer.addView(tools);
-        frame.addView(outer);
+        outer.addView(tools, new LinearLayout.LayoutParams(-1, -2));
+        frame.addView(outer, new FrameLayout.LayoutParams(-1, -1));
         setContentView(frame);
-        showPreview();
+
+        setBusy(true);
+        updateHistoryButtons();
+        // decode away from the screen thread: big camera photos take a while, and must never freeze or black out the editor
+        new Thread(() -> {
+            final Bitmap bm = loadScaled(uri);
+            runOnUiThread(() -> {
+                if (isFinishing()) return;
+                if (bm == null) {
+                    UiKit.makeToast(this, "⚠ " + T.t("Can't open this picture"), Toast.LENGTH_LONG).show();
+                    finish();
+                    return;
+                }
+                base = bm;
+                setBusy(false);
+                showPreview();
+            });
+        }).start();
     }
 
-    private TextView iconText(String s, View.OnClickListener l) {
-        TextView t = text(18, Color.WHITE, true);
-        t.setText(s);
-        t.setGravity(Gravity.CENTER);
-        t.setBackground(Ui.focusCard(this, dp(20)));
-        t.setOnClickListener(l);
-        return t;
+    /** While loading / saving: spinner on, tools and Save off. */
+    private void setBusy(boolean busy) {
+        spinner.setVisibility(busy ? View.VISIBLE : View.GONE);
+        tools.setAlpha(busy ? 0.35f : 1f);
+        for (int i = 0; i < tools.getChildCount(); i++) tools.getChildAt(i).setEnabled(!busy);
+        saveBtn.setEnabled(!busy);
+        saveBtn.setAlpha(busy ? 0.5f : 1f);
     }
 
     private View toolButton(String icon, String label, View.OnClickListener l) {
@@ -163,39 +197,70 @@ public class PhotoEditActivity extends Activity {
 
     private void showPreview() {
         preview.setColorFilter(null);
-        preview.setImageBitmap(base);
+        if (base != null) preview.setImageBitmap(base);
+        updateHistoryButtons();
     }
 
+    private void updateHistoryButtons() {
+        if (undoBtn == null) return;
+        undoBtn.setEnabled(!undo.isEmpty());
+        undoBtn.setAlpha(undo.isEmpty() ? 0.35f : 1f);
+        redoBtn.setEnabled(!redo.isEmpty());
+        redoBtn.setAlpha(redo.isEmpty() ? 0.35f : 1f);
+    }
+
+    /** Remember the photo before a change (and forget anything that could be redone). */
     private void pushUndo() {
-        undo.push(base.copy(base.getConfig(), true));
-        if (undo.size() > 15) undo.removeLast();
+        try {
+            undo.push(base.copy(Bitmap.Config.ARGB_8888, true));
+            while (undo.size() > HISTORY) undo.removeLast().recycle();
+        } catch (OutOfMemoryError e) {
+            while (!undo.isEmpty()) undo.removeLast().recycle();     // low memory: give up history, keep editing
+        }
+        while (!redo.isEmpty()) redo.removeLast().recycle();
+        updateHistoryButtons();
     }
 
     private void onUndo() {
-        if (undo.isEmpty()) {
-            UiKit.makeToast(this, T.t("Nothing to undo"), Toast.LENGTH_SHORT).show();
-            return;
-        }
+        if (undo.isEmpty()) return;
+        redo.push(base);
         base = undo.pop();
         showPreview();
     }
 
+    private void onRedo() {
+        if (redo.isEmpty()) return;
+        undo.push(base);
+        base = redo.pop();
+        showPreview();
+    }
+
     private void confirmExit() {
+        if (undo.isEmpty()) {
+            finish();
+            return;
+        }
         ZhPopup.confirm(this, "✖", T.t("Discard this edit?"), T.t("Your changes won't be saved."), T.t("Discard"), true, this::finish);
     }
 
     @Override
     public void onBackPressed() {
+        if (tool >= 0) {                              // first back closes the open tool
+            selectTool(-1);
+            return;
+        }
         confirmExit();
     }
 
     // ------------------------------------------------------------------ tool switching
 
     private void selectTool(int k) {
+        if (base == null) return;                     // still loading
         tool = k;
         panelHost.removeAllViews();
         removeCropOverlay();
         removeDrawOverlay();
+        preview.setColorFilter(null);
         switch (k) {
             case T_CROP: showCropPanel(); break;
             case T_ROTATE: showRotatePanel(); break;
@@ -751,6 +816,7 @@ public class PhotoEditActivity extends Activity {
 
     // ------------------------------------------------------------------ load / save
 
+    /** The photo at editing size (≤1600 px), turned the right way up. Runs on a background thread. */
     private Bitmap loadScaled(Uri uri) {
         try {
             android.graphics.BitmapFactory.Options o = new android.graphics.BitmapFactory.Options();
@@ -758,45 +824,106 @@ public class PhotoEditActivity extends Activity {
             try (java.io.InputStream in = getContentResolver().openInputStream(uri)) {
                 android.graphics.BitmapFactory.decodeStream(in, null, o);
             }
+            if (o.outWidth <= 0 || o.outHeight <= 0) return null;
             int s = 1;
             while (Math.max(o.outWidth, o.outHeight) / (s * 2) >= MAX_SIDE) s *= 2;
             android.graphics.BitmapFactory.Options o2 = new android.graphics.BitmapFactory.Options();
             o2.inSampleSize = s;
+            o2.inMutable = true;
+            o2.inPreferredConfig = Bitmap.Config.ARGB_8888;
+            Bitmap b;
             try (java.io.InputStream in = getContentResolver().openInputStream(uri)) {
-                Bitmap b = android.graphics.BitmapFactory.decodeStream(in, null, o2);
-                return b == null ? null : b.copy(Bitmap.Config.ARGB_8888, true);
+                b = android.graphics.BitmapFactory.decodeStream(in, null, o2);
             }
-        } catch (Exception e) {
+            if (b == null) return null;
+            int deg = orientation(uri);
+            if (deg != 0) {
+                Matrix m = new Matrix();
+                m.postRotate(deg);
+                Bitmap r = Bitmap.createBitmap(b, 0, 0, b.getWidth(), b.getHeight(), m, true);
+                if (r != b) b.recycle();
+                b = r;
+            }
+            return b.isMutable() && b.getConfig() == Bitmap.Config.ARGB_8888 ? b : b.copy(Bitmap.Config.ARGB_8888, true);
+        } catch (Throwable e) {                       // includes running out of memory on a huge photo
             return null;
         }
     }
 
-    private void save() {
-        if (!liveTexts.isEmpty()) bakeTexts();
-        try {
-            String name = "ZHPlay_edit_" + System.currentTimeMillis() + ".jpg";
-            ContentValues cv = new ContentValues();
-            cv.put(MediaStore.Images.Media.DISPLAY_NAME, name);
-            cv.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
-            if (Build.VERSION.SDK_INT >= 29) {
-                cv.put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/ZH Play");
-                cv.put(MediaStore.Images.Media.IS_PENDING, 1);
-            }
-            Uri out = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cv);
-            if (out == null) throw new Exception("insert failed");
-            try (java.io.OutputStream os = getContentResolver().openOutputStream(out)) {
-                base.compress(Bitmap.CompressFormat.JPEG, 92, os);
-            }
-            if (Build.VERSION.SDK_INT >= 29) {
-                cv.clear();
-                cv.put(MediaStore.Images.Media.IS_PENDING, 0);
-                getContentResolver().update(out, cv, null, null);
-            }
-            UiKit.makeToast(this, "✓ " + T.t("Saved to Pictures / ZH Play"), Toast.LENGTH_LONG).show();
-            finish();
-        } catch (Exception e) {
-            UiKit.makeToast(this, "⚠ " + T.t("Couldn't save") + ": " + e.getMessage(), Toast.LENGTH_LONG).show();
+    /** How far the camera turned this photo (gallery photos keep it in MediaStore; files keep it in EXIF). */
+    private int orientation(Uri uri) {
+        try (android.database.Cursor c = getContentResolver().query(uri, new String[]{MediaStore.Images.Media.ORIENTATION}, null, null, null)) {
+            if (c != null && c.moveToFirst() && !c.isNull(0)) return c.getInt(0);
+        } catch (Throwable ignored) {
         }
+        if (Build.VERSION.SDK_INT >= 24) {
+            try (java.io.InputStream in = getContentResolver().openInputStream(uri)) {
+                if (in == null) return 0;
+                switch (new android.media.ExifInterface(in).getAttributeInt(android.media.ExifInterface.TAG_ORIENTATION, 1)) {
+                    case android.media.ExifInterface.ORIENTATION_ROTATE_90: return 90;
+                    case android.media.ExifInterface.ORIENTATION_ROTATE_180: return 180;
+                    case android.media.ExifInterface.ORIENTATION_ROTATE_270: return 270;
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+        return 0;
     }
 
+    private void save() {
+        if (base == null) return;
+        if (!liveTexts.isEmpty()) bakeTexts();
+        // Android 6–9 need the storage permission to add a photo to the gallery
+        if (Build.VERSION.SDK_INT >= 23 && Build.VERSION.SDK_INT <= 28
+                && checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{android.Manifest.permission.WRITE_EXTERNAL_STORAGE}, 73);
+            return;
+        }
+        setBusy(true);
+        final Bitmap toSave = base;
+        new Thread(() -> {
+            String err = null;
+            try {
+                String name = "ZHPlay_edit_" + System.currentTimeMillis() + ".jpg";
+                ContentValues cv = new ContentValues();
+                cv.put(MediaStore.Images.Media.DISPLAY_NAME, name);
+                cv.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
+                if (Build.VERSION.SDK_INT >= 29) {
+                    cv.put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/ZH Play");
+                    cv.put(MediaStore.Images.Media.IS_PENDING, 1);
+                }
+                Uri out = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cv);
+                if (out == null) throw new Exception(T.t("the gallery refused the new file"));
+                try (java.io.OutputStream os = getContentResolver().openOutputStream(out)) {
+                    if (os == null || !toSave.compress(Bitmap.CompressFormat.JPEG, 92, os)) throw new Exception(T.t("writing failed"));
+                }
+                if (Build.VERSION.SDK_INT >= 29) {
+                    cv.clear();
+                    cv.put(MediaStore.Images.Media.IS_PENDING, 0);
+                    getContentResolver().update(out, cv, null, null);
+                }
+            } catch (Throwable e) {
+                err = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+            }
+            final String fe = err;
+            runOnUiThread(() -> {
+                if (isFinishing()) return;
+                setBusy(false);
+                if (fe == null) {
+                    UiKit.makeToast(this, "✓ " + T.t("Saved to Pictures / ZH Play"), Toast.LENGTH_LONG).show();
+                    finish();
+                } else {
+                    UiKit.makeToast(this, "⚠ " + T.t("Couldn't save") + ": " + fe, Toast.LENGTH_LONG).show();
+                }
+            });
+        }).start();
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int code, String[] perms, int[] res) {
+        super.onRequestPermissionsResult(code, perms, res);
+        if (code != 73) return;
+        if (res.length > 0 && res[0] == android.content.pm.PackageManager.PERMISSION_GRANTED) save();
+        else UiKit.makeToast(this, "⚠ " + T.t("Storage permission is needed to save the photo"), Toast.LENGTH_LONG).show();
+    }
 }

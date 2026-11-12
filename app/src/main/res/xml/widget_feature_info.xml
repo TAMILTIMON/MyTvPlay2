@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A single ZH Play feature as a 1×1 icon (ZH Browser, ZH VPN, ZH Music, …). -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:initialLayout="@layout/widget_feature"
+    android:previewLayout="@layout/widget_feature"
+    android:previewImage="@mipmap/ic_launcher"
+    android:minWidth="40dp" android:minHeight="40dp"
+    android:targetCellWidth="1" android:targetCellHeight="1"
+    android:resizeMode="none"
+    android:updatePeriodMillis="0"
+    android:widgetCategory="home_screen" />

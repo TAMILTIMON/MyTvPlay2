@@ -106,8 +106,6 @@ public class ConnectActivity extends AppCompatActivity {
         phoneTiles.put("group", UiKit.tile(this, "layers", T.t("TV group"), T.t("control several TVs at once"), 0xFF14B8A6, v -> TvGroup.manage(this, null)));
         phoneTiles.put("gallery", UiKit.tile(this, "image", T.t("Gallery"), T.t("photos & editing"), 0xFF6366F1,
                 v -> GalleryActivity.open(this)));
-        phoneTiles.put("shortcuts", UiKit.tile(this, "layout-grid", T.t("Add to home screen"), T.t("one icon per feature"), 0xFFF59E0B,
-                v -> ShortcutsActivity.open(this)));
         phoneTiles.put("bt_power", UiKit.tile(this, "power", T.t("Power on TV"), T.t("over Bluetooth, when it's off"), 0xFF22C55E,
                 v -> BtRemoteActivity.open(this, false)));
         phoneTiles.put("anywhere", UiKit.tile(this, "globe", T.t("My TVs anywhere"), T.t("control over the internet"), 0xFF0EA5E9,

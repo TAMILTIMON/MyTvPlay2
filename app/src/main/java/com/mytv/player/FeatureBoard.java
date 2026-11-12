@@ -49,6 +49,8 @@ final class FeatureBoard {
         t.put("eq", UiKit.tile(a, "sliders-vertical", T.t("Equalizer"), T.t("for the music player"), 0xFF22D3EE,
                 v -> a.startActivity(new Intent(a, PowerEqActivity.class))));
         t.put("updates", UiKit.tile(a, "refresh-cw", T.t("Updates"), Updater.installedName(a), 0xFF8B5CF6, v -> Updater.menu(a)));
+        if (!tv) t.put("home_icons", UiKit.tile(a, "layout-grid", T.t("Home-screen icons"), T.t("ZH Browser, ZH VPN, ZH Music… as widgets"), 0xFFF59E0B,
+                v -> ShortcutsActivity.open(a)));
         t.put("settings", UiKit.tile(a, "settings", T.t("Settings"), T.t("language, theme, …"), 0xFF64748B, v -> SettingsDialog.show(a)));
         if (!tv) t.put("exit", UiKit.tile(a, "power", T.t("Exit ZH Play"), T.t("close all, save battery"), 0xFFEF4444, v -> App.confirmExit(a)));
         int unread = InboxActivity.unread();
