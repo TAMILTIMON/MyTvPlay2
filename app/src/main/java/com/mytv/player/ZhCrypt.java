@@ -162,9 +162,43 @@ final class ZhCrypt {
     private static final Map<String, Long> oldTvs = new HashMap<>();
 
     /** Encryption is used for TVs on the network (not for this device talking to itself). */
+    private static final Map<String, Integer> capability = new HashMap<>();
+    private static final Map<String, Long> lastAsk = new HashMap<>();
+
+    /** Ask a device that isn't answering at most every 30 s (so an off TV doesn't slow every command). */
+    private static boolean askNow(String ip) {
+        synchronized (lastAsk) {
+            Long t = lastAsk.get(ip);
+            long now = System.currentTimeMillis();
+            if (t != null && now - t < 30000) return false;
+            lastAsk.put(ip, now);
+            return true;
+        }
+    }
+
+    /** What a device's /ping said: its encryption version, or 0 (older TV app, Linux PC app). */
+    static void noteCapability(String ip, int version) {
+        if (ip == null) return;
+        synchronized (capability) {
+            capability.put(ip, version);
+        }
+    }
+
     static boolean usable(String ip) {
         if (!ENABLED) return false;
         if (ip == null || ip.startsWith("127.") || ip.equals("localhost") || ip.equals("::1") || ip.startsWith("cloud:")) return false;
+        Integer cap;
+        synchronized (capability) {
+            cap = capability.get(ip);
+        }
+        if (cap == null && android.os.Looper.myLooper() != android.os.Looper.getMainLooper() && askNow(ip)) {
+            // not asked yet: one quick /ping (it records the answer through noteCapability)
+            Discovery.ping(ip, 1500);
+            synchronized (capability) {
+                cap = capability.get(ip);
+            }
+        }
+        if (cap == null || cap < 1) return false;        // didn't say it can → the plain connection, no handshake to fail
         synchronized (oldTvs) {
             Long t = oldTvs.get(ip);
             return t == null || System.currentTimeMillis() - t > 10 * 60 * 1000L;     // retry an old TV after 10 min

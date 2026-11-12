@@ -107,6 +107,7 @@ public final class Discovery {
             }
             JSONObject o = new JSONObject(sb.toString());
             if (!"mytvplayer".equals(o.optString("app"))) return null;
+            ZhCrypt.noteCapability(ip, o.optInt("enc", 0));       // 0 = an older TV / the Linux PC app: plain connection
             return new Device(o.optString("name", ip), ip, o.optBoolean("tv", true),
                     o.optString("code",""), o.optString("mac",""));   // pairing code + mac from TV
         } catch (Exception e) {

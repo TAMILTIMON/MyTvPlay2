@@ -429,7 +429,7 @@ public class WebServer extends NanoHTTPD {
 
                 case "/ping":
                     return json(new JSONObject().put("app", "mytvplayer").put("name", Discovery.deviceName(ctx))
-                            .put("tv", Ui.isTv(ctx)).put("ip", Net.ip()).put("mac", Net.mac())
+                            .put("tv", Ui.isTv(ctx)).put("ip", Net.ip()).put("mac", Net.mac()).put("enc", ZhCrypt.ENABLED ? ZhCrypt.VERSION : 0)
                             .put("code", PairCode.get())  // pairing code — IP stays hidden from UI
                             .put("share", Store.getBool("share_fs", false)).toString());
 
