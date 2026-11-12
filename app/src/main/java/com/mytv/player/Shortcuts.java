@@ -141,7 +141,7 @@ final class Shortcuts {
         ShortcutInfo info = new ShortcutInfo.Builder(a, "zh_" + it.id)
                 .setShortLabel(it.label)
                 .setLongLabel(it.label + " — " + T.t(it.sub))
-                .setIcon(Icon.createWithBitmap(iconFor(a, it)))
+                .setIcon(Icon.createWithAdaptiveBitmap(fullBleed(a, it)))
                 .setIntent(target)
                 .build();
         try {
@@ -162,59 +162,90 @@ final class Shortcuts {
         return c.getResources().getIdentifier("zh_widget_" + id, "drawable", c.getPackageName());
     }
 
-    /** The icon for a feature: your own logo if you added one, otherwise the generated ZH tile. */
-    static Bitmap iconFor(Context c, Item it) {
+    /**
+     * The feature's artwork as a full-bleed square (like an app icon's layers): edge-to-edge background,
+     * the logo / symbol centred in the part every icon shape shows. The launcher (or the widget below)
+     * then cuts it to the phone's own icon shape — so it looks like every other app icon, no white border.
+     */
+    static Bitmap fullBleed(Context c, Item it) {
+        int S = 216;                                     // 108dp canvas; the middle 2/3 is what an icon shape shows
+        Bitmap out = Bitmap.createBitmap(S, S, Bitmap.Config.ARGB_8888);
+        Canvas cv = new Canvas(out);
+        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
         int res = customLogo(c, it.id);
+        Bitmap logo = null;
         if (res != 0) {
             try {
-                Bitmap raw = android.graphics.BitmapFactory.decodeResource(c.getResources(), res);
-                if (raw != null) {
-                    int s = 192;                                   // fit it into a square, keeping its shape
-                    Bitmap out = Bitmap.createBitmap(s, s, Bitmap.Config.ARGB_8888);
-                    Canvas cv = new Canvas(out);
-                    float k = Math.min((float) s / raw.getWidth(), (float) s / raw.getHeight());
-                    float w = raw.getWidth() * k, h = raw.getHeight() * k;
-                    android.graphics.RectF dst = new android.graphics.RectF((s - w) / 2f, (s - h) / 2f, (s + w) / 2f, (s + h) / 2f);
-                    cv.drawBitmap(raw, null, dst, new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG));
-                    raw.recycle();
-                    return out;
-                }
+                logo = android.graphics.BitmapFactory.decodeResource(c.getResources(), res);
             } catch (Throwable ignored) {
-                // a broken file: fall back to the generated tile
             }
         }
-        return icon(c, it.icon, it.color);
+        if (logo != null) {
+            // your logo: fill the edges with its own border colour, then the logo over the visible area
+            cv.drawColor(borderColor(logo));
+            float target = S * 0.72f;                    // a little more than the visible 2/3, so it reaches the edges
+            float k = Math.max(target / logo.getWidth(), target / logo.getHeight());
+            float w = logo.getWidth() * k, h = logo.getHeight() * k;
+            cv.drawBitmap(logo, null, new android.graphics.RectF((S - w) / 2f, (S - h) / 2f, (S + w) / 2f, (S + h) / 2f), p);
+            logo.recycle();
+        } else {
+            // generated: the feature's colour edge to edge, its symbol in the middle
+            GradientDrawable bg = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{it.color, darker(it.color)});
+            bg.setBounds(0, 0, S, S);
+            bg.draw(cv);
+            UiKit.Icon fg = new UiKit.Icon(c, it.icon, 24, Color.WHITE);     // drawn at setBounds() size
+            int f = Math.round(S * 0.34f), o = (S - f) / 2;
+            fg.setBounds(o, o, o + f, o + f);
+            fg.draw(cv);
+        }
+        return out;
     }
 
-    /** A square tile: the feature's own symbol on its colour, with a small "ZH" badge in the corner. */
-    static Bitmap icon(Context c, String glyph, int color) {
+    /** The finished icon (cut to the phone's own icon shape) — for widgets and the list in the app. */
+    static Bitmap iconFor(Context c, Item it) {
+        Bitmap full = fullBleed(c, it);
         int s = 192;
-        Bitmap bmp = Bitmap.createBitmap(s, s, Bitmap.Config.ARGB_8888);
-        Canvas cv = new Canvas(bmp);
-        GradientDrawable bg = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{color, darker(color)});
-        bg.setCornerRadius(s * 0.24f);
-        bg.setBounds(0, 0, s, s);
-        bg.draw(cv);
-        UiKit.Icon fg = new UiKit.Icon(c, glyph, 24, Color.WHITE);     // drawn at setBounds() size
-        int f = Math.round(s * 0.5f), o = (s - f) / 2;
-        fg.setBounds(o, o - Math.round(s * 0.03f), o + f, o + f - Math.round(s * 0.03f));
-        fg.draw(cv);
-        float br = s * 0.15f, bx = s - br - s * 0.06f, by = s - br - s * 0.06f;
-        Paint badge = new Paint(Paint.ANTI_ALIAS_FLAG);
-        badge.setColor(0xFF111827);
-        cv.drawCircle(bx, by, br, badge);
-        Paint ring = new Paint(Paint.ANTI_ALIAS_FLAG);
-        ring.setStyle(Paint.Style.STROKE);
-        ring.setStrokeWidth(s * 0.012f);
-        ring.setColor(0x66FFFFFF);
-        cv.drawCircle(bx, by, br, ring);
-        Paint txt = new Paint(Paint.ANTI_ALIAS_FLAG);
-        txt.setColor(Color.WHITE);
-        txt.setTextSize(br * 0.95f);
-        txt.setTextAlign(Paint.Align.CENTER);
-        txt.setFakeBoldText(true);
-        cv.drawText("ZH", bx, by + txt.getTextSize() * 0.36f, txt);
-        return bmp;
+        Bitmap out = Bitmap.createBitmap(s, s, Bitmap.Config.ARGB_8888);
+        Canvas cv = new Canvas(out);
+        if (Build.VERSION.SDK_INT >= 26) {
+            // the very same shape the phone gives every app icon (circle, squircle, rounded square…)
+            android.graphics.drawable.AdaptiveIconDrawable ad = new android.graphics.drawable.AdaptiveIconDrawable(
+                    new android.graphics.drawable.ColorDrawable(0x00000000),
+                    new android.graphics.drawable.BitmapDrawable(c.getResources(), full));
+            ad.setBounds(0, 0, s, s);
+            ad.draw(cv);
+        } else {
+            // older phones: the visible middle part, as a rounded square
+            android.graphics.Path clip = new android.graphics.Path();
+            clip.addRoundRect(new android.graphics.RectF(0, 0, s, s), s * 0.22f, s * 0.22f, android.graphics.Path.Direction.CW);
+            cv.clipPath(clip);
+            int cut = full.getWidth() / 6;
+            cv.drawBitmap(full, new android.graphics.Rect(cut, cut, full.getWidth() - cut, full.getHeight() - cut),
+                    new android.graphics.RectF(0, 0, s, s), new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG));
+        }
+        full.recycle();
+        return out;
+    }
+
+    /** The average colour around a logo's edge (its background), so the icon's edges match it. */
+    private static int borderColor(Bitmap b) {
+        long r = 0, g = 0, bl = 0;
+        int n = 0, w = b.getWidth(), h = b.getHeight();
+        int step = Math.max(1, Math.min(w, h) / 40);
+        for (int i = 0; i < w; i += step) {
+            for (int y : new int[]{0, h - 1}) {
+                int px = b.getPixel(i, y);
+                if (Color.alpha(px) > 200) { r += Color.red(px); g += Color.green(px); bl += Color.blue(px); n++; }
+            }
+        }
+        for (int j = 0; j < h; j += step) {
+            for (int x : new int[]{0, w - 1}) {
+                int px = b.getPixel(x, j);
+                if (Color.alpha(px) > 200) { r += Color.red(px); g += Color.green(px); bl += Color.blue(px); n++; }
+            }
+        }
+        if (n == 0) return ColorExtract.dominant(b, Color.WHITE);   // see-through edges: use the logo's main colour
+        return Color.rgb((int) (r / n), (int) (g / n), (int) (bl / n));
     }
 
     private static int darker(int c) {
