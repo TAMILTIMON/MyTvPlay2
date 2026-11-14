@@ -317,6 +317,10 @@ public class SeedrActivity extends Activity {
             return;
         }
         if (!path.isEmpty()) list.addView(upRow(), rowLp());
+        videos.clear();
+        for (SeedrApi.SeedrFile f : items) if (f.playable()) videos.add(f);
+        java.util.Collections.sort(videos, (x, y) -> naturalCompare(x.name, y.name));   // E2 before E10
+        if (videos.size() >= 2) list.addView(carousel(), rowLp());
         if (items.isEmpty()) {
             TextView t = text(15, SUB, false);
             t.setText(path.isEmpty() ? T.t("Your Seedr is empty.\nTap ＋ to add a magnet link.") : T.t("This folder is empty."));
@@ -491,6 +495,7 @@ public class SeedrActivity extends Activity {
             final int act = ids.get(w);
             if (act == 4) rename(f);
             else if (act == 5) confirmDelete(f);
+            else if ((act == 0 || act == 1) && f.playable()) playFrom(f, act == 1);   // then the rest of the folder
             else withLink(f, url -> useLink(act, f.name, url));
         }).show();
     }
@@ -945,5 +950,191 @@ public class SeedrActivity extends Activity {
             final String m = msg;
             main.post(() -> toast(m));
         }).start();
+    }
+
+    // ------------------------------------------------------------------ play a whole folder
+
+    /** The videos in the folder on screen, in episode order. */
+    private final List<SeedrApi.SeedrFile> videos = new ArrayList<>();
+
+    /** "Episode 2" before "Episode 10": numbers inside names compare as numbers. */
+    static int naturalCompare(String a, String b) {
+        int i = 0, j = 0, na = a.length(), nb = b.length();
+        while (i < na && j < nb) {
+            char ca = a.charAt(i), cb = b.charAt(j);
+            if (Character.isDigit(ca) && Character.isDigit(cb)) {
+                int si = i, sj = j;
+                while (i < na && Character.isDigit(a.charAt(i))) i++;
+                while (j < nb && Character.isDigit(b.charAt(j))) j++;
+                String da = a.substring(si, i).replaceFirst("^0+(?=.)", ""), db = b.substring(sj, j).replaceFirst("^0+(?=.)", "");
+                if (da.length() != db.length()) return da.length() - db.length();
+                int c = da.compareTo(db);
+                if (c != 0) return c;
+            } else {
+                int c = Character.compare(Character.toLowerCase(ca), Character.toLowerCase(cb));
+                if (c != 0) return c;
+                i++;
+                j++;
+            }
+        }
+        return (na - i) - (nb - j);
+    }
+
+    /** Plays this video and then every later video in the folder, one after another (here or on the TV). */
+    private void playFrom(final SeedrApi.SeedrFile first, final boolean onTv) {
+        int at = -1;
+        for (int k = 0; k < videos.size(); k++) if (videos.get(k).id.equals(first.id)) at = k;
+        final List<SeedrApi.SeedrFile> queue = at < 0 ? Collections.singletonList(first) : new ArrayList<>(videos.subList(at, videos.size()));
+        if (onTv && Store.getStr("last_tv", "").isEmpty()) {
+            toast(T.t("Connect to your TV first (ZH Play home → pick the TV)"));
+            return;
+        }
+        loading(true);
+        if (queue.size() > 1) toast("▶ " + T.t("Getting") + " " + queue.size() + " " + T.t("videos ready…"));
+        new Thread(() -> {
+            // Seedr links are signed: fetch each one (4 at a time), keeping the episode order
+            final String[] urls = new String[queue.size()];
+            java.util.concurrent.ExecutorService ex = java.util.concurrent.Executors.newFixedThreadPool(4);
+            for (int k = 0; k < queue.size(); k++) {
+                final int n = k;
+                ex.execute(() -> {
+                    try {
+                        urls[n] = SeedrApi.fetchFileUrl(queue.get(n).id);
+                    } catch (Exception ignored) {
+                    }
+                });
+            }
+            ex.shutdown();
+            try {
+                ex.awaitTermination(90, java.util.concurrent.TimeUnit.SECONDS);
+            } catch (InterruptedException ignored) {
+            }
+            final List<Store.Item> items = new ArrayList<>();
+            for (int k = 0; k < queue.size(); k++)
+                if (urls[k] != null && !urls[k].isEmpty()) items.add(new Store.Item(queue.get(k).name, urls[k], ""));
+            if (items.isEmpty()) {
+                main.post(() -> {
+                    loading(false);
+                    toast("⚠ " + T.t("Couldn't get the video from Seedr — try again"));
+                });
+                return;
+            }
+            if (!onTv) {
+                main.post(() -> {
+                    loading(false);
+                    Store.addRecent(items.get(0));
+                    Remote.play(this, items, 0);                       // plays them one after another
+                });
+                return;
+            }
+            String msg;
+            try {
+                String ip = Store.getStr("last_tv", "");
+                org.json.JSONArray arr = new org.json.JSONArray();
+                for (Store.Item it : items) arr.put(new org.json.JSONObject().put("t", it.t).put("u", it.u));
+                HashMap<String, String> p = new HashMap<>();
+                p.put("items", arr.toString());
+                boolean listOk;
+                try {
+                    org.json.JSONObject r = TvClient.post(ip, "/playurls", p);
+                    listOk = r.optBoolean("ok", true);
+                } catch (TvClient.AuthNeeded | java.io.IOException e) {
+                    throw e;                                            // PIN needed / TV not reachable: say so
+                } catch (Exception notUnderstood) {
+                    listOk = false;                                     // an older TV answers "Not found" (not JSON)
+                }
+                if (listOk) {
+                    msg = items.size() > 1 ? "📺 " + T.t("Playing on the TV, then") + " " + (items.size() - 1) + " " + T.t("more") : T.t("Playing on the TV");
+                } else {
+                    // an older TV: it can take one video at a time
+                    HashMap<String, String> one = new HashMap<>();
+                    one.put("url", items.get(0).u);
+                    one.put("title", items.get(0).t);
+                    TvClient.post(ip, "/play", one);
+                    msg = T.t("Playing on the TV — update ZH Play on the TV to play the whole folder");
+                }
+            } catch (TvClient.AuthNeeded e) {
+                msg = T.t("Open the remote and enter the TV PIN first");
+            } catch (Exception e) {
+                msg = "⚠ " + T.t("Cannot reach the TV — same Wi-Fi?");
+            }
+            final String fm = msg;
+            main.post(() -> {
+                loading(false);
+                toast(fm);
+            });
+        }).start();
+    }
+
+    /** A row of picture cards for the folder's videos, plus Play all. Tap a card: play it and the ones after. */
+    private View carousel() {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout head = new LinearLayout(this);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        TextView t = text(15, Ui.TEXT, true);
+        t.setText(T.t("Videos") + "  ·  " + videos.size());
+        head.addView(t, new LinearLayout.LayoutParams(0, -2, 1));
+        boolean onTv = Ui.isTv(this);
+        head.addView(pill("▶  " + T.t("Play all"), true, v -> playFrom(videos.get(0), false)));
+        if (!onTv) {
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
+            lp.setMargins(dp(8), 0, 0, 0);
+            head.addView(pill("📺  " + T.t("On TV"), false, v -> playFrom(videos.get(0), true)), lp);
+        }
+        head.setPadding(dp(4), dp(4), dp(4), dp(8));
+        box.addView(head);
+
+        android.widget.HorizontalScrollView hs = new android.widget.HorizontalScrollView(this);
+        hs.setHorizontalScrollBarEnabled(false);
+        hs.setClipToPadding(false);
+        LinearLayout row = new LinearLayout(this);
+        row.setPadding(dp(2), dp(4), dp(2), dp(8));
+        int w = dp(onTv ? 220 : 168), h = Math.round(w * 9f / 16f);
+        for (final SeedrApi.SeedrFile f : videos) {
+            LinearLayout card = new LinearLayout(this);
+            card.setOrientation(LinearLayout.VERTICAL);
+            card.setFocusable(true);
+            card.setClickable(true);
+            card.setBackground(Ui.focusCard(this, 14));
+            card.setPadding(dp(6), dp(6), dp(6), dp(8));
+            android.widget.FrameLayout pic = new android.widget.FrameLayout(this);
+            android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+            bg.setColor(Ui.dark() ? 0xFF1A1F2E : 0xFFE5E7EB);
+            bg.setCornerRadius(dp(10));
+            pic.setBackground(bg);
+            pic.setClipToOutline(true);
+            pic.addView(UiKit.icon(this, "film", 28, Ui.ACCENT), new android.widget.FrameLayout.LayoutParams(dp(30), dp(30), Gravity.CENTER));
+            android.widget.ImageView iv = new android.widget.ImageView(this);
+            iv.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
+            pic.addView(iv, new android.widget.FrameLayout.LayoutParams(-1, -1));
+            card.addView(pic, new LinearLayout.LayoutParams(w, h));
+            TextView n = text(12, Ui.TEXT, false);
+            n.setText(f.name);
+            n.setMaxLines(2);
+            n.setEllipsize(TextUtils.TruncateAt.END);
+            n.setPadding(dp(2), dp(6), dp(2), 0);
+            card.addView(n, new LinearLayout.LayoutParams(w, -2));
+            card.setOnClickListener(v -> fileActions(f));
+            card.setOnFocusChangeListener((v, has) -> v.animate().scaleX(has ? 1.05f : 1f).scaleY(has ? 1.05f : 1f).setDuration(120).start());
+            LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(-2, -2);
+            clp.setMargins(0, 0, dp(10), 0);
+            row.addView(card, clp);
+            SeedrThumbs.load(iv, f);
+        }
+        hs.addView(row);
+        box.addView(hs);
+        return box;
+    }
+
+    private TextView pill(String label, boolean primary, View.OnClickListener l) {
+        TextView b = text(13, primary ? Color.WHITE : Ui.TEXT, true);
+        b.setText(label);
+        b.setPadding(dp(14), dp(8), dp(14), dp(8));
+        b.setBackground(primary ? Ui.gradient(this, 18) : Ui.focusCard(this, 18));
+        b.setFocusable(true);
+        b.setClickable(true);
+        b.setOnClickListener(l);
+        return b;
     }
 }

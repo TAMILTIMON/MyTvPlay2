@@ -402,6 +402,25 @@ public class WebServer extends NanoHTTPD {
                     return msg("Playing on the TV");
                 }
 
+                case "/playurls": {          // a list of links (e.g. a Seedr folder), played one after another
+                    if (Family.minutesLeft() == 0) return fail("⏰ Screen time for today is used up");
+                    List<Store.Item> items = new java.util.ArrayList<>();
+                    try {
+                        org.json.JSONArray arr = new org.json.JSONArray(val(p, "items"));
+                        for (int k = 0; k < arr.length(); k++) {
+                            org.json.JSONObject o = arr.optJSONObject(k);
+                            if (o != null && Formats.looksPlayable(o.optString("u")))
+                                items.add(new Store.Item(o.optString("t"), o.optString("u"), ""));
+                        }
+                    } catch (Exception e) {
+                        return fail("Couldn't read the list");
+                    }
+                    if (items.isEmpty()) return fail("Nothing to play");
+                    Store.addRecent(items.get(0));
+                    Remote.play(ctx, items, 0);
+                    return msg(items.size() > 1 ? "Playing " + items.size() + " videos on the TV" : "Playing on the TV");
+                }
+
                 case "/play": {
                     if (Family.minutesLeft() == 0) return fail("⏰ Screen time for today is used up");
                     String u = val(p, "url");
