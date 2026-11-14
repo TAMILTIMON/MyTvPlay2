@@ -132,8 +132,50 @@ public class UiDialog extends AlertDialog.Builder {
                     if (sel >= 0) lv.setSelection(sel);
                 }
             }
+            if (d.getWindow() != null) oneLineBoxes(d, d.getWindow().getDecorView());
         });
         return d;
+    }
+
+    /**
+     * Text boxes in pop-ups (names, links, PINs…): one line, so ✓ / Enter never adds a new line and the
+     * D-pad can leave the box; ✓ / Enter presses the pop-up's main button (Next / Save / OK).
+     * Left alone: boxes made to show several lines on purpose, and boxes that already have their own Enter action.
+     */
+    private static void oneLineBoxes(final AlertDialog d, View v) {
+        if (v instanceof android.widget.EditText) {
+            final android.widget.EditText e = (android.widget.EditText) v;
+            int maxL = e.getMaxLines();
+            boolean multiOnPurpose = e.getMinLines() > 1 || (maxL > 1 && maxL < Integer.MAX_VALUE);
+            if (multiOnPurpose) return;
+            int t = e.getInputType();
+            if ((t & android.text.InputType.TYPE_MASK_CLASS) == android.text.InputType.TYPE_CLASS_TEXT
+                    && (t & android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE) != 0) {
+                e.setInputType(t & ~android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);   // keeps password boxes hidden
+            }
+            e.setMaxLines(1);
+            e.setHorizontallyScrolling(true);
+            if ((e.getImeOptions() & android.view.inputmethod.EditorInfo.IME_MASK_ACTION)
+                    == android.view.inputmethod.EditorInfo.IME_ACTION_UNSPECIFIED) {
+                e.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_DONE);
+                e.setOnEditorActionListener((tv, action, ev) -> {
+                    if (ev != null && ev.getAction() != android.view.KeyEvent.ACTION_DOWN) return true;   // once per press
+                    android.widget.Button ok = d.getButton(DialogInterface.BUTTON_POSITIVE);
+                    if (ok != null && ok.getVisibility() == View.VISIBLE && ok.isEnabled()) {
+                        ok.performClick();                               // ✓ = the main button (Next / Save / OK)
+                    } else {
+                        View next = e.focusSearch(View.FOCUS_DOWN);       // no main button: move on
+                        if (next != null) next.requestFocus();
+                    }
+                    return true;
+                });
+            }
+            return;
+        }
+        if (v instanceof ViewGroup) {
+            ViewGroup g = (ViewGroup) v;
+            for (int i = 0; i < g.getChildCount(); i++) oneLineBoxes(d, g.getChildAt(i));
+        }
     }
 
     @Override
