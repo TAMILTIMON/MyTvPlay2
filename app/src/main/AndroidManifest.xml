@@ -148,6 +148,190 @@
             android:name=".ShortcutLaunchActivity"
             android:exported="true"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+        <!-- ZH Play features as their own app icons (no badge). Off until switched on in "Home-screen icons". -->
+        <activity-alias
+            android:name=".FeatureAppBrowser"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/zh_feat_browser"
+            android:roundIcon="@drawable/zh_feat_browser"
+            android:label="ZH Browser"
+            android:targetActivity=".ShortcutLaunchActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".FeatureAppPlayer"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/zh_feat_player"
+            android:roundIcon="@drawable/zh_feat_player"
+            android:label="ZH Player"
+            android:targetActivity=".ShortcutLaunchActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".FeatureAppVideos"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/zh_feat_videos"
+            android:roundIcon="@drawable/zh_feat_videos"
+            android:label="ZH Videos"
+            android:targetActivity=".ShortcutLaunchActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".FeatureAppMusic"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/zh_feat_music"
+            android:roundIcon="@drawable/zh_feat_music"
+            android:label="ZH Music"
+            android:targetActivity=".ShortcutLaunchActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".FeatureAppGallery"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/zh_feat_gallery"
+            android:roundIcon="@drawable/zh_feat_gallery"
+            android:label="ZH Gallery"
+            android:targetActivity=".ShortcutLaunchActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".FeatureAppVpn"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/zh_feat_vpn"
+            android:roundIcon="@drawable/zh_feat_vpn"
+            android:label="ZH VPN"
+            android:targetActivity=".ShortcutLaunchActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".FeatureAppSeedr"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/zh_feat_seedr"
+            android:roundIcon="@drawable/zh_feat_seedr"
+            android:label="ZH Seedr"
+            android:targetActivity=".ShortcutLaunchActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".FeatureAppRemote"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/zh_feat_remote"
+            android:roundIcon="@drawable/zh_feat_remote"
+            android:label="ZH Remote"
+            android:targetActivity=".ShortcutLaunchActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".FeatureAppFiles"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/zh_feat_files"
+            android:roundIcon="@drawable/zh_feat_files"
+            android:label="ZH Files"
+            android:targetActivity=".ShortcutLaunchActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".FeatureAppBoard"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/zh_feat_board"
+            android:roundIcon="@drawable/zh_feat_board"
+            android:label="ZH Whiteboard"
+            android:targetActivity=".ShortcutLaunchActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".FeatureAppDj"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/zh_feat_dj"
+            android:roundIcon="@drawable/zh_feat_dj"
+            android:label="ZH DJ"
+            android:targetActivity=".ShortcutLaunchActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".FeatureAppEditor"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/zh_feat_editor"
+            android:roundIcon="@drawable/zh_feat_editor"
+            android:label="ZH Song Editor"
+            android:targetActivity=".ShortcutLaunchActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".FeatureAppLibrary"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/zh_feat_library"
+            android:roundIcon="@drawable/zh_feat_library"
+            android:label="ZH Library"
+            android:targetActivity=".ShortcutLaunchActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".FeatureAppEq"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/zh_feat_eq"
+            android:roundIcon="@drawable/zh_feat_eq"
+            android:label="ZH Equalizer"
+            android:targetActivity=".ShortcutLaunchActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
         <activity
             android:name=".PanelHostActivity"
             android:exported="false"
@@ -459,6 +643,162 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info" />
+        </receiver>
+
+        <!-- one 1×1 home-screen icon per feature (Widgets → ZH Play) -->
+        <receiver
+            android:name=".FeatureWidget$Browser"
+            android:exported="true"
+            android:label="ZH Browser">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_feature_info" />
+        </receiver>
+        <receiver
+            android:name=".FeatureWidget$Player"
+            android:exported="true"
+            android:label="ZH Player">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_feature_info" />
+        </receiver>
+        <receiver
+            android:name=".FeatureWidget$Videos"
+            android:exported="true"
+            android:label="ZH Videos">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_feature_info" />
+        </receiver>
+        <receiver
+            android:name=".FeatureWidget$Music"
+            android:exported="true"
+            android:label="ZH Music">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_feature_info" />
+        </receiver>
+        <receiver
+            android:name=".FeatureWidget$Gallery"
+            android:exported="true"
+            android:label="ZH Gallery">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_feature_info" />
+        </receiver>
+        <receiver
+            android:name=".FeatureWidget$Vpn"
+            android:exported="true"
+            android:label="ZH VPN">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_feature_info" />
+        </receiver>
+        <receiver
+            android:name=".FeatureWidget$Seedr"
+            android:exported="true"
+            android:label="ZH Seedr">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_feature_info" />
+        </receiver>
+        <receiver
+            android:name=".FeatureWidget$Remote"
+            android:exported="true"
+            android:label="ZH Remote">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_feature_info" />
+        </receiver>
+        <receiver
+            android:name=".FeatureWidget$Files"
+            android:exported="true"
+            android:label="ZH Files">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_feature_info" />
+        </receiver>
+        <receiver
+            android:name=".FeatureWidget$Board"
+            android:exported="true"
+            android:label="ZH Whiteboard">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_feature_info" />
+        </receiver>
+        <receiver
+            android:name=".FeatureWidget$Dj"
+            android:exported="true"
+            android:label="ZH DJ">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_feature_info" />
+        </receiver>
+        <receiver
+            android:name=".FeatureWidget$Editor"
+            android:exported="true"
+            android:label="ZH Song Editor">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_feature_info" />
+        </receiver>
+        <receiver
+            android:name=".FeatureWidget$Library"
+            android:exported="true"
+            android:label="ZH Library">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_feature_info" />
+        </receiver>
+        <receiver
+            android:name=".FeatureWidget$Eq"
+            android:exported="true"
+            android:label="ZH Equalizer">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_feature_info" />
         </receiver>
 
         <!-- full TV remote on the home screen (resizable) -->

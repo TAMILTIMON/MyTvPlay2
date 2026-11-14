@@ -123,6 +123,41 @@ final class Shortcuts {
         }
     }
 
+    // ------------------------------------------------------------------ own app icons (no badge)
+
+    /** The launcher entry for a feature, e.g. "browser" → ".FeatureAppBrowser" (declared in the manifest). */
+    static android.content.ComponentName appIcon(Context c, String id) {
+        String suffix = id.substring(0, 1).toUpperCase(java.util.Locale.ROOT) + id.substring(1);
+        return new android.content.ComponentName(c.getPackageName(), c.getPackageName() + ".FeatureApp" + suffix);
+    }
+
+    /** The feature for a launcher entry (the reverse of appIcon), or null. */
+    static String idForAppIcon(String className) {
+        if (className == null) return null;
+        int i = className.lastIndexOf(".FeatureApp");
+        if (i < 0) return null;
+        String suffix = className.substring(i + ".FeatureApp".length());
+        for (Item it : ITEMS) if (it.id.equalsIgnoreCase(suffix)) return it.id;
+        return null;
+    }
+
+    static boolean appIconOn(Context c, String id) {
+        try {
+            return c.getPackageManager().getComponentEnabledSetting(appIcon(c, id))
+                    == android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /** Shows / hides the feature as its own app in the phone's app list (and home screen on some phones). */
+    static void setAppIcon(Context c, String id, boolean on) {
+        c.getPackageManager().setComponentEnabledSetting(appIcon(c, id),
+                on ? android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+                        : android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                android.content.pm.PackageManager.DONT_KILL_APP);
+    }
+
     // ------------------------------------------------------------------ pinned icons (Android 8+)
 
     static boolean pinSupported(Context c) {

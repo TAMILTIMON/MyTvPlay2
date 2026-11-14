@@ -77,10 +77,9 @@ public class ShortcutsActivity extends Activity {
         hlp.setMargins(dp(16), 0, dp(16), dp(6));
         outer.addView(how, hlp);
 
-        final boolean canPin = Shortcuts.pinSupported(this);
         TextView sub = text(13, Ui.DIM, false);
-        sub.setText(canPin ? T.t("Or tap Add below — the icon is placed for you (your home screen asks to confirm).")
-                : T.t("Your home screen can't place icons directly — use the widget steps above."));
+        sub.setText(T.t("Or switch a feature ON below: it becomes its own app in your phone's app list — its own icon, no ZH Play badge. Long-press it there and drag it to your home screen (some phones put it on the home screen by themselves)."));
+        sub.setLineSpacing(0, 1.15f);
         sub.setPadding(dp(16), dp(10), dp(16), dp(6));
         outer.addView(sub);
 
@@ -113,18 +112,19 @@ public class ShortcutsActivity extends Activity {
             col.addView(s2);
             row.addView(col, new LinearLayout.LayoutParams(0, -2, 1));
 
-            if (canPin) {
-                TextView add = text(13, Color.WHITE, true);
-                add.setText("+ " + T.t("Add"));
-                add.setGravity(Gravity.CENTER);
-                add.setPadding(dp(14), 0, dp(14), 0);
-                GradientDrawable ag = new GradientDrawable();
-                ag.setColor(Ui.ACCENT);
-                ag.setCornerRadius(dp(16));
-                add.setBackground(ag);
-                add.setOnClickListener(v -> Shortcuts.pin(this, it));
-                row.addView(add, new LinearLayout.LayoutParams(-2, dp(36)));
-            }
+            final ZhPopup.Toggle sw = new ZhPopup.Toggle(this, Shortcuts.appIconOn(this, it.id));
+            sw.setContentDescription(it.label);
+            sw.onChange(() -> {
+                try {
+                    Shortcuts.setAppIcon(this, it.id, sw.on());
+                    UiKit.makeToast(this, sw.on() ? "✓ " + it.label + " " + T.t("is now in your app list")
+                            : it.label + " " + T.t("removed from your app list"), android.widget.Toast.LENGTH_SHORT).show();
+                } catch (Exception e) {
+                    UiKit.makeToast(this, "⚠ " + e.getMessage(), android.widget.Toast.LENGTH_LONG).show();
+                }
+            });
+            row.addView(sw, new LinearLayout.LayoutParams(dp(48), dp(28)));
+            row.setOnClickListener(v -> sw.performClick());
             LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(-1, -2);
             rlp.setMargins(0, dp(8), 0, 0);
             body.addView(row, rlp);

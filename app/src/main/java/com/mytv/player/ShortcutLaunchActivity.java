@@ -11,6 +11,8 @@ public class ShortcutLaunchActivity extends Activity {
     protected void onCreate(Bundle b) {
         super.onCreate(b);
         String id = getIntent().getStringExtra(EXTRA_ID);
+        if (id == null && getIntent().getComponent() != null)
+            id = Shortcuts.idForAppIcon(getIntent().getComponent().getClassName());   // tapped "ZH Browser" etc. in the app list
         try {
             Shortcuts.launch(this, id == null ? "" : id);
         } catch (Exception e) {
