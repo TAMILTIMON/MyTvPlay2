@@ -11,7 +11,7 @@ android {
         minSdk 21
         targetSdk 34
         versionCode = (System.getenv('VCODE') ?: '34').toInteger()
-        versionName = '9.3' + (System.getenv('VCODE') ? '.' + System.getenv('VCODE') : '')
+        versionName = '9.3.1' + (System.getenv('VCODE') ? '.' + System.getenv('VCODE') : '')
     }
 
     // Two variants from the same code — every feature is in both:
@@ -125,6 +125,14 @@ dependencies {
 // otherwise the generated icon (symbol on its colour). Written on every build into build/generated/zhicons.
 def zhIconsDir = file('build/generated/zhicons/res')
 android.sourceSets.main.res.srcDir(zhIconsDir)
+// older versions kept fixed copies of these icons in src/main/res — they'd clash ("Duplicate resources"), so clear them
+['drawable', 'drawable-anydpi-v26'].each { dir ->
+    File d = file("src/main/res/${dir}")
+    if (d.isDirectory()) {
+        d.listFiles().findAll { it.name.startsWith('zh_feat_') && it.name.endsWith('.xml') }.each { it.delete() }
+        if (dir == 'drawable-anydpi-v26' && d.listFiles().length == 0) d.delete()
+    }
+}
 
 def zhEdgeColor(File f) {
     try {

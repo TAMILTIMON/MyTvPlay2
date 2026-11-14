@@ -39,7 +39,15 @@ public class App extends Application {
 
     /** Stops every service, removes every notification, closes every screen, ends the process. */
     public static void exitAll(Activity a) {
-        final android.content.Context c = a.getApplicationContext();
+        try {
+            a.finishAffinity();
+        } catch (Throwable ignored) {
+        }
+        exitAll(a.getApplicationContext());
+    }
+
+    /** Exit ZH Play completely — also from the background (auto-close timer), where no screen is open. */
+    public static void exitAll(final android.content.Context c) {
         Store.putBool("exited", true);
         Class<?>[] services = {MusicService.class, BrowserPlayService.class, CastScreenService.class,
                 TvControlService.class, MediaWatch.class, RemoteService.class};
@@ -58,10 +66,6 @@ public class App extends Application {
             android.app.ActivityManager am = (android.app.ActivityManager) c.getSystemService(android.content.Context.ACTIVITY_SERVICE);
             if (am != null && android.os.Build.VERSION.SDK_INT >= 21)
                 for (android.app.ActivityManager.AppTask t : am.getAppTasks()) t.finishAndRemoveTask();
-        } catch (Throwable ignored) {
-        }
-        try {
-            a.finishAffinity();
         } catch (Throwable ignored) {
         }
         new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
@@ -108,6 +112,7 @@ public class App extends Application {
         seedIptv();
         registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {
             public void onActivityStarted(Activity a) {
+                if (visible == 0) AutoExit.onForeground(a);          // in use again: no auto-close countdown
                 visible++;
                 // Google sign-in / admin gate (admin/access.json on GitHub)
                 if (Cloud.signedIn() && Cloud.cachedIdToken().isEmpty()) {
@@ -136,7 +141,10 @@ public class App extends Application {
                     RemoteService.start(a.getApplicationContext());
                 }
             }
-            public void onActivityStopped(Activity a) { visible = Math.max(0, visible - 1); }
+            public void onActivityStopped(Activity a) {
+                visible = Math.max(0, visible - 1);
+                if (visible == 0) AutoExit.onBackground(a);          // left ZH Play: auto-close countdown (if set)
+            }
             public void onActivityCreated(Activity a, Bundle b) {
                 Shortcuts.labelTask(a);              // opened from a ZH Music / ZH Videos… icon: its own name in Recent apps
             }

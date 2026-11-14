@@ -144,6 +144,10 @@
             android:name=".ShortcutsActivity"
             android:exported="false"
             android:label="Add to home screen" />
+        <!-- auto-close: ZH Play closes itself after the chosen time unused in the background -->
+        <receiver
+            android:name=".AutoExit$Fire"
+            android:exported="false" />
         <activity
             android:name=".ShortcutLaunchActivity"
             android:excludeFromRecents="true"

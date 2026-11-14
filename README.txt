@@ -1,3 +1,36 @@
+ZH PLAY 9.3.1 — everything in one consistent set
+================================================
+* Feature icons (ZH Music, ZH Videos, Remote…) each open in their OWN task: the right feature every time,
+  separate entries in Recent apps with their own name and icon.
+* App-list icons use your own logo (res/drawable-nodpi/zh_widget_<feature>.png) automatically at build time;
+  the build clears the old fixed icon copies itself.
+* Auto-close: Settings → More → "Close ZH Play when not used for" (minutes / hours / days); waits while
+  music / casting plays; on a TV it warns first.
+* Notifications: ⚙ in 🔔 Notifications — live alerts / announcements on-off, remove the broadcast banner and
+  messages here, clear the shade; ended broadcasts clear everywhere (also when the app is closed).
+* Whiteboard: TV loads board pictures; pictures work for every user; eraser for new pen styles.
+* Linux PC app connects again (encryption only with devices that announce it).
+
+ZH PLAY 9.3
+===========
+* GALLERY: phone photos in a fast grid (only visible cells load), album chips, full-screen viewer with
+  smooth swipe paging, pinch / double-tap zoom, photos shown the right way up; Edit · Share · Info · Delete.
+* PHOTO EDITOR: crop, rotate / straighten, brightness / contrast / saturation, filters, draw, text;
+  loads and saves in the background (no black screen); always dark; Undo / Redo; saves to Pictures/ZH Play.
+* HOME-SCREEN WIDGETS: Widgets → ZH Play → ZH Browser, ZH Player, ZH Videos, ZH Music, ZH Gallery, ZH VPN,
+  ZH Seedr, ZH Remote, ZH Files, ZH Whiteboard, ZH DJ, ZH Song Editor, ZH Library, ZH Equalizer — 1×1,
+  in the phone's own icon shape, full-bleed. Own logos: res/drawable-nodpi/zh_widget_<feature>.png.
+  "Home-screen icons" tile on the remote and Features boards (also pinned icons).
+* PAIRED TVs list (details, connect, remove, add), auto-connect switch, scroll lock in the remote,
+  TV found again by its hardware address when its IP changes.
+* COLOURS: full colour picker + harmony suggestions; custom accent / gradient in the browser;
+  background picture with opacity, and the app's colours adapt to it.
+* WHITEBOARD: pen styles (marker, fine, dashed), pictures and videos on the board, Ask AI.
+* Broadcast notification is cleared on every device when the admin ends a broadcast.
+* Linux PC app connects again: the phone only uses the encrypted connection with devices that announce
+  it in /ping (TV 9.3+); older TVs and the Linux PC get the plain connection without a handshake.
+* Update BOTH phone and TV.
+
 ZH PLAY 9.2.2 — Bluetooth device type fixed (was "gamepad", now "remote control")
 ===================================================================================
 * Your screenshot showed the phone listed with a gamepad/joystick icon on the TV, unlike the Mi remote.

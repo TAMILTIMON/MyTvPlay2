@@ -79,6 +79,7 @@ public final class SettingsDialog {
                 "§" + T.t("More"),
                 T.t("📱  Use as remote for another TV…"),
                 "👨‍👩‍👧  " + T.t("Profiles & kids lock") + ": " + Family.label(),
+                "⏻  " + T.t("Close ZH Play when not used for") + ": " + AutoExit.label(AutoExit.minutes()),
                 T.t("ℹ  Phone remote address: http://") + Net.ip() + ":" + RemoteService.PORT};
         new UiDialog(a).setTitle(T.t("⚙  Settings")).setItems(items, new DialogInterface.OnClickListener() {
             @Override
@@ -263,6 +264,9 @@ public final class SettingsDialog {
                     case 23:
                         if (Family.isKids()) Family.askPin(a, "", () -> Family.manage(a, a::recreate));
                         else Family.manage(a, a::recreate);
+                        break;
+                    case 24:
+                        AutoExit.settings(a, () -> show(a));
                         break;
                     default:
                         break;
