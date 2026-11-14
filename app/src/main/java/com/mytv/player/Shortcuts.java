@@ -128,7 +128,10 @@ final class Shortcuts {
     /** The launcher entry for a feature, e.g. "browser" → ".FeatureAppBrowser" (declared in the manifest). */
     static android.content.ComponentName appIcon(Context c, String id) {
         String suffix = id.substring(0, 1).toUpperCase(java.util.Locale.ROOT) + id.substring(1);
-        return new android.content.ComponentName(c.getPackageName(), c.getPackageName() + ".FeatureApp" + suffix);
+        // the app's id (com.tamil.castplay) + the full name of the manifest entry, which lives in the code's
+        // package (com.mytv.player) — the manifest's ".FeatureApp…" names are completed with that, not the app id
+        String codePackage = ShortcutLaunchActivity.class.getName().substring(0, ShortcutLaunchActivity.class.getName().lastIndexOf('.'));
+        return new android.content.ComponentName(c.getPackageName(), codePackage + ".FeatureApp" + suffix);
     }
 
     /** The feature for a launcher entry (the reverse of appIcon), or null. */
