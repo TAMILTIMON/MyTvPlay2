@@ -146,6 +146,9 @@
             android:label="Add to home screen" />
         <activity
             android:name=".ShortcutLaunchActivity"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity=""
             android:exported="true"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 

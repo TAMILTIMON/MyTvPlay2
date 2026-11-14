@@ -137,7 +137,9 @@ public class App extends Application {
                 }
             }
             public void onActivityStopped(Activity a) { visible = Math.max(0, visible - 1); }
-            public void onActivityCreated(Activity a, Bundle b) { }
+            public void onActivityCreated(Activity a, Bundle b) {
+                Shortcuts.labelTask(a);              // opened from a ZH Music / ZH Videos… icon: its own name in Recent apps
+            }
             public void onActivityResumed(Activity a) {
                 top = new java.lang.ref.WeakReference<>(a);
                 if (a instanceof ConnectActivity || a instanceof MainActivity) Broadcast.attach(a);   // 📢 / 🔴 LIVE bar

@@ -64,62 +64,89 @@ final class Shortcuts {
         return null;
     }
 
-    /** Opens the feature — the same way its tile inside ZH Play does. */
+    static final String EXTRA_FEATURE = "zh_feature";
+
+    /**
+     * Opens the feature from a home-screen icon / widget — the same screen its tile inside ZH Play opens,
+     * but in its OWN task: ZH Music, ZH Videos, the remote… each get their own entry in Recent apps, and
+     * tapping ZH Music always comes back to ZH Music (not to whatever ZH Play screen was open last).
+     */
     static void launch(Activity a, String id) {
+        Intent i;
         switch (id) {
             case "browser":
-                a.startActivity(new Intent(a, BrowserActivity.class));
+                i = new Intent(a, BrowserActivity.class);          // the browser already keeps its own task
                 break;
             case "player":
-                a.startActivity(new Intent(a, MainActivity.class).putExtra(MainActivity.EXTRA_PLAYER_HOME, true));
+                i = new Intent(a, MainActivity.class).putExtra(MainActivity.EXTRA_PLAYER_HOME, true);
                 break;
             case "videos":
-                a.startActivity(new Intent(a, PhoneLibraryActivity.class));
+                i = new Intent(a, PhoneLibraryActivity.class);
                 break;
             case "music":
-                a.startActivity(new Intent(a, PhoneLibraryActivity.class).putExtra(PhoneLibraryActivity.EXTRA_AUDIO, true));
+                i = new Intent(a, PhoneLibraryActivity.class).putExtra(PhoneLibraryActivity.EXTRA_AUDIO, true);
                 break;
             case "gallery":
-                GalleryActivity.open(a);
+                i = new Intent(a, GalleryActivity.class);
                 break;
             case "vpn":
-                a.startActivity(new Intent(a, PanelHostActivity.class).putExtra(PanelHostActivity.EXTRA_PANEL, "vpn"));
+                i = new Intent(a, PanelHostActivity.class).putExtra(PanelHostActivity.EXTRA_PANEL, "vpn");
                 break;
             case "seedr":
-                SeedrActivity.open(a);
+                if (!Auth.featureOn("seedr")) {
+                    UiKit.makeToast(a, T.t("Switched off by the admin"), android.widget.Toast.LENGTH_LONG).show();
+                    return;
+                }
+                i = new Intent(a, SeedrActivity.class);
                 break;
             case "remote": {
                 String ip = Store.getStr("last_tv", "");
-                if (ip.isEmpty()) {                      // no TV yet: the screen that finds one
-                    a.startActivity(new Intent(a, ConnectActivity.class));
+                if (ip.isEmpty()) {                                  // no TV yet: the screen that finds one
+                    i = new Intent(a, ConnectActivity.class);
                     break;
                 }
                 String name = "TV";
                 for (org.json.JSONObject tv : TvList.all()) if (ip.equals(tv.optString("ip"))) name = tv.optString("name", "TV");
-                a.startActivity(new Intent(a, NativeRemoteActivity.class)
-                        .putExtra(NativeRemoteActivity.EXTRA_IP, ip).putExtra(NativeRemoteActivity.EXTRA_NAME, name));
+                i = new Intent(a, NativeRemoteActivity.class)
+                        .putExtra(NativeRemoteActivity.EXTRA_IP, ip).putExtra(NativeRemoteActivity.EXTRA_NAME, name);
                 break;
             }
             case "files":
-                StorageActivity.open(a);
+                i = new Intent(a, StorageActivity.class);
                 break;
             case "board":
-                a.startActivity(new Intent(a, PresentActivity.class).putExtra(PresentActivity.EXTRA_BOARD, true));
+                i = new Intent(a, PresentActivity.class).putExtra(PresentActivity.EXTRA_BOARD, true);
                 break;
             case "dj":
-                a.startActivity(new Intent(a, DjActivity.class));
+                i = new Intent(a, DjActivity.class);
                 break;
             case "editor":
-                a.startActivity(new Intent(a, EditorActivity.class));
+                i = new Intent(a, EditorActivity.class);
                 break;
             case "library":
-                a.startActivity(new Intent(a, LibraryActivity.class));
+                i = new Intent(a, LibraryActivity.class);
                 break;
             case "eq":
-                a.startActivity(new Intent(a, PowerEqActivity.class));
+                i = new Intent(a, PowerEqActivity.class);
                 break;
             default:
-                a.startActivity(new Intent(a, ConnectActivity.class));
+                i = new Intent(a, ConnectActivity.class);
+        }
+        // a "document" task per feature: same feature → back to its task; another feature → its own task
+        i.addFlags(Intent.FLAG_ACTIVITY_NEW_DOCUMENT | Intent.FLAG_ACTIVITY_NEW_TASK)
+                .addCategory("com.tamil.castplay.feature." + id)
+                .putExtra(EXTRA_FEATURE, id);
+        a.startActivity(i);
+    }
+
+    /** Recent apps: a feature's task shows the feature's own name and icon (your logo if you added one). */
+    static void labelTask(Activity act) {
+        try {
+            String id = act.getIntent() == null ? null : act.getIntent().getStringExtra(EXTRA_FEATURE);
+            Item it = id == null ? null : find(id);
+            if (it == null || Build.VERSION.SDK_INT < 21) return;
+            act.setTaskDescription(new android.app.ActivityManager.TaskDescription(it.label, iconFor(act, it), it.color));
+        } catch (Throwable ignored) {
         }
     }
 
