@@ -45,6 +45,10 @@ public class TvControlService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        if (intent == null && Store.getBool("exited", false)) {          // restarted by Android after Exit: stay stopped
+            stopSelf();
+            return START_NOT_STICKY;
+        }
         if (intent != null && intent.getStringExtra("ip") != null) {
             ip = intent.getStringExtra("ip");
             name = intent.getStringExtra("name") == null ? "TV" : intent.getStringExtra("name");

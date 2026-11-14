@@ -68,20 +68,14 @@ final class AutoExit {
         }
     }
 
-    /** Music, background browser audio or screen casting is running right now. */
-    @SuppressWarnings("deprecation")
+    /** Music or background browser audio is actually PLAYING, or the screen is being cast, right now.
+     *  (A paused song's notification doesn't count — otherwise auto-close would wait forever.) */
     static boolean busy(Context c) {
         try {
-            android.app.ActivityManager am = (android.app.ActivityManager) c.getSystemService(Context.ACTIVITY_SERVICE);
-            if (am == null) return false;
-            String[] keep = {MusicService.class.getName(), BrowserPlayService.class.getName(), CastScreenService.class.getName()};
-            for (android.app.ActivityManager.RunningServiceInfo s : am.getRunningServices(100)) {
-                if (!c.getPackageName().equals(s.service.getPackageName())) continue;
-                for (String k : keep) if (k.equals(s.service.getClassName()) && (s.started || s.foreground)) return true;
-            }
-        } catch (Throwable ignored) {
+            return MusicService.playing() || BrowserPlayService.playing || CastScreenService.running;
+        } catch (Throwable e) {
+            return false;
         }
-        return false;
     }
 
     /** The countdown ended. */

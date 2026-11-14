@@ -82,6 +82,10 @@ public class RemoteService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        if (Store.getBool("exited", false) && !Ui.isTv(this)) {      // ZH Play was exited: don't come back by itself
+            stopSelf();
+            return START_NOT_STICKY;
+        }
         return START_STICKY;
     }
 

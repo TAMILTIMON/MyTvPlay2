@@ -49,6 +49,7 @@ public class App extends Application {
     /** Exit ZH Play completely — also from the background (auto-close timer), where no screen is open. */
     public static void exitAll(final android.content.Context c) {
         Store.putBool("exited", true);
+        MediaWatch.unbindNow();                     // otherwise Android keeps ZH Play running for its notification listener
         Class<?>[] services = {MusicService.class, BrowserPlayService.class, CastScreenService.class,
                 TvControlService.class, MediaWatch.class, RemoteService.class};
         for (Class<?> s : services) {
@@ -139,6 +140,7 @@ public class App extends Application {
                 if (Store.getBool("exited", false)) {          // opened again after Exit: back to normal
                     Store.putBool("exited", false);
                     RemoteService.start(a.getApplicationContext());
+                    MediaWatch.rebind(a.getApplicationContext());
                 }
             }
             public void onActivityStopped(Activity a) {
