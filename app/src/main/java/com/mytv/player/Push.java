@@ -34,6 +34,20 @@ final class Push {
         return i > 0 ? u.substring(0, i) : "";
     }
 
+    /** Live alerts → topic "live", announcements → topic "news", as the person chose (the old "all" topic is left). */
+    static void applyTopics() {
+        if (!ready) return;
+        try {
+            FirebaseMessaging fm = FirebaseMessaging.getInstance();
+            fm.unsubscribeFromTopic("all");
+            if (Broadcast.liveAlertsOn()) fm.subscribeToTopic("live");
+            else fm.unsubscribeFromTopic("live");
+            if (Broadcast.newsOn()) fm.subscribeToTopic("news");
+            else fm.unsubscribeFromTopic("news");
+        } catch (Throwable ignored) {
+        }
+    }
+
     static void init(Context c) {
         if (ready) return;
         String app = appId(), key = Cloud.apiKey(), proj = projectId();
@@ -45,8 +59,8 @@ final class Push {
                         .setProjectId(proj).setGcmSenderId(parts.length > 1 ? parts[1] : "").setDatabaseUrl(Cloud.dbUrl()).build());
             }
             Broadcast.channel(c);
-            FirebaseMessaging.getInstance().subscribeToTopic("all");
             ready = true;
+            applyTopics();
         } catch (Throwable ignored) {
             // Play services missing / wrong id: the in-app bar and the start-time reminder still work
         }

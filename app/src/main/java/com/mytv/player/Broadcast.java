@@ -38,7 +38,17 @@ final class Broadcast {
     private Broadcast() {
     }
 
-    static final String CH = "zh_live";
+    static final String CH = "zh_live";            // announcements (and older live alerts)
+    static final String CH_LIVE = "zh_bcast";      // live broadcast alerts — their own channel, so they can be cleared / turned off alone
+
+    /** The person's choice: live broadcast alerts / announcements (both on by default). */
+    static boolean liveAlertsOn() {
+        return Store.getBool("notif_live", true);
+    }
+
+    static boolean newsOn() {
+        return Store.getBool("notif_news", true);
+    }
     private static long lastSync, lastMember;
     static volatile String watching;              // broadcast id this app joined
 
@@ -267,7 +277,10 @@ final class Broadcast {
     static void channel(Context c) {
         if (Build.VERSION.SDK_INT >= 26) {
             NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
-            if (nm != null) nm.createNotificationChannel(new NotificationChannel(CH, "ZH Play live", NotificationManager.IMPORTANCE_HIGH));
+            if (nm != null) {
+                nm.createNotificationChannel(new NotificationChannel(CH, "ZH Play announcements", NotificationManager.IMPORTANCE_HIGH));
+                nm.createNotificationChannel(new NotificationChannel(CH_LIVE, "ZH Play live broadcasts", NotificationManager.IMPORTANCE_HIGH));
+            }
         }
     }
 
@@ -284,6 +297,13 @@ final class Broadcast {
             if (am != null) {
                 if (Build.VERSION.SDK_INT >= 23) am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, start, pi);
                 else am.set(AlarmManager.RTC_WAKEUP, start, pi);
+                long end = b.optLong("end", 0);
+                if (end > start) {                    // at the end time: clear its notification, even if the app isn't opened
+                    PendingIntent pe = PendingIntent.getBroadcast(c, 4404, new Intent(c, Reminder.class).setAction(ACTION_END),
+                            PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0));
+                    if (Build.VERSION.SDK_INT >= 23) am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, end + 60000, pe);
+                    else am.set(AlarmManager.RTC_WAKEUP, end + 60000, pe);
+                }
                 Store.putStr("live_alarm", key);
             }
         } catch (Exception ignored) {
@@ -300,13 +320,20 @@ final class Broadcast {
     }
 
     static void notify(Context c, String title, String body, String link, String mode) {
+        notify(c, title, body, link, mode, false);
+    }
+
+    /** live = a broadcast alert (its own channel); otherwise an announcement. Nothing is shown if the person turned it off. */
+    static void notify(Context c, String title, String body, String link, String mode, boolean live) {
+        if (live ? !liveAlertsOn() : !newsOn()) return;
         try {
             channel(c);
             Intent open = new Intent(c, LiveActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     .putExtra("url", link == null ? "" : link).putExtra("open", mode == null ? "auto" : mode);
             PendingIntent pi = PendingIntent.getActivity(c, 4402, open,
                     PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0));
-            android.app.Notification.Builder nb = Build.VERSION.SDK_INT >= 26 ? new android.app.Notification.Builder(c, CH) : new android.app.Notification.Builder(c);
+            android.app.Notification.Builder nb = Build.VERSION.SDK_INT >= 26
+                    ? new android.app.Notification.Builder(c, live ? CH_LIVE : CH) : new android.app.Notification.Builder(c);
             nb.setSmallIcon(R.drawable.lc_tv).setContentTitle(title).setContentText(body).setAutoCancel(true).setContentIntent(pi)
                     .setStyle(new android.app.Notification.BigTextStyle().bigText(body));      // full message, not one cut line
             if (Build.VERSION.SDK_INT >= 21) nb.setColor(0xFF8B5CF6).setCategory(android.app.Notification.CATEGORY_RECOMMENDATION);
@@ -316,18 +343,49 @@ final class Broadcast {
             }
             if (Build.VERSION.SDK_INT < 26) nb.setPriority(android.app.Notification.PRIORITY_HIGH);
             NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
-            if (nm != null) nm.notify(4403, nb.build());
+            if (nm != null) nm.notify(live ? 4403 : 4405, nb.build());
         } catch (Exception ignored) {
         }
     }
 
     /** Alarm at the broadcast's start time. */
+    static final String ACTION_END = "com.tamil.castplay.BROADCAST_END";
+
     public static class Reminder extends BroadcastReceiver {
         @Override
         public void onReceive(Context c, Intent i) {
+            if (ACTION_END.equals(i.getAction())) {          // the broadcast's end time has passed
+                clearNotifications(c, true);
+                return;
+            }
             JSONObject b = current();
             if (b == null || "ended".equals(b.optString("state"))) return;
-            Broadcast.notify(c, "🔴 " + T.t("LIVE NOW") + ": " + b.optString("title"), T.t("Tap to watch on ZH Play"));
+            Broadcast.notify(c, "🔴 " + T.t("LIVE NOW") + ": " + b.optString("title"), T.t("Tap to watch on ZH Play"), "", "auto", true);
+        }
+    }
+
+    /**
+     * Removes ZH Play's broadcast notifications from the shade — the ones the app posted and the ones Google's
+     * push service posted by itself while the app was closed. liveOnly: just live / scheduled broadcast alerts;
+     * otherwise announcements too.
+     */
+    static void clearNotifications(Context c, boolean liveOnly) {
+        try {
+            NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (nm == null) return;
+            nm.cancel(4403);
+            if (!liveOnly) nm.cancel(4405);
+            if (Build.VERSION.SDK_INT < 23) return;
+            for (android.service.notification.StatusBarNotification sbn : nm.getActiveNotifications()) {
+                android.app.Notification n = sbn.getNotification();
+                String ch = Build.VERSION.SDK_INT >= 26 ? n.getChannelId() : null;
+                CharSequence t = n.extras == null ? null : n.extras.getCharSequence(android.app.Notification.EXTRA_TITLE);
+                String title = t == null ? "" : t.toString();
+                boolean liveAlert = CH_LIVE.equals(ch) || title.startsWith("🔴") || title.startsWith("📅");
+                boolean news = CH.equals(ch);
+                if (liveAlert || (!liveOnly && news)) nm.cancel(sbn.getTag(), sbn.getId());
+            }
+        } catch (Throwable ignored) {
         }
     }
 
@@ -387,11 +445,7 @@ final class Broadcast {
             Store.removeRecent(k);
             Store.removeHistory(k);
         }
-        try {
-            NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
-            if (nm != null) nm.cancel(4403);          // the "🔴 LIVE NOW" / scheduled notification, now stale
-        } catch (Throwable ignored) {
-        }
+        clearNotifications(c, true);                  // the "🔴 LIVE NOW" / scheduled notifications, now stale — wherever they came from
     }
 
     static String kindLabel(String k) {

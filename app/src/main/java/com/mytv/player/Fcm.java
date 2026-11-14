@@ -86,14 +86,17 @@ final class Fcm {
                     .put("url", link == null ? "" : link)
                     .put("open", open == null ? "auto" : open)
                     .put("title", title).put("body", body);
-            JSONObject msgRoot = new JSONObject().put("topic", "all").put("data", data);
+            boolean live = "end".equals(kind) || (bid != null && !bid.isEmpty());
+            JSONObject msgRoot = new JSONObject().put("condition", live ? "'all' in topics || 'live' in topics" : "'all' in topics || 'news' in topics")
+                    .put("data", data);
             if (!"end".equals(kind)) {
                 msgRoot.put("notification", Thumb.web(img).isEmpty() ? new JSONObject().put("title", title).put("body", body)
                         : new JSONObject().put("title", title).put("body", body).put("image", Thumb.web(img)));
             }
             JSONObject msg = new JSONObject().put("message", msgRoot
                     .put("android", new JSONObject().put("priority", "high")
-                            .put("notification", new JSONObject().put("channel_id", Broadcast.CH).put("click_action", "com.tamil.castplay.OPEN_PUSH"))));
+                            .put("notification", new JSONObject().put("channel_id", live ? Broadcast.CH_LIVE : Broadcast.CH)
+                                    .put("click_action", "com.tamil.castplay.OPEN_PUSH"))));
             String r = post("https://fcm.googleapis.com/v1/projects/" + sa.optString("project_id") + "/messages:send",
                     msg.toString(), "application/json", at);
             return new JSONObject(r).has("name") ? "📣 " + T.t("Sent to everyone") : "⚠ " + r;

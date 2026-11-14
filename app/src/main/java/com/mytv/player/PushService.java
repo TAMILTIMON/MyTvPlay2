@@ -22,6 +22,11 @@ public class PushService extends FirebaseMessagingService {
         }
         final String link = m.getData() == null ? "" : m.getData().get("url");
         final String open = m.getData() == null || m.getData().get("open") == null ? "auto" : m.getData().get("open");
+        final boolean liveMsg = m.getData() != null && m.getData().get("bid") != null && !m.getData().get("bid").isEmpty();
+        if (liveMsg ? !Broadcast.liveAlertsOn() : !Broadcast.newsOn()) {      // switched off by the person: stay quiet
+            Broadcast.sync(getApplicationContext(), true);
+            return;
+        }
         final android.app.Activity top = App.visible > 0 ? App.top() : null;
         if (top != null) {
             // ZH Play is open: a banner slides in at the top (tap = open the link / the live show)
@@ -29,7 +34,7 @@ public class PushService extends FirebaseMessagingService {
             top.runOnUiThread(() -> ZhPopup.banner(top, ft, fb, ZhPopup.PUSH, () -> top.startActivity(
                     new android.content.Intent(top, LiveActivity.class).putExtra("url", link == null ? "" : link).putExtra("open", open))));
         } else {
-            Broadcast.notify(this, title, body, link, open);
+            Broadcast.notify(this, title, body, link, open, liveMsg);
         }
         Broadcast.sync(getApplicationContext(), true);
     }
@@ -37,7 +42,7 @@ public class PushService extends FirebaseMessagingService {
     @Override
     public void onNewToken(String t) {
         try {
-            com.google.firebase.messaging.FirebaseMessaging.getInstance().subscribeToTopic("all");
+            Push.applyTopics();                              // keep the person's choice (live / announcements)
         } catch (Throwable ignored) {
         }
     }
