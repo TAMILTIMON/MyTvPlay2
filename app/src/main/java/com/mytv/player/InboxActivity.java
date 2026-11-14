@@ -43,6 +43,7 @@ public class InboxActivity extends Activity {
             String k = it.next();
             JSONObject m = in.optJSONObject(k);
             if (m == null) continue;
+            if (m.optLong("at") <= Store.getLong("inbox_cleared_at", 0) || hidden().contains(k)) continue;   // removed on this phone
             try {
                 m.put("id", k);
             } catch (Exception ignored) {
@@ -51,6 +52,33 @@ public class InboxActivity extends Activity {
         }
         Collections.sort(l, (a, b) -> Long.compare(b.optLong("at"), a.optLong("at")));
         return l;
+    }
+
+    /** Messages removed on this phone (one by one). */
+    static java.util.Set<String> hidden() {
+        java.util.Set<String> s = new java.util.HashSet<>();
+        try {
+            org.json.JSONArray a = new org.json.JSONArray(Store.getStr("inbox_hidden", "[]"));
+            for (int i = 0; i < a.length(); i++) s.add(a.optString(i));
+        } catch (Exception ignored) {
+        }
+        return s;
+    }
+
+    static void hide(String id) {
+        java.util.Set<String> s = hidden();
+        s.add(id);
+        org.json.JSONArray a = new org.json.JSONArray();
+        for (String x : s) a.put(x);
+        while (a.length() > 200) a.remove(0);
+        Store.putStr("inbox_hidden", a.toString());
+    }
+
+    /** Removes every message shown now (new ones still arrive). */
+    static void hideAll() {
+        long newest = 0;
+        for (JSONObject m : messages()) newest = Math.max(newest, m.optLong("at"));
+        if (newest > 0) Store.putLong("inbox_cleared_at", newest);
     }
 
     /** New since the inbox was last opened (+1 while a broadcast is live). */
@@ -101,6 +129,9 @@ public class InboxActivity extends Activity {
             ZhPopup.banner(this, null, T.t("Checking for new messages…"), ZhPopup.INFO, null);
             v.postDelayed(this::render, 2500);
         }), new LinearLayout.LayoutParams(dp(42), dp(42)));
+        LinearLayout.LayoutParams glp = new LinearLayout.LayoutParams(dp(42), dp(42));
+        glp.setMargins(dp(8), 0, 0, 0);
+        head.addView(UiKit.darkButton(this, "settings", 42, false, v -> notificationSettings()), glp);
         outer.addView(head);
         ScrollView sv = new ScrollView(this);
         body = new LinearLayout(this);
@@ -157,6 +188,7 @@ public class InboxActivity extends Activity {
         // ---- hero: the live / upcoming broadcast with its picture
         final JSONObject b = Broadcast.current();
         String ph = Broadcast.phase(b);
+        if (!ph.isEmpty() && b.optString("id").equals(Store.getStr("bc_hidden", ""))) ph = "";      // removed on this phone
         if (!ph.isEmpty()) {
             final boolean live = "live".equals(ph);
             FrameLayout hero = picture(b.optString("img").isEmpty() ? Thumb.auto(b.optString("url")) : b.optString("img"),
@@ -177,6 +209,21 @@ public class InboxActivity extends Activity {
             txt.addView(tt);
             txt.addView(ts);
             hero.addView(txt, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM));
+            TextView x = text(16, Color.WHITE, true);
+            x.setText("✕");
+            x.setGravity(Gravity.CENTER);
+            x.setBackground(round(0x99000000, dp(18)));
+            x.setFocusable(true);
+            x.setContentDescription(T.t("Remove"));
+            x.setOnClickListener(v -> ZhPopup.confirm(this, "✕", T.t("Remove this broadcast banner?"), b.optString("title"),
+                    T.t("Remove"), true, () -> {
+                        Store.putStr("bc_hidden", b.optString("id"));
+                        Broadcast.clearNotifications(this, true);
+                        render();
+                    }));
+            FrameLayout.LayoutParams xlp = new FrameLayout.LayoutParams(dp(36), dp(36), Gravity.TOP | Gravity.END);
+            xlp.setMargins(0, dp(10), dp(10), 0);
+            hero.addView(x, xlp);
             focusGrow(hero);
             hero.setOnClickListener(v -> {
                 if (live) Broadcast.watch(this);
@@ -286,6 +333,16 @@ public class InboxActivity extends Activity {
         final Runnable close = () -> dim.animate().alpha(0f).setDuration(150).withEndAction(() -> root.removeView(dim)).start();
         LinearLayout btns = new LinearLayout(this);
         btns.setPadding(0, dp(18), 0, 0);
+        TextView rm = ZhPopup.button(this, "🗑  " + T.t("Remove"), false, true);
+        rm.setOnClickListener(v -> {
+            close.run();
+            hide(m.optString("id"));
+            render();
+            ZhPopup.banner(this, "✓ " + T.t("Removed"));
+        });
+        LinearLayout.LayoutParams rmlp = new LinearLayout.LayoutParams(0, dp(48), 1);
+        rmlp.setMargins(0, 0, dp(10), 0);
+        btns.addView(rm, rmlp);
         TextView cl = ZhPopup.button(this, T.t("Close"), false, false);
         cl.setOnClickListener(v -> close.run());
         btns.addView(cl, new LinearLayout.LayoutParams(0, dp(48), 1));
@@ -322,5 +379,84 @@ public class InboxActivity extends Activity {
         if (m < 60) return m + " " + T.t("min ago");
         if (m < 1440) return (m / 60) + " h " + T.t("ago");
         return Broadcast.when(at);
+    }
+
+    // ------------------------------------------------------------------ notification settings
+
+    /** Which notifications this phone gets, and clearing the ones already in the shade. */
+    private void notificationSettings() {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(20), dp(8), dp(20), dp(4));
+        box.addView(settingRow(T.t("Live broadcast alerts"), T.t("“LIVE NOW” and starting-soon notifications"),
+                Broadcast.liveAlertsOn(), on -> {
+                    Store.putBool("notif_live", on);
+                    if (!on) Broadcast.clearNotifications(this, true);
+                    Push.applyTopics();
+                }));
+        box.addView(settingRow(T.t("Announcements"), T.t("Messages from the ZH Play team"),
+                Broadcast.newsOn(), on -> {
+                    Store.putBool("notif_news", on);
+                    Push.applyTopics();
+                }));
+        TextView clearCards = ZhPopup.button(this, "🗑  " + T.t("Remove all notifications here"), false, true);
+        LinearLayout.LayoutParams cclp = new LinearLayout.LayoutParams(-1, dp(46));
+        cclp.setMargins(0, dp(12), 0, 0);
+        box.addView(clearCards, cclp);
+        TextView restore = ZhPopup.button(this, "↺  " + T.t("Show removed ones again"), false, false);
+        LinearLayout.LayoutParams rslp = new LinearLayout.LayoutParams(-1, dp(46));
+        rslp.setMargins(0, dp(8), 0, 0);
+        box.addView(restore, rslp);
+        TextView note = text(12, Ui.DIM, false);
+        note.setText(T.t("Switched off: those notifications stop arriving. You can still read everything here in Notifications."));
+        note.setPadding(0, dp(10), 0, dp(4));
+        box.addView(note);
+        final android.app.Dialog[] dlg = new android.app.Dialog[1];
+        clearCards.setOnClickListener(v -> ZhPopup.confirm(this, "🗑", T.t("Remove all notifications here?"),
+                T.t("The broadcast banner and every message are removed from this phone. New ones still arrive."),
+                T.t("Remove all"), true, () -> {
+                    hideAll();
+                    JSONObject cur = Broadcast.current();
+                    if (cur != null) Store.putStr("bc_hidden", cur.optString("id"));
+                    Broadcast.clearNotifications(this, false);
+                    if (dlg[0] != null) dlg[0].dismiss();
+                    render();
+                    ZhPopup.banner(this, "✓ " + T.t("All notifications removed"));
+                }));
+        restore.setOnClickListener(v -> {
+            Store.putLong("inbox_cleared_at", 0);
+            Store.putStr("inbox_hidden", "[]");
+            Store.putStr("bc_hidden", "");
+            if (dlg[0] != null) dlg[0].dismiss();
+            render();
+            ZhPopup.banner(this, "✓ " + T.t("Removed notifications are back"));
+        });
+        dlg[0] = new UiDialog(this).setTitle("🔔  " + T.t("Notifications")).setView(box)
+                .setPositiveButton(T.t("Done"), null)
+                .setNeutralButton(T.t("Clear all from the shade"), (d, w) -> {
+                    Broadcast.clearNotifications(this, false);
+                    ZhPopup.banner(this, "✓ " + T.t("Notifications cleared"));
+                })
+                .show();
+    }
+
+    private View settingRow(String title, String sub, boolean on, final java.util.function.Consumer<Boolean> changed) {
+        LinearLayout r = new LinearLayout(this);
+        r.setGravity(Gravity.CENTER_VERTICAL);
+        r.setPadding(0, dp(10), 0, dp(10));
+        LinearLayout col = new LinearLayout(this);
+        col.setOrientation(LinearLayout.VERTICAL);
+        TextView t = text(15, Ui.TEXT, true);
+        t.setText(title);
+        TextView s2 = text(12, Ui.DIM, false);
+        s2.setText(sub);
+        col.addView(t);
+        col.addView(s2);
+        r.addView(col, new LinearLayout.LayoutParams(0, -2, 1));
+        final ZhPopup.Toggle tg = new ZhPopup.Toggle(this, on);
+        tg.onChange(() -> changed.accept(tg.on()));
+        r.addView(tg, new LinearLayout.LayoutParams(dp(48), dp(28)));
+        r.setOnClickListener(v -> tg.performClick());
+        return r;
     }
 }
