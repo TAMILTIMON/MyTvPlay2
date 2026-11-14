@@ -72,7 +72,7 @@ final class AutoExit {
      *  (A paused song's notification doesn't count — otherwise auto-close would wait forever.) */
     static boolean busy(Context c) {
         try {
-            return MusicService.playing() || BrowserPlayService.playing || CastScreenService.running;
+            return MusicService.playing() || BrowserPlayService.playing || CastScreenService.running || Updater.busy();
         } catch (Throwable e) {
             return false;
         }

@@ -52,6 +52,13 @@ public final class Updater {
         }
     }
 
+    /** An update is downloading / waiting in the installer until this time (auto-close waits meanwhile). */
+    static volatile long busyUntil;
+
+    static boolean busy() {
+        return System.currentTimeMillis() < busyUntil;
+    }
+
     public static final class Info {
         public int code;
         public String url = "", name = "", date = "";
@@ -87,7 +94,9 @@ public final class Updater {
         c.setReadTimeout(15000);
         c.setRequestProperty("Accept", "application/vnd.github+json");
         c.setRequestProperty("User-Agent", "ZH Play");
-        if (c.getResponseCode() != 200) throw new Exception("No releases found on github.com/" + repo());
+        int rc = c.getResponseCode();
+        if (rc == 403 || rc == 429) throw new Exception(T.t("GitHub allows only 60 checks an hour per internet connection — try again later"));
+        if (rc != 200) throw new Exception("No releases found on github.com/" + repo());
         StringBuilder sb = new StringBuilder();
         try (InputStream in = c.getInputStream()) {
             byte[] b = new byte[16384];
@@ -161,7 +170,7 @@ public final class Updater {
         c.setReadTimeout(10000);
         c.setRequestProperty("Accept", "application/vnd.github+json");
         c.setRequestProperty("User-Agent", "ZH Play");
-        if (c.getResponseCode() != 200) throw new Exception("No release found on github.com/" + repo());
+        if (c.getResponseCode() != 200) return latestFromPage();   // rate-limited (403 / 429) or busy: the release page
         StringBuilder sb = new StringBuilder();
         try (InputStream in = c.getInputStream()) {
             byte[] b = new byte[16384];
@@ -169,6 +178,32 @@ public final class Updater {
             while ((n = in.read(b)) > 0) sb.append(new String(b, 0, n, "UTF-8"));
         }
         return fromRelease(new JSONObject(sb.toString()));
+    }
+
+    /**
+     * The newest release from the normal GitHub page (github.com/…/releases/latest → …/tag/v285) — not limited to
+     * 60 checks an hour like the data service; the APK link is built from the release's fixed file names.
+     */
+    private static Info latestFromPage() throws Exception {
+        HttpURLConnection c = (HttpURLConnection) new URL("https://github.com/" + repo() + "/releases/latest").openConnection();
+        c.setInstanceFollowRedirects(false);
+        c.setConnectTimeout(8000);
+        c.setReadTimeout(10000);
+        c.setRequestProperty("User-Agent", "ZH Play");
+        c.getResponseCode();
+        String loc = c.getHeaderField("Location");
+        c.disconnect();
+        if (loc == null || !loc.contains("/releases/tag/"))
+            throw new Exception(T.t("GitHub is busy right now — please try again in a few minutes"));
+        String tag = loc.substring(loc.lastIndexOf('/') + 1);
+        Info i = new Info();
+        String digits = tag.replaceAll("[^0-9]", "");
+        i.code = digits.isEmpty() ? 0 : Integer.parseInt(digits);
+        i.name = "ZH Play " + tag;
+        String abi = Build.SUPPORTED_ABIS.length > 0 ? Build.SUPPORTED_ABIS[0] : "";
+        String want = abi.contains("arm64") ? "arm64-v8a" : abi.contains("armeabi") ? "armeabi-v7a" : "universal";
+        i.url = "https://github.com/" + repo() + "/releases/download/" + tag + "/ZHPlay-" + want + "-release.apk";
+        return i;
     }
 
     private static Info fromRelease(JSONObject o) throws Exception {
@@ -258,6 +293,7 @@ public final class Updater {
             return;
         }
         UiKit.makeToast(a, T.t("Downloading update…"), android.widget.Toast.LENGTH_LONG).show();
+        busyUntil = System.currentTimeMillis() + 15 * 60_000L;     // auto-close must not cut an update off
         new Thread(() -> {
             try {
                 File dir = a.getExternalCacheDir() != null ? a.getExternalCacheDir() : a.getCacheDir();
@@ -284,11 +320,8 @@ public final class Updater {
             Intent i = new Intent(Intent.ACTION_VIEW).setDataAndType(u, "application/vnd.android.package-archive")
                     .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
             a.startActivity(i);
-            // schedule deletion: the system installer runs in a separate process; delete after a short delay
-            // (the FileProvider URI keeps the file readable until the installer is done)
-            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-                try { f.delete(); } catch (Exception ignored) {}
-            }, 60_000);   // 60 s: enough for the installer to read the file
+            // the file stays until the next update replaces it: deleting it after a minute broke installs whenever
+            // the person took longer than that to tap "Install"
         } catch (Exception e) {
             UiKit.makeToast(a, "Install failed: " + e.getMessage(), android.widget.Toast.LENGTH_LONG).show();
             try { f.delete(); } catch (Exception ignored) {}  // failed: clean up immediately
