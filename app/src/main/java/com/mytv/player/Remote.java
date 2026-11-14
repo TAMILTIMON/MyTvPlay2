@@ -188,6 +188,58 @@ public final class Remote {
         return acc.type(text) ? null : "Select a search / text box on the TV first";
     }
 
+    /**
+     * Makes the focused text box hold exactly this text (the phone's box is the source): ZH Play's own box,
+     * else any app's box through the accessibility service. "unsupported" = neither is available here.
+     */
+    public static String setText(Context ctx, final String text) {
+        if (App.visible > 0) {
+            final android.app.Activity a = App.top();
+            if (a != null) {
+                try {
+                    Boolean ok = call(() -> {
+                        android.view.View f = a.getCurrentFocus();
+                        if (!(f instanceof android.widget.EditText)) return false;
+                        android.widget.EditText e = (android.widget.EditText) f;
+                        e.setText(text);
+                        e.setSelection(e.getText().length());
+                        return true;
+                    });
+                    if (Boolean.TRUE.equals(ok)) return null;
+                } catch (Throwable ignored) {
+                }
+            }
+        }
+        TvAccess acc = TvAccess.inst;
+        if (acc != null && acc.type(text)) return null;
+        return "unsupported";
+    }
+
+    /** The text in the focused box on the TV right now (ZH Play's own, or any app's). Never a password. */
+    public static String currentText() {
+        if (App.visible > 0) {
+            final android.app.Activity a = App.top();
+            if (a != null) {
+                try {
+                    String own = call(() -> {
+                        android.view.View f = a.getCurrentFocus();
+                        if (!(f instanceof android.widget.EditText)) return null;
+                        android.widget.EditText e = (android.widget.EditText) f;
+                        int t = e.getInputType() & android.text.InputType.TYPE_MASK_VARIATION;
+                        if (t == android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+                                || t == android.text.InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD
+                                || t == android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD) return "";
+                        return e.getText().toString();
+                    });
+                    if (own != null) return own;
+                } catch (Throwable ignored) {
+                }
+            }
+        }
+        TvAccess acc = TvAccess.inst;
+        return acc == null ? "" : acc.currentText();
+    }
+
     /** Puts the text into the focused text box of the ZH Play screen in front, at the cursor. */
     private static boolean insertOwn(final String text) {
         final android.app.Activity a = App.top();

@@ -169,12 +169,33 @@ public class TvAccess extends AccessibilityService {
         }
     }
 
-    /** Puts text into the focused search / text box of any app. */
+    /** Puts text into the focused search / text box of any app (replacing what's there; cursor at the end). */
     public boolean type(String text) {
         AccessibilityNodeInfo f = focused();
         if (f == null || !f.isEditable()) return false;
         Bundle b = new Bundle();
         b.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text);
-        return f.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, b);
+        if (!f.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, b)) return false;
+        try {
+            Bundle sel = new Bundle();
+            sel.putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, text.length());
+            sel.putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, text.length());
+            f.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION, sel);
+        } catch (Throwable ignored) {
+        }
+        return true;
+    }
+
+    /** The text in the focused box right now ("" for an empty box showing its hint, and never a password). */
+    public String currentText() {
+        try {
+            AccessibilityNodeInfo f = focused();
+            if (f == null || !f.isEditable() || f.isPassword()) return "";
+            CharSequence cur = f.getText();
+            boolean hint = android.os.Build.VERSION.SDK_INT >= 26 && f.isShowingHintText();
+            return cur == null || hint ? "" : cur.toString();
+        } catch (Throwable t) {
+            return "";
+        }
     }
 }

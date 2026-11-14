@@ -743,6 +743,11 @@ public class WebServer extends NanoHTTPD {
                     return err == null ? ok() : fail(err);
                 }
 
+                case "/settext": {           // the phone's whole text → the TV's box (keeps both exactly the same)
+                    String err = Remote.setText(ctx, val(p, "text"));
+                    return err == null ? msg("✅") : fail(err);
+                }
+
                 case "/type": {
                     String err = Remote.type(ctx, val(p, "text"));
                     return err == null ? msg("✅") : fail(err);
@@ -1219,6 +1224,8 @@ public class WebServer extends NanoHTTPD {
         if (Cloud.signedIn()) o.put("cloud_id", Cloud.deviceId());   // the phone remembers it for "from anywhere"
         o.put("num", BgState.num);                  // a number box (PIN…) is open → phone shows its number pad
         o.put("kbd", BgState.kbd);                  // TV keyboard open → phone shows live typing (checked in the background)
+        if (BgState.kbd) o.put("kbdText", Remote.currentText());   // what's already in that box → the phone shows it to edit
+        o.put("settext", true);                     // this TV understands /settext (whole-text sync)
         boolean tvDark = !"light".equals(Store.getStr("theme", "dark"));
         int[] pc = Palette.resolve(tvDark);
         o.put("pal", new JSONObject().put("i", Palette.index()).put("custom", Palette.hasCustom()).put("dark", tvDark)

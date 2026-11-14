@@ -566,7 +566,10 @@ public class NativeRemoteActivity extends AppCompatActivity {
         kt.setText(T.t("Type on the TV"));
         kt.setPadding(dp(8), 0, 0, 0);
         kh.addView(kt, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
-        kh.addView(UiKit.roundButton(this, "check", 40, true, v -> sendKey("enter")));
+        kh.addView(UiKit.roundButton(this, "check", 40, true, v -> {
+            sendKey("enter");
+            resyncAfterEnter();
+        }));
         ImageView kx = UiKit.closeButton(this, v -> {
             kbdDismissed = System.currentTimeMillis();
             showKbd(false);
@@ -579,6 +582,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
         liveBox.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEND);
         liveBox.setOnEditorActionListener((v, a, e) -> {
             sendKey("enter");
+            resyncAfterEnter();
             return true;
         });
         liveBox.addTextChangedListener(new TextWatcher() {
@@ -589,6 +593,10 @@ public class NativeRemoteActivity extends AppCompatActivity {
                 final String now = e.toString(), was = liveSent;
                 liveSent = now;
                 kbdTyped = System.currentTimeMillis();
+                if (wholeText()) {                          // the TV's box becomes exactly this text
+                    sendWholeText(now);
+                    return;
+                }
                 int same = 0;
                 while (same < was.length() && same < now.length() && was.charAt(same) == now.charAt(same)) same++;
                 for (int i = 0; i < was.length() - same; i++) key("del");
@@ -1260,8 +1268,10 @@ public class NativeRemoteActivity extends AppCompatActivity {
                 (android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
         if (on) {
             liveMute = true;
-            liveBox.setText("");
-            liveSent = "";
+            String tvText = S == null ? "" : S.optString("kbdText", "");   // what's already in the TV's box: edit it here
+            liveBox.setText(tvText);
+            liveBox.setSelection(tvText.length());
+            liveSent = tvText;
             liveMute = false;
             liveBox.requestFocus();
             if (imm != null) imm.showSoftInput(liveBox, 0);
@@ -2563,6 +2573,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
         }
         autoNumPad(S.optBoolean("num"));
         if (kb && !kbdShown && System.currentTimeMillis() - kbdDismissed > 4000 && !sheetOpen) showKbd(true);
+        else if (kb && kbdShown && wholeText()) adoptTvText(S.optString("kbdText", ""));   // after ✓ / changes made on the TV
         else if (!kb && kbdShown && System.currentTimeMillis() - kbdTyped > 2500) showKbd(false);
         adbBtn.setVisibility(S.optBoolean("adb", true) ? View.GONE : View.VISIBLE);
         if (System.currentTimeMillis() - brTouch > 2500) brSlider.setValue(S.optInt("bright", 100));
@@ -2616,5 +2627,59 @@ public class NativeRemoteActivity extends AppCompatActivity {
             if (t.optJSONObject(i).optInt("id") == sel) return t.optJSONObject(i).optString("name");
         }
         return S.optBoolean("player") ? T.t("Off") : "—";
+    }
+
+    // ------------------------------------------------------------------ live typing: whole-text sync
+
+    private final java.util.concurrent.ExecutorService textLine = java.util.concurrent.Executors.newSingleThreadExecutor();
+    private volatile String pendingText;
+    private volatile boolean textUnsupported;
+    private volatile long textSentAt;
+
+    /** This TV keeps its box equal to the phone's (TV 9.3.2+ with the accessibility service or a ZH Play box). */
+    private boolean wholeText() {
+        return S != null && S.optBoolean("settext") && !textUnsupported;
+    }
+
+    /** Sends the phone's whole text; only the newest is sent, so fast typing never queues up. */
+    private void sendWholeText(String text) {
+        boolean start = pendingText == null;
+        pendingText = text;
+        if (!start) return;
+        textLine.execute(() -> {
+            String t;
+            while ((t = pendingText) != null) {
+                try {
+                    org.json.JSONObject r = TvClient.post(ip, "/settext", m("text", t));
+                    if (!r.optBoolean("ok", true) && "unsupported".equals(r.optString("msg"))) {
+                        textUnsupported = true;            // no accessibility on that TV: back to key-by-key
+                    }
+                } catch (Exception ignored) {
+                }
+                textSentAt = System.currentTimeMillis();
+                if (t.equals(pendingText)) pendingText = null;
+            }
+        });
+    }
+
+    /** ✓ may add a new line on the TV (or the app may change the text): read it back shortly after. */
+    private void resyncAfterEnter() {
+        kbdTyped = 0;                                       // allow adopting the TV's text right away
+        main.postDelayed(() -> call("/state", new java.util.HashMap<>(), r -> {
+            if (kbdShown && r != null) adoptTvText(r.optString("kbdText", ""));
+        }), 700);
+    }
+
+    /** Shows the TV's text in the phone's box — only while the person isn't typing, so it never fights them. */
+    private void adoptTvText(String tv) {
+        if (tv == null || liveBox == null) return;
+        long now = System.currentTimeMillis();
+        if (pendingText != null || now - kbdTyped < 1500 || now - textSentAt < 800) return;
+        if (tv.equals(liveSent)) return;
+        liveMute = true;
+        liveBox.setText(tv);
+        liveBox.setSelection(tv.length());
+        liveSent = tv;
+        liveMute = false;
     }
 }
