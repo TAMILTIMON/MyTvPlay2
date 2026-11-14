@@ -11,7 +11,7 @@ android {
         minSdk 21
         targetSdk 34
         versionCode = (System.getenv('VCODE') ?: '34').toInteger()
-        versionName = '9.2.2' + (System.getenv('VCODE') ? '.' + System.getenv('VCODE') : '')
+        versionName = '9.3' + (System.getenv('VCODE') ? '.' + System.getenv('VCODE') : '')
     }
 
     // Two variants from the same code — every feature is in both:
@@ -117,4 +117,81 @@ dependencies {
     implementation 'org.libtorrent4j:libtorrent4j:2.1.0-35'
     implementation 'org.libtorrent4j:libtorrent4j-android-arm:2.1.0-35'
     implementation 'org.libtorrent4j:libtorrent4j-android-arm64:2.1.0-35'
+}
+
+// ---- ZH Play feature app icons ("ZH Browser", "ZH VPN", … in the phone's app list)
+// For each feature: if you added your own logo  src/main/res/drawable-nodpi/zh_widget_<feature>.png
+// the app icon uses it (edge to edge, its border colour filling the edges, like the widgets);
+// otherwise the generated icon (symbol on its colour). Written on every build into build/generated/zhicons.
+def zhIconsDir = file('build/generated/zhicons/res')
+android.sourceSets.main.res.srcDir(zhIconsDir)
+
+def zhEdgeColor(File f) {
+    try {
+        def img = javax.imageio.ImageIO.read(f)
+        if (img == null) return '#FFFFFFFF'
+        long r = 0, g = 0, b = 0, n = 0
+        int w = img.getWidth(), h = img.getHeight()
+        int step = Math.max(1, (int) (Math.min(w, h) / 40))
+        def take = { int x, int y ->
+            int px = img.getRGB(x, y)
+            if (((px >> 24) & 0xFF) > 200) {
+                r += (px >> 16) & 0xFF; g += (px >> 8) & 0xFF; b += px & 0xFF; n++
+            }
+        }
+        for (int i = 0; i < w; i += step) { take(i, 0); take(i, h - 1) }
+        for (int j = 0; j < h; j += step) { take(0, j); take(w - 1, j) }
+        if (n == 0) return '#FFFFFFFF'
+        return String.format('#FF%02X%02X%02X', (int) (r / n), (int) (g / n), (int) (b / n))
+    } catch (Exception e) {
+        return '#FFFFFFFF'
+    }
+}
+
+['browser', 'player', 'videos', 'music', 'gallery', 'vpn', 'seedr', 'remote', 'files', 'board', 'dj', 'editor', 'library', 'eq'].each { id ->
+    File logo = ['png', 'jpg'].collect { file("src/main/res/drawable-nodpi/zh_widget_${id}.${it}") }.find { it.exists() }
+    File v26 = new File(zhIconsDir, 'drawable-anydpi-v26')
+    File base = new File(zhIconsDir, 'drawable')
+    v26.mkdirs()
+    base.mkdirs()
+    if (logo != null) {
+        String edge = zhEdgeColor(logo)
+        new File(v26, "zh_feat_${id}.xml").text = """<?xml version="1.0" encoding="utf-8"?>
+<!-- generated: your logo zh_widget_${id} -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background>
+        <shape android:shape="rectangle">
+            <solid android:color="${edge}" />
+        </shape>
+    </background>
+    <foreground>
+        <inset android:drawable="@drawable/zh_widget_${id}" android:inset="14%" />
+    </foreground>
+</adaptive-icon>
+"""
+        new File(base, "zh_feat_${id}.xml").text = """<?xml version="1.0" encoding="utf-8"?>
+<!-- generated: your logo zh_widget_${id} -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@drawable/zh_widget_${id}" />
+</layer-list>
+"""
+    } else {
+        new File(v26, "zh_feat_${id}.xml").text = """<?xml version="1.0" encoding="utf-8"?>
+<!-- generated: the ZH Play symbol for ${id} -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@drawable/zh_featbg_${id}" />
+    <foreground>
+        <inset android:drawable="@drawable/zh_glyph_${id}" android:inset="33%" />
+    </foreground>
+</adaptive-icon>
+"""
+        new File(base, "zh_feat_${id}.xml").text = """<?xml version="1.0" encoding="utf-8"?>
+<!-- generated: the ZH Play symbol for ${id} -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@drawable/zh_featbg_${id}" />
+    <item android:left="12dp" android:top="12dp" android:right="12dp" android:bottom="12dp"
+        android:drawable="@drawable/zh_glyph_${id}" />
+</layer-list>
+"""
+    }
 }

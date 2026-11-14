@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@drawable/zh_featbg_seedr" />
-    <foreground>
-        <inset android:drawable="@drawable/zh_glyph_seedr" android:inset="33%" />
-    </foreground>
-</adaptive-icon>
