@@ -841,5 +841,91 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
+
+        <!-- a feature opened from its own icon starts here, so Recent apps shows that feature's icon and name -->
+        <activity-alias
+            android:name=".FeatureTaskVideos"
+            android:exported="false"
+            android:icon="@drawable/zh_feat_videos"
+            android:roundIcon="@drawable/zh_feat_videos"
+            android:label="ZH Videos"
+            android:targetActivity=".PhoneLibraryActivity" />
+        <activity-alias
+            android:name=".FeatureTaskMusic"
+            android:exported="false"
+            android:icon="@drawable/zh_feat_music"
+            android:roundIcon="@drawable/zh_feat_music"
+            android:label="ZH Music"
+            android:targetActivity=".PhoneLibraryActivity" />
+        <activity-alias
+            android:name=".FeatureTaskGallery"
+            android:exported="false"
+            android:icon="@drawable/zh_feat_gallery"
+            android:roundIcon="@drawable/zh_feat_gallery"
+            android:label="ZH Gallery"
+            android:targetActivity=".GalleryActivity" />
+        <activity-alias
+            android:name=".FeatureTaskVpn"
+            android:exported="false"
+            android:icon="@drawable/zh_feat_vpn"
+            android:roundIcon="@drawable/zh_feat_vpn"
+            android:label="ZH VPN"
+            android:targetActivity=".PanelHostActivity" />
+        <activity-alias
+            android:name=".FeatureTaskSeedr"
+            android:exported="false"
+            android:icon="@drawable/zh_feat_seedr"
+            android:roundIcon="@drawable/zh_feat_seedr"
+            android:label="ZH Seedr"
+            android:targetActivity=".SeedrActivity" />
+        <activity-alias
+            android:name=".FeatureTaskRemote"
+            android:exported="false"
+            android:icon="@drawable/zh_feat_remote"
+            android:roundIcon="@drawable/zh_feat_remote"
+            android:label="ZH Remote"
+            android:targetActivity=".NativeRemoteActivity" />
+        <activity-alias
+            android:name=".FeatureTaskFiles"
+            android:exported="false"
+            android:icon="@drawable/zh_feat_files"
+            android:roundIcon="@drawable/zh_feat_files"
+            android:label="ZH Files"
+            android:targetActivity=".StorageActivity" />
+        <activity-alias
+            android:name=".FeatureTaskBoard"
+            android:exported="false"
+            android:icon="@drawable/zh_feat_board"
+            android:roundIcon="@drawable/zh_feat_board"
+            android:label="ZH Whiteboard"
+            android:targetActivity=".PresentActivity" />
+        <activity-alias
+            android:name=".FeatureTaskDj"
+            android:exported="false"
+            android:icon="@drawable/zh_feat_dj"
+            android:roundIcon="@drawable/zh_feat_dj"
+            android:label="ZH DJ"
+            android:targetActivity=".DjActivity" />
+        <activity-alias
+            android:name=".FeatureTaskEditor"
+            android:exported="false"
+            android:icon="@drawable/zh_feat_editor"
+            android:roundIcon="@drawable/zh_feat_editor"
+            android:label="ZH Song Editor"
+            android:targetActivity=".EditorActivity" />
+        <activity-alias
+            android:name=".FeatureTaskLibrary"
+            android:exported="false"
+            android:icon="@drawable/zh_feat_library"
+            android:roundIcon="@drawable/zh_feat_library"
+            android:label="ZH Library"
+            android:targetActivity=".LibraryActivity" />
+        <activity-alias
+            android:name=".FeatureTaskEq"
+            android:exported="false"
+            android:icon="@drawable/zh_feat_eq"
+            android:roundIcon="@drawable/zh_feat_eq"
+            android:label="ZH Equalizer"
+            android:targetActivity=".PowerEqActivity" />
     </application>
 </manifest>

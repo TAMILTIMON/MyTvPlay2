@@ -66,6 +66,16 @@ final class Shortcuts {
 
     static final String EXTRA_FEATURE = "zh_feature";
 
+    /** Features with a named entry of their own in the manifest ("FeatureTask…"). */
+    static final java.util.Set<String> TASK_FEATURES = new java.util.HashSet<>(java.util.Arrays.asList(
+            "videos", "music", "gallery", "vpn", "seedr", "remote", "files", "board", "dj", "editor", "library", "eq"));
+
+    /** Where the app's screens live (com.mytv.player) — the manifest's short names are completed with this. */
+    static String codePackage() {
+        String n = ShortcutLaunchActivity.class.getName();
+        return n.substring(0, n.lastIndexOf('.'));
+    }
+
     /**
      * Opens the feature from a home-screen icon / widget — the same screen its tile inside ZH Play opens,
      * but in its OWN task: ZH Music, ZH Videos, the remote… each get their own entry in Recent apps, and
@@ -131,6 +141,13 @@ final class Shortcuts {
                 break;
             default:
                 i = new Intent(a, ConnectActivity.class);
+        }
+        // start through the feature's own named entry (manifest "FeatureTask…"): the task's first screen then carries
+        // the feature's icon and name, which is what Recent apps shows (Browser / Player stay in ZH Play's own windows)
+        String cls = i.getComponent() == null ? "" : i.getComponent().getClassName();
+        if (TASK_FEATURES.contains(id) && !cls.endsWith(".ConnectActivity")) {
+            i.setComponent(new android.content.ComponentName(a.getPackageName(),
+                    codePackage() + ".FeatureTask" + id.substring(0, 1).toUpperCase(java.util.Locale.ROOT) + id.substring(1)));
         }
         // a "document" task per feature: same feature → back to its task; another feature → its own task
         i.addFlags(Intent.FLAG_ACTIVITY_NEW_DOCUMENT | Intent.FLAG_ACTIVITY_NEW_TASK)
