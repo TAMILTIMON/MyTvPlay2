@@ -285,6 +285,9 @@ public class StorageActivity extends Activity {
         names.addView(title);
         names.addView(subtitle);
         head.addView(names, new LinearLayout.LayoutParams(0, -2, 1));
+        if (!Ui.isTv(this)) {                                       // 🔒 Private folder (phone)
+            head.addView(UiKit.darkButton(this, "lock", 42, false, v -> VaultActivity.open(this)), new LinearLayout.LayoutParams(dp(42), dp(42)));
+        }
         actions = new LinearLayout(this);
         actions.setGravity(Gravity.CENTER_VERTICAL);
         head.addView(actions);
@@ -1184,8 +1187,14 @@ public class StorageActivity extends Activity {
         l.add("📤  " + T.t("Share"));
         if (picked.size() == 1) l.add("✏  " + T.t("Rename"));
         l.add("ℹ  " + T.t("Properties"));
+        if (!Ui.isTv(this)) l.add("🔒  " + T.t("Move to Private folder"));
         new UiDialog(this).setTitle(picked.size() + " " + T.t("selected")).setItems(l.toArray(new String[0]), (d, w) -> {
             String c = l.get(w);
+            if (c.contains(T.t("Private folder"))) {
+                sel.clear();
+                Vault.moveFlow(this, picked, () -> load(cur));
+                return;
+            }
             if (c.contains(T.t("Share"))) share(picked);
             else if (c.contains(T.t("Rename"))) rename(picked.get(0));
             else properties(picked);
@@ -1211,6 +1220,10 @@ public class StorageActivity extends Activity {
         a.add(() -> toClip(Collections.singletonList(e.f), true));
         l.add("✏  " + T.t("Rename"));
         a.add(() -> rename(e.f));
+        if (!e.dir && !Ui.isTv(this)) {
+            l.add("🔒  " + T.t("Move to Private folder"));
+            a.add(() -> Vault.moveFlow(this, Collections.singletonList(e.f), () -> load(cur)));
+        }
         l.add("🗑  " + T.t("Delete"));
         a.add(() -> confirmDelete(Collections.singletonList(e.f)));
         l.add("ℹ  " + T.t("Properties"));
