@@ -2086,7 +2086,7 @@ public class PresentActivity extends AppCompatActivity {
             p.put("v", v);
             if (x != null) p.put("x", x);
             if (y != null) p.put("y", y);
-            TvClient.post(ip, "/presentcmd", p);
+            TvClient.postQuick(ip, "/presentcmd", p);      // from outside home: bundled, in order, no waiting
         } catch (Exception ignored) {
         }
     }

@@ -432,7 +432,7 @@ public class NativeRemoteActivity extends AppCompatActivity {
     private KeyChannel line() {
         if (keys == null) keys = new KeyChannel(ip, line -> {
             try {
-                if (line.startsWith("k ")) TvClient.post(ip, "/key", m("k", line.substring(2)));
+                if (line.startsWith("k ")) TvClient.postQuick(ip, "/key", m("k", line.substring(2)));
                 else if (line.startsWith("t ")) TvClient.post(ip, "/type", m("text", java.net.URLDecoder.decode(line.substring(2), "UTF-8")));
             } catch (Exception ignored) {
             }

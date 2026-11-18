@@ -328,4 +328,19 @@ public final class TvClient {
             return "Cannot reach the TV";
         }
     }
+
+    /**
+     * For commands whose answer isn't needed (whiteboard strokes, remote keys): from outside home they go in the
+     * cloud's fast lane — bundled, in order, without waiting. At home (or with an older TV) as usual.
+     */
+    public static void postQuick(String ip, String path, Map<String, String> params) throws Exception {
+        if (ip != null && ip.startsWith("cloud:")) {
+            String id = ip.substring(6);
+            if (Cloud.batchOk(id)) {
+                Cloud.queue(id, path, params);
+                return;
+            }
+        }
+        post(ip, path, params);
+    }
 }

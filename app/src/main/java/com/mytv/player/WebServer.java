@@ -1226,6 +1226,7 @@ public class WebServer extends NanoHTTPD {
         o.put("kbd", BgState.kbd);                  // TV keyboard open → phone shows live typing (checked in the background)
         if (BgState.kbd) o.put("kbdText", Remote.currentText());   // what's already in that box → the phone shows it to edit
         o.put("settext", true);                     // this TV understands /settext (whole-text sync)
+        o.put("batch", true);                       // …and cloud bundles (the fast lane from outside home)
         boolean tvDark = !"light".equals(Store.getStr("theme", "dark"));
         int[] pc = Palette.resolve(tvDark);
         o.put("pal", new JSONObject().put("i", Palette.index()).put("custom", Palette.hasCustom()).put("dark", tvDark)

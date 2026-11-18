@@ -15,6 +15,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -179,7 +180,7 @@ final class Cloud {
         String id = new JSONObject(http("POST", db("/tvs/" + tvId + "/cmd"), cmd.toString())).getString("name");
         long until = System.currentTimeMillis() + 20000;
         while (System.currentTimeMillis() < until) {
-            Thread.sleep(350);
+            Thread.sleep(150);
             String s = http("GET", db("/tvs/" + tvId + "/res/" + id), null);
             if (s != null && !s.trim().equals("null")) {
                 try {
@@ -200,6 +201,79 @@ final class Cloud {
         } catch (Exception ignored) {
         }
         throw new Exception("The TV didn't answer — is it switched on and online?");
+    }
+
+    // ------------------------------------------------------------------ phone: the fast lane
+
+    private static final Map<String, List<JSONObject>> lane = new HashMap<>();
+    private static final java.util.concurrent.ScheduledExecutorService laneTimer =
+            java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
+    private static final Map<String, Long> askedBatch = new HashMap<>();
+
+    /** This TV takes bundles (TV 9.3.3+, it says so in /state). Learned once, remembered. */
+    static boolean batchOk(final String tvId) {
+        String known = Store.getStr("cloud_batch_" + tvId, "");
+        if (!known.isEmpty()) return "1".equals(known);
+        synchronized (askedBatch) {
+            Long t = askedBatch.get(tvId);
+            if (t != null && System.currentTimeMillis() - t < 60000) return false;
+            askedBatch.put(tvId, System.currentTimeMillis());
+        }
+        Runnable learn = () -> {
+            try {
+                JSONObject st = send(tvId, "/state", null);
+                Store.putStr("cloud_batch_" + tvId, st.optBoolean("batch") ? "1" : "0");
+            } catch (Exception ignored) {
+            }
+        };
+        if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
+            new Thread(learn).start();
+            return false;
+        }
+        learn.run();
+        return "1".equals(Store.getStr("cloud_batch_" + tvId, ""));
+    }
+
+    /** Adds a command to the TV's next bundle (sent ~0.12 s later, together with any others). No answer. */
+    static void queue(final String tvId, String path, Map<String, String> params) {
+        try {
+            JSONObject q = new JSONObject();
+            if (params != null) for (Map.Entry<String, String> e : params.entrySet()) q.put(e.getKey(), e.getValue() == null ? "" : e.getValue());
+            JSONObject item = new JSONObject().put("p", path).put("q", q);
+            boolean first;
+            synchronized (lane) {
+                List<JSONObject> l = lane.get(tvId);
+                if (l == null) lane.put(tvId, l = new java.util.ArrayList<>());
+                first = l.isEmpty();
+                l.add(item);
+            }
+            if (first) laneTimer.schedule(() -> flush(tvId), 120, java.util.concurrent.TimeUnit.MILLISECONDS);
+        } catch (Exception ignored) {
+        }
+    }
+
+    private static void flush(String tvId) {
+        List<JSONObject> l;
+        synchronized (lane) {
+            l = lane.remove(tvId);
+        }
+        if (l == null || l.isEmpty()) return;
+        try {
+            org.json.JSONArray items = new org.json.JSONArray();
+            for (JSONObject o : l) items.put(o);
+            JSONObject cmd = new JSONObject().put("p", "/batch").put("nr", true)
+                    .put("q", new JSONObject().put("items", items.toString()))
+                    .put("t", new JSONObject().put(".sv", "timestamp"));
+            for (int attempt = 0; attempt < 2; attempt++) {
+                try {
+                    http("POST", db("/tvs/" + tvId + "/cmd"), cmd.toString());
+                    return;
+                } catch (Exception again) {
+                    Thread.sleep(300);
+                }
+            }
+        } catch (Exception ignored) {
+        }
     }
 
     // ------------------------------------------------------------------ TV: listen for commands
@@ -265,8 +339,11 @@ final class Cloud {
                     if (!(v instanceof JSONObject)) continue;
                     JSONObject o = (JSONObject) v;
                     if ("/".equals(path)) {
-                        for (Iterator<String> it = o.keys(); it.hasNext(); ) {
-                            String id = it.next();
+                        // several waiting at once (e.g. after reconnecting): oldest first — Firebase ids sort by time
+                        List<String> ids = new java.util.ArrayList<>();
+                        for (Iterator<String> it = o.keys(); it.hasNext(); ) ids.add(it.next());
+                        java.util.Collections.sort(ids);
+                        for (String id : ids) {
                             Object cmd = o.opt(id);
                             if (cmd instanceof JSONObject) run(app, id, (JSONObject) cmd);
                         }
@@ -280,11 +357,42 @@ final class Cloud {
         }
     }
 
+    /** Bundles from the fast lane run one after another, each command in order. */
+    private static final java.util.concurrent.ExecutorService bundleLine = java.util.concurrent.Executors.newSingleThreadExecutor();
+
     /** Runs one command on this TV (through its own web server) and writes the answer back. */
     private static void run(Context app, final String id, final JSONObject cmd) {
         synchronized (done) {
             if (!done.add(id)) return;
             if (done.size() > 500) done.clear();
+        }
+        if ("/batch".equals(cmd.optString("p"))) {          // fast lane: several commands, in order, no answer needed
+            bundleLine.execute(() -> {
+                try {
+                    long t = cmd.optLong("t", 0);
+                    if (t == 0 || System.currentTimeMillis() - t < 120000) {
+                        org.json.JSONArray items = new org.json.JSONArray(cmd.optJSONObject("q") == null ? "[]"
+                                : cmd.optJSONObject("q").optString("items", "[]"));
+                        for (int i = 0; i < items.length(); i++) {
+                            JSONObject it = items.optJSONObject(i);
+                            if (it == null) continue;
+                            Map<String, String> q = new HashMap<>();
+                            JSONObject qo = it.optJSONObject("q");
+                            if (qo != null) for (Iterator<String> k = qo.keys(); k.hasNext(); ) {
+                                String key = k.next();
+                                q.put(key, qo.optString(key));
+                            }
+                            try {
+                                TvClient.postDirect("127.0.0.1", it.optString("p", "/ping"), q);
+                            } catch (Exception ignored) {
+                            }
+                        }
+                    }
+                    http("DELETE", db("/tvs/" + deviceId() + "/cmd/" + id), null);
+                } catch (Exception ignored) {
+                }
+            });
+            return;
         }
         new Thread(() -> {
             try {
@@ -338,7 +446,8 @@ final class Cloud {
                 while ((l = r.readLine()) != null) sb.append(l);
             }
         }
-        c.disconnect();
+        // no disconnect(): the answer is fully read, so Android keeps the secure connection open for the next
+        // request (no new handshake each time — the biggest delay on mobile data)
         if (code >= 400) {
             String m = sb.toString();
             try {
