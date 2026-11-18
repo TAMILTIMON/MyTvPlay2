@@ -276,6 +276,52 @@ final class Cloud {
         }
     }
 
+    // ------------------------------------------------------------------ 🎙 voice messages
+
+    /** Phone: leaves a voice message for the TV in this account's cloud space, then nudges the TV. */
+    static void sendVoice(final String tvId, String from, String audioB64) throws Exception {
+        JSONObject v = new JSONObject().put("from", from).put("a", audioB64).put("t", new JSONObject().put(".sv", "timestamp"));
+        http("POST", db("/tvs/" + tvId + "/voice"), v.toString());
+        Map<String, String> none = new HashMap<>();
+        if (batchOk(tvId)) {
+            queue(tvId, "/voicecheck", none);
+        } else {
+            new Thread(() -> {
+                try {
+                    send(tvId, "/voicecheck", none);          // a TV that's off picks it up when it's back
+                } catch (Exception ignored) {
+                }
+            }).start();
+        }
+    }
+
+    /** TV: takes the voice messages waiting for it (oldest first) and removes them from the cloud. */
+    static List<Object[]> takeVoice() throws Exception {
+        List<Object[]> out = new java.util.ArrayList<>();
+        String s = http("GET", db("/tvs/" + deviceId() + "/voice"), null);
+        if (s == null || s.trim().equals("null") || !s.trim().startsWith("{")) return out;
+        JSONObject all = new JSONObject(s);
+        List<String> ids = new java.util.ArrayList<>();
+        for (Iterator<String> it = all.keys(); it.hasNext(); ) ids.add(it.next());
+        java.util.Collections.sort(ids);
+        for (String id : ids) {
+            JSONObject m = all.optJSONObject(id);
+            try {
+                http("DELETE", db("/tvs/" + deviceId() + "/voice/" + id), null);
+            } catch (Exception ignored) {
+            }
+            if (m == null) continue;
+            long t = m.optLong("t", 0);
+            if (t > 0 && System.currentTimeMillis() - t > VoiceMsg.MAX_AGE) continue;
+            try {
+                byte[] a = android.util.Base64.decode(m.optString("a"), android.util.Base64.DEFAULT);
+                out.add(new Object[]{m.optString("from"), t, a});
+            } catch (Exception ignored) {
+            }
+        }
+        return out;
+    }
+
     // ------------------------------------------------------------------ TV: listen for commands
 
     private static volatile boolean tvRunning;
@@ -320,6 +366,7 @@ final class Cloud {
     private static final Set<String> done = new HashSet<>();
 
     private static void listen(Context app) throws Exception {
+        VoiceMsg.collectWaiting(app);                             // messages sent while this TV was off / offline
         HttpURLConnection c = (HttpURLConnection) new URL(db("/tvs/" + deviceId() + "/cmd")).openConnection();
         c.setRequestProperty("Accept", "text/event-stream");
         c.setConnectTimeout(15000);

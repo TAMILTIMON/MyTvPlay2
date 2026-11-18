@@ -821,6 +821,9 @@ public class NativeRemoteActivity extends AppCompatActivity {
         board.put("share", tShare);
         board.put("power", UiKit.tile(this, "power", T.t("Power"), T.t("sleep, restart"), 0xFFEF4444, v -> powerMenu()));
         board.put("exit_app", UiKit.tile(this, "power", T.t("Exit ZH Play"), T.t("close all, save battery"), 0xFF991B1B, v -> App.confirmExit(this)));
+        board.put("voice_msg", UiKit.tile(this, "mic", T.t("Voice message"), T.t("to the TV, from anywhere"), 0xFFEF4444,
+                v -> VoiceNote.open(this, ip, tvName, S == null ? "" : S.optString("cloud_id", ""),
+                        S == null || S.optBoolean("voice", true))));
         board.put("home_icons", UiKit.tile(this, "layout-grid", T.t("Home-screen icons"), T.t("ZH Browser, ZH VPN… as widgets"), 0xFFF59E0B,
                 v -> ShortcutsActivity.open(this)));
         board.put("colours", UiKit.tile(this, "palette", T.t("Colours"), T.t("theme & palette"), 0xFFD946EF, v -> Palette.show(this)));

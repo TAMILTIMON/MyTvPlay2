@@ -743,6 +743,22 @@ public class WebServer extends NanoHTTPD {
                     return err == null ? ok() : fail(err);
                 }
 
+                case "/voicemsg": {          // 🎙 a voice message from a phone on the same Wi-Fi
+                    byte[] a;
+                    try {
+                        a = android.util.Base64.decode(val(p, "audio"), android.util.Base64.DEFAULT);
+                    } catch (Exception e) {
+                        return fail("The recording didn't arrive");
+                    }
+                    String err = VoiceMsg.receive(ctx, val(p, "from"), 0, a);
+                    return err == null ? msg("🎙 Playing on the TV") : fail(err);
+                }
+
+                case "/voicecheck":           // 🎙 a phone left a message in the cloud: fetch it
+                    if (VoiceMsg.off()) return fail("Voice messages are switched off on this TV");
+                    if (Cloud.signedIn()) VoiceMsg.collectWaiting(ctx);
+                    return msg("🎙 Playing on the TV");
+
                 case "/settext": {           // the phone's whole text → the TV's box (keeps both exactly the same)
                     String err = Remote.setText(ctx, val(p, "text"));
                     return err == null ? msg("✅") : fail(err);
@@ -1227,6 +1243,7 @@ public class WebServer extends NanoHTTPD {
         if (BgState.kbd) o.put("kbdText", Remote.currentText());   // what's already in that box → the phone shows it to edit
         o.put("settext", true);                     // this TV understands /settext (whole-text sync)
         o.put("batch", true);                       // …and cloud bundles (the fast lane from outside home)
+        o.put("voice", !VoiceMsg.off());            // 🎙 voice messages allowed on this TV
         boolean tvDark = !"light".equals(Store.getStr("theme", "dark"));
         int[] pc = Palette.resolve(tvDark);
         o.put("pal", new JSONObject().put("i", Palette.index()).put("custom", Palette.hasCustom()).put("dark", tvDark)
