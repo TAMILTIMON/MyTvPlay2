@@ -80,7 +80,7 @@ public final class SettingsDialog {
                 T.t("📱  Use as remote for another TV…"),
                 "👨‍👩‍👧  " + T.t("Profiles & kids lock") + ": " + Family.label(),
                 "⏻  " + T.t("Close ZH Play when not used for") + ": " + AutoExit.label(AutoExit.minutes()),
-                "🎙  " + T.t("Voice messages from phones") + ": " + (VoiceMsg.off() ? T.t("Off") : T.t("On")),
+                "🎙  " + T.t("Voice messages & stickers from phones") + ": " + (VoiceMsg.off() ? T.t("Off") : T.t("On")),
                 T.t("ℹ  Phone remote address: http://") + Net.ip() + ":" + RemoteService.PORT};
         new UiDialog(a).setTitle(T.t("⚙  Settings")).setItems(items, new DialogInterface.OnClickListener() {
             @Override
@@ -271,8 +271,8 @@ public final class SettingsDialog {
                         break;
                     case 25:
                         VoiceMsg.setOff(!VoiceMsg.off());
-                        UiKit.makeToast(a, "🎙 " + T.t(VoiceMsg.off() ? "Voice messages are off: phones can't send them to this TV"
-                                : "Voice messages are on: they open and play on this TV by themselves"), android.widget.Toast.LENGTH_LONG).show();
+                        UiKit.makeToast(a, "🎙 " + T.t(VoiceMsg.off() ? "Voice messages & stickers are off: phones can't send them to this TV"
+                                : "Voice messages & stickers are on: they appear on this TV by themselves"), android.widget.Toast.LENGTH_LONG).show();
                         show(a);
                         break;
                     default:

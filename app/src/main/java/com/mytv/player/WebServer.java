@@ -754,6 +754,22 @@ public class WebServer extends NanoHTTPD {
                     return err == null ? msg("🎙 Playing on the TV") : fail(err);
                 }
 
+                case "/sticker": {            // 🌟 a sticker from a phone on the same Wi-Fi
+                    byte[] img;
+                    try {
+                        img = android.util.Base64.decode(val(p, "img"), android.util.Base64.DEFAULT);
+                    } catch (Exception e) {
+                        return fail("The sticker didn't arrive");
+                    }
+                    String err = StickerMsg.receive(ctx, val(p, "from"), 0, img, val(p, "anim"));
+                    return err == null ? msg("🌟 On the TV now") : fail(err);
+                }
+
+                case "/stickercheck":         // 🌟 a phone left a sticker in the cloud: fetch it
+                    if (VoiceMsg.off()) return fail("Stickers are switched off on this TV");
+                    if (Cloud.signedIn()) StickerMsg.collectWaiting(ctx);
+                    return msg("🌟 On the TV now");
+
                 case "/voicecheck":           // 🎙 a phone left a message in the cloud: fetch it
                     if (VoiceMsg.off()) return fail("Voice messages are switched off on this TV");
                     if (Cloud.signedIn()) VoiceMsg.collectWaiting(ctx);

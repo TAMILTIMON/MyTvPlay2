@@ -295,6 +295,50 @@ final class Cloud {
         }
     }
 
+    /** Phone: leaves a sticker for the TV in this account's cloud space, then nudges the TV. */
+    static void sendSticker(final String tvId, String from, String pngB64, String anim) throws Exception {
+        JSONObject v = new JSONObject().put("from", from).put("img", pngB64).put("anim", anim).put("t", new JSONObject().put(".sv", "timestamp"));
+        http("POST", db("/tvs/" + tvId + "/sticker"), v.toString());
+        Map<String, String> none = new HashMap<>();
+        if (batchOk(tvId)) {
+            queue(tvId, "/stickercheck", none);
+        } else {
+            new Thread(() -> {
+                try {
+                    send(tvId, "/stickercheck", none);
+                } catch (Exception ignored) {
+                }
+            }).start();
+        }
+    }
+
+    /** TV: takes the stickers waiting for it (oldest first) and removes them from the cloud. */
+    static List<Object[]> takeStickers() throws Exception {
+        List<Object[]> out = new java.util.ArrayList<>();
+        String s = http("GET", db("/tvs/" + deviceId() + "/sticker"), null);
+        if (s == null || !s.trim().startsWith("{")) return out;
+        JSONObject all = new JSONObject(s);
+        List<String> ids = new java.util.ArrayList<>();
+        for (Iterator<String> it = all.keys(); it.hasNext(); ) ids.add(it.next());
+        java.util.Collections.sort(ids);
+        for (String id : ids) {
+            JSONObject m = all.optJSONObject(id);
+            try {
+                http("DELETE", db("/tvs/" + deviceId() + "/sticker/" + id), null);
+            } catch (Exception ignored) {
+            }
+            if (m == null) continue;
+            long t = m.optLong("t", 0);
+            if (t > 0 && System.currentTimeMillis() - t > VoiceMsg.MAX_AGE) continue;
+            try {
+                out.add(new Object[]{m.optString("from"), t,
+                        android.util.Base64.decode(m.optString("img"), android.util.Base64.DEFAULT), m.optString("anim", "bounce")});
+            } catch (Exception ignored) {
+            }
+        }
+        return out;
+    }
+
     /** TV: takes the voice messages waiting for it (oldest first) and removes them from the cloud. */
     static List<Object[]> takeVoice() throws Exception {
         List<Object[]> out = new java.util.ArrayList<>();
@@ -367,6 +411,7 @@ final class Cloud {
 
     private static void listen(Context app) throws Exception {
         VoiceMsg.collectWaiting(app);                             // messages sent while this TV was off / offline
+        StickerMsg.collectWaiting(app);
         HttpURLConnection c = (HttpURLConnection) new URL(db("/tvs/" + deviceId() + "/cmd")).openConnection();
         c.setRequestProperty("Accept", "text/event-stream");
         c.setConnectTimeout(15000);

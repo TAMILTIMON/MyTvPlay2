@@ -103,6 +103,9 @@ dependencies {
     implementation platform('com.google.firebase:firebase-bom:33.5.1')
     implementation 'com.google.firebase:firebase-messaging'
 
+    // Stickers: cuts the person out of a photo, on the phone, offline (Google ML Kit, bundled model)
+    implementation 'com.google.mlkit:segmentation-selfie:16.0.0-beta6'
+
     // VLC engine: plays almost every format/codec, equalizer, volume boost, subtitles, tracks.
     implementation 'org.videolan.android:libvlc-all:3.6.2'
 

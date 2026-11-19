@@ -346,6 +346,18 @@
             android:exported="false"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
         <activity
+            android:name=".StickerActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize"
+            android:exported="false"
+            android:label="Make a sticker" />
+        <activity
+            android:name=".StickerShowActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <activity
             android:name=".VoiceMsgActivity"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation"
             android:excludeFromRecents="true"
