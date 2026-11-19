@@ -454,38 +454,38 @@ public class BrowserActivity extends AppCompatActivity {
     public void onActionModeStarted(android.view.ActionMode mode) {
         super.onActionModeStarted(mode);
         if (mode.getMenu() == null) return;
-        // Custom items use OnMenuItemClickListener — the bare onActionItemClicked method is never called by the system.
+        // setShowAsAction returns void — assign MenuItem first, then set listener (no chaining).
         if (mode.getMenu().findItem(9876) == null) {
-            mode.getMenu().add(android.view.Menu.NONE, 9876, 0, "🔍 " + T.t("Search in new tab"))
-                    .setShowAsAction(android.view.MenuItem.SHOW_AS_ACTION_IF_ROOM)
-                    .setOnMenuItemClickListener(item -> {
-                        handleSelectedText(mode, "search_tab");
-                        return true;
-                    });
+            android.view.MenuItem mi = mode.getMenu().add(android.view.Menu.NONE, 9876, 0, "🔍 " + T.t("Search in new tab"));
+            mi.setShowAsAction(android.view.MenuItem.SHOW_AS_ACTION_IF_ROOM);
+            mi.setOnMenuItemClickListener(item -> {
+                handleSelectedText(mode, "search_tab");
+                return true;
+            });
         }
         if (mode.getMenu().findItem(9877) == null) {
-            mode.getMenu().add(android.view.Menu.NONE, 9877, 1, "🌐 " + T.t("Web search"))
-                    .setShowAsAction(android.view.MenuItem.SHOW_AS_ACTION_IF_ROOM)
-                    .setOnMenuItemClickListener(item -> {
-                        handleSelectedText(mode, "search");
-                        return true;
-                    });
+            android.view.MenuItem mi = mode.getMenu().add(android.view.Menu.NONE, 9877, 1, "🌐 " + T.t("Web search"));
+            mi.setShowAsAction(android.view.MenuItem.SHOW_AS_ACTION_IF_ROOM);
+            mi.setOnMenuItemClickListener(item -> {
+                handleSelectedText(mode, "search");
+                return true;
+            });
         }
         if (mode.getMenu().findItem(9878) == null) {
-            mode.getMenu().add(android.view.Menu.NONE, 9878, 2, "🔤 " + T.t("Translate"))
-                    .setShowAsAction(android.view.MenuItem.SHOW_AS_ACTION_IF_ROOM)
-                    .setOnMenuItemClickListener(item -> {
-                        handleSelectedText(mode, "translate");
-                        return true;
-                    });
+            android.view.MenuItem mi = mode.getMenu().add(android.view.Menu.NONE, 9878, 2, "🔤 " + T.t("Translate"));
+            mi.setShowAsAction(android.view.MenuItem.SHOW_AS_ACTION_IF_ROOM);
+            mi.setOnMenuItemClickListener(item -> {
+                handleSelectedText(mode, "translate");
+                return true;
+            });
         }
         if (mode.getMenu().findItem(9879) == null) {
-            mode.getMenu().add(android.view.Menu.NONE, 9879, 3, "📤 " + T.t("Share"))
-                    .setShowAsAction(android.view.MenuItem.SHOW_AS_ACTION_IF_ROOM)
-                    .setOnMenuItemClickListener(item -> {
-                        handleSelectedText(mode, "share");
-                        return true;
-                    });
+            android.view.MenuItem mi = mode.getMenu().add(android.view.Menu.NONE, 9879, 3, "📤 " + T.t("Share"));
+            mi.setShowAsAction(android.view.MenuItem.SHOW_AS_ACTION_IF_ROOM);
+            mi.setOnMenuItemClickListener(item -> {
+                handleSelectedText(mode, "share");
+                return true;
+            });
         }
     }
 
