@@ -449,27 +449,93 @@ public class BrowserActivity extends AppCompatActivity {
         }
     }
 
-    /** Adds "Search in new tab" to the text-selection floating toolbar. */
+    /** Text-selection floating toolbar: Search, Translate, Share (plus system Copy / Select all). */
     @Override
     public void onActionModeStarted(android.view.ActionMode mode) {
         super.onActionModeStarted(mode);
-        if (mode.getMenu() != null && mode.getMenu().findItem(9876) == null) {
-            mode.getMenu().add(android.view.Menu.NONE, 9876, android.view.Menu.NONE, "🔍 " + T.t("Search in new tab"))
-                .setShowAsAction(android.view.MenuItem.SHOW_AS_ACTION_IF_ROOM);
+        if (mode.getMenu() == null) return;
+        // Custom items use OnMenuItemClickListener — the bare onActionItemClicked method is never called by the system.
+        if (mode.getMenu().findItem(9876) == null) {
+            mode.getMenu().add(android.view.Menu.NONE, 9876, 0, "🔍 " + T.t("Search in new tab"))
+                    .setShowAsAction(android.view.MenuItem.SHOW_AS_ACTION_IF_ROOM)
+                    .setOnMenuItemClickListener(item -> {
+                        handleSelectedText(mode, "search_tab");
+                        return true;
+                    });
+        }
+        if (mode.getMenu().findItem(9877) == null) {
+            mode.getMenu().add(android.view.Menu.NONE, 9877, 1, "🌐 " + T.t("Web search"))
+                    .setShowAsAction(android.view.MenuItem.SHOW_AS_ACTION_IF_ROOM)
+                    .setOnMenuItemClickListener(item -> {
+                        handleSelectedText(mode, "search");
+                        return true;
+                    });
+        }
+        if (mode.getMenu().findItem(9878) == null) {
+            mode.getMenu().add(android.view.Menu.NONE, 9878, 2, "🔤 " + T.t("Translate"))
+                    .setShowAsAction(android.view.MenuItem.SHOW_AS_ACTION_IF_ROOM)
+                    .setOnMenuItemClickListener(item -> {
+                        handleSelectedText(mode, "translate");
+                        return true;
+                    });
+        }
+        if (mode.getMenu().findItem(9879) == null) {
+            mode.getMenu().add(android.view.Menu.NONE, 9879, 3, "📤 " + T.t("Share"))
+                    .setShowAsAction(android.view.MenuItem.SHOW_AS_ACTION_IF_ROOM)
+                    .setOnMenuItemClickListener(item -> {
+                        handleSelectedText(mode, "share");
+                        return true;
+                    });
         }
     }
 
-    public boolean onActionItemClicked(android.view.ActionMode mode, android.view.MenuItem item) {
-        if (item.getItemId() == 9876) {
-            web.evaluateJavascript("(function(){var s=window.getSelection();return s?s.toString():''})()", val -> {
-                if (val == null || "null".equals(val) || val.length() <= 2) return;
-                String q = (val.length() >= 2 && val.charAt(0) == '"') ? val.substring(1, val.length() - 1) : val;
-                if (!q.isEmpty()) main.post(() -> newTab(BrowserLook.searchUrl() + android.net.Uri.encode(q)));
+    /** Read current selection and run Search / Translate / Share. */
+    private void handleSelectedText(android.view.ActionMode mode, String action) {
+        if (web == null) return;
+        web.evaluateJavascript("(function(){var s=window.getSelection();return s?s.toString():''})()", val -> {
+            if (val == null || "null".equals(val) || val.length() <= 2) return;
+            String q = (val.length() >= 2 && val.charAt(0) == '"') ? val.substring(1, val.length() - 1) : val;
+            q = q.replace("\\n", "\n").replace("\\\"", "\"").trim();
+            if (q.isEmpty()) return;
+            final String text = q;
+            main.post(() -> {
+                try {
+                    if ("search_tab".equals(action)) {
+                        newTab(BrowserLook.searchUrl() + android.net.Uri.encode(text));
+                    } else if ("search".equals(action)) {
+                        go(BrowserLook.searchUrl() + android.net.Uri.encode(text));
+                    } else if ("translate".equals(action)) {
+                        // Prefer a translate app via ACTION_PROCESS_TEXT; fall back to Google Translate in a new tab
+                        boolean opened = false;
+                        try {
+                            Intent i = new Intent(Intent.ACTION_PROCESS_TEXT);
+                            i.setType("text/plain");
+                            i.putExtra(Intent.EXTRA_PROCESS_TEXT, text);
+                            i.putExtra(Intent.EXTRA_PROCESS_TEXT_READONLY, true);
+                            if (i.resolveActivity(getPackageManager()) != null) {
+                                startActivity(Intent.createChooser(i, T.t("Translate")));
+                                opened = true;
+                            }
+                        } catch (Exception ignored) {
+                        }
+                        if (!opened) {
+                            newTab("https://translate.google.com/?sl=auto&tl=en&text="
+                                    + android.net.Uri.encode(text) + "&op=translate");
+                        }
+                    } else if ("share".equals(action)) {
+                        startActivity(Intent.createChooser(
+                                new Intent(Intent.ACTION_SEND).setType("text/plain")
+                                        .putExtra(Intent.EXTRA_TEXT, text),
+                                T.t("Share")));
+                    }
+                } catch (Exception ignored) {
+                }
+                try {
+                    mode.finish();
+                } catch (Exception ignored) {
+                }
             });
-            mode.finish();
-            return true;
-        }
-        return false;
+        });
     }
 
     @Override
@@ -1085,7 +1151,10 @@ public class BrowserActivity extends AppCompatActivity {
                     v.evaluateJavascript(AUDIO_JS, null);
                 }
                 if (cssDark() && url != null && !url.contains("tamilcastplay.local")) v.evaluateJavascript(DARK_JS, null);
-                if (url != null && url.startsWith("http") && !Store.getBool("b_private", false)) BrowserData.visit(v.getTitle(), url);
+                if (url != null && url.startsWith("http") && !Store.getBool("b_private", false)) {
+                    BrowserData.visit(v.getTitle(), url);
+                    addHistory(v.getTitle(), url);
+                }
                 injectMedia(v);
                 saveTabs();
                 String h = hosts.get(v);
@@ -1303,14 +1372,16 @@ public class BrowserActivity extends AppCompatActivity {
                 main.post(() -> UiKit.makeToast(BrowserActivity.this, T.t("Can't download this") + ": " + why, Toast.LENGTH_LONG).show());
             }
         }, "ZHDl");
+        // Long-press: links / images / magnets get a menu; plain text must return false so WebView
+        // can start its native text selection (copy / translate / search toolbar).
+        web.setLongClickable(true);
         web.setOnLongClickListener(v -> {
             WebView.HitTestResult h = web.getHitTestResult();
             String u = h.getExtra();
             int t = h.getType();
-            // WebView sometimes returns UNKNOWN_TYPE for magnet: links (non-http scheme)
-            // Ask JS for the link under the finger as a fallback
+            // Magnet / torrent links often report UNKNOWN_TYPE — probe via JS, but never
+            // consume the event for plain text (that would block selection).
             if (u == null || t == WebView.HitTestResult.UNKNOWN_TYPE) {
-                // JS fallback: ask what's under the finger (magnet: links often return UNKNOWN_TYPE)
                 web.evaluateJavascript(
                     "(function(){var el=document.elementFromPoint(window._zhLpX||0,window._zhLpY||0);"
                     + "for(var e=el;e;e=e.parentElement){"
@@ -1320,18 +1391,22 @@ public class BrowserActivity extends AppCompatActivity {
                     + "return null;})()",
                     val -> {
                         if (val != null && !val.equals("null")) {
-                            String link = val.startsWith("\"") ? val.substring(1, val.length()-1) : val;
+                            String link = val.startsWith("\"") ? val.substring(1, val.length() - 1) : val;
                             if (link.startsWith("magnet:") || Formats.isTorrent(link)) {
                                 main.post(() -> showMagnetMenu(link));
                             }
                         }
                     });
-                // consume the event so WebView's default long-press menu doesn't also appear
-                if (u == null) return true;
+                // Only consume when we already know it's a magnet from HitTestResult
+                if (u != null && u.startsWith("magnet:")) {
+                    showMagnetMenu(u);
+                    return true;
+                }
+                // Plain text / empty hit → let WebView start text selection
+                return false;
             }
-            if (u != null && (t == WebView.HitTestResult.SRC_ANCHOR_TYPE
-                    || t == WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE
-                    || (t == WebView.HitTestResult.UNKNOWN_TYPE && u.startsWith("magnet:")))) {
+            if (t == WebView.HitTestResult.SRC_ANCHOR_TYPE
+                    || t == WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE) {
                 if (u.startsWith("magnet:") || Formats.isTorrent(u)) {
                     showMagnetMenu(u);
                     return true;
@@ -1340,7 +1415,7 @@ public class BrowserActivity extends AppCompatActivity {
                 offer(u, null);
                 return true;
             }
-            if (u != null && t == WebView.HitTestResult.IMAGE_TYPE) {
+            if (t == WebView.HitTestResult.IMAGE_TYPE) {
                 final String img = u;
                 new UiDialog(this).setTitle(T.t("Image"))
                         .setItems(new String[]{"⬇  " + T.t("Download image"), T.t("Open image in a new tab"), T.t("Copy image link")}, (d, w) -> {
@@ -1352,6 +1427,7 @@ public class BrowserActivity extends AppCompatActivity {
                         }).show();
                 return true;
             }
+            // EDIT_TEXT_TYPE, SRC_ANCHOR_TYPE already handled, everything else (incl. text) → selection
             return false;
         });
     }
@@ -1440,11 +1516,15 @@ public class BrowserActivity extends AppCompatActivity {
 
     // ---------------------------------------------------------------- history
     private void addHistory(String title, String url) {
+        if (url == null || !url.startsWith("http") || Store.getBool("b_private", false)) return;
         try {
             org.json.JSONArray a = new org.json.JSONArray(Store.getStr("bhist", "[]"));
             org.json.JSONArray out = new org.json.JSONArray();
-            out.put(new org.json.JSONObject().put("t", title == null ? url : title).put("u", url).put("w", System.currentTimeMillis()));
-            for (int i = 0; i < a.length() && out.length() < 300; i++) {
+            out.put(new org.json.JSONObject()
+                    .put("t", title == null || title.isEmpty() ? url : title)
+                    .put("u", url)
+                    .put("w", System.currentTimeMillis()));
+            for (int i = 0; i < a.length() && out.length() < 500; i++) {
                 if (!a.getJSONObject(i).optString("u").equals(url)) out.put(a.getJSONObject(i));
             }
             Store.putStr("bhist", out.toString());
@@ -1452,30 +1532,204 @@ public class BrowserActivity extends AppCompatActivity {
         }
     }
 
+    /** Returns [title, url, whenMs] newest first. */
     private List<String[]> history(int max) {
         List<String[]> l = new ArrayList<>();
         try {
             org.json.JSONArray a = new org.json.JSONArray(Store.getStr("bhist", "[]"));
             for (int i = 0; i < a.length() && l.size() < max; i++) {
-                l.add(new String[]{a.getJSONObject(i).optString("t"), a.getJSONObject(i).optString("u")});
+                org.json.JSONObject o = a.getJSONObject(i);
+                l.add(new String[]{
+                        o.optString("t"),
+                        o.optString("u"),
+                        String.valueOf(o.optLong("w", 0))
+                });
             }
         } catch (Exception ignored) {
         }
         return l;
     }
 
+    /** Grouped (Today / Yesterday / Last week / …) searchable history sheet. */
     private void showHistory() {
-        final List<String[]> h = history(300);
-        if (h.isEmpty()) {
+        final List<String[]> all = history(500);
+        if (all.isEmpty()) {
             UiKit.makeToast(this, T.t("No history yet"), Toast.LENGTH_SHORT).show();
             return;
         }
-        String[] n = new String[h.size()];
-        for (int i = 0; i < n.length; i++) n[i] = h.get(i)[0] + "\n" + h.get(i)[1];
-        new UiDialog(this).setTitle("🕘 " + T.t("History"))
-                .setItems(n, (d, w) -> web.loadUrl(h.get(w)[1]))
-                .setNeutralButton("🗑 " + T.t("Clear history"), (d, w) -> Store.putStr("bhist", "[]"))
-                .setPositiveButton(T.t("Close"), null).show();
+
+        final android.app.Dialog d = new android.app.Dialog(this);
+        d.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(Ui.dp(this, 14), Ui.dp(this, 10), Ui.dp(this, 14), Ui.dp(this, 12));
+        android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+        bg.setColor(Ui.SOLID);
+        float rr = Ui.dp(this, 24);
+        bg.setCornerRadii(new float[]{rr, rr, rr, rr, 0, 0, 0, 0});
+        box.setBackground(bg);
+
+        View handle = new View(this);
+        handle.setBackground(Ui.card(this, Ui.STROKE, 0, 3));
+        LinearLayout.LayoutParams hl = new LinearLayout.LayoutParams(Ui.dp(this, 40), Ui.dp(this, 5));
+        hl.gravity = Gravity.CENTER_HORIZONTAL;
+        hl.setMargins(0, 0, 0, Ui.dp(this, 10));
+        box.addView(handle, hl);
+
+        LinearLayout top = new LinearLayout(this);
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        TextView title = Ui.text(this, 18, Ui.TEXT, true);
+        title.setText("🕘 " + T.t("History"));
+        top.addView(title, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        Button clearBtn = Ui.button(this, "🗑 " + T.t("Clear"), false);
+        clearBtn.setOnClickListener(v -> {
+            new UiDialog(this).setTitle(T.t("Clear history"))
+                    .setMessage(T.t("Remove all browsing history?"))
+                    .setPositiveButton(T.t("Clear"), (dd, w) -> {
+                        Store.putStr("bhist", "[]");
+                        d.dismiss();
+                        UiKit.makeToast(this, "🧹 ✅", Toast.LENGTH_SHORT).show();
+                    })
+                    .setNegativeButton(T.t("Cancel"), null).show();
+        });
+        top.addView(clearBtn);
+        box.addView(top);
+
+        // Search
+        final EditText search = new EditText(this);
+        search.setSingleLine(true);
+        search.setHint("🔍 " + T.t("Search history"));
+        search.setTextColor(Ui.TEXT);
+        search.setHintTextColor(Ui.DIM);
+        search.setBackground(Ui.card(this, Ui.FIELD, Ui.STROKE, 16));
+        search.setPadding(Ui.dp(this, 14), Ui.dp(this, 12), Ui.dp(this, 14), Ui.dp(this, 12));
+        LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        slp.setMargins(0, Ui.dp(this, 10), 0, Ui.dp(this, 8));
+        box.addView(search, slp);
+
+        final android.widget.ScrollView sv = new android.widget.ScrollView(this);
+        sv.setVerticalScrollBarEnabled(false);
+        final LinearLayout list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        sv.addView(list);
+        int maxH = (int) (getResources().getDisplayMetrics().heightPixels * 0.62f);
+        box.addView(sv, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, maxH));
+
+        final Runnable rebuild = new Runnable() {
+            @Override
+            public void run() {
+                list.removeAllViews();
+                String q = search.getText() == null ? "" : search.getText().toString().trim().toLowerCase(Locale.ROOT);
+
+                // Bucket by relative day
+                long now = System.currentTimeMillis();
+                java.util.Calendar cal = java.util.Calendar.getInstance();
+                cal.set(java.util.Calendar.HOUR_OF_DAY, 0);
+                cal.set(java.util.Calendar.MINUTE, 0);
+                cal.set(java.util.Calendar.SECOND, 0);
+                cal.set(java.util.Calendar.MILLISECOND, 0);
+                long startToday = cal.getTimeInMillis();
+                long startYesterday = startToday - 24L * 60 * 60 * 1000;
+                long startWeek = startToday - 7L * 24 * 60 * 60 * 1000;
+                long startMonth = startToday - 30L * 24 * 60 * 60 * 1000;
+                long startYear = startToday - 365L * 24 * 60 * 60 * 1000;
+
+                // section key -> items
+                LinkedHashMap<String, List<String[]>> groups = new LinkedHashMap<>();
+                String[] keys = {
+                        T.t("Today"),
+                        T.t("Yesterday"),
+                        T.t("Last 7 days"),
+                        T.t("Last 30 days"),
+                        T.t("Last year"),
+                        T.t("Older")
+                };
+                for (String k : keys) groups.put(k, new ArrayList<>());
+
+                int shown = 0;
+                for (String[] e : all) {
+                    String t = e[0] == null ? "" : e[0];
+                    String u = e[1] == null ? "" : e[1];
+                    if (!q.isEmpty()) {
+                        if (!t.toLowerCase(Locale.ROOT).contains(q)
+                                && !u.toLowerCase(Locale.ROOT).contains(q)) continue;
+                    }
+                    long when = 0;
+                    try {
+                        when = Long.parseLong(e[2]);
+                    } catch (Exception ignored) {
+                    }
+                    String section;
+                    if (when >= startToday) section = keys[0];
+                    else if (when >= startYesterday) section = keys[1];
+                    else if (when >= startWeek) section = keys[2];
+                    else if (when >= startMonth) section = keys[3];
+                    else if (when >= startYear) section = keys[4];
+                    else section = keys[5];
+                    groups.get(section).add(e);
+                    shown++;
+                }
+
+                if (shown == 0) {
+                    TextView empty = Ui.text(BrowserActivity.this, 14, Ui.DIM, false);
+                    empty.setText(T.t("No matching history"));
+                    empty.setPadding(Ui.dp(BrowserActivity.this, 8), Ui.dp(BrowserActivity.this, 24), 0, 0);
+                    list.addView(empty);
+                    return;
+                }
+
+                for (Map.Entry<String, List<String[]>> g : groups.entrySet()) {
+                    List<String[]> items = g.getValue();
+                    if (items.isEmpty()) continue;
+                    list.addView(UiRows.header(BrowserActivity.this, g.getKey() + "  ·  " + items.size()));
+                    for (final String[] e : items) {
+                        String host;
+                        try {
+                            host = android.net.Uri.parse(e[1]).getHost();
+                            if (host != null) host = host.replaceFirst("^www\\.", "");
+                        } catch (Exception ex) {
+                            host = e[1];
+                        }
+                        String sub = host == null ? e[1] : host;
+                        long when = 0;
+                        try {
+                            when = Long.parseLong(e[2]);
+                        } catch (Exception ignored) {
+                        }
+                        if (when > 0) {
+                            java.text.SimpleDateFormat tf = new java.text.SimpleDateFormat("HH:mm", Locale.getDefault());
+                            if (when < startToday - 24L * 60 * 60 * 1000) {
+                                tf = new java.text.SimpleDateFormat("d MMM · HH:mm", Locale.getDefault());
+                            }
+                            sub = sub + "  ·  " + tf.format(new java.util.Date(when));
+                        }
+                        list.addView(UiRows.row(BrowserActivity.this, "globe",
+                                e[0] == null || e[0].isEmpty() ? e[1] : e[0],
+                                sub, -1, false, v2 -> {
+                                    d.dismiss();
+                                    go(e[1]);
+                                }));
+                    }
+                }
+            }
+        };
+        rebuild.run();
+        search.addTextChangedListener(new android.text.TextWatcher() {
+            public void beforeTextChanged(CharSequence c, int a, int b, int d) { }
+            public void onTextChanged(CharSequence c, int a, int b, int d) { }
+            public void afterTextChanged(android.text.Editable e) {
+                rebuild.run();
+            }
+        });
+
+        d.setContentView(box);
+        android.view.Window w = d.getWindow();
+        if (w != null) {
+            w.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0));
+            w.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            w.setGravity(Gravity.BOTTOM);
+        }
+        d.show();
     }
 
     private void clearData() {
@@ -1713,10 +1967,26 @@ public class BrowserActivity extends AppCompatActivity {
                 {"bookmark", T.t("Bookmarks"), (Runnable) () -> library(1)},
                 {"star", T.t(cur != null && BrowserData.isBookmarked(cur) ? "Remove bookmark" : "Add bookmark"), (Runnable) () -> {
                     if (cur == null || isStartPage(cur)) return;
-                    boolean on = BrowserData.toggleBookmark(web.getTitle(), cur);
-                    UiKit.makeToast(this, T.t(on ? "Added to bookmarks" : "Bookmark removed"), Toast.LENGTH_SHORT).show();
+                    if (BrowserData.isBookmarked(cur)) {
+                        BrowserData.toggleBookmark(web.getTitle(), cur);
+                        UiKit.makeToast(this, T.t("Bookmark removed"), Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    askShortcutName(cur, web.getTitle(), name -> {
+                        BrowserData.toggleBookmark(name, cur);
+                        // Keep local start-page shortcuts in sync with a short label
+                        List<String[]> bl = bookmarkList();
+                        boolean found = false;
+                        for (String[] b : bl) {
+                            if (cur.equals(b[1])) { b[0] = name; found = true; break; }
+                        }
+                        if (!found) bl.add(0, new String[]{name, cur});
+                        saveBookmarks(bl);
+                        UiKit.makeToast(this, T.t("Added to bookmarks"), Toast.LENGTH_SHORT).show();
+                        if (isStartPage(web.getUrl())) home();
+                    });
                 }},
-                {"clock", T.t("History"), (Runnable) () -> library(0)},
+                {"clock", T.t("History"), (Runnable) () -> showHistory()},
                 {"audio-lines", T.t("Background play") + ": " + T.t(Store.getBool("b_bgplay", true) ? "On" : "Off"), (Runnable) () -> {
                     Store.putBool("b_bgplay", !Store.getBool("b_bgplay", true));
                     UiKit.makeToast(this, T.t("Background play") + ": " + T.t(Store.getBool("b_bgplay", true) ? "On" : "Off")
@@ -1775,7 +2045,8 @@ public class BrowserActivity extends AppCompatActivity {
                     if (!enterPipMode()) {
                         UiKit.makeToast(this, T.t("PiP is not supported or no video is playing"), Toast.LENGTH_SHORT).show();
                     }
-                }}
+                }},
+                {"smartphone", T.t("Add to Home screen"), (Runnable) this::addToHomeScreen}
         };
 
         LinearLayout quick = new LinearLayout(this);
@@ -1828,6 +2099,7 @@ public class BrowserActivity extends AppCompatActivity {
                 {16, T.t("Videos on page"), found.isEmpty() ? null : found.size() + " " + T.t("found"), -1, false},
                 {7, T.t(bm ? "Remove bookmark" : "Add bookmark"), null, -1, false},
                 {14, T.t("Share"), null, -1, false},
+                {24, T.t("Add to Home screen"), T.t("Icon with a short name"), -1, false},
                 {21, T.t("Copy link"), null, -1, false},
                 {15, T.t("Open on TV"), tv ? null : Store.getStr("last_tv", ""), -1, false},
                 {13, T.t("Desktop site"), T.t(desk ? "On" : "Off"), desk ? 1 : 0, false},
@@ -2155,10 +2427,13 @@ public class BrowserActivity extends AppCompatActivity {
             int i = 0;
             for (String[] b : bm) {
                 if (i >= 12) break;
-                String host = android.net.Uri.parse(b[1]).getHost();
-                String letter = b[0].isEmpty() ? "?" : b[0].substring(0, 1).toUpperCase(java.util.Locale.ROOT);
+                String label = b[0] == null ? "" : b[0].trim();
+                // Never let a long title stretch the home grid — clamp display name
+                if (label.length() > 16) label = label.substring(0, 14).trim() + "…";
+                if (label.isEmpty()) label = shortShortcutName("", b[1]);
+                String letter = label.isEmpty() ? "?" : label.substring(0, 1).toUpperCase(java.util.Locale.ROOT);
                 h.append("<a class=s href='").append(b[1].replace("'", "%27")).append("'><em style='background:").append(colors[i % colors.length])
-                        .append("'>").append(esc(letter)).append("</em><small>").append(esc(b[0])).append("</small></a>");
+                        .append("'>").append(esc(letter)).append("</em><small>").append(esc(label)).append("</small></a>");
                 i++;
             }
             h.append("</div>");
@@ -2870,6 +3145,150 @@ public class BrowserActivity extends AppCompatActivity {
         Store.putBool("bm_set", true);
     }
 
+    /**
+     * Short label that fits under a home / start-page icon (≈12–16 characters).
+     * Prefers a clean site name; falls back to a trimmed page title.
+     */
+    private static String shortShortcutName(String title, String url) {
+        String host = null;
+        try {
+            host = Uri.parse(url == null ? "" : url).getHost();
+            if (host != null) {
+                host = host.replaceFirst("(?i)^www\\.", "");
+                // strip common multi-level prefixes: m.youtube.com → youtube.com
+                if (host.startsWith("m.") || host.startsWith("mobile.")) {
+                    host = host.substring(host.indexOf('.') + 1);
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        String t = title == null ? "" : title.trim();
+        // Drop common site suffixes that make titles huge
+        t = t.replaceAll("(?i)\\s*[-–—|]\\s*(YouTube|Wikipedia|Google|Facebook|Instagram|Twitter|X|Reddit|Vimeo|Dailymotion).*$", "");
+        t = t.replaceAll("\\s+", " ").trim();
+        // Prefer a readable host brand when title is empty or is basically the URL
+        if (t.isEmpty() || (url != null && t.equalsIgnoreCase(url)) || t.length() > 40) {
+            if (host != null && !host.isEmpty()) {
+                // youtube.com → YouTube, archive.org → Archive
+                String brand = host;
+                int dot = brand.indexOf('.');
+                if (dot > 0) brand = brand.substring(0, dot);
+                if (brand.length() <= 12) {
+                    return brand.substring(0, 1).toUpperCase(Locale.ROOT) + brand.substring(1);
+                }
+                return brand.substring(0, Math.min(12, brand.length()));
+            }
+        }
+        if (t.length() <= 16) return t;
+        // Keep first words until ~14 chars
+        StringBuilder sb = new StringBuilder();
+        for (String w : t.split(" ")) {
+            if (sb.length() > 0 && sb.length() + 1 + w.length() > 14) break;
+            if (sb.length() > 0) sb.append(' ');
+            sb.append(w);
+            if (sb.length() >= 12) break;
+        }
+        String out = sb.toString().trim();
+        if (out.isEmpty()) out = t.substring(0, Math.min(14, t.length()));
+        if (out.length() > 16) out = out.substring(0, 14).trim() + "…";
+        return out;
+    }
+
+    private interface NamePicked {
+        void on(String name);
+    }
+
+    /** Ask the user for a short shortcut / bookmark name. Skip or empty → compact auto name. */
+    private void askShortcutName(final String url, final String pageTitle, final NamePicked done) {
+        final String suggested = shortShortcutName(pageTitle, url);
+        final EditText e = new EditText(this);
+        e.setSingleLine(true);
+        e.setText(suggested);
+        e.setSelectAllOnFocus(true);
+        e.setHint(T.t("Short name (fits under icon)"));
+        e.setTextColor(Ui.TEXT);
+        e.setHintTextColor(Ui.DIM);
+        e.setPadding(Ui.dp(this, 16), Ui.dp(this, 14), Ui.dp(this, 16), Ui.dp(this, 14));
+        int pad = Ui.dp(this, 8);
+        LinearLayout wrap = new LinearLayout(this);
+        wrap.setOrientation(LinearLayout.VERTICAL);
+        wrap.setPadding(pad, pad, pad, 0);
+        TextView tip = Ui.text(this, 12, Ui.DIM, false);
+        tip.setText(T.t("Keep it short so it fits on the home screen without overlapping other icons."));
+        tip.setPadding(Ui.dp(this, 4), 0, Ui.dp(this, 4), Ui.dp(this, 8));
+        wrap.addView(tip);
+        wrap.addView(e);
+        new UiDialog(this).setTitle("⭐ " + T.t("Shortcut name"))
+                .setView(wrap)
+                .setPositiveButton(T.t("Add"), (d, w) -> {
+                    String name = e.getText() == null ? "" : e.getText().toString().trim();
+                    if (name.isEmpty()) name = suggested;
+                    // Hard cap so launcher / start-page grid never bleeds
+                    if (name.length() > 18) name = name.substring(0, 16).trim() + "…";
+                    done.on(name);
+                })
+                .setNegativeButton(T.t("Cancel"), null)
+                .setNeutralButton(T.t("Use short name"), (d, w) -> done.on(suggested))
+                .show();
+        e.requestFocus();
+    }
+
+    /** Pin this page as an Android home-screen shortcut with a short label. */
+    private void addToHomeScreen() {
+        final String url = web == null ? null : web.getUrl();
+        if (url == null || isStartPage(url) || !url.startsWith("http")) {
+            UiKit.makeToast(this, T.t("Open a webpage first"), Toast.LENGTH_SHORT).show();
+            return;
+        }
+        final String pageTitle = web.getTitle();
+        askShortcutName(url, pageTitle, name -> pinHomeShortcut(name, url));
+    }
+
+    private void pinHomeShortcut(String name, String url) {
+        try {
+            Intent launch = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+            launch.setPackage(getPackageName());
+            launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                android.content.pm.ShortcutManager sm = getSystemService(android.content.pm.ShortcutManager.class);
+                if (sm != null && sm.isRequestPinShortcutSupported()) {
+                    String id = "zh_web_" + Integer.toHexString(url.hashCode());
+                    android.content.pm.ShortcutInfo.Builder b = new android.content.pm.ShortcutInfo.Builder(this, id)
+                            .setShortLabel(name.length() > 10 ? name.substring(0, 10) : name)
+                            .setLongLabel(name)
+                            .setIntent(launch);
+                    // Prefer site favicon if we cached one
+                    Bitmap iconBmp = BrowserData.icon(this, url);
+                    if (iconBmp != null && !iconBmp.isRecycled()) {
+                        b.setIcon(android.graphics.drawable.Icon.createWithBitmap(iconBmp));
+                    } else {
+                        b.setIcon(android.graphics.drawable.Icon.createWithResource(this, getApplicationInfo().icon));
+                    }
+                    sm.requestPinShortcut(b.build(), null);
+                    UiKit.makeToast(this, "✓ " + T.t("Shortcut added") + ": " + name, Toast.LENGTH_SHORT).show();
+                    return;
+                }
+            }
+            // Legacy broadcast (pre-O / launchers that still accept it)
+            Intent add = new Intent("com.android.launcher.action.INSTALL_SHORTCUT");
+            add.putExtra(Intent.EXTRA_SHORTCUT_INTENT, launch);
+            add.putExtra(Intent.EXTRA_SHORTCUT_NAME, name);
+            Bitmap iconBmp = BrowserData.icon(this, url);
+            if (iconBmp != null && !iconBmp.isRecycled()) {
+                add.putExtra(Intent.EXTRA_SHORTCUT_ICON, iconBmp);
+            } else {
+                add.putExtra(Intent.EXTRA_SHORTCUT_ICON_RESOURCE,
+                        Intent.ShortcutIconResource.fromContext(this, getApplicationInfo().icon));
+            }
+            add.putExtra("duplicate", false);
+            sendBroadcast(add);
+            UiKit.makeToast(this, "✓ " + T.t("Shortcut added") + ": " + name, Toast.LENGTH_SHORT).show();
+        } catch (Exception e) {
+            UiKit.makeToast(this, T.t("Can't add shortcut") + ": " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
     private void bookmarks() {
         final List<String[]> l = bookmarkList();
         final String cur = web.getUrl();
@@ -2880,16 +3299,30 @@ public class BrowserActivity extends AppCompatActivity {
         new UiDialog(this).setTitle(T.t("Bookmarks"))
                 .setItems(names.toArray(new String[0]), (d, w) -> {
                     if (canAdd && w == 0) {
-                        l.add(0, new String[]{web.getTitle() == null ? cur : web.getTitle(), cur});
-                        saveBookmarks(l);
-                        UiKit.makeToast(this, T.t("Saved"), Toast.LENGTH_SHORT).show();
+                        askShortcutName(cur, web.getTitle(), name -> {
+                            l.add(0, new String[]{name, cur});
+                            saveBookmarks(l);
+                            try {
+                                BrowserData.toggleBookmark(name, cur);
+                            } catch (Exception ignored) {
+                            }
+                            UiKit.makeToast(this, T.t("Saved") + ": " + name, Toast.LENGTH_SHORT).show();
+                            if (isStartPage(web.getUrl())) home();
+                        });
                         return;
                     }
                     final String[] b = l.get(w - (canAdd ? 1 : 0));
                     new UiDialog(this).setTitle(b[0])
-                            .setItems(new String[]{T.t("Open"), T.t("Remove")}, (d2, w2) -> {
+                            .setItems(new String[]{T.t("Open"), T.t("Rename"), T.t("Remove")}, (d2, w2) -> {
                                 if (w2 == 0) web.loadUrl(b[1]);
-                                else {
+                                else if (w2 == 1) {
+                                    askShortcutName(b[1], b[0], name -> {
+                                        b[0] = name;
+                                        saveBookmarks(l);
+                                        UiKit.makeToast(this, T.t("Saved") + ": " + name, Toast.LENGTH_SHORT).show();
+                                        if (isStartPage(web.getUrl())) home();
+                                    });
+                                } else {
                                     l.remove(b);
                                     saveBookmarks(l);
                                 }
